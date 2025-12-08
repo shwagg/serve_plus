@@ -1,22 +1,39 @@
-# Logs
-logs
-*.log
+# NODE / FRONTEND
+node_modules/
+dist/
+dist-ssr/
+*.local
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# FIREBASE / BACKEND
+functions/node_modules/
+.firebase/
+firebaserc.bak
 
-# Editor directories and files
+# Emulator artifacts
+.emulator.log
+ui-debug.log
+emulator-debug.log*
+firebase-debug.log*
+
+# If you use emulator export/import (OPTIONAL: remove if you want to commit data
+emulator_data/
+
+# ENV FILES (SECRETS)
+.env
+.env.local
+.env.development
+.env.production
+
+
+# SYSTEM / EDITORS
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj

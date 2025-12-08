@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAuBOoirb88gGlSCL5hz3kPqKxnwxLUjYk",
@@ -22,7 +22,7 @@ const functions = getFunctions(app);
 // Connect to emulators (LOCAL ONLY)
 if (import.meta.env.DEV) {
   connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, "localhost", 8080);
+  connectFirestoreEmulator(db, "localhost", 0);
   connectFunctionsEmulator(functions, "localhost", 5001);
 }
 
