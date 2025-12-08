@@ -19,7 +19,7 @@ emulator-debug.log*
 firebase-debug.log*
 
 # If you use emulator export/import (OPTIONAL: remove if you want to commit data
-emulator_data/
+# emulator_data/
 
 # ENV FILES (SECRETS)
 .env
