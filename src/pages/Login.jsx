@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "../firebaseConfig";
+import { auth, db, functions } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -13,11 +15,11 @@ function Login() {
     setError("");
 
     try {
-      // firebase authentication
+      // ✅ 1. Firebase Authentication
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
 
-      // ifefetch yung user record sa firebase
+      // ✅ 2. Fetch user profile from Firestore
       const userRef = doc(db, "users", uid);
       const userSnap = await getDoc(userRef);
 
@@ -33,7 +35,11 @@ function Login() {
         return;
       }
 
-      // rbac redirection
+      // ✅ 3. CALL BACKEND TO CREATE AUDIT LOG
+      const logLogin = httpsCallable(functions, "logLogin");
+      await logLogin();   // <-- THIS is what writes to auditLogs
+
+      // ✅ 4. RBAC REDIRECTION
       if (role === "admin") {
         window.location.href = "/admin/dashboard";
       } else if (role === "faculty") {
@@ -49,6 +55,7 @@ function Login() {
       setError("Invalid email or password.");
     }
   };
+
 
   return (
     <div className="login-container">
