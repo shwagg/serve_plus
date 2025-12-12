@@ -1,7 +1,8 @@
 const admin = require("firebase-admin");
 const functions = require("firebase-functions");
 
-exports.logLogin = functions.https.onCall(async (data, context) => {
+// Define the function correctly
+const logLogin = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -11,13 +12,13 @@ exports.logLogin = functions.https.onCall(async (data, context) => {
 
   const uid = context.auth.uid;
 
-  const userRecord = await admin.firestore().collection("users").doc(uid).get();
+  const userDoc = await admin.firestore().collection("users").doc(uid).get();
 
-  if (!userRecord.exists) {
+  if (!userDoc.exists) {
     throw new functions.https.HttpsError("not-found", "User record missing.");
   }
 
-  const { role, status } = userRecord.data();
+  const { role, status } = userDoc.data();
 
   if (status !== "active") {
     throw new functions.https.HttpsError(
@@ -26,7 +27,7 @@ exports.logLogin = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // Store login audit log
+  // Store audit log
   await admin.firestore().collection("auditLogs").add({
     uid,
     action: "LOGIN",
@@ -36,3 +37,6 @@ exports.logLogin = functions.https.onCall(async (data, context) => {
 
   return { role };
 });
+
+// EXPORT PROPERLY
+module.exports = { logLogin };
