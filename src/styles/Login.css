@@ -32,10 +32,19 @@
 .login-title {
   margin: 0 0 0 0;
   font-size: 28px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: #1f2937;
+  font-weight: 700;
+  /*color: #1f2937;*/
+  color: #1f3c88;
   text-align: center;
+  font-family: 'Open Sans', sans-serif;
+}
+.login-title-to {
+  color: #9fa1a4;
+  font-weight: 600;
+}
+.login-title-plus {
+  color: #93bc3c;
+  font-weight: 700;
 }
 
 /*Inputs*/

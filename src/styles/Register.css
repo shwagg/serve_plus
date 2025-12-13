@@ -1,6 +1,6 @@
 /*Full page*/
 .register-container {
-  min-height: 100vh;
+  width: 100%;
   display: grid;
   place-items: center;
   background: #ffffff;
@@ -9,10 +9,12 @@
 
 /*All contents here*/
 .register-card {
-  width: 100%;
-  max-width: 520px;
+  width: min(92%, 520px); 
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto;
+  padding: 1.5rem;
 }
 
 /*Form*/
@@ -21,17 +23,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 /*Title*/
 .register-title {
   margin: 0 0 0 0;
   font-size: 28px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: #1f2937;
+  font-weight: 700;
+  /*color: #1f2937;*/
+  color: #1f3c88;
   text-align: center;
+  font-family: 'Open Sans', sans-serif;
+}
+.register-title-to {
+  color: #9fa1a4;
+  font-weight: 600;
+}
+.register-title-plus {
+  color: #93bc3c;
+  font-weight: 700;
 }
 
 /*Inputs*/

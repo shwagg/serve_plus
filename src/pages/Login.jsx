@@ -64,7 +64,9 @@ function Login() {
     <div className="login-container">
       <div className="login-card">
         <form className="login-form" onSubmit={handleLogin}>
-          <h2 className="login-title">LOGIN to SERVE+</h2>
+          <h2 className="login-title">
+            LOGIN <span className="login-title-to">to</span> SERVE<span className="login-title-plus">+</span>
+          </h2>
 
           {/*Sign up option*/}
           <p className="login-signup">

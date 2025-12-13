@@ -26,7 +26,9 @@ function Register() {
         <div className="register-container">
             <div className="register-card">
                 <form className="register-form" onSubmit={registerSubmit}>
-                    <h2 className="register-title">SIGN UP to SERVE+</h2>
+                    <h2 className="register-title">
+                        SIGN UP <span className="register-title-to">to</span> SERVE<span className="register-title-plus">+</span>
+                    </h2>
 
                     {/* Link to Login Page if account exists */}
                     <p className="register-loginLink">
