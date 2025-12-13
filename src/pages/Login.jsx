@@ -3,12 +3,14 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db, functions } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { Link, useNavigate } from "react-router-dom";
 
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -39,15 +41,15 @@ function Login() {
       const logLogin = httpsCallable(functions, "logLogin");
       await logLogin();   // <-- THIS is what writes to auditLogs
 
-      // ✅ 4. RBAC REDIRECTION
+      // ✅ 4. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
       if (role === "admin") {
-        window.location.href = "/admin/dashboard";
+        navigate("/admin/dashboard", { replace: true });
       } else if (role === "faculty") {
-        window.location.href = "/faculty/home";
+        navigate("/faculty/home", { replace: true });
       } else if (role === "partner") {
-        window.location.href = "/partner/home";
+        navigate("/partner/home", { replace: true });
       } else {
-        window.location.href = "/student/home";
+        navigate("/student/home", { replace: true });
       }
 
     } catch (err) {
@@ -79,6 +81,13 @@ function Login() {
         <button type="submit">Sign In</button>
 
         {error && <p style={{ color: "red" }}>{error}</p>}
+
+        {/*Sign up option*/}
+        <p style={{ marginTop: "10px" }}>
+          No account yet?{" "}
+          <Link to="/register">Sign up here</Link>
+        </p>
+
       </form>
     </div>
   );
