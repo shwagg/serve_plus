@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import StudentHome from "./pages/student/StudentHome";
+import "./App.css";
 
 function App() {
   return (

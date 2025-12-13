@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import "../styles/Register.css";
 
 function Register() {
     const [name, setName] = useState("");
@@ -23,55 +24,60 @@ function Register() {
 
     return (
         <div className="register-container">
-            <form onSubmit={registerSubmit}>
-                <h2>SIGN UP to SERVE+</h2>
+            <div className="register-card">
+                <form className="register-form" onSubmit={registerSubmit}>
+                    <h2 className="register-title">SIGN UP to SERVE+</h2>
 
-                <input
-                    type="text"
-                    placeholder="Name"
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                />
+                    {/* Link to Login Page if account exists */}
+                    <p className="register-loginLink">
+                        Already have an account?{" "}
+                        <Link to="/">Login here</Link>
+                    </p>
 
-                <input
-                    type="text"
-                    placeholder="Username"
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                />
+                    <input
+                        className="register-input"
+                        type="text"
+                        placeholder="Name"
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
 
-                <input
-                    type="email"
-                    placeholder="Email"
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                />
+                    <input
+                        className="register-input"
+                        type="text"
+                        placeholder="Username"
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                    />
 
-                <input
-                    type="password"
-                    placeholder="Password"
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                />
+                    <input
+                        className="register-input"
+                        type="email"
+                        placeholder="Email"
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                    />
 
-                <input
-                    type="password"
-                    placeholder="Confirm Password"
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                />
-                <button type="submit">Create Account</button>
+                    <input
+                        className="register-input"
+                        type="password"
+                        placeholder="Password"
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                    />
 
-
-                {/* Link to Login Page if account exists */}
-                <p style={{ marginTop: "10px" }}>
-                    Already have an account?{" "}
-                    <Link to="/">Login here</Link>
-                </p>
-            </form>
+                    <input
+                        className="register-input"
+                        type="password"
+                        placeholder="Confirm Password"
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                    />
+                    <button className="register-btn" type="submit">CREATE ACCOUNT</button>
+                </form>
+            </div>
         </div>
     );
-
 }
 
 export default Register;

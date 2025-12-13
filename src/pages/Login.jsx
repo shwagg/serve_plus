@@ -4,6 +4,7 @@ import { auth, db, functions } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { Link, useNavigate } from "react-router-dom";
+import "../styles/Login.css";
 
 
 function Login() {
@@ -61,34 +62,39 @@ function Login() {
 
   return (
     <div className="login-container">
-      <form onSubmit={handleLogin}>
-        <h2>Login</h2>
+      <div className="login-card">
+        <form className="login-form" onSubmit={handleLogin}>
+          <h2 className="login-title">LOGIN to SERVE+</h2>
 
-        <input
-          type="email"
-          placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+          {/*Sign up option*/}
+          <p className="login-signup">
+            New to SERVE+?{" "}
+            <Link to="/register">Sign up here</Link>
+          </p>
 
-        <input
-          type="password"
-          placeholder="Password"
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+          <input
+            className="login-input"
+            type="email"
+            placeholder="Email"
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        <button type="submit">Sign In</button>
+          <input
+            className="login-input"
+            type="password"
+            placeholder="Password"
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
-        {error && <p style={{ color: "red" }}>{error}</p>}
+          <button className="login-btn" type="submit">SIGN IN</button>
 
-        {/*Sign up option*/}
-        <p style={{ marginTop: "10px" }}>
-          No account yet?{" "}
-          <Link to="/register">Sign up here</Link>
-        </p>
+          {error && <p className="login-error" style={{ color: "red" }}>{error}</p>}
 
-      </form>
+          <p className="login-smallText" >Forgot Password?</p>
+        </form>
+      </div>
     </div>
   );
 }
