@@ -21,6 +21,7 @@ function Login() {
       // ✅ 1. Firebase Authentication
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
+      console.log("Login successful, uid:", uid);
 
       // ✅ 2. Fetch user profile from Firestore
       const userRef = doc(db, "users", uid);
@@ -39,8 +40,15 @@ function Login() {
       }
 
       // ✅ 3. CALL BACKEND TO CREATE AUDIT LOG
-      const logLogin = httpsCallable(functions, "logLogin");
-      await logLogin();   // <-- THIS is what writes to auditLogs
+      try {
+        console.log("Calling logLogin with uid:", uid);
+        const logLogin = httpsCallable(functions, "logLogin");
+        const result = await logLogin({ uid });   // <-- THIS is what writes to auditLogs
+        console.log("Audit log result:", result);
+      } catch (auditErr) {
+        console.warn("Audit log failed:", auditErr);
+        // Don't block login if audit log fails
+      }
 
       // ✅ 4. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
       if (role === "admin") {

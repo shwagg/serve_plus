@@ -3,14 +3,15 @@ const functions = require("firebase-functions");
 
 // Define the function correctly
 const logLogin = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
+  // Get uid from the data parameter (passed by client)
+  const uid = data?.uid;
+
+  if (!uid) {
     throw new functions.https.HttpsError(
-      "unauthenticated",
-      "User must be logged in."
+      "invalid-argument",
+      "User ID is required."
     );
   }
-
-  const uid = context.auth.uid;
 
   const userDoc = await admin.firestore().collection("users").doc(uid).get();
 
