@@ -33,7 +33,15 @@ export function SessionProvider({ children }) {
     try {
       await signOut(auth);
       setIsSessionActive(false);
-      window.location.href = "/"; // Redirect to login
+      // Mark that logout was automatic so the login page can show a popup
+      try {
+        sessionStorage.setItem("autoLoggedOut", "1");
+      } catch (e) {
+        /* ignore storage errors */
+      }
+      // Push a history entry so Back presses stay on the same page, and redirect to login
+      window.history.pushState(null, null, window.location.href);
+      window.location.href = "/";
     } catch (error) {
       console.error("Error during logout:", error);
     } finally {
@@ -66,12 +74,40 @@ export function SessionProvider({ children }) {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
+        // On successful login clear auto-logout marker and any popstate handler
+        try {
+          sessionStorage.removeItem("autoLoggedOut");
+        } catch (e) {
+          /* ignore */
+        }
+        try {
+          window.onpopstate = null;
+        } catch (e) {
+          /* ignore */
+        }
         setIsSessionActive(true);
         resetInactivityTimer();
       } else {
         setIsSessionActive(false);
         if (inactivityTimerRef.current) {
           clearTimeout(inactivityTimerRef.current);
+        }
+
+        // If we were auto-logged-out, install a popstate handler on the login page
+        try {
+          const flagged = sessionStorage.getItem("autoLoggedOut");
+          if (flagged) {
+            // ensure there's a history entry to stay on
+            window.history.pushState(null, null, window.location.href);
+            window.onpopstate = () => {
+              alert("You were automatically logged out. Please sign in again.");
+              // keep user on login page
+              window.history.pushState(null, null, "/");
+              window.location.href = "/";
+            };
+          }
+        } catch (e) {
+          /* ignore storage or window errors */
         }
       }
     });
