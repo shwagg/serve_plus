@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth, db } from "../firebaseConfig";
+import { doc, setDoc } from "firebase/firestore";
 import "../styles/Register.css";
 
 function Register() {
@@ -8,18 +11,46 @@ function Register() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
-
-
-    const registerSubmit = (e) => {
+    const registerSubmit = async (e) => {
         e.preventDefault();
+        setError("");
+        setLoading(true);
 
         if (password !== confirmPassword) {
-            alert("Passwords do not match");
+            setError("Passwords do not match");
+            setLoading(false);
             return;
         }
 
-        console.log(name, username, email, password);
+        try {
+            // 1. Create user in Firebase Auth
+            const userCred = await createUserWithEmailAndPassword(auth, email, password);
+            const uid = userCred.user.uid;
+
+            // 2. Create user profile in Firestore
+            await setDoc(doc(db, "users", uid), {
+                uid,
+                name,
+                username,
+                email,
+                role: "student", // Default role for new registrations
+                status: "active",
+                createdAt: new Date(),
+            });
+
+            // 3. Redirect to login
+            alert("Account created successfully! Please log in.");
+            navigate("/", { replace: true });
+        } catch (err) {
+            console.error(err);
+            setError(err.message || "Registration failed. Please try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -75,7 +106,10 @@ function Register() {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                     />
-                    <button className="register-btn" type="submit">CREATE ACCOUNT</button>
+                    <button className="register-btn" type="submit" disabled={loading}>
+                        {loading ? "Creating Account..." : "CREATE ACCOUNT"}
+                    </button>
+                    {error && <p className="register-error" style={{ color: "red" }}>{error}</p>}
                 </form>
             </div>
         </div>
