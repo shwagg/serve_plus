@@ -6,6 +6,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import StudentHome from "./pages/student/StudentHome";
+import FacultyHome from "./pages/faculty/FacultyHome";
+import PartnerHome from "./pages/partner/PartnerHome";
 import "./App.css";
 
 function App() {
@@ -28,6 +30,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <StudentHome />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/home"
+            element={
+              <ProtectedRoute>
+                <FacultyHome/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/partner/home"
+            element={
+              <ProtectedRoute>
+                <PartnerHome/>
               </ProtectedRoute>
             }
           />

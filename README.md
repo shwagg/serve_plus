@@ -13,4 +13,6 @@ backend/functions = Cloud Functions backend logic
 
 Import yung local firebase emulators (copy) ->  firebase emulators:start --import=./emulator_data
 
-Export yung changes mo 
+Export yung changes -> firebase emulators:export ./emulator_data
+
+if hindi gumana export, use -> firebase emulators:export ./emulator_data --force
