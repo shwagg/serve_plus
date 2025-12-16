@@ -4,7 +4,7 @@ import { signOut } from "firebase/auth";
 
 const SessionContext = createContext();
 
-const SESSION_TIMEOUT = 10 * 1000; // currently 10 seconds, to make it 10 minutes = 10 * 60 * 1000
+const SESSION_TIMEOUT = 10 * 60 * 1000; // currently 10 seconds, to make it 10 minutes = 10 * 60 * 1000
 
 export function SessionProvider({ children }) {
   const [isSessionActive, setIsSessionActive] = useState(false);

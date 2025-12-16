@@ -7,7 +7,7 @@ export function useSessionTimeout() {
 
   useEffect(() => {
     // Show warning 10 seconds before timeout (optional)
-    const warningTime = 50 * 1000; // 50 seconds for 1 minute timeout
+    const warningTime = 9 * 60 * 1000; // 50 seconds for 1 minute timeout
 
     const showWarning = setTimeout(() => {
       // You can dispatch a notification here if you have a notification system
