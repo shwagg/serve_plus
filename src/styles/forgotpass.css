@@ -1,0 +1,42 @@
+.forgot-smallText{
+    margin: -2px 0 36px 0;
+    font-size: 14px;
+    font-weight: 400;
+    text-align: center;
+    color: #475569;
+}
+
+.forgot-description{
+    margin: -15px 0 2px 0;
+    font-size: 14px;
+    text-align: center;
+    color: #475569;
+}
+
+.forgot-message{
+  margin: 26px 0 3px 0;
+  color: #4caf50;
+  font-size: 28px;
+  text-align: center;
+  white-space: pre-line; /*to respect line breaks*/
+}
+
+
+.forgot-resend {
+  cursor: pointer;
+  color: #30bdb7;
+  font-weight: 600;
+  margin-top: 10px;
+  text-align: center;
+  text-decoration: none; /* default */
+}
+
+.forgot-resend:hover {
+  text-decoration: underline;
+}
+
+/* Disabled (cooldown) state */
+.forgot-resend[tabindex="-1"] {
+  cursor: not-allowed;
+  color: #94a3b8;
+}

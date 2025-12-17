@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, setDoc } from "firebase/firestore";
-import "../styles/Register.css";
 
 function Register() {
     const [name, setName] = useState("");
@@ -54,21 +53,21 @@ function Register() {
     };
 
     return (
-        <div className="register-container">
-            <div className="register-card">
-                <form className="register-form" onSubmit={registerSubmit}>
-                    <h2 className="register-title">
-                        SIGN UP <span className="register-title-to">to</span> SERVE<span className="register-title-plus">+</span>
+        <div className="ui-container">
+            <div className="ui-card">
+                <form className="ui-form" onSubmit={registerSubmit}>
+                    <h2 className="ui-title">
+                        SIGN UP <span className="ui-title-to">to</span> SERVE<span className="ui-title-plus">+</span>
                     </h2>
 
                     {/* Link to Login Page if account exists */}
-                    <p className="register-loginLink">
+                    <p className="ui-link">
                         Already have an account?{" "}
                         <Link to="/">Login here</Link>
                     </p>
 
                     <input
-                        className="register-input"
+                        className="ui-input"
                         type="text"
                         placeholder="Name"
                         onChange={(e) => setName(e.target.value)}
@@ -76,7 +75,7 @@ function Register() {
                     />
 
                     <input
-                        className="register-input"
+                        className="ui-input"
                         type="text"
                         placeholder="Username"
                         onChange={(e) => setUsername(e.target.value)}
@@ -84,7 +83,7 @@ function Register() {
                     />
 
                     <input
-                        className="register-input"
+                        className="ui-input"
                         type="email"
                         placeholder="Email"
                         onChange={(e) => setEmail(e.target.value)}
@@ -92,7 +91,7 @@ function Register() {
                     />
 
                     <input
-                        className="register-input"
+                        className="ui-input"
                         type="password"
                         placeholder="Password"
                         onChange={(e) => setPassword(e.target.value)}
@@ -100,16 +99,16 @@ function Register() {
                     />
 
                     <input
-                        className="register-input"
+                        className="ui-input"
                         type="password"
                         placeholder="Confirm Password"
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                     />
-                    <button className="register-btn" type="submit" disabled={loading}>
+                    <button className="ui-btn" type="submit" disabled={loading}>
                         {loading ? "Creating Account..." : "CREATE ACCOUNT"}
                     </button>
-                    {error && <p className="register-error" style={{ color: "red" }}>{error}</p>}
+                    {error && <p className="ui-error">{error}</p>}
                 </form>
             </div>
         </div>

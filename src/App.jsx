@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./router/ProtectedRoute";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPass from "./pages/ForgotPass";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import StudentHome from "./pages/student/StudentHome";
 import FacultyHome from "./pages/faculty/FacultyHome";
@@ -16,6 +17,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Login />} />
+          <Route path="/reset-password" element={<ForgotPass />} />
           <Route path="/register" element={<Register />} />
           <Route
             path="/admin/dashboard"
@@ -37,7 +39,7 @@ function App() {
             path="/faculty/home"
             element={
               <ProtectedRoute>
-                <FacultyHome/>
+                <FacultyHome />
               </ProtectedRoute>
             }
           />
@@ -45,7 +47,7 @@ function App() {
             path="/partner/home"
             element={
               <ProtectedRoute>
-                <PartnerHome/>
+                <PartnerHome />
               </ProtectedRoute>
             }
           />

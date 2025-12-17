@@ -4,7 +4,6 @@ import { auth, db, functions } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { Link, useNavigate } from "react-router-dom";
-import "../styles/Login.css";
 
 
 function Login() {
@@ -69,21 +68,21 @@ function Login() {
 
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <form className="login-form" onSubmit={handleLogin}>
-          <h2 className="login-title">
-            LOGIN <span className="login-title-to">to</span> SERVE<span className="login-title-plus">+</span>
+    <div className="ui-container">
+      <div className="ui-card">
+        <form className="ui-form" onSubmit={handleLogin}>
+          <h2 className="ui-title">
+            LOGIN <span className="ui-title-to">to</span> SERVE<span className="ui-title-plus">+</span>
           </h2>
 
           {/*Sign up option*/}
-          <p className="login-signup">
+          <p className="ui-link">
             New to SERVE+?{" "}
             <Link to="/register">Sign up here</Link>
           </p>
 
           <input
-            className="login-input"
+            className="ui-input"
             type="email"
             placeholder="Email"
             onChange={(e) => setEmail(e.target.value)}
@@ -91,18 +90,18 @@ function Login() {
           />
 
           <input
-            className="login-input"
+            className="ui-input"
             type="password"
             placeholder="Password"
             onChange={(e) => setPassword(e.target.value)}
             required
           />
 
-          <button className="login-btn" type="submit">SIGN IN</button>
+          <button className="ui-btn" type="submit">SIGN IN</button>
 
-          {error && <p className="login-error" style={{ color: "red" }}>{error}</p>}
+          {error && <p className="ui-error">{error}</p>}
 
-          <p className="login-smallText" >Forgot Password?</p>
+          <p className="ui-smallText" ><Link to="/reset-password">Forgot Password?</Link></p>
         </form>
       </div>
     </div>

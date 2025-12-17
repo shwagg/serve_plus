@@ -1,5 +1,8 @@
-/*Full-page centered layout*/
-.login-container {
+/*This is for shared ui design*/
+/*Used for login, registration, forgotPassword ui design so far*/
+
+/*For full page layout*/
+.ui-container {
   width: 100%;
   /*min-height: 100vh;*/
   display: grid;
@@ -8,8 +11,8 @@
   padding: 1rem;
 }
 
-/*All-Content container*/
-.login-card {
+/*All-content container*/
+.ui-card {
   /*width: 92%;*/
   width: min(92%, 520px); 
   display: flex;
@@ -19,8 +22,33 @@
   padding: 1.5rem;
 }
 
-/*Form layout*/
-.login-form {
+/*Emoji Icon*/
+.ui-icon{
+  font-size: 56px;
+  margin-bottom: -2px;
+}
+
+/*Title*/
+.ui-title {
+  margin: 0 0 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  /*color: #1f2937;*/
+  color: #1f3c88;
+  text-align: center;
+  font-family: 'Open Sans', sans-serif;
+}
+.ui-title-to { /*"login 'TO' serve"*/
+  color: #9fa1a4;
+  font-weight: 600;
+}
+.ui-title-plus { /*serve '+'*/
+  color: #93bc3c;
+  font-weight: 700;
+}
+
+/*Forms (such as input boxes) layout*/
+.ui-form {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -28,91 +56,83 @@
   gap: 14px;
 }
 
-/*Title*/
-.login-title {
-  margin: 0 0 0 0;
-  font-size: 28px;
-  font-weight: 700;
-  /*color: #1f2937;*/
-  color: #1f3c88;
-  text-align: center;
-  font-family: 'Open Sans', sans-serif;
-}
-.login-title-to {
-  color: #9fa1a4;
-  font-weight: 600;
-}
-.login-title-plus {
-  color: #93bc3c;
-  font-weight: 700;
-}
-
 /*Inputs*/
-.login-input {
+.ui-input {
   width: 100%;
   /*max-width: 100%;*/
   max-width: 420px;  
-  height: 42px;
+  height: 56px;
   padding: 0 14px;
-  border-radius: 8px;
+  border-radius: 32px;
   border: 2px solid #30bdb7;  /* teal outline */
   outline: none;
   font-size: 14px;
 }
-
-.login-input::placeholder {
+.ui-input::placeholder {
   color: #94a3b8;
 }
-
-.login-input:focus {
+.ui-input:focus {
   box-shadow: 0 0 0 3px rgba(48, 189, 183, 0.18);
 }
 
 /*Button*/
-.login-btn {
+.ui-btn {
   width: 220px;
-  height: 46px;
+  height: 56px;
   border: none;
-  border-radius: 10px;
+  border-radius: 32px; /*modern roundness*/
   background: #30bdb7;
   color: #ffffff;
   font-weight: 700;
+  text-transform: uppercase;
   cursor: pointer;
   margin-top: 35px;
 }
-
-.login-btn:hover {
+.ui-btn:hover {
   filter: brightness(0.95);
 }
 
 /*Error text*/
-.login-error {
+.ui-error {
   margin: 0;
   color: #dc2626;
   font-size: 13px;
 }
 
-/*Small Texts*/
-.login-smallText {
-  margin: 15px 0 0 0;
+/*Success text*/
+.ui-success {
+  margin: 0;
+  color: #4caf50;
+  /*color: #93bc3c; /*official serve+ green*/
   font-size: 13px;
+}
+
+/*Small Texts*/
+.ui-smallText {
+  margin: 15px 0 0 0;
+  font-size: 14px;
   font-weight: 600;
   color: #30bdb7;
 }
-
-/*Signup text*/
-.login-signup {
-  margin: -15px 0 35px 0;
-  font-size: 13px;
-  color: #475569;
+.ui-smallText a { /*Links inside small texts*/
+  color: #30bdb7;
+  text-decoration: none;
+}
+.ui-smallText a:hover {
+  text-decoration: underline;
 }
 
-.login-signup a {
+/*Link to other pages (e.g. login>sign up page)*/
+.ui-link {
+  margin: -15px 0 35px 0;
+  font-size: 14px;
+  color: #475569;
+}
+.ui-link a {
   color: #0f766e;
   font-weight: 600;
   text-decoration: none;
 }
-
-.login-signup a:hover {
+.ui-link a:hover {
   text-decoration: underline;
 }
