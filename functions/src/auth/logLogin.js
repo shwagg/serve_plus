@@ -19,7 +19,7 @@ const logLogin = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("not-found", "User record missing.");
   }
 
-  const { role, status } = userDoc.data();
+  const { role, status, email } = userDoc.data();
 
   if (status !== "active") {
     throw new functions.https.HttpsError(
@@ -28,9 +28,10 @@ const logLogin = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // Store audit log
+  // Store audit log with email
   await admin.firestore().collection("auditLogs").add({
     uid,
+    email: email || null,
     action: "LOGIN",
     role,
     timestamp: admin.firestore.FieldValue.serverTimestamp(),

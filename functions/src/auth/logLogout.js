@@ -15,7 +15,7 @@ const logLogout = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("not-found", "User record missing.");
   }
 
-  const { role, status } = userDoc.data();
+  const { role, status, email } = userDoc.data();
   if (status !== "active") {
     throw new functions.https.HttpsError(
       "permission-denied",
@@ -23,10 +23,10 @@ const logLogout = functions.https.onCall(async (data, context) => {
     );
   }
 
-
   functions.logger.info("Writing audit log", { uid, role, status });
   await admin.firestore().collection("auditLogs").add({
     uid,
+    email: email || null,
     action: "LOGOUT",
     role,
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
