@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPass from "./pages/ForgotPass";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AuditLogs from "./pages/admin/AuditLogs";
 import StudentHome from "./pages/student/StudentHome";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
@@ -24,6 +25,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <ProtectedRoute>
+                <AuditLogs />
               </ProtectedRoute>
             }
           />

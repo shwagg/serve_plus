@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react";
-import { auth } from "../firebaseConfig";
+import { auth, functions } from "../firebaseConfig";
 import { signOut } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 
 const SessionContext = createContext();
 
@@ -31,6 +32,17 @@ export function SessionProvider({ children }) {
 
     setIsLoggingOut(true);
     try {
+      // Log logout to backend if user is present
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const logLogout = httpsCallable(functions, "logLogout");
+          await logLogout({ uid: user.uid });
+        } catch (e) {
+          // Don't block logout if audit log fails
+          console.warn("Audit log (logout) failed:", e);
+        }
+      }
       await signOut(auth);
       setIsSessionActive(false);
       // Mark that logout was automatic so the login page can show a popup

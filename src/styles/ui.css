@@ -1,3 +1,41 @@
+/* AuditLogs Table Styles */
+
+.audit-logs-container {
+  margin: 2rem auto;
+  max-width: 700px;
+  background: #e3f0ff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(30, 64, 175, 0.10);
+  padding: 2rem;
+  border: 2px solid #2563eb;
+}
+
+.audit-logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.audit-logs-table th, .audit-logs-table td {
+  border: 1px solid #2563eb33;
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+.audit-logs-table th {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.audit-logs-table tr:nth-child(even) {
+  background: #dbeafe;
+}
+
+.audit-logs-table tr:nth-child(odd) {
+  background: #e0edff;
+}
 /*This is for shared ui design*/
 /*Used for login, registration, forgotPassword ui design so far*/
 
