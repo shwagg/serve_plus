@@ -16,13 +16,29 @@ function Login() {
     e.preventDefault();
     setError("");
 
+    // check if account is locked before login attempt
+    if (email) {
+      try {
+        const checkAttempts = httpsCallable(functions, "checkLoginAttempts");
+        const checkResult = await checkAttempts({ email });
+        
+        if (!checkResult.data.allowed) {
+          const lockTime = new Date(checkResult.data.lockUntil).toLocaleTimeString();
+          setError(`Account is locked until ${lockTime} due to too many failed login attempts.`);
+          return;
+        }
+      } catch (checkErr) {
+        console.warn("Could not check login attempts:", checkErr);
+      }
+    }
+
     try {
-      // ✅ 1. Firebase Authentication
+      //  Firebase Authentication
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
       console.log("Login successful, uid:", uid);
 
-      // ✅ 2. Fetch user profile from Firestore
+      // Fetch user profile from Firestore
       const userRef = doc(db, "users", uid);
       const userSnap = await getDoc(userRef);
 
@@ -38,7 +54,7 @@ function Login() {
         return;
       }
 
-      // ✅ 3. CALL BACKEND TO CREATE AUDIT LOG
+      // CALL BACKEND TO CREATE AUDIT LOG
       try {
         console.log("Calling logLogin with uid:", uid);
         const logLogin = httpsCallable(functions, "logLogin");
@@ -49,7 +65,15 @@ function Login() {
         // Don't block login if audit log fails
       }
 
-      // ✅ 4. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
+      // Reset login attempts on successful login
+      try {
+        const resetAttempts = httpsCallable(functions, "resetLoginAttempts");
+        await resetAttempts({ email });
+      } catch (resetErr) {
+        console.warn("Reset login attempts failed:", resetErr);
+      }
+
+      // RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
       if (role === "admin") {
         navigate("/admin/dashboard", { replace: true });
       } else if (role === "faculty") {
@@ -61,8 +85,32 @@ function Login() {
       }
 
     } catch (err) {
-      console.error(err);
-      setError("Invalid email or password.");
+      console.error("Login error:", err);
+      console.log("Email value when recording failure:", email);
+      
+      // Record failed login attempt
+      if (email) {
+        try {
+          const recordFailure = httpsCallable(functions, "recordLoginFailure");
+          console.log("Calling recordLoginFailure with:", { email });
+          const result = await recordFailure({ email });
+          console.log("Failure recorded:", result.data);
+          
+          if (result.data.error) {
+            setError(result.data.error);
+          } else if (result.data.isLocked) {
+            const lockTime = new Date(result.data.lockUntil).toLocaleTimeString();
+            setError(`Too many failed attempts. Account locked until ${lockTime}.`);
+          } else {
+            setError(`Invalid email or password. (${result.data.attempts}/${result.data.maxAttempts} attempts)`);
+          }
+        } catch (recordErr) {
+          console.error("Failed to record login failure:", recordErr);
+          setError(recordErr.message || "Invalid email or password.");
+        }
+      } else {
+        setError("Invalid email or password.");
+      }
     }
   };
 

@@ -1,38 +1,37 @@
 const admin = require("firebase-admin");
-const functions = require("firebase-functions");
+const { FieldValue } = require("firebase-admin/firestore");
 
-const logLogout = functions.https.onCall(async (data, context) => {
-  const uid = data?.uid;
+async function logLogout(request) {
+  const uid = request.data?.uid;
+
   if (!uid) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "User ID is required."
-    );
+    throw new Error("User ID is required");
   }
 
   const userDoc = await admin.firestore().collection("users").doc(uid).get();
+
   if (!userDoc.exists) {
-    throw new functions.https.HttpsError("not-found", "User record missing.");
+    throw new Error("User record missing");
   }
 
   const { role, status, email } = userDoc.data();
+
   if (status !== "active") {
-    throw new functions.https.HttpsError(
-      "permission-denied",
-      "Account is blocked."
-    );
+    throw new Error("Account is blocked");
   }
 
-  functions.logger.info("Writing audit log", { uid, role, status });
+  // Store audit log
   await admin.firestore().collection("auditLogs").add({
     uid,
     email: email || null,
     action: "LOGOUT",
     role,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: FieldValue.serverTimestamp(),
   });
 
+  console.log("Logout logged for:", email);
+
   return { role };
-});
+}
 
 module.exports = { logLogout };
