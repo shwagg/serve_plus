@@ -16,3 +16,8 @@ Import yung local firebase emulators (copy) ->  firebase emulators:start --impor
 Export yung changes -> firebase emulators:export ./emulator_data
 
 if hindi gumana export, use -> firebase emulators:export ./emulator_data --force
+
+
+
+
+isang run ng import and export -> firebase emulators:start --import=./emulator_data --export-on-exit
