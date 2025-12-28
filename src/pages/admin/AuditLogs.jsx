@@ -23,6 +23,7 @@ export default function AuditLogs() {
             id: data.uid || doc.id,
             action: data.action,
             email: data.email || "-", // fallback if not present
+            role: data.role || "-", // fallback if not present
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString("en-US", { month: "short", day: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZoneName: "short" }) : "-",
           };
         });
@@ -53,8 +54,8 @@ export default function AuditLogs() {
       <header
         style={{
           width: "100%",
-          background: "#2563eb",
-          color: "#fff",
+          background: "#f1f5f9",
+          color: "#111",
           padding: "2rem 0 1.5rem 0",
           textAlign: "center",
           fontWeight: 700,
@@ -97,10 +98,11 @@ export default function AuditLogs() {
                 fontSize: "1.08rem",
               }}
             >
-              <thead style={{ background: "#2563eb" }}>
+              <thead style={{ background: "#e5e7eb" }}>
                 <tr>
                   <th style={{ textAlign: "left", padding: "1rem", color: "#fff", fontWeight: 600, letterSpacing: "0.5px" }}>ID</th>
                   <th style={{ textAlign: "left", padding: "1rem", color: "#fff", fontWeight: 600, letterSpacing: "0.5px" }}>Email</th>
+                  <th style={{ textAlign: "left", padding: "1rem", color: "#fff", fontWeight: 600, letterSpacing: "0.5px" }}>Role</th>
                   <th style={{ textAlign: "left", padding: "1rem", color: "#fff", fontWeight: 600, letterSpacing: "0.5px" }}>Date & Time</th>
                   <th style={{ textAlign: "left", padding: "1rem", color: "#fff", fontWeight: 600, letterSpacing: "0.5px" }}>Action</th>
                 </tr>
@@ -108,15 +110,16 @@ export default function AuditLogs() {
               <tbody>
                 {logs.length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "#64748b" }}>
-                      No audit logs found.
+                    <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "#111" }}>
+                      <p>No audit logs found.</p>
                     </td>
                   </tr>
                 ) : (
                   logs.map((log) => (
-                    <tr key={log.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                    <tr key={log.id} style={{ borderBottom: "1px solid #e2e8f0", color: "#111"}}>
                         <td style={{ padding: "1rem" }}>{log.id}</td>
                         <td style={{ padding: "1rem" }}>{log.email}</td>
+                        <td style={{ padding: "1rem" }}>{log.role}</td>
                         <td style={{ padding: "1rem" }}>{log.timestamp}</td>
                         <td style={{ padding: "1rem" }}>{log.action}</td>
                       </tr>
