@@ -8,6 +8,7 @@ import ForgotPass from "./pages/ForgotPass";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AuditLogs from "./pages/admin/AuditLogs";
 import StudentHome from "./pages/student/StudentHome";
+import ProposeProject from "./pages/student/ProposeProject";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
 import "./App.css";
@@ -41,6 +42,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <StudentHome />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/propose-project"
+            element={
+              <ProtectedRoute>
+                <ProposeProject />
               </ProtectedRoute>
             }
           />
