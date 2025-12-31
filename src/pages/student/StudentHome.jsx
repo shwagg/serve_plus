@@ -1,4 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
+import { functions } from "../../firebaseConfig";
+import { httpsCallable } from "firebase/functions";
 
 import React, { useState, useEffect } from "react";
 import "../../styles/ui.css";
@@ -34,17 +36,15 @@ const StudentHome = () => {
   const navigate = useNavigate();
 
   async function handleLogout() {
-    // Remove session (example: localStorage)
+    // Get user before removing session
+    const user = JSON.parse(localStorage.getItem('user'));
+    // Remove session
     localStorage.removeItem('user');
-    // Call backend to log audit (assume /api/logout endpoint exists)
+    // Call Firebase function to log audit
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
       if (user?.uid) {
-        await fetch('/api/logout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid: user.uid }),
-        });
+        const logLogout = httpsCallable(functions, "logLogout");
+        await logLogout({ uid: user.uid });
       }
     } catch (e) {
       // Ignore errors for now
