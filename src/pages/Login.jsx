@@ -73,6 +73,9 @@ function Login() {
         console.warn("Reset login attempts failed:", resetErr);
       }
 
+      // Store user session in localStorage
+      localStorage.setItem('user', JSON.stringify({ uid, email, role, status }));
+
       // RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
       if (role === "admin") {
         navigate("/admin/dashboard", { replace: true });

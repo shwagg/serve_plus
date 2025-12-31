@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../../styles/ui.css";
 
 const leaderboard = [
@@ -12,6 +12,45 @@ const leaderboard = [
 ];
 
 const StudentHome = () => {
+  const [showLogoutPopup, setShowLogoutPopup] = useState(false);
+  useEffect(() => {
+    // Check session on mount
+    const user = localStorage.getItem('user');
+    if (!user) {
+      setShowLogoutPopup(true);
+    }
+    // Listen for browser back navigation
+    window.onpopstate = () => {
+      const user = localStorage.getItem('user');
+      if (!user) {
+        setShowLogoutPopup(true);
+      }
+    };
+    return () => {
+      window.onpopstate = null;
+    };
+  }, []);
+
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    // Remove session (example: localStorage)
+    localStorage.removeItem('user');
+    // Call backend to log audit (assume /api/logout endpoint exists)
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user?.uid) {
+        await fetch('/api/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: user.uid }),
+        });
+      }
+    } catch (e) {
+      // Ignore errors for now
+    }
+    navigate('/login');
+  }
 
   const [menuOverlayOpen, setMenuOverlayOpen] = useState(false);
   const [chatOverlayOpen, setChatOverlayOpen] = useState(false);
@@ -25,6 +64,16 @@ const StudentHome = () => {
 
   return (
     <div className="student-dashboard" style={{ background: '#f6f6f6', minHeight: '100vh', fontFamily: 'sans-serif', position: 'relative' }}>
+      {/* Logout Popup */}
+      {showLogoutPopup && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', padding: '32px 40px', borderRadius: 16, boxShadow: '0 4px 24px #0003', textAlign: 'center' }}>
+            <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 12, color: '#234e7b' }}>You have been logged out</div>
+            <div style={{ fontSize: 16, color: '#555', marginBottom: 18 }}>Your session has ended. Please log in again to continue.</div>
+            <button style={{ background: '#234e7b', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 32px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }} onClick={() => { setShowLogoutPopup(false); navigate('/login', { replace: true }); }}>OK</button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header style={{ display: 'flex', alignItems: 'center', padding: '16px 32px', background: '#fff', borderBottom: '1px solid #e0e0e0' }}>
         <img src="/assets/logo.png" alt="Serve+ Logo" style={{ height: 40, marginRight: 16 }} />
@@ -108,10 +157,12 @@ const StudentHome = () => {
                     <span style={{ fontSize: 16 }}>☆</span>
                     <span style={{ fontWeight: 500 }}>Leaderboard</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 16 }}>⊞</span>
-                    <span style={{ fontWeight: 500 }}>Create Proposal</span>
-                  </div>
+                  <Link to="/student/propose-project" style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
+                      <span style={{ fontSize: 16 }}>⊞</span>
+                      <span style={{ fontWeight: 500 }}>Create Proposal</span>
+                    </div>
+                  </Link>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
                     <span style={{ fontSize: 16 }}>⚙️</span>
                     <span style={{ fontWeight: 500 }}>Settings</span>
@@ -125,7 +176,7 @@ const StudentHome = () => {
                     <span style={{ fontWeight: 500 }}>About Us</span>
                   </div>
                 </nav>
-                <button style={{ background: '#2ec4b6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', fontWeight: 600, fontSize: 15, marginTop: 14, cursor: 'pointer', width: '100%' }}>Log Out</button>
+                <button style={{ background: '#2ec4b6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', fontWeight: 600, fontSize: 15, marginTop: 14, cursor: 'pointer', width: '100%' }} onClick={handleLogout}>Log Out</button>
               </div>
             )}
           </div>
