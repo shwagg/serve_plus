@@ -4,12 +4,13 @@ import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAuBOoirb88gGlSCL5hz3kPqKxnwxLUjYk",
-  authDomain: "serveplus-a806e.firebaseapp.com",
-  projectId: "serveplus-a806e",
-  storageBucket: "serveplus-a806e.firebasestorage.app",
-  messagingSenderId: "48789144750",
-  appId: "1:48789144750:web:29c74c480c2123d495193f"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  //measurementID missing. measurement id pang built-in analytics daw ni firebase.
 };
 
 const app = initializeApp(firebaseConfig);
