@@ -4,28 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "../../context/SessionContext";
 import "../../styles/AdminDashboard.css"
 
-//og design
-/*
-      <h1>Admin Dashboard</h1>
-      <p>Welcome, Admin.</p>
-      <button onClick={handleLogout}>
-        Logout
-      </button>
-      <div style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
-        <Link to="/admin/audit-logs" className="ui-link">View Audit Logs</Link>
-      </div>
-
-const handleLogout = async () => {
-  try {
-    await signOut(auth);
-    navigate("/auth", { replace: true });
-  } catch (err) {
-    console.error("Logout failed:", err);
-  }
-};
-const { logout } = useSession();
-*/
-
 export default function AdminDashboard() {
   const engagement = [
     { label: "Senior Citizen Care Day", value: 95 },
