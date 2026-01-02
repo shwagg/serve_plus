@@ -18,10 +18,12 @@ const app = initializeApp(firebaseConfig);
 // Initialize services
 const auth = getAuth(app);
 const db = getFirestore(app);
-const functions = getFunctions(app);
+const functions = getFunctions(app, "us-central1");
 
 // Connect to emulators (LOCAL ONLY)
+let emulatorsConnected = false;
 if (import.meta.env.DEV) {
+  emulatorsConnected = true;
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);

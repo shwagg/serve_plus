@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { SessionProvider } from "./context/SessionContext";
 import { ProtectedRoute } from "./router/ProtectedRoute";
 
-import Login from "./pages/Login";
+import Auth from "./pages/Auth"; //changed login to authorization page
 import Register from "./pages/Register";
 import ForgotPass from "./pages/ForgotPass";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -18,13 +18,13 @@ function App() {
     <SessionProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="/reset-password" element={<ForgotPass />} />
           <Route path="/register" element={<Register />} />
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminDashboard />
               </ProtectedRoute>
             }
@@ -40,7 +40,7 @@ function App() {
           <Route
             path="/student/home"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["student"]}>
                 <StudentHome />
               </ProtectedRoute>
             }
@@ -56,7 +56,7 @@ function App() {
           <Route
             path="/faculty/home"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["faculty"]}>
                 <FacultyHome />
               </ProtectedRoute>
             }
@@ -64,12 +64,12 @@ function App() {
           <Route
             path="/partner/home"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["partner"]}>
                 <PartnerHome />
               </ProtectedRoute>
             }
           />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>
     </SessionProvider>

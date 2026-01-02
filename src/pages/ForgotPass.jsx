@@ -86,7 +86,7 @@ function ForgotPassword() {
                             </button>
 
                             <p className="ui-smallText">
-                                <Link to="/">Back to Login</Link>
+                                <Link to="/auth">Back to Login</Link>
                             </p>
                         </>
                     )}
@@ -106,7 +106,7 @@ function ForgotPassword() {
                             <button
                                 className="ui-btn"
                                 type="button"
-                                onClick={() => navigate("/", { replace: true })}
+                                onClick={() => navigate("/auth", { replace: true })}
                             >
                                 Back to Login
                             </button>

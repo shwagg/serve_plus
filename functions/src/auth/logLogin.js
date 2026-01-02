@@ -2,7 +2,8 @@ const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
 async function logLogin(request) {
-  const uid = request.data?.uid;
+  //const uid = request.data?.uid ?? data?.data?.uid;
+  const uid = context?.auth?.uid || data?.uid || data?.data?.uid;
 
   if (!uid) {
     throw new Error("User ID is required");

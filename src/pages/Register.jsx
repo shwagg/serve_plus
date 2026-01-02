@@ -63,7 +63,7 @@ function Register() {
                     {/* Link to Login Page if account exists */}
                     <p className="ui-link">
                         Already have an account?{" "}
-                        <Link to="/">Login here</Link>
+                        <Link to="/auth">Login here</Link>
                     </p>
 
                     <input

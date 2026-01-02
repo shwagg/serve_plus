@@ -8,6 +8,7 @@ admin.initializeApp();
 
 // Import functions
 const { logLogin } = require("./src/auth/logLogin");
+<<<<<<< HEAD
 const { logLogout } = require("./src/auth/logLogout");
 const { recordLoginFailure } = require("./src/auth/recordLoginFailure");
 const { resetLoginAttempts } = require("./src/auth/resetLoginAttempts");
@@ -23,3 +24,11 @@ exports.resetLoginAttempts = functions.https.onCall(resetLoginAttempts);
 exports.checkLoginAttempts = functions.https.onCall(checkLoginAttempts);
 
 
+=======
+const { sendMfaCode, verifyMfaCode } = require("./src/auth/mfa");
+
+// Export to Firebase
+exports.logLogin = logLogin;
+exports.sendMfaCode = sendMfaCode;
+exports.verifyMfaCode = verifyMfaCode;
+>>>>>>> e7fe4de (deleted and replaced login.jsx,added MFA for admin)
