@@ -5,7 +5,10 @@ import { ProtectedRoute } from "./router/ProtectedRoute";
 import Auth from "./pages/Auth"; //changed login to authorization page
 import Register from "./pages/Register";
 import ForgotPass from "./pages/ForgotPass";
+import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import ProjectList from "./pages/admin/ProjectList";
+import CreateProject from "./pages/admin/CreateProject";
 import AuditLogs from "./pages/admin/AuditLogs";
 import StudentHome from "./pages/student/StudentHome";
 import ProposeProject from "./pages/student/ProposeProject";
@@ -22,13 +25,18 @@ function App() {
           <Route path="/reset-password" element={<ForgotPass />} />
           <Route path="/register" element={<Register />} />
           <Route
-            path="/admin/dashboard"
+            path="/admin"
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminDashboard />
+                <AdminLayout />
               </ProtectedRoute>
             }
-          />
+          >
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="projects" element={<ProjectList />} />
+            <Route path="projects/new" element={<CreateProject />} />
+          </Route>
+
           <Route
             path="/admin/audit-logs"
             element={
