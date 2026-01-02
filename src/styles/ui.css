@@ -42,7 +42,7 @@
 /*For full page layout*/
 .ui-container {
   width: 100%;
-  /*min-height: 100vh;*/
+  min-height: 100vh;
   display: grid;
   place-items: center;
   background: #ffffff;
@@ -95,6 +95,9 @@
 }
 
 /*Inputs*/
+input {
+  color-scheme: light;
+}
 .ui-input {
   width: 100%;
   /*max-width: 100%;*/
