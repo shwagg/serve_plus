@@ -67,16 +67,19 @@ const StudentHome = () => {
   const [leaderboard, setLeaderboard] = useState(defaultLeaderboard);
   const [missionCards, setMissionCards] = useState([
     {
+      id: "laguna-lake-cleanup",
       img: "/assets/mission1.jpg",
       alt: "Laguna Lake",
       title: "Laguna Lake Watershed Reforestation & River Cleanup Drive"
     },
     {
+      id: "bayan-ko-titser-ko",
       img: "/assets/mission2.jpg",
       alt: "Bayan Ko",
       title: '"Bayan Ko, Titser Ko" Literacy & Tutorial Program'
     },
     {
+      id: "hydroponics-hope",
       img: "/assets/mission3.jpg",
       alt: "Hydroponics",
       title: "Hydroponics & Sustainable Livelihood Workshop (HOPE)"
@@ -247,10 +250,14 @@ const StudentHome = () => {
               <h2 style={{ color: '#fff', fontWeight: 700 }}>Find Your Next Mission</h2>
               <a href="#" style={{ color: '#fff', textDecoration: 'underline', fontWeight: 500 }}>View All Events</a>
             </div>
-            <div style={{ display: 'flex', gap: 24 }}>
+            <div style={{ display: 'flex', gap: 24, overflowX: 'auto', width: '100%', paddingBottom: 8 }}>
               {/* Mission Cards */}
               {missionCards.map((mission, idx) => (
-                <div key={mission.alt} style={{ background: '#fff', borderRadius: 16, width: '32%', padding: 0, boxShadow: '0 2px 8px #0001' }}>
+                <div
+                  key={mission.alt}
+                  style={{ background: '#fff', borderRadius: 16, minWidth: 250, maxWidth: 300, flex: '0 0 auto', padding: 0, boxShadow: '0 2px 8px #0001', cursor: 'pointer' }}
+                  onClick={() => window.location.href = `/event/${mission.id}`}
+                >
                   <img src={mission.img} alt={mission.alt} style={{ width: '100%', height: 100, objectFit: 'cover', borderTopLeftRadius: 16, borderTopRightRadius: 16 }} />
                   <div style={{ padding: 16, textAlign: 'center', fontWeight: 600, color: '#2e5d3b' }}>
                     {mission.title}

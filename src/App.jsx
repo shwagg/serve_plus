@@ -14,6 +14,8 @@ import StudentHome from "./pages/student/StudentHome";
 import ProposeProject from "./pages/student/ProposeProject";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
+import EventDetails from "./pages/student/missions/EventDetails";
+import EventActivity from "./pages/student/missions/EventActivity";
 import "./App.css";
 
 function App() {
@@ -76,6 +78,14 @@ function App() {
                 <PartnerHome />
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/event/:id"
+            element={<EventDetails />}
+          />
+          <Route
+            path="/event/:id/activity"
+            element={<EventActivity />}
           />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
