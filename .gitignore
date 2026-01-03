@@ -17,7 +17,7 @@ firebaserc.bak
 ui-debug.log
 emulator-debug.log*
 firebase-debug.log*
-firestore-debug.log 
+firestore-debug.log
 
 # If you use emulator export/import (OPTIONAL: remove if you want to commit data
 # emulator_data/
