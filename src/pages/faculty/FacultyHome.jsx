@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import Header from "../../components/Header.jsx";
 
 export default function FacultyHome() {
   const navigate = useNavigate();
@@ -7,6 +8,8 @@ export default function FacultyHome() {
   };
 
   return (
+    <>
+    <Header />
     <div>
       <h1>Faculty Dashboard</h1>
       <p>Welcome, Faculty.</p>
@@ -16,5 +19,6 @@ export default function FacultyHome() {
         Logout
       </button>
     </div>
+    </>
   );
 }
