@@ -111,7 +111,7 @@ export function SessionProvider({ children }) {
         try {
           const flagged = sessionStorage.getItem("autoLoggedOut");
           if (flagged) {
-            // ensure there's a history entry to stay on
+            // ensure there's a history entry to stay on a
             window.history.pushState(null, null, window.location.href);
             window.onpopstate = () => {
               alert("You were automatically logged out. Please sign in again.");
