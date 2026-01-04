@@ -4,6 +4,10 @@ import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import React, { useState, useEffect } from "react";
+import servePlusLogo from "../../assets/serve_plus_logo.svg";
+import chatIcon from "../../assets/headassets/Chat Icon.svg";
+import notificationIcon from "../../assets/headassets/Notification Icon.svg";
+import menuIcon from "../../assets/headassets/Menu Icon.svg";
 import "../../styles/ui.css";
 
 const defaultLeaderboard = [
@@ -126,7 +130,7 @@ const StudentHome = () => {
   const handleNotificationOverlayToggle = () => setNotificationOverlayOpen((open) => !open);
 
   return (
-    <div className="student-dashboard" style={{ background: '#f6f6f6', minHeight: '100vh', fontFamily: 'sans-serif', position: 'relative' }}>
+    <div className="student-dashboard" style={{ background: '#f6f6f6', minHeight: '100vh', minWidth: '100vw', width: '100vw', fontFamily: 'sans-serif', position: 'relative', overflowX: 'hidden' }}>
       {/* Logout Popup */}
       {showLogoutPopup && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -138,8 +142,8 @@ const StudentHome = () => {
         </div>
       )}
       {/* Header */}
-      <header style={{ display: 'flex', alignItems: 'center', padding: '16px 32px', background: '#fff', borderBottom: '1px solid #e0e0e0' }}>
-        <img src="/assets/logo.png" alt="Serve+ Logo" style={{ height: 40, marginRight: 16 }} />
+      <header style={{ display: 'flex', alignItems: 'center', padding: '16px 32px', background: '#fff', borderBottom: '1px solid #e0e0e0', height: 72, margin: '16px 16px 0 16px', borderRadius: 16 }}>
+        <img src={servePlusLogo} alt="Serve+ Logo" style={{ height: 70, marginRight: 16, maxHeight: '100%' }} />
         <span style={{ fontWeight: 600, fontSize: 22, color: '#2e5d3b' }}>{`Level ${level}`}</span>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -149,9 +153,15 @@ const StudentHome = () => {
           <span style={{ color: '#888', fontWeight: 500 }}>{nextLevelPoints}</span>
           {/* Button Row */}
           <div style={{ display: 'flex', gap: 8, marginLeft: 16, position: 'relative' }}>
-            <button ref={button2Ref} style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#7bb661', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010 }} onClick={handleChatOverlayToggle}>Button 1</button>
-            <button style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#234e7b', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010 }} onClick={handleNotificationOverlayToggle}>Button 2</button>
-            <button ref={button3Ref} style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#ffa726', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010 }} onClick={handleMenuOverlayToggle}>Button 3</button>
+            <button ref={button2Ref} style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#7bb661', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleChatOverlayToggle}>
+              <img src={chatIcon} alt="Chat" style={{ height: 22, width: 22 }} />
+            </button>
+            <button style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#234e7b', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleNotificationOverlayToggle}>
+              <img src={notificationIcon} alt="Notification" style={{ height: 22, width: 22 }} />
+            </button>
+            <button ref={button3Ref} style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#ffa726', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleMenuOverlayToggle}>
+              <img src={menuIcon} alt="Menu" style={{ height: 22, width: 22 }} />
+            </button>
             {/* Chat Overlay (now on Button 1) */}
             {chatOverlayOpen && (
               <div style={{ position: 'absolute', top: 40, right: 120, width: 300, background: '#555', color: '#fff', borderRadius: 16, boxShadow: '0 4px 16px #0003', zIndex: 1000, padding: '20px 16px', marginTop: 8 }}>
@@ -238,14 +248,13 @@ const StudentHome = () => {
               </div>
             )}
           </div>
-          <i className="icon-bell" style={{ fontSize: 22, marginLeft: 16 }}></i>
-          <i className="icon-menu" style={{ fontSize: 22 }}></i>
+          {/* Removed old icon placeholders, now using SVGs in buttons above */}
         </div>
       </header>
 
 
       {/* Main Dashboard */}
-      <div style={{ display: 'flex', gap: 24, padding: '32px' }}>
+      <div style={{ display: 'flex', gap: 24, padding: '32px 0 32px 0', width: '100%', boxSizing: 'border-box', justifyContent: 'center', margin: '0 16px 16px 16px' }}>
         {/* Missions & Leaderboard */}
         <div style={{ flex: 2 }}>
           {/* Find Your Next Mission */}
@@ -299,7 +308,8 @@ const StudentHome = () => {
         </div>
 
         {/* Global Notification */}
-        <aside style={{ flex: 1, background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 2px 8px #0001', minWidth: 320, maxWidth: 360 }}>
+        <aside style={{ flex: 1, background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 2px 8px #0001', minWidth: 320, maxWidth: 360, marginLeft: 8, marginRight: 32
+         }}>
           <h3 style={{ color: '#234e7b', fontWeight: 700, marginBottom: 16 }}>Global Notification</h3>
           <div style={{ color: '#234e7b', fontWeight: 500, lineHeight: '1.7' }}>
             {globalNotifications.map((notif, idx) => (
