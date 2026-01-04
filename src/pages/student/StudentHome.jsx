@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
-import { functions } from "../../firebaseConfig";
+import { auth, functions } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import React, { useState, useEffect } from "react";
 import "../../styles/ui.css";
@@ -15,43 +16,7 @@ const defaultLeaderboard = [
 
 const StudentHome = () => {
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
-  useEffect(() => {
-    // Check session on mount
-    const user = localStorage.getItem('user');
-    if (!user) {
-      setShowLogoutPopup(true);
-    }
-    // Listen for browser back navigation
-    window.onpopstate = () => {
-      const user = localStorage.getItem('user');
-      if (!user) {
-        setShowLogoutPopup(true);
-      }
-    };
-    return () => {
-      window.onpopstate = null;
-    };
-  }, []);
-
-  const navigate = useNavigate();
-
-  async function handleLogout() {
-    // Get user before removing session
-    const user = JSON.parse(localStorage.getItem('user'));
-    // Remove session
-    localStorage.removeItem('user');
-    // Call Firebase function to log audit
-    try {
-      if (user?.uid) {
-        const logLogout = httpsCallable(functions, "logLogout");
-        await logLogout({ uid: user.uid });
-      }
-    } catch (e) {
-      // Ignore errors for now
-    }
-    navigate('/login');
-  }
-
+  const [currentUser, setCurrentUser] = useState(null);
   const [menuOverlayOpen, setMenuOverlayOpen] = useState(false);
   const [chatOverlayOpen, setChatOverlayOpen] = useState(false);
   const [notificationOverlayOpen, setNotificationOverlayOpen] = useState(false);
@@ -117,6 +82,45 @@ const StudentHome = () => {
     }
   ]);
 
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // use firebase auth state
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (user) {
+        setShowLogoutPopup(false);
+        const resolvedName = user.displayName || user.email || "Student";
+        setStudentName(resolvedName);
+        setMenuProfileName(resolvedName);
+      } else {
+        setShowLogoutPopup(true);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  async function handleLogout() {
+    const user = auth.currentUser;
+    try {
+      if (user?.uid) {
+        const logLogout = httpsCallable(functions, "logLogout");
+        await logLogout({ uid: user.uid });
+      }
+    } catch (e) {
+      // Ignore audit failures when logging out
+    }
+
+    try {
+      await signOut(auth);
+    } catch (e) {
+      // Ignore sign-out failures for now
+    }
+
+    navigate("/auth");
+  }
+
   const handleMenuOverlayToggle = () => setMenuOverlayOpen((open) => !open);
   const handleChatOverlayToggle = () => setChatOverlayOpen((open) => !open);
   const handleNotificationOverlayToggle = () => setNotificationOverlayOpen((open) => !open);
@@ -129,7 +133,7 @@ const StudentHome = () => {
           <div style={{ background: '#fff', padding: '32px 40px', borderRadius: 16, boxShadow: '0 4px 24px #0003', textAlign: 'center' }}>
             <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 12, color: '#234e7b' }}>You have been logged out</div>
             <div style={{ fontSize: 16, color: '#555', marginBottom: 18 }}>Your session has ended. Please log in again to continue.</div>
-            <button style={{ background: '#234e7b', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 32px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }} onClick={() => { setShowLogoutPopup(false); navigate('/login', { replace: true }); }}>OK</button>
+            <button style={{ background: '#234e7b', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 32px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }} onClick={() => { setShowLogoutPopup(false); navigate('/auth', { replace: true }); }}>OK</button>
           </div>
         </div>
       )}

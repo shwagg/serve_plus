@@ -3,7 +3,7 @@ import { auth, functions } from "../firebaseConfig";
 import { signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 
-const SessionContext = createContext();
+export const SessionContext = createContext();
 
 const SESSION_TIMEOUT = 10 * 60 * 1000; // currently 10 seconds, to make it 10 minutes = 10 * 60 * 1000
 
