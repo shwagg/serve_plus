@@ -10,13 +10,18 @@ export default function EventActivity() {
 
   useEffect(() => {
     async function fetchEvent() {
+      console.log("Fetching event with id:", id);
       try {
-        const eventRef = doc(db, 'Missions', id); // <-- changed 'events' to 'Missions'
+        const eventRef = doc(db, 'Missions', id);
+        console.log("eventRef:", eventRef);
         const eventSnap = await getDoc(eventRef);
+        console.log("eventSnap.exists():", eventSnap.exists());
+        console.log("eventSnap.data():", eventSnap.data());
         if (eventSnap.exists()) {
           setEvent(eventSnap.data());
         }
       } catch (err) {
+        console.error("Error fetching event:", err);
         setEvent(null);
       } finally {
         setLoading(false);
