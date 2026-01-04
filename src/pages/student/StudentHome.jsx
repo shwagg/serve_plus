@@ -55,11 +55,11 @@ const StudentHome = () => {
     }
   ]);
   const [globalNotifications, setGlobalNotifications] = useState([
-    { text: "New Event Added: The Disaster Risk Reduction Training in Los Baños is now open! Sign up and secure your slot today." },
-    { text: "2 New Volunteers Joined the Hydroponics Workshop! You are now 80% full. Get your tasks before they run out" },
-    { text: "Leaderboard Alert! You have surpassed Alyzza Ocoma and are now ranked #2. Keep earning those points!" },
-    { text: "Opportunity Alert: The 'Bayan Ko, Titser Ko' team needs one (1) more volunteer skilled in Literacy Coaching. Are you ready to serve?" },
-    { text: "Certificate Ready: Your official Certificate of Participation for the Laguna Lake Cleanup is now available in your Profile!" }
+    { title: "New Event Added:", bold: "The Disaster Risk Reduction Training in Los Baños is now open!", text: "Sign up and secure your slot today." },
+    { title: "2 New Volunteers Joined the Hydroponics Workshop!", text: "You are now 80% full. Get your tasks before they run out" },
+    { title: "Leaderboard Alert!", bold: "You have surpassed Alyzza Ocoma and are now ranked #2.", text: "Keep earning those points!" },
+    { title: "Opportunity Alert:", bold: "The 'Bayan Ko, Titser Ko' team needs one (1) more volunteer skilled in Literacy Coaching.", text: "Are you ready to serve?" },
+    { title: "Certificate Ready:", bold: "Your official Certificate of Participation for the Laguna Lake Cleanup is now available in your Profile!" }
   ]);
   const [menuProfileName, setMenuProfileName] = useState("Joshua Garcia");
   const [chatList, setChatList] = useState([
@@ -307,13 +307,16 @@ const StudentHome = () => {
           </section>
         </div>
 
-        {/* Global Notification */}
-        <aside style={{ flex: 1, background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 2px 8px #0001', minWidth: 320, maxWidth: 360, marginLeft: 8, marginRight: 32
-         }}>
+        {/* Global Notification (copied from EventDetails.jsx) */}
+        <aside style={{ flex: 1, background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 2px 8px #0001', minWidth: 320, maxWidth: 360, marginLeft: 8, marginRight: 32, border: '2px solid #30bdb7' }}>
           <h3 style={{ color: '#234e7b', fontWeight: 700, marginBottom: 16 }}>Global Notification</h3>
-          <div style={{ color: '#234e7b', fontWeight: 500, lineHeight: '1.7' }}>
+          <div style={{ color: '#234e7b', fontWeight: 500, lineHeight: '1.7', fontSize: 15 }}>
             {globalNotifications.map((notif, idx) => (
-              <div key={idx} style={{ marginTop: idx === 0 ? 0 : 12 }}>{notif.text}</div>
+              <div key={idx} style={{ marginTop: idx === 0 ? 0 : 16 }}>
+                {notif.title && <span style={{ fontWeight: 700 }}>{notif.title} </span>}
+                {notif.bold && <span style={{ fontWeight: 700 }}>{notif.bold} </span>}
+                {notif.text && <span>{notif.text}</span>}
+              </div>
             ))}
           </div>
         </aside>
