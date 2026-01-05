@@ -1,9 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
-import { auth, functions } from "../../firebaseConfig";
+import { auth, functions, db } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import React, { useState, useEffect } from "react";
+import { collection, getDocs } from "firebase/firestore";
 import servePlusLogo from "../../assets/serve_plus_logo.svg";
 import chatIcon from "../../assets/headassets/Chat Icon.svg";
 import notificationIcon from "../../assets/headassets/Notification Icon.svg";
@@ -34,26 +35,20 @@ const StudentHome = () => {
   const [studentName, setStudentName] = useState("Joshua");
   const [studentRank, setStudentRank] = useState(8);
   const [leaderboard, setLeaderboard] = useState(defaultLeaderboard);
-  const [missionCards, setMissionCards] = useState([
-    {
-      id: "laguna-lake-cleanup",
-      img: "/assets/mission1.jpg",
-      alt: "Laguna Lake",
-      title: "Laguna Lake Watershed Reforestation & River Cleanup Drive"
-    },
-    {
-      id: "bayan-ko-titser-ko",
-      img: "/assets/mission2.jpg",
-      alt: "Bayan Ko",
-      title: '"Bayan Ko, Titser Ko" Literacy & Tutorial Program'
-    },
-    {
-      id: "hydroponics-hope",
-      img: "/assets/mission3.jpg",
-      alt: "Hydroponics",
-      title: "Hydroponics & Sustainable Livelihood Workshop (HOPE)"
-    }
-  ]);
+  const [missionCards, setMissionCards] = useState([]);
+    // Fetch missions from Firestore
+    useEffect(() => {
+      const fetchMissions = async () => {
+        try {
+          const querySnapshot = await getDocs(collection(db, "Missions"));
+          const missions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setMissionCards(missions);
+        } catch (error) {
+          console.error("Error fetching missions:", error);
+        }
+      };
+      fetchMissions();
+    }, []);
   const [globalNotifications, setGlobalNotifications] = useState([
     { title: "New Event Added:", bold: "The Disaster Risk Reduction Training in Los Baños is now open!", text: "Sign up and secure your slot today." },
     { title: "2 New Volunteers Joined the Hydroponics Workshop!", text: "You are now 80% full. Get your tasks before they run out" },
@@ -265,18 +260,22 @@ const StudentHome = () => {
             </div>
             <div style={{ display: 'flex', gap: 24, overflowX: 'auto', width: '100%', paddingBottom: 8 }}>
               {/* Mission Cards */}
-              {missionCards.map((mission, idx) => (
-                <div
-                  key={mission.alt}
-                  style={{ background: '#fff', borderRadius: 16, minWidth: 250, maxWidth: 300, flex: '0 0 auto', padding: 0, boxShadow: '0 2px 8px #0001', cursor: 'pointer' }}
-                  onClick={() => window.location.href = `/event/${mission.id}`}
-                >
-                  <img src={mission.img} alt={mission.alt} style={{ width: '100%', height: 100, objectFit: 'cover', borderTopLeftRadius: 16, borderTopRightRadius: 16 }} />
-                  <div style={{ padding: 16, textAlign: 'center', fontWeight: 600, color: '#2e5d3b' }}>
-                    {mission.title}
+              {missionCards.length === 0 ? (
+                <div style={{ color: '#fff', fontWeight: 500 }}>No missions available.</div>
+              ) : (
+                missionCards.map((mission, idx) => (
+                  <div
+                    key={mission.id}
+                    style={{ background: '#fff', borderRadius: 16, minWidth: 250, maxWidth: 300, flex: '0 0 auto', padding: 0, boxShadow: '0 2px 8px #0001', cursor: 'pointer' }}
+                    onClick={() => window.location.href = `/event/${mission.id}`}
+                  >
+                    <img src={mission.img || "/assets/mission1.jpg"} alt={mission.alt || mission.title} style={{ width: '100%', height: 100, objectFit: 'cover', borderTopLeftRadius: 16, borderTopRightRadius: 16 }} />
+                    <div style={{ padding: 16, textAlign: 'center', fontWeight: 600, color: '#2e5d3b' }}>
+                      {mission.title}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </section>
 

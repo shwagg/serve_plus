@@ -38,31 +38,39 @@ export default function EventActivity() {
   }const eventRef = doc(db, 'Missions', id);
 
   return (
-    <div style={{ display: 'flex', gap: 24, padding: 32 }}>
-      {/* Left: Event Summary */}
-      <div style={{ flex: 1, background: '#fff', borderRadius: 20, boxShadow: '0 2px 16px #0002', padding: 24 }}>
-        <img src={event.img || '/assets/mission1.jpg'} alt={event.alt || 'Event'} style={{ width: '100%', height: 180, objectFit: 'cover', borderTopLeftRadius: 20, borderTopRightRadius: 20 }} />
-        <div style={{ padding: 16 }}>
-          <h2 style={{ color: '#7bb661', fontWeight: 700, marginBottom: 12 }}>
-            {event.title}
-          </h2>
-          <p style={{ color: '#234e7b', fontSize: 15, marginBottom: 18 }}>
-            {event.description}
-          </p>
-          <div style={{ background: '#f6f6f6', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-            <div><strong>Location:</strong> {event.location}</div>
-            <div><strong>Date & Time:</strong> {event.date}<br />{event.time}</div>
-            <div><strong>Points:</strong> {event.points} PTS</div>
-            <div><strong>Event Badge:</strong><br /><img src={event.badge || '/assets/badge.png'} alt="Event Badge" style={{ width: 80, marginTop: 8 }} /></div>
-            {event.waiver && <div style={{ marginTop: 8 }}><a href={event.waiver} style={{ color: '#234e7b', textDecoration: 'underline', fontWeight: 500 }}>Waiver Form</a></div>}
+    <div style={{ display: 'flex', gap: 24, padding: 32, justifyContent: 'center', background: '#fff', minHeight: '100vh' }}>
+      {/* Left: Event Summary styled as per screenshot */}
+      <div style={{ flex: '0 0 40%', maxWidth: '40%', minWidth: 340, background: 'transparent', borderRadius: 24, padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* Top image */}
+        <div style={{ width: '100%', height: 180, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', position: 'relative' }}>
+          <img src={event.img || '/assets/mission1.jpg'} alt={event.alt || 'Event'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {/* Optional close button */}
+          {/* <button style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(255,255,255,0.85)', border: 'none', borderRadius: '50%', width: 36, height: 36, fontSize: 22, fontWeight: 700, color: '#234e7b', cursor: 'pointer', zIndex: 2 }}>×</button> */}
+        </div>
+        {/* Green card */}
+        <div style={{ background: '#7bb661', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, padding: '32px 24px 24px 24px', width: '100%', boxSizing: 'border-box', marginTop: -4, minHeight: 420, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+          <h2 style={{ color: '#fff', fontWeight: 700, marginBottom: 12, fontSize: 26, lineHeight: 1.2 }}>{event.title}</h2>
+          <p style={{ color: '#fff', fontSize: 15, marginBottom: 18, fontWeight: 400, lineHeight: 1.5 }}>{event.description}</p>
+          {/* White info box */}
+          <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 18, color: '#222', fontSize: 15, boxShadow: '0 2px 8px #0001' }}>
+            <div style={{ marginBottom: 10 }}><strong>Location:</strong> <span style={{ color: '#234e7b' }}>{event.location}</span></div>
+            <div style={{ marginBottom: 10 }}><strong>Date & Time:</strong>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>{event.date}</li>
+                <li>{event.time}</li>
+              </ul>
+            </div>
+            <div style={{ marginBottom: 10 }}><strong>Points:</strong> <span style={{ color: '#388e3c' }}>{event.points} PTS</span></div>
+            <div style={{ marginBottom: 10 }}><strong>Event Badge:</strong><br /><img src={event.badge || '/assets/badge.png'} alt="Event Badge" style={{ width: 90, marginTop: 8, borderRadius: 8, border: '2px solid #eee' }} /></div>
+            {event.waiver && <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}><a href={event.waiver} style={{ color: '#30bdb7', textDecoration: 'underline', fontWeight: 500, fontSize: 15 }}>Waiver Form</a></div>}
           </div>
-          <button style={{ background: '#bdbdbd', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontWeight: 600, fontSize: 16, cursor: 'not-allowed' }} disabled>
+          <button style={{ background: '#bdbdbd', color: '#fff', border: 'none', borderRadius: 10, padding: '14px 0', fontWeight: 600, fontSize: 18, cursor: 'not-allowed', width: '100%', marginTop: 8, letterSpacing: 1 }} disabled>
             INCOMPLETE
           </button>
         </div>
       </div>
       {/* Right: Activity Section */}
-      <div style={{ flex: 1.2, background: '#7bb661', borderRadius: 20, padding: 24 }}>
+      <div style={{ flex: '0 0 60%', maxWidth: '60%', minWidth: 400, background: '#7bb661', borderRadius: 20, padding: 24 }}>
         <h2 style={{ color: '#fff', fontWeight: 700, marginBottom: 16 }}>Activity</h2>
         {event.activities && event.activities.map((activity, idx) => (
           <div key={idx} style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 24 }}>

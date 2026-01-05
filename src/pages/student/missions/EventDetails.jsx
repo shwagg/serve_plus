@@ -1,26 +1,34 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
-// If you want to make this dynamic, you can fetch from Firestore here as well
 
-const missionCards = [
-  {
-    id: "laguna-lake-cleanup",
-    img: '/assets/mission1.jpg',
-    alt: 'Laguna Lake Cleanup',
-    title: 'Laguna Lake Watershed Reforestation & River Cleanup Drive',
-    description: `This initiative is dedicated to the environmental health of Laguna Lake by mobilizing volunteers for essential river cleanup and waste segregation along its tributaries. Following the cleanup, participants engage in reforestation, planting native seedlings to stabilize riverbanks, prevent erosion, and enhance water quality. This project directly contributes to the long-term ecological resilience of the region, ensuring a healthier future for Laguna's communities and its vital water source.`,
-    details: [
-      'Volunteers conduct a simultaneous cleanup along a designated stretch of the river, segregating collected waste.',
-      'Planting indigenous tree seedlings along the riverbanks to prevent soil erosion and improve water quality.',
-      'Waste segregation, data collection, and seedling planting/maintenance.'
-    ]
-  },
-  // Add more missions here as needed
-];
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { db } from '../../../firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
+
 
 export default function EventDetails() {
   const { id } = useParams();
-  const mission = missionCards.find(m => m.id === id) || missionCards[0];
+  const [mission, setMission] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchMission() {
+      try {
+        const missionRef = doc(db, 'Missions', id);
+        const missionSnap = await getDoc(missionRef);
+        if (missionSnap.exists()) {
+          setMission(missionSnap.data());
+        } else {
+          setMission(null);
+        }
+      } catch (err) {
+        setMission(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMission();
+  }, [id]);
+
 
   // Example notifications (replace with real data as needed)
   const notifications = [
@@ -30,6 +38,13 @@ export default function EventDetails() {
     { title: "Opportunity Alert:", bold: "The 'Bayan Ko, Titser Ko' team needs one (1) more volunteer skilled in Literacy Coaching.", text: "Are you ready to serve?" },
     { title: "Certificate Ready:", bold: "Your official Certificate of Participation for the Laguna Lake Cleanup is now available in your Profile!" }
   ];
+
+  if (loading) {
+    return <div style={{ padding: 32 }}>Loading...</div>;
+  }
+  if (!mission) {
+    return <div style={{ padding: 32 }}>Event not found.</div>;
+  }
 
   return (
     <div style={{ background: '#f6f6f6', minHeight: '100vh', minWidth: '100vw', width: '100vw', fontFamily: 'sans-serif', position: 'relative', overflowX: 'hidden', padding: 0 }}>
@@ -50,14 +65,14 @@ export default function EventDetails() {
               <div style={{ marginBottom: 18 }}>
                 <span style={{ fontWeight: 600 }}>Activity Details:</span>
                 <ul style={{ color: '#234e7b', fontSize: 15, marginTop: 8 }}>
-                  {mission.details.map((item, idx) => (
+                  {(mission.details || (mission.activities && mission.activities[0]?.details) || []).map((item, idx) => (
                     <li key={idx}>{item}</li>
                   ))}
                 </ul>
               </div>
               <button
                 style={{ background: '#7bb661', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontWeight: 600, fontSize: 16, cursor: 'pointer', marginTop: 8 }}
-                onClick={() => window.location.href = `/event/${mission.id}/activity`}
+                onClick={() => window.location.href = `/event/${id}/activity`}
               >
                 JOIN EVENT
               </button>
