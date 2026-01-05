@@ -29,4 +29,4 @@ kung pagkaexport niyo parang nareplace yung folder from "emulator_data" to whate
 
 close niyo lang lahat from database to vite(react) tas run this command 
 
-Rename-Item <current name>  emulator_data
+Rename-Item <currentname>  emulator_data
