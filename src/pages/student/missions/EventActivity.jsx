@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { db } from '../../../firebaseConfig';
@@ -6,23 +7,184 @@ import Header from '../../../components/Header';
 
 export default function EventActivity() {
   const { id } = useParams();
+
+  // If the id is 'placeholder', show a blank activity creation form
+  if (id === 'placeholder') {
+    // Example skills for Core Service & Soft Skills
+    const coreSkills = [
+      'Teamwork',
+      'Communication',
+      'Problem Solving',
+      'Leadership',
+      'Time Management',
+      'Adaptability',
+      'Conflict Resolution',
+      'Empathy',
+      'Critical Thinking',
+      'Responsibility',
+    ];
+    const technicalSkills = [
+      'Data Analysis',
+      'Coding/Programming',
+      'Web Design',
+      'Social Media Management',
+      'Digital Literacy',
+      'Spreadsheet Skills',
+      'Presentation Software',
+      'Video Editing',
+      'IT Troubleshooting',
+      'Database Management',
+    ];
+    const specializedSkills = [
+      'Project Planning',
+      'Grant Writing',
+      'Event Coordination',
+      'Research Methods',
+      'Survey Design',
+      'Workshop Facilitation',
+      'Community Assessment',
+      'Policy Analysis',
+      'Report Writing',
+      'Monitoring & Evaluation',
+    ];
+    const [showCoreDropdown, setShowCoreDropdown] = React.useState(false);
+    const [showTechnicalDropdown, setShowTechnicalDropdown] = React.useState(false);
+    const [showSpecializedDropdown, setShowSpecializedDropdown] = React.useState(false);
+    const [easySkills, setEasySkills] = React.useState('');
+    const [moderateSkills, setModerateSkills] = React.useState('');
+    const [hardSkills, setHardSkills] = React.useState('');
+
+    // Handler for adding a skill to a level
+    const handleAddSkill = (skill, level) => {
+      if (level === 'easy') setEasySkills(easySkills ? easySkills + '\n' + skill : skill);
+      if (level === 'moderate') setModerateSkills(moderateSkills ? moderateSkills + '\n' + skill : skill);
+      if (level === 'hard') setHardSkills(hardSkills ? hardSkills + '\n' + skill : skill);
+      setShowCoreDropdown(false);
+      setShowTechnicalDropdown(false);
+      setShowSpecializedDropdown(false);
+    };
+
+    return (
+      <div style={{ background: '#f7f9fa', minHeight: '100vh', padding: 32, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <form style={{ background: '#fff', borderRadius: 20, padding: 32, minWidth: 800, maxWidth: 900, boxShadow: '0 2px 8px #0001', border: '4px solid #3386e6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontSize: 28, fontWeight: 700, color: '#2566b3' }}>Service-Learning Proposal</span>
+            <span style={{ fontSize: 22, color: '#3386e6', cursor: 'pointer' }} title="Info">ℹ️</span>
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 22, color: '#2566b3', marginBottom: 18, textAlign: 'center' }}>Specific Activity</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 18 }}>
+            {/* Main form and skill dropdowns */}
+            <React.Fragment>
+              <div>
+                <label style={{ fontWeight: 600, color: '#2566b3' }}>Activity Title</label>
+                <input type="text" style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', marginBottom: 12, marginTop: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
+                <label style={{ fontWeight: 600, color: '#2566b3' }}>Role Description</label>
+                <textarea style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', minHeight: 100, marginBottom: 12, marginTop: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
+                <label style={{ fontWeight: 600, color: '#2566b3' }}>Type of Skills:</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
+                  {/* Core Skills Dropdown */}
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', color: '#234e7b', background: '#fff', textAlign: 'left', fontWeight: 500, cursor: 'pointer' }} onClick={() => { setShowCoreDropdown(v => !v); setShowTechnicalDropdown(false); setShowSpecializedDropdown(false); }}>
+                      Core Service & Soft Skills ▼
+                    </button>
+                    {showCoreDropdown && (
+                      <div style={{ position: 'absolute', zIndex: 10, background: '#fff', border: '1.5px solid #1ea7fd', borderRadius: 6, width: '100%', boxShadow: '0 2px 8px #0002', marginTop: 2 }}>
+                        {coreSkills.map(skill => (
+                          <div key={skill} style={{ padding: 8, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#2566b3' }}>{skill}</span>
+                            <div>
+                              <button type="button" style={{ marginRight: 4, background: 'none', color: '#2566b3', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'easy')}>Easy</button>
+                              <button type="button" style={{ marginRight: 4, background: 'none', color: '#e6a700', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'moderate')}>Moderate</button>
+                              <button type="button" style={{ background: 'none', color: '#d32f2f', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'hard')}>Hard</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* Technical Skills Dropdown */}
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', color: '#234e7b', background: '#fff', textAlign: 'left', fontWeight: 500, cursor: 'pointer' }} onClick={() => { setShowTechnicalDropdown(v => !v); setShowCoreDropdown(false); setShowSpecializedDropdown(false); }}>
+                      Technical & Digital Skills ▼
+                    </button>
+                    {showTechnicalDropdown && (
+                      <div style={{ position: 'absolute', zIndex: 10, background: '#fff', border: '1.5px solid #1ea7fd', borderRadius: 6, width: '100%', boxShadow: '0 2px 8px #0002', marginTop: 2 }}>
+                        {technicalSkills.map(skill => (
+                          <div key={skill} style={{ padding: 8, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#2566b3' }}>{skill}</span>
+                            <div>
+                              <button type="button" style={{ marginRight: 4, background: 'none', color: '#2566b3', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'easy')}>Easy</button>
+                              <button type="button" style={{ marginRight: 4, background: 'none', color: '#e6a700', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'moderate')}>Moderate</button>
+                              <button type="button" style={{ background: 'none', color: '#d32f2f', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'hard')}>Hard</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* Specialized Skills Dropdown */}
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', color: '#234e7b', background: '#fff', textAlign: 'left', fontWeight: 500, cursor: 'pointer' }} onClick={() => { setShowSpecializedDropdown(v => !v); setShowCoreDropdown(false); setShowTechnicalDropdown(false); }}>
+                      Specialized Project Skills ▼
+                    </button>
+                    {showSpecializedDropdown && (
+                      <div style={{ position: 'absolute', zIndex: 10, background: '#fff', border: '1.5px solid #1ea7fd', borderRadius: 6, width: '100%', boxShadow: '0 2px 8px #0002', marginTop: 2 }}>
+                        {specializedSkills.map(skill => (
+                          <div key={skill} style={{ padding: 8, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#2566b3' }}>{skill}</span>
+                            <div>
+                              <button type="button" style={{ marginRight: 4, background: 'none', color: '#2566b3', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'easy')}>Easy</button>
+                              <button type="button" style={{ marginRight: 4, background: 'none', color: '#e6a700', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'moderate')}>Moderate</button>
+                              <button type="button" style={{ background: 'none', color: '#d32f2f', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleAddSkill(skill, 'hard')}>Hard</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ fontWeight: 600, color: '#2566b3' }}>Required Skills:</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                  <div>
+                    <label style={{ fontWeight: 500, color: '#2566b3' }}>Easy Skills</label>
+                    <textarea value={easySkills} onChange={e => setEasySkills(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', minHeight: 40, marginBottom: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 500, color: '#2566b3' }}>Moderate Skills</label>
+                    <textarea value={moderateSkills} onChange={e => setModerateSkills(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', minHeight: 40, marginBottom: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 500, color: '#2566b3' }}>Hard Skills</label>
+                    <textarea value={hardSkills} onChange={e => setHardSkills(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', minHeight: 40, marginBottom: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
+                  </div>
+                </div>
+              </div>
+            </React.Fragment>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+            <button type="submit" style={{ background: '#1ea7fd', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>
+              CONFIRM
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchEvent() {
-      console.log("Fetching event with id:", id);
       try {
         const eventRef = doc(db, 'Missions', id);
-        console.log("eventRef:", eventRef);
         const eventSnap = await getDoc(eventRef);
-        console.log("eventSnap.exists():", eventSnap.exists());
-        console.log("eventSnap.data():", eventSnap.data());
         if (eventSnap.exists()) {
           setEvent(eventSnap.data());
         }
       } catch (err) {
-        console.error("Error fetching event:", err);
         setEvent(null);
       } finally {
         setLoading(false);
@@ -36,7 +198,7 @@ export default function EventActivity() {
   }
   if (!event) {
     return <div style={{ padding: 32 }}>Event not found.</div>;
-  }const eventRef = doc(db, 'Missions', id);
+  }
 
   return (
     <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: '#f6f6f6', position: 'relative' }}>
