@@ -1,5 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
+import { addDoc, collection } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { useParams } from 'react-router-dom';
 import { db } from '../../../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
@@ -7,63 +9,92 @@ import Header from '../../../components/Header';
 
 export default function EventActivity() {
   const { id } = useParams();
+  // All hooks at top level
+  // Placeholder form hooks
+  const coreSkills = [
+    'Teamwork', 'Communication', 'Problem Solving', 'Leadership', 'Time Management', 'Adaptability', 'Conflict Resolution', 'Empathy', 'Critical Thinking', 'Responsibility',
+  ];
+  const technicalSkills = [
+    'Data Analysis', 'Coding/Programming', 'Web Design', 'Social Media Management', 'Digital Literacy', 'Spreadsheet Skills', 'Presentation Software', 'Video Editing', 'IT Troubleshooting', 'Database Management',
+  ];
+  const specializedSkills = [
+    'Project Planning', 'Grant Writing', 'Event Coordination', 'Research Methods', 'Survey Design', 'Workshop Facilitation', 'Community Assessment', 'Policy Analysis', 'Report Writing', 'Monitoring & Evaluation',
+  ];
+  const [showCoreDropdown, setShowCoreDropdown] = React.useState(false);
+  const [showTechnicalDropdown, setShowTechnicalDropdown] = React.useState(false);
+  const [showSpecializedDropdown, setShowSpecializedDropdown] = React.useState(false);
+  const [easySkills, setEasySkills] = React.useState('');
+  const [moderateSkills, setModerateSkills] = React.useState('');
+  const [hardSkills, setHardSkills] = React.useState('');
+  // Event hooks
+  // const [event, setEvent] = useState(null); // REMOVE duplicate declaration
+  // const [loading, setLoading] = useState(true); // REMOVE duplicate declaration
+  // Journal hooks
+  const [journalReflections, setJournalReflections] = useState({});
+  const [submitStatus, setSubmitStatus] = useState({});
+  const auth = getAuth();
 
-  // If the id is 'placeholder', show a blank activity creation form
+  // Handler for adding a skill to a level (for placeholder)
+  const handleAddSkill = (skill, level) => {
+    if (level === 'easy') setEasySkills(easySkills ? easySkills + '\n' + skill : skill);
+    if (level === 'moderate') setModerateSkills(moderateSkills ? moderateSkills + '\n' + skill : skill);
+    if (level === 'hard') setHardSkills(hardSkills ? hardSkills + '\n' + skill : skill);
+    setShowCoreDropdown(false);
+    setShowTechnicalDropdown(false);
+    setShowSpecializedDropdown(false);
+  };
+
+  // Journal handlers
+  const handleJournalChange = (idx, value) => {
+    setJournalReflections(prev => ({ ...prev, [idx]: value }));
+  };
+  const handleJournalSubmit = async (activityIdx, activity) => {
+    const user = auth.currentUser;
+    if (!user) {
+      setSubmitStatus(prev => ({ ...prev, [activityIdx]: 'You must be logged in.' }));
+      return;
+    }
+    if (!journalReflections[activityIdx] || !journalReflections[activityIdx].trim()) {
+      setSubmitStatus(prev => ({ ...prev, [activityIdx]: 'Reflection cannot be empty.' }));
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'activityJournals'), {
+        userId: user.uid,
+        missionId: id,
+        activityId: activity.title,
+        journalReflection: journalReflections[activityIdx],
+        timestamp: new Date().toISOString(),
+      });
+      setSubmitStatus(prev => ({ ...prev, [activityIdx]: 'Reflection submitted!' }));
+      setJournalReflections(prev => ({ ...prev, [activityIdx]: '' }));
+    } catch (err) {
+      setSubmitStatus(prev => ({ ...prev, [activityIdx]: 'Error submitting. Try again.' }));
+    }
+  };
+
+  useEffect(() => {
+    async function fetchEvent() {
+      try {
+        const eventRef = doc(db, 'Missions', id);
+        const eventSnap = await getDoc(eventRef);
+        if (eventSnap.exists()) {
+          setEvent(eventSnap.data());
+        } else {
+          console.error('Event not found for id:', id);
+        }
+      } catch (err) {
+        console.error('Error fetching event:', err);
+        setEvent(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchEvent();
+  }, [id]);
+
+  // Conditional rendering for placeholder
   if (id === 'placeholder') {
-    // Example skills for Core Service & Soft Skills
-    const coreSkills = [
-      'Teamwork',
-      'Communication',
-      'Problem Solving',
-      'Leadership',
-      'Time Management',
-      'Adaptability',
-      'Conflict Resolution',
-      'Empathy',
-      'Critical Thinking',
-      'Responsibility',
-    ];
-    const technicalSkills = [
-      'Data Analysis',
-      'Coding/Programming',
-      'Web Design',
-      'Social Media Management',
-      'Digital Literacy',
-      'Spreadsheet Skills',
-      'Presentation Software',
-      'Video Editing',
-      'IT Troubleshooting',
-      'Database Management',
-    ];
-    const specializedSkills = [
-      'Project Planning',
-      'Grant Writing',
-      'Event Coordination',
-      'Research Methods',
-      'Survey Design',
-      'Workshop Facilitation',
-      'Community Assessment',
-      'Policy Analysis',
-      'Report Writing',
-      'Monitoring & Evaluation',
-    ];
-    const [showCoreDropdown, setShowCoreDropdown] = React.useState(false);
-    const [showTechnicalDropdown, setShowTechnicalDropdown] = React.useState(false);
-    const [showSpecializedDropdown, setShowSpecializedDropdown] = React.useState(false);
-    const [easySkills, setEasySkills] = React.useState('');
-    const [moderateSkills, setModerateSkills] = React.useState('');
-    const [hardSkills, setHardSkills] = React.useState('');
-
-    // Handler for adding a skill to a level
-    const handleAddSkill = (skill, level) => {
-      if (level === 'easy') setEasySkills(easySkills ? easySkills + '\n' + skill : skill);
-      if (level === 'moderate') setModerateSkills(moderateSkills ? moderateSkills + '\n' + skill : skill);
-      if (level === 'hard') setHardSkills(hardSkills ? hardSkills + '\n' + skill : skill);
-      setShowCoreDropdown(false);
-      setShowTechnicalDropdown(false);
-      setShowSpecializedDropdown(false);
-    };
-
     return (
       <div style={{ background: '#f7f9fa', minHeight: '100vh', padding: 32, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <form style={{ background: '#fff', borderRadius: 20, padding: 32, minWidth: 800, maxWidth: 900, boxShadow: '0 2px 8px #0001', border: '4px solid #3386e6' }}>
@@ -183,8 +214,11 @@ export default function EventActivity() {
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
           setEvent(eventSnap.data());
+        } else {
+          console.error('Event not found for id:', id);
         }
       } catch (err) {
+        console.error('Error fetching event:', err);
         setEvent(null);
       } finally {
         setLoading(false);
@@ -194,11 +228,26 @@ export default function EventActivity() {
   }, [id]);
 
   if (loading) {
-    return <div style={{ padding: 32 }}>Loading...</div>;
+    return <div style={{ padding: 32, color: '#234e7b', fontWeight: 600 }}>Loading...</div>;
   }
   if (!event) {
-    return <div style={{ padding: 32 }}>Event not found.</div>;
+    return (
+      <div style={{ padding: 32, color: '#d32f2f', fontWeight: 700 }}>
+        Event not found.<br />
+        <span style={{ fontWeight: 400, color: '#234e7b' }}>Check the event ID in the URL or verify your Firestore data.</span>
+      </div>
+    );
   }
+  if (!event.activities || !Array.isArray(event.activities) || event.activities.length === 0) {
+    return (
+      <div style={{ padding: 32, color: '#d32f2f', fontWeight: 700 }}>
+        No activities found for this event.<br />
+        <span style={{ fontWeight: 400, color: '#234e7b' }}>Check your Firestore event document for an 'activities' array.</span>
+      </div>
+    );
+  }
+
+  // ...existing code...
 
   return (
     <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: '#f6f6f6', position: 'relative' }}>
@@ -209,8 +258,6 @@ export default function EventActivity() {
           {/* Top image */}
           <div style={{ width: '100%', height: 180, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', position: 'relative' }}>
             <img src={event.img || '/assets/mission1.jpg'} alt={event.alt || 'Event'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            {/* Optional close button */}
-            {/* <button style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(255,255,255,0.85)', border: 'none', borderRadius: '50%', width: 36, height: 36, fontSize: 22, fontWeight: 700, color: '#234e7b', cursor: 'pointer', zIndex: 2 }}>×</button> */}
           </div>
           {/* Green card */}
           <div style={{ background: '#7bb661', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, padding: '32px 24px 24px 24px', width: '100%', boxSizing: 'border-box', marginTop: -4, minHeight: 420, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
@@ -251,15 +298,24 @@ export default function EventActivity() {
                 ))}
               </ul>
               {activity.required && <div style={{ color: '#234e7b', fontSize: 15, marginBottom: 8 }}><strong>Required:</strong> {activity.required}</div>}
-              <input type="file" style={{ marginBottom: 8, width: '100%' }} />
-              <textarea placeholder="Journal Reflection" style={{ width: '100%', minHeight: 60, marginBottom: 8, borderRadius: 6, border: '1px solid #ccc', padding: 8 }} />
+              <textarea
+                placeholder="Journal Reflection"
+                style={{ width: '100%', minHeight: 60, marginBottom: 8, borderRadius: 6, border: '1px solid #ccc', padding: 8 }}
+                value={journalReflections[idx] || ''}
+                onChange={e => handleJournalChange(idx, e.target.value)}
+              />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span>Task Progress</span>
-                <progress value="0" max="100" style={{ flex: 1 }} />
+                <progress value={submitStatus[idx] === 'Reflection submitted!' ? 100 : 0} max="100" style={{ flex: 1 }} />
               </div>
-              <button style={{ background: '#bdbdbd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 24px', fontWeight: 600, fontSize: 14, cursor: 'not-allowed' }} disabled>
+              <button
+                style={{ background: journalReflections[idx] && journalReflections[idx].trim() ? '#1ea7fd' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 24px', fontWeight: 600, fontSize: 14, cursor: journalReflections[idx] && journalReflections[idx].trim() ? 'pointer' : 'not-allowed' }}
+                disabled={!journalReflections[idx] || !journalReflections[idx].trim()}
+                onClick={() => handleJournalSubmit(idx, activity)}
+              >
                 SUBMIT
               </button>
+              {submitStatus[idx] && <div style={{ marginTop: 8, color: submitStatus[idx] === 'Reflection submitted!' ? '#7bb661' : '#d32f2f', fontWeight: 600 }}>{submitStatus[idx]}</div>}
             </div>
           ))}
         </div>
