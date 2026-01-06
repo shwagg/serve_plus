@@ -5,10 +5,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import React, { useState, useEffect } from "react";
 import { collection, getDocs } from "firebase/firestore";
-import servePlusLogo from "../../assets/serve_plus_logo.svg";
-import chatIcon from "../../assets/headassets/Chat Icon.svg";
-import notificationIcon from "../../assets/headassets/Notification Icon.svg";
-import menuIcon from "../../assets/headassets/Menu Icon.svg";
+import Header from "../../components/Header";
 import "../../styles/ui.css";
 
 const defaultLeaderboard = [
@@ -125,7 +122,7 @@ const StudentHome = () => {
   const handleNotificationOverlayToggle = () => setNotificationOverlayOpen((open) => !open);
 
   return (
-    <div className="student-dashboard" style={{ background: '#f6f6f6', minHeight: '100vh', minWidth: '100vw', width: '100vw', fontFamily: 'sans-serif', position: 'relative', overflowX: 'hidden' }}>
+    <div className="student-dashboard" style={{ background: '#f6f6f6', minHeight: '100vh', minWidth: '100vw', width: '100vw', fontFamily: 'sans-serif', position: 'relative', overflowX: 'hidden', paddingTop: '80px', boxSizing: 'border-box', overflowY: 'auto' }}>
       {/* Logout Popup */}
       {showLogoutPopup && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -137,115 +134,8 @@ const StudentHome = () => {
         </div>
       )}
       {/* Header */}
-      <header style={{ display: 'flex', alignItems: 'center', padding: '16px 32px', background: '#fff', borderBottom: '1px solid #e0e0e0', height: 72, margin: '16px 16px 0 16px', borderRadius: 16 }}>
-        <img src={servePlusLogo} alt="Serve+ Logo" style={{ height: 70, marginRight: 16, maxHeight: '100%' }} />
-        <span style={{ fontWeight: 600, fontSize: 22, color: '#2e5d3b' }}>{`Level ${level}`}</span>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 120, background: '#e9e9e9', borderRadius: 8, overflow: 'hidden', marginRight: 8 }}>
-            <div style={{ width: `${(currentPoints/nextLevelPoints)*100}%`, background: '#ffa726', height: 24, textAlign: 'center', color: '#fff', fontWeight: 600 }}>{currentPoints}</div>
-          </div>
-          <span style={{ color: '#888', fontWeight: 500 }}>{nextLevelPoints}</span>
-          {/* Button Row */}
-          <div style={{ display: 'flex', gap: 8, marginLeft: 16, position: 'relative' }}>
-            <button ref={button2Ref} style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#7bb661', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleChatOverlayToggle}>
-              <img src={chatIcon} alt="Chat" style={{ height: 22, width: 22 }} />
-            </button>
-            <button style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#234e7b', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleNotificationOverlayToggle}>
-              <img src={notificationIcon} alt="Notification" style={{ height: 22, width: 22 }} />
-            </button>
-            <button ref={button3Ref} style={{ padding: '6px 18px', borderRadius: 6, border: 'none', background: '#ffa726', color: '#fff', fontWeight: 600, cursor: 'pointer', position: 'relative', zIndex: 1010, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleMenuOverlayToggle}>
-              <img src={menuIcon} alt="Menu" style={{ height: 22, width: 22 }} />
-            </button>
-            {/* Chat Overlay (now on Button 1) */}
-            {chatOverlayOpen && (
-              <div style={{ position: 'absolute', top: 40, right: 120, width: 300, background: '#555', color: '#fff', borderRadius: 16, boxShadow: '0 4px 16px #0003', zIndex: 1000, padding: '20px 16px', marginTop: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontWeight: 700, fontSize: 18 }}>Chats</span>
-                  <a href="#" style={{ color: '#fff', textDecoration: 'underline', fontWeight: 500, fontSize: 14 }}>View all Chats</a>
-                </div>
-                <div style={{ marginBottom: 12 }}>
-                  <input type="text" placeholder="Search" style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: 'none', fontSize: 15, background: '#eee', color: '#333' }} />
-                </div>
-                {/* Chat List */}
-                <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                  {chatList.map((chat, idx) => (
-                    <div key={chat.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: idx < 3 ? '1px solid #8882' : 'none', cursor: 'pointer' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="icon-user" style={{ fontSize: 22, color: '#2ec4b6' }}></i>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 15 }}>{chat.name}</div>
-                        <div style={{ fontSize: 13, color: '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{chat.msg}</div>
-                      </div>
-                      {chat.unread && <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2ec4b6', display: 'inline-block' }}></span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Notification Overlay (Button 2) */}
-            {notificationOverlayOpen && (
-              <div style={{ position: 'absolute', top: 40, right: 60, width: 340, background: '#555', color: '#fff', borderRadius: 16, boxShadow: '0 4px 16px #0003', zIndex: 1000, padding: '20px 22px', marginTop: 8 }}>
-                <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 10 }}>Notification</div>
-                {notificationContent.map((section, idx) => (
-                  <React.Fragment key={idx}>
-                    <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>{section.title}</div>
-                    {section.items && (
-                      <ul style={{ marginLeft: 18, marginBottom: 10 }}>
-                        {section.items.map((item, i) => (
-                          <li key={i} style={{ fontSize: 15, marginBottom: 4 }}>{item}</li>
-                        ))}
-                      </ul>
-                    )}
-                    {section.text && (
-                      <div style={{ fontSize: 15, marginBottom: 10 }}>{section.text}</div>
-                    )}
-                    {idx < notificationContent.length - 1 && <hr style={{ border: 'none', borderTop: '1px solid #aaa', margin: '12px 0' }} />}
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
-            {menuOverlayOpen && (
-              <div style={{ position: 'absolute', top: 40, right: 0, width: 230, background: '#555', color: '#fff', borderRadius: 16, boxShadow: '0 4px 16px #0003', zIndex: 1000, padding: '20px 16px', marginTop: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="icon-user" style={{ fontSize: 24, color: '#7bb661' }}></i>
-                  </div>
-                  <span style={{ fontWeight: 600, fontSize: 16 }}>{menuProfileName}</span>
-                </div>
-                <hr style={{ border: 'none', borderTop: '1px solid #aaa', margin: '10px 0 14px 0' }} />
-                <nav style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 16 }}>☆</span>
-                    <span style={{ fontWeight: 500 }}>Leaderboard</span>
-                  </div>
-                  <Link to="/student/propose-project" style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
-                      <span style={{ fontSize: 16 }}>⊞</span>
-                      <span style={{ fontWeight: 500 }}>Create Proposal</span>
-                    </div>
-                  </Link>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 16 }}>⚙️</span>
-                    <span style={{ fontWeight: 500 }}>Settings</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 16 }}>🛠️</span>
-                    <span style={{ fontWeight: 500 }}>Support</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 16 }}>ℹ️</span>
-                    <span style={{ fontWeight: 500 }}>About Us</span>
-                  </div>
-                </nav>
-                <button style={{ background: '#2ec4b6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', fontWeight: 600, fontSize: 15, marginTop: 14, cursor: 'pointer', width: '100%' }} onClick={handleLogout}>Log Out</button>
-              </div>
-            )}
-          </div>
-          {/* Removed old icon placeholders, now using SVGs in buttons above */}
-        </div>
-      </header>
+      <Header />
+      {/* ...existing code... */}
 
 
       {/* Main Dashboard */}
