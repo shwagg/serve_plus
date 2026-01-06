@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 export default function ProposeProject() {
   const [page, setPage] = useState(1);
 
@@ -141,6 +142,7 @@ function PageTwo({ onPrev, onNext }) {
 import React, { useState } from "react";
 
 function PageThree({ onPrev }) {
+  const navigate = useNavigate();
   // Demo data for activity and student leader
   const [activities, setActivities] = React.useState([
     { id: 1, name: 'Riverbank Cleanup & Segregation' }
@@ -153,10 +155,8 @@ function PageThree({ onPrev }) {
   const [leaderInput, setLeaderInput] = React.useState("");
 
   const addActivity = () => {
-    if (activityInput.trim()) {
-      setActivities([...activities, { id: Date.now(), name: activityInput }]);
-      setActivityInput("");
-    }
+    // Placeholder event ID for now
+    navigate("/event/placeholder/activity");
   };
   const removeActivity = id => setActivities(activities.filter(a => a.id !== id));
 
