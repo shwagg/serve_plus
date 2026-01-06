@@ -282,7 +282,7 @@ export default function EventActivity() {
           </div>
         </div>
         {/* Right: Activity Section */}
-        <div style={{ flex: '0 0 60%', maxWidth: '60%', minWidth: 400, background: '#7bb661', borderRadius: 20, padding: 24 }}>
+        <div style={{ flex: '0 0 60%', maxWidth: '60%', minWidth: 400, background: '#7bb661', borderRadius: 20, padding: 24, height: '75vh', overflowY: 'auto' }}>
           <h2 style={{ color: '#fff', fontWeight: 700, marginBottom: 16 }}>Activity</h2>
           {event.activities && event.activities.map((activity, idx) => (
             <div key={idx} style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 24 }}>
