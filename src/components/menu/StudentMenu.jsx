@@ -26,7 +26,7 @@ export default function StudentMenu({ userName, userEmail, onLogout, onClose }) 
           <img src={leaderboardIcon} alt="Leaderboard" className="menu-icon" />
           Leaderboard
         </button>
-        <button className="menu-item" onClick={() => handleMenuClick('/global/menu/create')}>
+        <button className="menu-item" onClick={() => handleMenuClick('/student/propose-project')}>
           <img src={createIcon} alt="Create" className="menu-icon" />
           Create Proposal
         </button>
