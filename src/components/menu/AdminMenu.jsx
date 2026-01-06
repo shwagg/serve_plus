@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import '../styles/Menu.css';
+import createIcon from '../../assets/menuassets/Create.svg';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
@@ -20,6 +21,10 @@ export default function AdminMenu({ userName, userEmail, onLogout, onClose }) {
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">
+        <button className="menu-item" onClick={() => handleMenuClick('/global/menu/create')}>
+          <img src={createIcon} alt="Create" className="menu-icon" />
+          Create Proposal
+        </button>
         <button className="menu-item" onClick={() => handleMenuClick('/global/menu/settings')}>
           <img src={settingsIcon} alt="Settings" className="menu-icon" />
           Settings

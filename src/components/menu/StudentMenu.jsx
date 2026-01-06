@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import '../styles/Menu.css';
 import leaderboardIcon from '../../assets/menuassets/Leaderboard.svg';
+import createIcon from '../../assets/menuassets/Create.svg';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
@@ -24,6 +25,10 @@ export default function StudentMenu({ userName, userEmail, onLogout, onClose }) 
         <button className="menu-item" onClick={() => handleMenuClick('/global/menu/leaderboard')}>
           <img src={leaderboardIcon} alt="Leaderboard" className="menu-icon" />
           Leaderboard
+        </button>
+        <button className="menu-item" onClick={() => handleMenuClick('/global/menu/create')}>
+          <img src={createIcon} alt="Create" className="menu-icon" />
+          Create Proposal
         </button>
         <button className="menu-item" onClick={() => handleMenuClick('/global/menu/settings')}>
           <img src={settingsIcon} alt="Settings" className="menu-icon" />
