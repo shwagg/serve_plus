@@ -16,11 +16,13 @@ export default function AdminLayout() {
                         <NavLink to="/admin/projects" end className="sidebar-item-link">
                             Project List
                         </NavLink>
-                        {/* others can remain text for now if you want */}
                         <NavLink to="/admin/projects/new" className="sidebar-item-link">
                             Service-Learning Proposal
                         </NavLink>
                         <p className="sidebar-item">Current Event Monitoring</p>
+                        <NavLink to="/admin/audit-logs" className="sidebar-item-link">
+                            Audit Logs
+                        </NavLink>
                     </div>
                 </nav>
             </aside>
