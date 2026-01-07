@@ -20,7 +20,7 @@ export default function AdminDashboard() {
   const upcomingEvents = [];
 
   return (
-    <>
+    <div className="admin-dashboard">
       <h1 className="page-title">Dashboard</h1>
       <div className="dashboard-grid">
         {/* LEFT column cards */}
@@ -146,7 +146,7 @@ export default function AdminDashboard() {
           </div>
         </section>
       </div>
-    </>
+    </div>
   );
 }
 
