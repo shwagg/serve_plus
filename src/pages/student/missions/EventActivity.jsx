@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { addDoc, collection } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../../../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import Header from '../../../components/Header';
@@ -95,9 +95,35 @@ export default function EventActivity() {
 
   // Conditional rendering for placeholder
   if (id === 'placeholder') {
+    const navigate = useNavigate();
+    const [activityTitle, setActivityTitle] = useState("");
+    const [roleDescription, setRoleDescription] = useState("");
+    // ...existing code...
+    const location = useLocation();
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      if (!activityTitle.trim()) return;
+      // Compose activity object
+      const newActivity = {
+        id: Date.now(),
+        name: activityTitle,
+        role: roleDescription,
+        easySkills,
+        moderateSkills,
+        hardSkills
+      };
+      // Merge previous activities with new activity
+      let prevActivities = Array.isArray(location.state?.activities) ? location.state.activities : [];
+      // Only add if not already present (by id)
+      if (!prevActivities.some(a => a.id === newActivity.id)) {
+        prevActivities = [...prevActivities, newActivity];
+      }
+      // Redirect back to proposal page 3/3 with all activities
+      navigate("/student/propose-project?page=3", { state: { newActivity, activities: prevActivities } });
+    };
     return (
       <div style={{ background: '#f7f9fa', minHeight: '100vh', padding: 32, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <form style={{ background: '#fff', borderRadius: 20, padding: 32, minWidth: 800, maxWidth: 900, boxShadow: '0 2px 8px #0001', border: '4px solid #3386e6' }}>
+        <form style={{ background: '#fff', borderRadius: 20, padding: 32, minWidth: 800, maxWidth: 900, boxShadow: '0 2px 8px #0001', border: '4px solid #3386e6' }} onSubmit={handleSubmit}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: 28, fontWeight: 700, color: '#2566b3' }}>Service-Learning Proposal</span>
             <span style={{ fontSize: 22, color: '#3386e6', cursor: 'pointer' }} title="Info">ℹ️</span>
@@ -108,9 +134,9 @@ export default function EventActivity() {
             <React.Fragment>
               <div>
                 <label style={{ fontWeight: 600, color: '#2566b3' }}>Activity Title</label>
-                <input type="text" style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', marginBottom: 12, marginTop: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
+                <input type="text" value={activityTitle} onChange={e => setActivityTitle(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', marginBottom: 12, marginTop: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
                 <label style={{ fontWeight: 600, color: '#2566b3' }}>Role Description</label>
-                <textarea style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', minHeight: 100, marginBottom: 12, marginTop: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
+                <textarea value={roleDescription} onChange={e => setRoleDescription(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1.5px solid #1ea7fd', minHeight: 100, marginBottom: 12, marginTop: 4, color: '#234e7b', background: '#fff' }} placeholder="" />
                 <label style={{ fontWeight: 600, color: '#2566b3' }}>Type of Skills:</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
                   {/* Core Skills Dropdown */}

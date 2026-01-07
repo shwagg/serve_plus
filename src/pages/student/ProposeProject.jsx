@@ -1,6 +1,30 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 export default function ProposeProject() {
-  const [page, setPage] = useState(1);
+  const location = useLocation();
+  // Set initial page based on query param
+  const queryPage = (() => {
+    const params = new URLSearchParams(location.search);
+    const p = parseInt(params.get('page'), 10);
+    return p === 3 ? 3 : 1;
+  })();
+  const [page, setPage] = useState(queryPage);
+
+  // Store activities in state, initialize with demo if needed
+  const [activities, setActivities] = useState([]);
+
+  // If coming back from EventActivity, add new activity
+  React.useEffect(() => {
+    if (location.state && location.state.activities) {
+      setActivities(location.state.activities);
+      window.history.replaceState({}, document.title);
+    } else if (location.state && location.state.newActivity) {
+      setActivities(prev => {
+        if (prev.some(a => a.id === location.state.newActivity.id)) return prev;
+        return [...prev, location.state.newActivity];
+      });
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   return (
     <div style={{ background: '#f7f9fa', minHeight: '100vh', padding: '2rem' }}>
@@ -21,7 +45,7 @@ export default function ProposeProject() {
         </div>
         {page === 1 ? <PageOne onNext={() => setPage(2)} /> : null}
         {page === 2 ? <PageTwo onPrev={() => setPage(1)} onNext={() => setPage(3)} /> : null}
-        {page === 3 ? <PageThree onPrev={() => setPage(2)} /> : null}
+        {page === 3 ? <PageThree onPrev={() => setPage(2)} activities={activities} setActivities={setActivities} /> : null}
       </div>
     </div>
   );
@@ -141,32 +165,14 @@ function PageTwo({ onPrev, onNext }) {
 
 import React, { useState } from "react";
 
-function PageThree({ onPrev }) {
+function PageThree({ onPrev, activities, setActivities }) {
   const navigate = useNavigate();
-  // Demo data for activity and student leader
-  const [activities, setActivities] = React.useState([
-    { id: 1, name: 'Riverbank Cleanup & Segregation' }
-  ]);
-  const [leaders, setLeaders] = React.useState([
-    { id: 1, name: 'Maria G. Santos' }
-  ]);
   const [budget, setBudget] = React.useState("");
-  const [activityInput, setActivityInput] = React.useState("");
-  const [leaderInput, setLeaderInput] = React.useState("");
 
   const addActivity = () => {
-    // Placeholder event ID for now
-    navigate("/event/placeholder/activity");
+    navigate("/event/placeholder/activity", { state: { fromProposal: true, activities } });
   };
   const removeActivity = id => setActivities(activities.filter(a => a.id !== id));
-
-  const addLeader = () => {
-    if (leaderInput.trim()) {
-      setLeaders([...leaders, { id: Date.now(), name: leaderInput }]);
-      setLeaderInput("");
-    }
-  };
-  const removeLeader = id => setLeaders(leaders.filter(l => l.id !== id));
 
   return (
     <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); alert('Submitted!'); }}>
@@ -177,13 +183,6 @@ function PageThree({ onPrev }) {
           <div style={{ border: '1.5px solid #1ea7fd', borderRadius: 12, padding: 16, minHeight: 220, background: '#f7f9fa', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <button type="button" style={addBtnStyle} onClick={addActivity}>+ Add Activity</button>
-              <input
-                type="text"
-                placeholder=""
-                value={activityInput}
-                onChange={e => setActivityInput(e.target.value)}
-                style={{ ...inputStyle, maxWidth: 180, marginBottom: 0 }}
-              />
             </div>
             {activities.map(a => (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', background: '#1ea7fd', color: '#fff', borderRadius: 6, marginBottom: 8, padding: '6px 12px', fontWeight: 500 }}>
@@ -194,7 +193,7 @@ function PageThree({ onPrev }) {
             ))}
           </div>
         </div>
-        {/* Budget & Roster Involvement */}
+        {/* Budget Section Only */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <div style={{ fontWeight: 600, marginBottom: 4 }}>Budget</div>
@@ -206,28 +205,6 @@ function PageThree({ onPrev }) {
               onChange={e => setBudget(e.target.value)}
             />
             <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>Note: Attach the Fundraising Activity Proposal if applicable</div>
-          </div>
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Roster Involvement</div>
-            <div style={{ border: '1.5px solid #1ea7fd', borderRadius: 12, padding: 12, minHeight: 80, background: '#f7f9fa' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <button type="button" style={addBtnStyle} onClick={addLeader}>+ Add Student Leader</button>
-                <input
-                  type="text"
-                  placeholder=""
-                  value={leaderInput}
-                  onChange={e => setLeaderInput(e.target.value)}
-                  style={{ ...inputStyle, maxWidth: 150, marginBottom: 0 }}
-                />
-              </div>
-              {leaders.map(l => (
-                <div key={l.id} style={{ display: 'flex', alignItems: 'center', background: '#1ea7fd', color: '#fff', borderRadius: 6, marginBottom: 8, padding: '6px 12px', fontWeight: 500 }}>
-                  <button type="button" onClick={() => removeLeader(l.id)} style={removeBtnStyle}>×</button>
-                  <span style={{ flex: 1 }}>{l.name}</span>
-                  <span style={{ fontSize: 18, marginLeft: 8 }}>📋</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>
