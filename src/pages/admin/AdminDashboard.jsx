@@ -44,7 +44,11 @@ export default function AdminDashboard() {
         const upcoming = [];
 
         for (const m of published) {
-          const md = parseMissionDate(m.date);
+          const md =
+            m.dateAt?.toDate
+              ? m.dateAt.toDate()
+              : parseMissionDate(m.date);
+
           if (!md) continue;
 
           const missionDay = new Date(md.getFullYear(), md.getMonth(), md.getDate());
@@ -155,15 +159,25 @@ export default function AdminDashboard() {
               ) : (
                 <div className="event-grid">
                   {eventsToday.map((e) => (
-                    <div className="event-card" key={e.id}>
-                      <div className="event-title">{e.title}</div>
-                      <div className="event-footer">
-                        <span className="event-date">{e.date}</span>
-                        <button className="event-details" type="button">
-                          Details
-                        </button>
+                    <div
+                      className="event-card"
+                      key={e.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate(`/admin/projects/${e.id}`)}
+                      onKeyDown={(eKey) => {
+                        if (eKey.key === "Enter") {
+                          navigate(`/admin/projects/${e.id}`);
+                        }
+                      }}
+                    >
+                      <div className="event-date">{e.date}</div>
+                      <div className="event-title">
+                        {e.title || e.alt || "Untitled Event"}
                       </div>
+                      <div className="event-details">{e.description || "Unknown Location"}</div>
                     </div>
+
                   ))}
                 </div>
               )}
@@ -188,7 +202,9 @@ export default function AdminDashboard() {
                 <div className="event-grid">
                   {upcomingEvents.map((e) => (
                     <div className="event-card" key={e.id}>
-                      <div className="event-title">{e.title}</div>
+                      <div className="event-title">
+                        {e.title || e.alt || e.name || "Untitled Event"}
+                      </div>
                       <div className="event-footer">
                         <span className="event-date">{e.date}</span>
                         <button className="event-details" type="button">

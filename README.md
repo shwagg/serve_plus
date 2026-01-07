@@ -30,3 +30,5 @@ kung pagkaexport niyo parang nareplace yung folder from "emulator_data" to whate
 close niyo lang lahat from database to vite(react) tas run this command 
 
 Rename-Item (currentname)  emulator_data
+Example: Rename-Item -Path "firebase-export-1767802674593GHuXVa" -NewName "emulator_data"
+
