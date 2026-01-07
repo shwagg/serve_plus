@@ -9,6 +9,7 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProjectList from "./pages/global/ProjectList";
 import CreateProject from "./pages/global/CreateProject";
+import ProjectDetails from "./pages/admin/ProjectDetails";
 import AuditLogs from "./pages/admin/AuditLogs";
 import StudentHome from "./pages/student/StudentHome";
 import ProposeProject from "./pages/student/ProposeProject";
@@ -37,6 +38,7 @@ function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="projects" element={<ProjectList />} />
             <Route path="projects/new" element={<CreateProject />} />
+            <Route path="projects/:projectId" element={<ProjectDetails />} />
           </Route>
 
           <Route

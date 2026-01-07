@@ -78,8 +78,13 @@ export default function ProjectList() {
                                         />
 
                                         <div className="project-info">
-                                            <div className="project-title">
-                                                {p.title || p.alt || "Untitled Mission"}
+                                            <div className="project-title-row">
+                                                <div className="project-title">
+                                                    {p.title || p.alt || "Untitled Mission"}
+                                                </div>
+                                                <span className={`status-pill status-${(p.status || "draft")}`}>
+                                                    {(p.status || "draft").toUpperCase()}
+                                                </span>
                                             </div>
 
                                             <div className="project-meta">

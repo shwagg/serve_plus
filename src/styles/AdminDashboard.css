@@ -399,6 +399,48 @@
   font-weight: 900;
 }
 
+.project-title-row{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-pill{
+  font-size: 10px;
+  font-weight: 900;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #334155;
+}
+
+.status-draft{
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.status-pending{
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.status-published{
+  background: #f0fdfa;
+  border-color: #ccfbf1;
+  color: #0f766e;
+}
+
+.status-rejected{
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+
 
 /* Event containers (ready for mapping later) */
 .event-grid{

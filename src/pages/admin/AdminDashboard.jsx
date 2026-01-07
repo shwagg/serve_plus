@@ -1,12 +1,73 @@
 //first page for admin after login
-import { signOut } from "firebase/auth";
-import { auth } from "../../firebaseConfig";
-import { Link, useNavigate } from "react-router-dom";
+import { db, auth } from "../../firebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { Form, Link, useNavigate } from "react-router-dom";
 import { useSession } from "../../context/SessionContext";
 import "../../styles/AdminDashboard.css"
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  //filled from firestore under 'Missons'
+  const [eventsToday, setEventsToday] = useState([]);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+
+  useEffect(() => {
+    const parseMissionDate = (dateStr) => {
+      // Works for strings like: "November 09, 2025"
+      // Similar format to what we have in Firestore
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    const isSameDay = (a, b) =>
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+
+    const startOfToday = () => {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    };
+
+    const fetchPublishedMissions = async () => {
+      try {
+        const snap = await getDocs(collection(db, "Missions"));
+        const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+        // only published missions should be visible as "events" (after complete approval)
+        const published = rows.filter((m) => (m.status || "draft") === "published");
+
+        const today = startOfToday();
+
+        const todayEvents = [];
+        const upcoming = [];
+
+        for (const m of published) {
+          const md = parseMissionDate(m.date);
+          if (!md) continue;
+
+          const missionDay = new Date(md.getFullYear(), md.getMonth(), md.getDate());
+
+          if (isSameDay(missionDay, today)) todayEvents.push(m);
+          else if (missionDay > today) upcoming.push(m);
+        }
+
+        // (optional) sort upcoming by soonest date
+        upcoming.sort((a, b) => (new Date(a.date)) - (new Date(b.date)));
+
+        setEventsToday(todayEvents);
+        setUpcomingEvents(upcoming);
+      } catch (err) {
+        console.error("Failed to load missions for dashboard:", err);
+        setEventsToday([]);
+        setUpcomingEvents([]);
+      }
+    };
+
+    fetchPublishedMissions();
+  }, []);
+
   const engagement = [
     { label: "Senior Citizen Care Day", value: 95 },
     { label: "Laguna Lake Cleanup", value: 90 },
@@ -14,10 +75,6 @@ export default function AdminDashboard() {
     { label: "Community Youth Seminar", value: 65 },
     { label: "Financial Literacy Clinic", value: 55 },
   ];
-
-  // Later: fill these from Firestore (filter by date/status)
-  const eventsToday = [];
-  const upcomingEvents = [];
 
   return (
     <div className="admin-dashboard">
