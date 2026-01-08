@@ -22,10 +22,7 @@ exports.recordLoginFailure = functions.https.onCall(recordLoginFailure);
 exports.resetLoginAttempts = functions.https.onCall(resetLoginAttempts);
 exports.checkLoginAttempts = functions.https.onCall(checkLoginAttempts);
 
-
 const { sendMfaCode, verifyMfaCode } = require("./src/auth/mfa");
 
-// Export to Firebase
-exports.logLogin = logLogin;
 exports.sendMfaCode = sendMfaCode;
 exports.verifyMfaCode = verifyMfaCode;

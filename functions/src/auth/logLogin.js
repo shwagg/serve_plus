@@ -1,8 +1,7 @@
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
-async function logLogin(request) {
-  //const uid = request.data?.uid ?? data?.data?.uid;
+async function logLogin(data, context) {
   const uid = context?.auth?.uid || data?.uid || data?.data?.uid;
 
   if (!uid) {

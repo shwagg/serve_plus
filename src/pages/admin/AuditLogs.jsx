@@ -20,7 +20,8 @@ export default function AuditLogs() {
         const logsData = querySnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
-            id: data.uid || doc.id,
+            ...data,
+            docId: doc.id,
             action: data.action,
             email: data.email || "-", // fallback if not present
             role: data.role || "-", // fallback if not present
@@ -116,8 +117,8 @@ export default function AuditLogs() {
                   </tr>
                 ) : (
                   logs.map((log) => (
-                    <tr key={log.id} style={{ borderBottom: "1px solid #e2e8f0", color: "#111"}}>
-                        <td style={{ padding: "1rem" }}>{log.id}</td>
+                    <tr key={log.docId} style={{ borderBottom: "1px solid #e2e8f0", color: "#111"}}>
+                        <td style={{ padding: "1rem" }}>{log.uid || log.docId}</td>
                         <td style={{ padding: "1rem" }}>{log.email}</td>
                         <td style={{ padding: "1rem" }}>{log.role}</td>
                         <td style={{ padding: "1rem" }}>{log.timestamp}</td>

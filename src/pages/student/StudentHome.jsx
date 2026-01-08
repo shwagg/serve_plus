@@ -100,12 +100,14 @@ const StudentHome = () => {
   async function handleLogout() {
     const user = auth.currentUser;
     try {
+      console.log("Attempting to log logout for:", user?.uid);
       if (user?.uid) {
         const logLogout = httpsCallable(functions, "logLogout");
         await logLogout({ uid: user.uid });
       }
     } catch (e) {
-      // Ignore audit failures when logging out
+      // Log audit failures when logging out
+      console.error("Audit log (logout) failed:", e);
     }
 
     try {
@@ -212,6 +214,6 @@ const StudentHome = () => {
       </div>
     </div>
   );
-};
+}
 
 export default StudentHome;

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../firebaseConfig';
+import { auth, db, functions } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import './Header.css';
 import chatIcon from '../assets/headassets/Chat Icon.svg';
 import notificationIcon from '../assets/headassets/Notification Icon.svg';
@@ -68,6 +69,11 @@ export default function Header() {
   };
   const handleLogout = async () => {
     try {
+      const user = auth.currentUser;
+      if (user?.uid) {
+        const logLogout = httpsCallable(functions, "logLogout");
+        await logLogout({ uid: user.uid });
+      }
       await signOut(auth);
       navigate('/');
     } catch (error) {
