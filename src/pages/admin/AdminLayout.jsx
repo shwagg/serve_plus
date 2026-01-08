@@ -20,7 +20,7 @@ export default function AdminLayout() {
                             Project List
                         </NavLink>
                         <NavLink to="/admin/projects/new" className="sidebar-item-link">
-                            Service-Learning Proposal
+                            Project Proposal
                         </NavLink>
                         <p className="sidebar-item">Current Event Monitoring</p>
                         <NavLink to="/admin/audit-logs" className="sidebar-item-link">

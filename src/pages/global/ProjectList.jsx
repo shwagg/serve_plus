@@ -129,6 +129,8 @@ export default function ProjectList() {
                             <option value="for_approval">For approval</option>
                             <option value="published">Published</option>
                             <option value="rejected">Rejected</option>
+                            <option value="archived">Archived</option>
+
                         </select>
 
                         <select

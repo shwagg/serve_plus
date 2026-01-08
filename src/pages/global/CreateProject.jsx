@@ -12,7 +12,7 @@ export default function CreateProject() {
     const [location, setLocation] = useState("");
     const [points, setPoints] = useState("");
     const [description, setDescription] = useState("");
-    const [waiver, setWaiver] = useState("");
+    //const [waiver, setWaiver] = useState("");
 
     const [facultyInCharge, setFacultyInCharge] = useState("");
     const [sections, setSections] = useState("");
@@ -23,6 +23,33 @@ export default function CreateProject() {
     const [volunteerHours, setVolunteerHours] = useState("");
     const [sdgs, setSdgs] = useState([]); // array of strings
 
+    // SDG items for selection
+    const sdgItems = [
+        "1. No Poverty",
+        "2. Zero Hunger",
+        "3. Good Health and Well-Being",
+        "4. Quality Education",
+        "5. Gender Equality",
+        "6. Clean Water and Sanitation",
+        "7. Affordable and Clean Energy",
+        "8. Decent Work and Economic Growth",
+        "9. Industry, Innovation, and Infrastructure",
+        "10. Reduced Inequalities",
+        "11. Sustainable Cities and Communities",
+        "12. Responsible Consumption and Production",
+        "13. Climate Action",
+        "14. Life Below Water",
+        "15. Life on Land",
+        "16. Peace, Justice, and Strong Institutions",
+        "17. Partnership for the Goals",
+    ];
+    const half = Math.ceil(sdgItems.length / 2); // 9
+    const leftCol = sdgItems.slice(0, half);     // 1-9
+    const rightCol = sdgItems.slice(half);       // 10-17
+    const sdgColumnMajor = leftCol.flatMap((item, i) => [
+        item,
+        rightCol[i]
+    ]).filter(Boolean);
 
     const navigate = useNavigate();
     const [saving, setSaving] = useState(false);
@@ -69,9 +96,9 @@ export default function CreateProject() {
                 updatedAt: serverTimestamp(),
             };
 
-            // basic required checks (optional)
+            // input required before submitting
             if (!payload.title) throw new Error("Title is required.");
-            if (!payload.date) throw new Error("Date is required.");
+            //if (!payload.date) throw new Error("Date is required.");
 
             const docRef = await addDoc(collection(db, "Missions"), payload);
 
@@ -99,6 +126,13 @@ export default function CreateProject() {
 
         return () => clearTimeout(timer);
     }, [showInfo]);
+
+    //date proposed set to default when saving as drafts
+    useEffect(() => {
+        const today = new Date().toISOString().slice(0, 10);
+        setDate((prev) => prev || today);
+    }, []);
+
 
     return (
         <div className="create-project">
@@ -139,6 +173,18 @@ export default function CreateProject() {
                         </div>
 
                         {/* Row 2 */}
+                        <div className="cp-field cp-span-12">
+                            <label className="cp-label">Description / Project Rationale</label>
+                            <textarea
+                                className="cp-input"
+                                rows={5}
+                                placeholder="Briefly describe the purpose, activities, and expected impact of the project."
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Row 3 */}
                         <div className="cp-field cp-span-6">
                             <label className="cp-label">Faculty-In-Charge / Proponent(s)</label>
                             <input className="cp-input" type="text" value={facultyInCharge} onChange={(e) => setFacultyInCharge(e.target.value)} />
@@ -149,7 +195,7 @@ export default function CreateProject() {
                             <input className="cp-input" type="text" value={sections} onChange={(e) => setSections(e.target.value)} />
                         </div>
 
-                        {/* Row 3 */}
+                        {/* Row 4 */}
                         <div className="cp-field cp-span-6">
                             <label className="cp-label">Course Title</label>
                             <input className="cp-input" type="text" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} />
@@ -160,7 +206,7 @@ export default function CreateProject() {
                             <input className="cp-input" type="text" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} />
                         </div>
 
-                        {/* Row 4 */}
+                        {/* Row 5 */}
                         <div className="cp-field cp-span-6">
                             <label className="cp-label">Stakeholders</label>
                             <input className="cp-input" type="text" value={stakeholders} onChange={(e) => setStakeholders(e.target.value)} />
@@ -174,16 +220,29 @@ export default function CreateProject() {
                             </div>
                         </div>
 
-                        {/* Row 5 */}
+                        {/* Row 6 */}
                         <div className="cp-field cp-span-6">
                             <label className="cp-label">Target location</label>
                             <input className="cp-input" type="text" value={location} onChange={(e) => setLocation(e.target.value)} />
                         </div>
 
-                        <div className="cp-field cp-span-6">
+                        <div className="cp-field cp-span-3">
                             <label className="cp-label">Number of Volunteer Hours</label>
                             <input className="cp-input" type="number" min="0" value={volunteerHours} onChange={(e) => setVolunteerHours(e.target.value)} />
                         </div>
+
+                        <div className="cp-field cp-span-3">
+                            <label className="cp-label">Points</label>
+                            <input
+                                className="cp-input"
+                                type="number"
+                                min="0"
+                                placeholder="e.g., 150"
+                                value={points}
+                                onChange={(e) => setPoints(e.target.value)}
+                            />
+                        </div>
+
                     </div>
 
                     {/* SDG Section */}
@@ -196,25 +255,7 @@ export default function CreateProject() {
                         </div>
 
                         <div className="cp-sdgGrid">
-                            {[
-                                "1. No Poverty",
-                                "2. Zero Hunger",
-                                "3. Good Health and Well-Being",
-                                "4. Quality Education",
-                                "5. Gender Equality",
-                                "6. Clean Water and Sanitation",
-                                "7. Affordable and Clean Energy",
-                                "8. Decent Work and Economic Growth",
-                                "9. Industry, Innovation, and Infrastructure",
-                                "10. Reduced Inequalities",
-                                "11. Sustainable Cities and Communities",
-                                "12. Responsible Consumption and Production",
-                                "13. Climate Action",
-                                "14. Life Below Water",
-                                "15. Life on Land",
-                                "16. Peace, Justice, and Strong Institutions",
-                                "17. Partnership for the Goals",
-                            ].map((item) => (
+                            {sdgColumnMajor.map((item) => (
                                 <label key={item} className="cp-sdgItem">
                                     <input
                                         type="checkbox"
