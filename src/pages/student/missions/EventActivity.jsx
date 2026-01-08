@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { query, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { addDoc, collection } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -32,6 +33,9 @@ export default function EventActivity() {
   // Journal hooks
   const [journalReflections, setJournalReflections] = useState({});
   const [submitStatus, setSubmitStatus] = useState({});
+  const [userJournals, setUserJournals] = useState([]);
+  const [editingJournalId, setEditingJournalId] = useState(null);
+  const [editingJournalText, setEditingJournalText] = useState('');
   const auth = getAuth();
 
   // Handler for adding a skill to a level (for placeholder)
@@ -74,7 +78,7 @@ export default function EventActivity() {
   };
 
   useEffect(() => {
-    async function fetchEvent() {
+    async function fetchEventAndJournals() {
       try {
         const eventRef = doc(db, 'Missions', id);
         const eventSnap = await getDoc(eventRef);
@@ -83,15 +87,63 @@ export default function EventActivity() {
         } else {
           console.error('Event not found for id:', id);
         }
+        // Fetch user journals for this mission
+        const user = auth.currentUser;
+        if (user) {
+          const journalsQuery = query(
+            collection(db, 'activityJournals'),
+            where('userId', '==', user.uid),
+            where('missionId', '==', id)
+          );
+          const snap = await getDocs(journalsQuery);
+          setUserJournals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
       } catch (err) {
-        console.error('Error fetching event:', err);
+        console.error('Error fetching event or journals:', err);
         setEvent(null);
       } finally {
         setLoading(false);
       }
     }
-    fetchEvent();
-  }, [id]);
+    fetchEventAndJournals();
+    // eslint-disable-next-line
+  }, [id, auth.currentUser]);
+  // Edit journal handler
+  const handleEditJournal = (journal) => {
+    setEditingJournalId(journal.id);
+    setEditingJournalText(journal.journalReflection);
+  };
+
+  const handleSaveEditJournal = async (journal) => {
+    try {
+      const journalRef = doc(db, 'activityJournals', journal.id);
+      await updateDoc(journalRef, { journalReflection: editingJournalText });
+      setEditingJournalId(null);
+      setEditingJournalText('');
+      // Refresh journals
+      const user = auth.currentUser;
+      if (user) {
+        const journalsQuery = query(
+          collection(db, 'activityJournals'),
+          where('userId', '==', user.uid),
+          where('missionId', '==', id)
+        );
+        const snap = await getDocs(journalsQuery);
+        setUserJournals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    } catch (err) {
+      alert('Failed to update journal.');
+    }
+  };
+
+  const handleDeleteJournal = async (journalId) => {
+    try {
+      await deleteDoc(doc(db, 'activityJournals', journalId));
+      setUserJournals(userJournals.filter(j => j.id !== journalId));
+    } catch (err) {
+      alert('Failed to delete journal.');
+    }
+  };
 
   // Conditional rendering for placeholder
   if (id === 'placeholder') {
@@ -307,43 +359,70 @@ export default function EventActivity() {
             </button>
           </div>
         </div>
+        {/* Activities Section with journals below each activity title */}
         {/* Right: Activity Section */}
         <div style={{ flex: '0 0 60%', maxWidth: '60%', minWidth: 400, background: '#7bb661', borderRadius: 20, padding: 24, height: '75vh', overflowY: 'auto' }}>
           <h2 style={{ color: '#fff', fontWeight: 700, marginBottom: 16 }}>Activity</h2>
-          {event.activities && event.activities.map((activity, idx) => (
-            <div key={idx} style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <h3 style={{ color: '#234e7b', fontWeight: 700 }}>{activity.title}</h3>
-                <button style={{ background: '#7bb661', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                  JOIN THE ACTIVITY!
-                </button>
-              </div>
-              <ul style={{ color: '#234e7b', fontSize: 15, marginBottom: 8 }}>
-                {activity.details && activity.details.map((detail, i) => (
-                  <li key={i}>{detail}</li>
+          {event.activities && event.activities.map((activity, idx) => {
+            // Find journals for this activity
+            const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
+            return (
+              <div key={idx} style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h3 style={{ color: '#234e7b', fontWeight: 700 }}>{activity.title}</h3>
+                  <button style={{ background: '#7bb661', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                    JOIN THE ACTIVITY!
+                  </button>
+                </div>
+                {/* User's journals for this activity */}
+                {journalsForActivity.length > 0 && journalsForActivity.map(journal => (
+                  <div key={journal.id} style={{ background: '#f9f9f9', border: '1px solid #eee', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+                    {editingJournalId === journal.id ? (
+                      <>
+                        <textarea
+                          value={editingJournalText}
+                          onChange={e => setEditingJournalText(e.target.value)}
+                          style={{ width: '100%', minHeight: 60, margin: '8px 0', borderRadius: 6, border: '1px solid #ccc', padding: 8 }}
+                        />
+                        <button onClick={() => handleSaveEditJournal(journal)} style={{ marginRight: 8, background: '#1ea7fd', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 600, cursor: 'pointer' }}>Save</button>
+                        <button onClick={() => setEditingJournalId(null)} style={{ background: '#bdbdbd', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ margin: '8px 0', color: '#234e7b' }}>{journal.journalReflection}</div>
+                        <button onClick={() => handleEditJournal(journal)} style={{ marginRight: 8, background: '#7bb661', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+                        <button onClick={() => handleDeleteJournal(journal.id)} style={{ background: '#d32f2f', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+                      </>
+                    )}
+                  </div>
                 ))}
-              </ul>
-              {activity.required && <div style={{ color: '#234e7b', fontSize: 15, marginBottom: 8 }}><strong>Required:</strong> {activity.required}</div>}
-              <textarea
-                placeholder="Journal Reflection"
-                style={{ width: '100%', minHeight: 60, marginBottom: 8, borderRadius: 6, border: '1px solid #ccc', padding: 8 }}
-                value={journalReflections[idx] || ''}
-                onChange={e => handleJournalChange(idx, e.target.value)}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span>Task Progress</span>
-                <progress value={submitStatus[idx] === 'Reflection submitted!' ? 100 : 0} max="100" style={{ flex: 1 }} />
+                <ul style={{ color: '#234e7b', fontSize: 15, marginBottom: 8 }}>
+                  {activity.details && activity.details.map((detail, i) => (
+                    <li key={i}>{detail}</li>
+                  ))}
+                </ul>
+                {activity.required && <div style={{ color: '#234e7b', fontSize: 15, marginBottom: 8 }}><strong>Required:</strong> {activity.required}</div>}
+                <textarea
+                  placeholder="Journal Reflection"
+                  style={{ width: '100%', minHeight: 60, marginBottom: 8, borderRadius: 6, border: '1px solid #ccc', padding: 8 }}
+                  value={journalReflections[idx] || ''}
+                  onChange={e => handleJournalChange(idx, e.target.value)}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span>Task Progress</span>
+                  <progress value={submitStatus[idx] === 'Reflection submitted!' ? 100 : 0} max="100" style={{ flex: 1 }} />
+                </div>
+                <button
+                  style={{ background: journalReflections[idx] && journalReflections[idx].trim() ? '#1ea7fd' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 24px', fontWeight: 600, fontSize: 14, cursor: journalReflections[idx] && journalReflections[idx].trim() ? 'pointer' : 'not-allowed' }}
+                  disabled={!journalReflections[idx] || !journalReflections[idx].trim()}
+                  onClick={() => handleJournalSubmit(idx, activity)}
+                >
+                  SUBMIT
+                </button>
+                {submitStatus[idx] && <div style={{ marginTop: 8, color: submitStatus[idx] === 'Reflection submitted!' ? '#7bb661' : '#d32f2f', fontWeight: 600 }}>{submitStatus[idx]}</div>}
               </div>
-              <button
-                style={{ background: journalReflections[idx] && journalReflections[idx].trim() ? '#1ea7fd' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 24px', fontWeight: 600, fontSize: 14, cursor: journalReflections[idx] && journalReflections[idx].trim() ? 'pointer' : 'not-allowed' }}
-                disabled={!journalReflections[idx] || !journalReflections[idx].trim()}
-                onClick={() => handleJournalSubmit(idx, activity)}
-              >
-                SUBMIT
-              </button>
-              {submitStatus[idx] && <div style={{ marginTop: 8, color: submitStatus[idx] === 'Reflection submitted!' ? '#7bb661' : '#d32f2f', fontWeight: 600 }}>{submitStatus[idx]}</div>}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
