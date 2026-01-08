@@ -8,6 +8,8 @@ import { auth, db, functions } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { Link, useNavigate } from "react-router-dom";
+import bbl_icon from "../assets/bbl_icon.svg";
+import "../styles/ui.css";
 
 function Auth() {
   const [email, setEmail] = useState("");
@@ -223,6 +225,13 @@ function Auth() {
                 <Link to="/reset-password">Forgot Password?</Link>
               </p>
 
+              <div className="divider">
+                <span>Sign in with</span>
+              </div>
+
+              <button className="icon-btn" type="button" aria-label="Sign in with Blackboard">
+                <img src={bbl_icon} alt="Blackboard" />
+              </button>
 
               {error && (
                 <p
