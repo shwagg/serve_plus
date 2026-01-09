@@ -3,6 +3,7 @@ import { SessionProvider } from "./context/SessionContext";
 import { ProtectedRoute } from "./router/ProtectedRoute";
 
 import Auth from "./pages/Auth"; //changed login to authorization page
+import OAuthCallback from "./pages/OAuthCallback";
 import Register from "./pages/Register";
 import ForgotPass from "./pages/ForgotPass";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -25,6 +26,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/oauth-callback" element={<OAuthCallback />} />
           <Route path="/reset-password" element={<ForgotPass />} />
           <Route path="/register" element={<Register />} />
           <Route

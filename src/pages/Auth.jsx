@@ -9,6 +9,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { Link, useNavigate } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
+import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
 
 function Auth() {
@@ -17,6 +18,7 @@ function Auth() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const initiateBlackboardAuth = useBlackboardAuth();
 
   const isDev = import.meta.env.DEV; //(Dev-only switch)
   //only developers can see detailed debug info while developing.
@@ -229,7 +231,12 @@ function Auth() {
                 <span>Sign in with</span>
               </div>
 
-              <button className="icon-btn" type="button" aria-label="Sign in with Blackboard">
+              <button
+                className="icon-btn"
+                type="button"
+                aria-label="Sign in with Blackboard"
+                onClick={initiateBlackboardAuth}
+              >
                 <img src={bbl_icon} alt="Blackboard" />
               </button>
 
