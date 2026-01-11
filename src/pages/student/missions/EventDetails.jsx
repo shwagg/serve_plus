@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { db } from '../../../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { useParams, useNavigate } from 'react-router-dom';
+import { db, auth } from '../../../firebaseConfig';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import Header from '../../../components/Header';
 
 
 export default function EventDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [mission, setMission] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -17,6 +18,19 @@ export default function EventDetails() {
         const missionSnap = await getDoc(missionRef);
         if (missionSnap.exists()) {
           setMission(missionSnap.data());
+          
+          // Check if user is already a volunteer
+          const user = auth.currentUser;
+          if (user) {
+            const volunteerRef = doc(db, 'Missions', id, 'volunteer', user.uid);
+            const volunteerSnap = await getDoc(volunteerRef);
+            
+            if (volunteerSnap.exists()) {
+              // User is already a volunteer, redirect to activity page
+              navigate(`/event/${id}/activity`, { replace: true });
+              return;
+            }
+          }
         } else {
           setMission(null);
         }
@@ -27,7 +41,7 @@ export default function EventDetails() {
       }
     }
     fetchMission();
-  }, [id]);
+  }, [id, navigate]);
 
 
   // Example notifications (replace with real data as needed)
@@ -74,7 +88,30 @@ export default function EventDetails() {
                 </div>
                 <button
                   style={{ background: '#7bb661', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontWeight: 600, fontSize: 16, cursor: 'pointer', marginTop: 8 }}
-                  onClick={() => window.location.href = `/event/${id}/activity`}
+                  onClick={async () => {
+                    const user = auth.currentUser;
+                    if (!user) {
+                      alert('Please log in to join this event.');
+                      return;
+                    }
+                    
+                    try {
+                      // Add user to volunteer subcollection with UID as document ID
+                      const volunteerRef = doc(db, 'Missions', id, 'volunteer', user.uid);
+                      await setDoc(volunteerRef, {
+                        joinedAt: new Date().toISOString(),
+                        attendanceStatus: 'pending',
+                        pointsEarned: 0,
+                        verified: false
+                      });
+                      
+                      // Navigate to activity page
+                      navigate(`/event/${id}/activity`);
+                    } catch (error) {
+                      console.error('Error joining event:', error);
+                      alert('Failed to join event. Please try again.');
+                    }
+                  }}
                 >
                   JOIN EVENT
                 </button>

@@ -1,12 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
-import { query, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
-import { addDoc, collection } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { db } from '../../../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Header from '../../../components/Header';
+import { db } from '../../../firebaseConfig';
 
 export default function EventActivity() {
   const { id } = useParams();
@@ -283,6 +281,7 @@ export default function EventActivity() {
   }
 
   const [event, setEvent] = useState(null);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -292,6 +291,15 @@ export default function EventActivity() {
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
           setEvent(eventSnap.data());
+          
+          // Fetch tasks from tasks subcollection
+          const tasksRef = collection(db, 'Missions', id, 'task');
+          const tasksSnap = await getDocs(tasksRef);
+          const tasksData = tasksSnap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setTasks(tasksData);
         } else {
           console.error('Event not found for id:', id);
         }
@@ -316,11 +324,11 @@ export default function EventActivity() {
       </div>
     );
   }
-  if (!event.activities || !Array.isArray(event.activities) || event.activities.length === 0) {
+  if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
     return (
       <div style={{ padding: 32, color: '#d32f2f', fontWeight: 700 }}>
-        No activities found for this event.<br />
-        <span style={{ fontWeight: 400, color: '#234e7b' }}>Check your Firestore event document for an 'activities' array.</span>
+        No tasks found for this event.<br />
+        <span style={{ fontWeight: 400, color: '#234e7b' }}>Check your Firestore tasks subcollection.</span>
       </div>
     );
   }
@@ -363,7 +371,7 @@ export default function EventActivity() {
         {/* Right: Activity Section */}
         <div style={{ flex: '0 0 60%', maxWidth: '60%', minWidth: 400, background: '#7bb661', borderRadius: 20, padding: 24, height: '75vh', overflowY: 'auto' }}>
           <h2 style={{ color: '#fff', fontWeight: 700, marginBottom: 16 }}>Activity</h2>
-          {event.activities && event.activities.map((activity, idx) => {
+          {tasks && tasks.map((activity, idx) => {
             // Find journals for this activity
             const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
             return (
