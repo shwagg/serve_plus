@@ -33,19 +33,19 @@ const StudentHome = () => {
   const [studentRank, setStudentRank] = useState(8);
   const [leaderboard, setLeaderboard] = useState(defaultLeaderboard);
   const [missionCards, setMissionCards] = useState([]);
-    // Fetch missions from Firestore
-    useEffect(() => {
-      const fetchMissions = async () => {
-        try {
-          const querySnapshot = await getDocs(collection(db, "Missions"));
-          const missions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setMissionCards(missions);
-        } catch (error) {
-          console.error("Error fetching missions:", error);
-        }
-      };
-      fetchMissions();
-    }, []);
+  // Fetch missions from Firestore
+  useEffect(() => {
+    const fetchMissions = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "Missions"));
+        const missions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMissionCards(missions);
+      } catch (error) {
+        console.error("Error fetching missions:", error);
+      }
+    };
+    fetchMissions();
+  }, []);
   const [globalNotifications, setGlobalNotifications] = useState([
     { title: "New Event Added:", bold: "The Disaster Risk Reduction Training in Los Baños is now open!", text: "Sign up and secure your slot today." },
     { title: "2 New Volunteers Joined the Hydroponics Workshop!", text: "You are now 80% full. Get your tasks before they run out" },
@@ -124,7 +124,7 @@ const StudentHome = () => {
   const handleNotificationOverlayToggle = () => setNotificationOverlayOpen((open) => !open);
 
   return (
-    <div className="student-dashboard" style={{ background: '#f6f6f6', minHeight: '100vh', minWidth: '100vw', width: '100vw', fontFamily: 'sans-serif', position: 'relative', overflowX: 'hidden', paddingTop: '80px', boxSizing: 'border-box', overflowY: 'auto' }}>
+    <div className="main-page" >
       {/* Logout Popup */}
       {showLogoutPopup && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
