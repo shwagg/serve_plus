@@ -11,6 +11,24 @@ export default function ProposeProject() {
 
   // Store activities in state, initialize with demo if needed
   const [activities, setActivities] = useState([]);
+  // Store all form data
+  const [formData, setFormData] = useState({
+    title: '',
+    date: '',
+    faculty: '',
+    sections: '',
+    courseTitle: '',
+    courseCode: '',
+    stakeholders: '',
+    targetDates: '',
+    targetLocation: '',
+    volunteerHours: '',
+    sdgs: [],
+    description: '',
+    objectives: '',
+    indicators: '',
+    budget: '',
+  });
 
   // If coming back from EventActivity, add new activity
   React.useEffect(() => {
@@ -40,69 +58,82 @@ export default function ProposeProject() {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ margin: 0, fontWeight: 700, fontSize: 28 }}>Service-Learning Proposal</h2>
-          <span style={{ fontWeight: 500, fontSize: 18 }}>Page {page} / 3</span>
+          <span style={{ fontWeight: 500, fontSize: 18 }}>Page {page} / 4</span>
           <span style={{ position: 'absolute', top: 24, right: 24, fontSize: 22, cursor: 'pointer' }} title="Info">ℹ️</span>
         </div>
-        {page === 1 ? <PageOne onNext={() => setPage(2)} /> : null}
-        {page === 2 ? <PageTwo onPrev={() => setPage(1)} onNext={() => setPage(3)} /> : null}
-        {page === 3 ? <PageThree onPrev={() => setPage(2)} activities={activities} setActivities={setActivities} /> : null}
+        {page === 1 ? <PageOne onNext={() => setPage(2)} formData={formData} setFormData={setFormData} /> : null}
+        {page === 2 ? <PageTwo onPrev={() => setPage(1)} onNext={() => setPage(3)} formData={formData} setFormData={setFormData} /> : null}
+        {page === 3 ? <PageThree onPrev={() => setPage(2)} onNext={() => setPage(4)} activities={activities} setActivities={setActivities} formData={formData} setFormData={setFormData} /> : null}
+        {page === 4 ? <PageFour onPrev={() => setPage(3)} activities={activities} formData={formData} /> : null}
       </div>
     </div>
   );
 }
 
-function PageOne({ onNext }) {
+function PageOne({ onNext, formData, setFormData }) {
+  const handleChange = e => {
+    const { name, value, type, checked } = e.target;
+    if (type === 'checkbox') {
+      setFormData(prev => {
+        let sdgs = prev.sdgs;
+        if (checked) sdgs = [...sdgs, value];
+        else sdgs = sdgs.filter(s => s !== value);
+        return { ...prev, sdgs };
+      });
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
   return (
     <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); onNext(); }}>
-      {/* ...existing code for page 1 form... */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
         <div style={{ flex: 2 }}>
           <label style={labelStyle}>Title of Service-Learning Initiative</label>
-          <input style={inputStyle} type="text" />
+          <input style={inputStyle} type="text" name="title" value={formData.title} onChange={handleChange} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Date Proposed</label>
-          <input style={inputStyle} type="date" />
+          <input style={inputStyle} type="date" name="date" value={formData.date} onChange={handleChange} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Faculty-In-Charge / Proponent(s)</label>
-          <input style={inputStyle} type="text" />
+          <input style={inputStyle} type="text" name="faculty" value={formData.faculty} onChange={handleChange} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Participating Section(s)</label>
-          <input style={inputStyle} type="text" />
+          <input style={inputStyle} type="text" name="sections" value={formData.sections} onChange={handleChange} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Course Title</label>
-          <input style={inputStyle} type="text" />
+          <input style={inputStyle} type="text" name="courseTitle" value={formData.courseTitle} onChange={handleChange} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Course Code</label>
-          <input style={inputStyle} type="text" />
+          <input style={inputStyle} type="text" name="courseCode" value={formData.courseCode} onChange={handleChange} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Stakeholders</label>
-          <input style={inputStyle} type="text" />
+          <input style={inputStyle} type="text" name="stakeholders" value={formData.stakeholders} onChange={handleChange} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Target Dates</label>
-          <input style={inputStyle} type="date" />
+          <input style={inputStyle} type="date" name="targetDates" value={formData.targetDates} onChange={handleChange} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Target location</label>
-          <input style={inputStyle} type="text" />
+          <input style={inputStyle} type="text" name="targetLocation" value={formData.targetLocation} onChange={handleChange} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Number of Volunteer Hours</label>
-          <input style={inputStyle} type="number" min="0" />
+          <input style={inputStyle} type="number" min="0" name="volunteerHours" value={formData.volunteerHours} onChange={handleChange} />
         </div>
       </div>
       <div style={{ marginBottom: 8, fontWeight: 600 }}>SDG(s)</div>
@@ -121,7 +152,7 @@ function PageOne({ onNext }) {
       }}>
         {sdgList.map((sdg, i) => (
           <label key={sdg.num} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 500 }}>
-            <input type="checkbox" style={{ accentColor: '#3386e6', width: 18, height: 18 }} />
+            <input type="checkbox" style={{ accentColor: '#3386e6', width: 18, height: 18 }} name="sdgs" value={sdg.label} checked={formData.sdgs.includes(sdg.label)} onChange={handleChange} />
             {sdg.num}. {sdg.label}
           </label>
         ))}
@@ -134,7 +165,11 @@ function PageOne({ onNext }) {
   );
 }
 
-function PageTwo({ onPrev, onNext }) {
+function PageTwo({ onPrev, onNext, formData, setFormData }) {
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
   return (
     <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); onNext(); }}>
       <div style={{ marginBottom: 20 }}>
@@ -142,18 +177,18 @@ function PageTwo({ onPrev, onNext }) {
           <label style={labelStyle}>Description</label>
           <span style={{ fontSize: 13, color: '#888', fontWeight: 400 }}>Note: Please write a detailed description of the activity.</span>
         </div>
-        <textarea style={textareaStyle} rows={4} />
+        <textarea style={textareaStyle} rows={4} name="description" value={formData.description} onChange={handleChange} />
       </div>
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <label style={labelStyle}>Objectives</label>
           <span style={{ fontSize: 13, color: '#888', fontWeight: 400 }}>Note: Please specify student outcome, course objective or learning outcome to be met.</span>
         </div>
-        <textarea style={textareaStyle} rows={4} />
+        <textarea style={textareaStyle} rows={4} name="objectives" value={formData.objectives} onChange={handleChange} />
       </div>
       <div style={{ marginBottom: 32 }}>
         <label style={labelStyle}>Success Indicators</label>
-        <textarea style={textareaStyle} rows={4} />
+        <textarea style={textareaStyle} rows={4} name="indicators" value={formData.indicators} onChange={handleChange} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <button type="button" style={buttonStyle} onClick={onPrev}>PREVIOUS</button>
@@ -165,17 +200,19 @@ function PageTwo({ onPrev, onNext }) {
 
 import React, { useState } from "react";
 
-function PageThree({ onPrev, activities, setActivities }) {
+function PageThree({ onPrev, onNext, activities, setActivities, formData, setFormData }) {
   const navigate = useNavigate();
-  const [budget, setBudget] = React.useState("");
 
   const addActivity = () => {
     navigate("/event/placeholder/activity", { state: { fromProposal: true, activities } });
   };
   const removeActivity = id => setActivities(activities.filter(a => a.id !== id));
+  const handleBudgetChange = e => {
+    setFormData(prev => ({ ...prev, budget: e.target.value }));
+  };
 
   return (
-    <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); alert('Submitted!'); }}>
+    <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); onNext(); }}>
       <div style={{ display: 'flex', gap: 24, marginBottom: 12 }}>
         {/* Specific Activity */}
         <div style={{ flex: 2, minWidth: 0 }}>
@@ -201,8 +238,9 @@ function PageThree({ onPrev, activities, setActivities }) {
               style={inputStyle}
               type="text"
               placeholder=""
-              value={budget}
-              onChange={e => setBudget(e.target.value)}
+              name="budget"
+              value={formData.budget}
+              onChange={handleBudgetChange}
             />
             <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>Note: Attach the Fundraising Activity Proposal if applicable</div>
           </div>
@@ -213,7 +251,47 @@ function PageThree({ onPrev, activities, setActivities }) {
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <button type="button" style={buttonStyle} onClick={onPrev}>PREVIOUS</button>
-        <button type="submit" style={{ ...buttonStyle, background: '#1ea7fd', color: '#fff', border: 'none' }}>SUBMIT</button>
+        <button type="submit" style={{ ...buttonStyle, background: '#1ea7fd', color: '#fff', border: 'none' }}>NEXT</button>
+      </div>
+    </form>
+  );
+}
+
+function PageFour({ onPrev, activities, formData }) {
+  // Final review and submit page
+  return (
+    <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); alert('Submitted!'); }}>
+      <h3 style={{ fontWeight: 700, marginBottom: 16 }}>Final Review & Submit</h3>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Service-Learning Proposal Details:</div>
+        <div style={{ marginBottom: 8 }}><b>Title:</b> {formData.title}</div>
+        <div style={{ marginBottom: 8 }}><b>Date Proposed:</b> {formData.date}</div>
+        <div style={{ marginBottom: 8 }}><b>Faculty-In-Charge / Proponent(s):</b> {formData.faculty}</div>
+        <div style={{ marginBottom: 8 }}><b>Participating Section(s):</b> {formData.sections}</div>
+        <div style={{ marginBottom: 8 }}><b>Course Title:</b> {formData.courseTitle}</div>
+        <div style={{ marginBottom: 8 }}><b>Course Code:</b> {formData.courseCode}</div>
+        <div style={{ marginBottom: 8 }}><b>Stakeholders:</b> {formData.stakeholders}</div>
+        <div style={{ marginBottom: 8 }}><b>Target Dates:</b> {formData.targetDates}</div>
+        <div style={{ marginBottom: 8 }}><b>Target Location:</b> {formData.targetLocation}</div>
+        <div style={{ marginBottom: 8 }}><b>Number of Volunteer Hours:</b> {formData.volunteerHours}</div>
+        <div style={{ marginBottom: 8 }}><b>SDGs:</b> {formData.sdgs.join(', ')}</div>
+        <div style={{ marginBottom: 8 }}><b>Description:</b> {formData.description}</div>
+        <div style={{ marginBottom: 8 }}><b>Objectives:</b> {formData.objectives}</div>
+        <div style={{ marginBottom: 8 }}><b>Success Indicators:</b> {formData.indicators}</div>
+        <div style={{ marginBottom: 8 }}><b>Budget:</b> {formData.budget}</div>
+        <div style={{ fontWeight: 600, margin: '16px 0 8px 0' }}>Activities Added:</div>
+        <ul>
+          {activities.map(a => (
+            <li key={a.id} style={{ marginBottom: 4 }}>{a.name}</li>
+          ))}
+        </ul>
+      </div>
+      <div style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>
+        Please review all information before submitting. You will not be able to edit after submission.
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <button type="button" style={buttonStyle} onClick={onPrev}>PREVIOUS</button>
+        <button type="submit" style={{ ...buttonStyle, background: '#3386e6', color: '#fff', border: 'none' }}>SUBMIT</button>
       </div>
     </form>
   );
