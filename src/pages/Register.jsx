@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, setDoc } from "firebase/firestore";
+import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 
 function Register() {
     const [name, setName] = useState("");
@@ -10,6 +11,8 @@ function Register() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -20,7 +23,7 @@ function Register() {
         setLoading(true);
 
         if (password !== confirmPassword) {
-            setError("Passwords do not match");
+            setError("Password does not match");
             setLoading(false);
             return;
         }
@@ -90,23 +93,48 @@ function Register() {
                         required
                     />
 
-                    <input
-                        className="ui-input"
-                        type="password"
-                        placeholder="Password"
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                    />
+                    <div className="ui-input-pass-wrap">
+                        <input
+                            className="ui-input"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Password"
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                        {password.length > 0 && (
+                            <button
+                                type="button"
+                                className="ui-btn eye"
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                onClick={() => setShowPassword((prev) => !prev)}
+                            >
+                                {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </button>
+                        )}
+                    </div>
 
-                    <input
-                        className="ui-input"
-                        type="password"
-                        placeholder="Confirm Password"
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                    />
+                    <div className="ui-input-pass-wrap">
+                        <input
+                            className="ui-input"
+                            type={showConfirmPassword ? "text" : "password"}
+                            placeholder="Confirm Password"
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            required
+                        />
+                        {confirmPassword.length > 0 && (
+                            <button
+                                type="button"
+                                className="ui-btn eye"
+                                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                            >
+                                {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </button>
+                        )}
+                    </div>
+
                     <button className="ui-btn" type="submit" disabled={loading}>
-                        {loading ? "Creating Account..." : "CREATE ACCOUNT"}
+                        {loading ? "Creating Account..." : "Create Account"}
                     </button>
                     {error && <p className="ui-error">{error}</p>}
                 </form>

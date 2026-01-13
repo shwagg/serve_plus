@@ -11,6 +11,8 @@ import { Link, useNavigate } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
 import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
+import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
+
 
 function Auth() {
   const [email, setEmail] = useState("");
@@ -25,6 +27,7 @@ function Auth() {
 
   const [step, setStep] = useState("login"); //"login" or "mfa"
   const [mfaCode, setMfaCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
@@ -206,18 +209,30 @@ function Auth() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
+              <div className="ui-input-pass-wrap">
+                <input
+                  className="ui-input pass"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                {password.length > 0 && (
+                  <button
+                    type="button"
+                    className="ui-btn eye"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </button>
+                )}
+              </div>
 
-              <input
-                className="ui-input"
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
 
               <button className="ui-btn" type="submit">
-                SIGN IN
+                Sign in
               </button>
 
               {error && <p className="ui-error">{error}</p>}

@@ -32,3 +32,7 @@ close niyo lang lahat from database to vite(react) tas run this command
 Rename-Item (currentname)  emulator_data
 Example: Rename-Item -Path "firebase-export-1767812823428G3B94I" -NewName "emulator_data"
 
+Hi, for material-icons, install lang ito:
+close yung run npm dev.
+"npm install @mui/material @mui/icons-material @emotion/react @emotion/styled"
+then run npm dev again.
