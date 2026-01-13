@@ -14,6 +14,7 @@ import ProjectDetails from "./pages/admin/ProjectDetails";
 import AuditLogs from "./pages/admin/AuditLogs";
 import StudentHome from "./pages/student/StudentHome";
 import ProposeProject from "./pages/student/ProposeProject";
+import AttendanceScannerPage from "./pages/student/AttendanceScannerPage";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
 import EventDetails from "./pages/student/missions/EventDetails";
@@ -56,6 +57,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["student"]}>
                 <StudentHome />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/attendance"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <AttendanceScannerPage />
               </ProtectedRoute>
             }
           />

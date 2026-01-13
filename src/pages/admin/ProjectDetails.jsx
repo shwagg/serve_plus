@@ -8,6 +8,7 @@ import "../../styles/AdminDashboard.css";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import ceBg from "../../assets/ce-proposal-page1.png";
+import QRCode from "qrcode";
 
 
 export default function ProjectDetails() {
@@ -45,6 +46,8 @@ export default function ProjectDetails() {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
 
   const ref = doc(db, "Missions", projectId);
 
@@ -78,6 +81,14 @@ export default function ProjectDetails() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  useEffect(() => {
+    if (projectId && showQR) {
+      QRCode.toDataURL(JSON.stringify({ eventId: projectId }), (err, url) => {
+        if (!err) setQrUrl(url);
+      });
+    }
+  }, [projectId, showQR]);
 
   const setStatus = async (nextStatus) => {
     setSaving(true);
@@ -259,6 +270,23 @@ export default function ProjectDetails() {
         <button disabled={!canPublish || saving} onClick={() => setStatus("published")}>
           Publish
         </button>
+
+        <button
+          style={{ background: '#222', color: '#fff', borderRadius: 20, padding: '12px 24px', fontWeight: 600 }}
+          onClick={() => setShowQR((prev) => !prev)}
+          disabled={saving}
+          type="button"
+        >
+          {showQR ? "Hide QR Code" : "Show Attendance QR Code"}
+        </button>
+        {showQR && qrUrl && (
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} />
+            <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
+              Scan this code to mark attendance for this event.
+            </div>
+          </div>
+        )}
       </div>
 
       <hr />

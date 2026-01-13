@@ -12,7 +12,7 @@ export default function CreateProject() {
     const [location, setLocation] = useState("");
     const [points, setPoints] = useState("");
     const [description, setDescription] = useState("");
-    //const [waiver, setWaiver] = useState("");
+    const [waiver, setWaiver] = useState("");
 
     const [facultyInCharge, setFacultyInCharge] = useState("");
     const [sections, setSections] = useState("");
