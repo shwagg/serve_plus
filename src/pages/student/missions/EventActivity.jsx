@@ -10,10 +10,51 @@ import {
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
+import QRScanner from "../../../components/QRScanner";
 import { db } from "../../../firebaseConfig";
 
 export default function EventActivity() {
+    const [showQRModal, setShowQRModal] = useState(false);
+    const [qrStatus, setQRStatus] = useState("");
+    const handleQRScan = async (decodedText) => {
+      setQRStatus("");
+      // Use event id from this page
+      const projectId = id;
+      // Get current user
+      const user = auth.currentUser;
+      if (!user) {
+        setQRStatus("You must be logged in to record attendance.");
+        return;
+      }
+      try {
+        // Fetch user info from users collection
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        let name = "";
+        let email = "";
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          name = data.name || data.username || "";
+          email = data.email || "";
+        } else {
+          name = user.displayName || "";
+          email = user.email || "";
+        }
+        await setDoc(
+          doc(db, "Missions", projectId, "volunteer", user.uid),
+          {
+            name,
+            email,
+            attendanceStatus: "present"
+          },
+          { merge: true }
+        );
+        setQRStatus("Attendance recorded!");
+      } catch (err) {
+        setQRStatus("Failed to record attendance.");
+      }
+    };
   const { id } = useParams();
+  const navigate = useNavigate();
   // All hooks at top level
   // Placeholder form hooks
   const coreSkills = [
@@ -1021,6 +1062,7 @@ export default function EventActivity() {
               display: "flex",
               flexDirection: "column",
               alignItems: "stretch",
+              position: "relative"
             }}
           >
             <h2
@@ -1086,6 +1128,46 @@ export default function EventActivity() {
                   }}
                 />
               </div>
+              {/* View Event Page Button */}
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+                <button
+                  style={{
+                    background: "#2566b3",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "10px 24px",
+                    fontWeight: 600,
+                    fontSize: 16,
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px #0001",
+                  }}
+                  onClick={() => setShowQRModal(true)}
+                >
+                  Scan Attendance QR Code
+                </button>
+              </div>
+              {showQRModal && (
+                <div style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  width: "100vw",
+                  height: "100vh",
+                  background: "rgba(0,0,0,0.4)",
+                  zIndex: 9999,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}>
+                  <div style={{ background: "#fff", borderRadius: 16, padding: 32, boxShadow: "0 4px 24px #0003", minWidth: 340, textAlign: "center", position: "relative" }}>
+                    <button style={{ position: "absolute", top: 12, right: 12, background: "#eee", border: "none", borderRadius: 8, padding: "4px 12px", cursor: "pointer", fontWeight: 700 }} onClick={() => setShowQRModal(false)}>X</button>
+                    <h3 style={{ marginBottom: 16, color: "#2566b3" }}>Scan or Upload QR Code</h3>
+                    <QRScanner onScan={handleQRScan} />
+                    {qrStatus && <div style={{ marginTop: 16, color: qrStatus === "Attendance recorded!" ? "green" : "red" }}>{qrStatus}</div>}
+                  </div>
+                </div>
+              )}
               {event.waiver && (
                 <div
                   style={{

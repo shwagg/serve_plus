@@ -1,7 +1,8 @@
 import { useRef, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
-import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
+
 import "../../styles/AdminDashboard.css";
 
 //for demo purposes only
@@ -14,6 +15,32 @@ import QRCode from "qrcode";
 export default function ProjectDetails() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [attendees, setAttendees] = useState([]);
+  const [project, setProject] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+
+  // Fetch attendees from Firestore subcollection
+  useEffect(() => {
+    if (!projectId || !showQR) return;
+    const fetchAttendees = async () => {
+      try {
+        const volunteerRef = collection(db, "Missions", projectId, "volunteer");
+        const snap = await getDocs(volunteerRef);
+        setAttendees(
+          snap.docs
+            .filter(doc => doc.data().attendanceStatus === "present")
+            .map(doc => doc.data().name || doc.data().email || "Unknown")
+        );
+      } catch (err) {
+        setAttendees([]);
+      }
+    };
+    fetchAttendees();
+  }, [projectId, showQR]);
+  // Removed duplicate declarations
 
   //export to PDF (demo purposes only)
   const pdfRef = useRef(null);
@@ -43,11 +70,7 @@ export default function ProjectDetails() {
     pdf.save(filename);
   };
 
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [showQR, setShowQR] = useState(false);
-  const [qrUrl, setQrUrl] = useState("");
+  // Removed duplicate state declarations for project, loading, saving, showQR, qrUrl
 
   const ref = doc(db, "Missions", projectId);
 
@@ -280,10 +303,24 @@ export default function ProjectDetails() {
           {showQR ? "Hide QR Code" : "Show Attendance QR Code"}
         </button>
         {showQR && qrUrl && (
-          <div style={{ marginTop: 16, textAlign: 'center' }}>
-            <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-              Scan this code to mark attendance for this event.
+          <div style={{ marginTop: 24, display: 'flex', alignItems: 'flex-start', gap: 32 }}>
+            <div>
+              <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} style={{ display: 'block' }} />
+              <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
+                Scan this code to mark attendance for this event.
+              </div>
+            </div>
+            <div style={{ minWidth: 180 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: '#111' }}>Attendees</div>
+              {attendees.length === 0 ? (
+                <div style={{ color: '#888', fontSize: 13 }}>No scans yet.</div>
+              ) : (
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 15, color: '#111' }}>
+                  {attendees.map((name, idx) => (
+                    <li key={idx} style={{ marginBottom: 4 }}>{name}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         )}

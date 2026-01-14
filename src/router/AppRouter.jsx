@@ -1,8 +1,6 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import StudentHome from '../pages/student/StudentHome';
 import ProposeProject from '../pages/student/ProposeProject';
-import AttendanceScannerPage from '../pages/student/AttendanceScannerPage';
 import EventDetails from '../pages/student/missions/EventDetails';
 import EventActivity from '../pages/student/missions/EventActivity';
 import AdminLayout from '../pages/admin/AdminLayout';
@@ -17,7 +15,6 @@ export default function AppRouter() {
       <Routes>
         {/* Student and event routes */}
         <Route path="/student" element={<StudentHome />} />
-        <Route path="/student/attendance" element={<AttendanceScannerPage />} />
         <Route path="/event/:id" element={<EventDetails />} />
         <Route path="/event/:id/activity" element={<EventActivity />} />
 

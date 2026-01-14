@@ -40,7 +40,7 @@ service cloud.firestore {
         allow create, update, delete: if request.auth != null &&
           (request.auth.token.role == "admin" ||
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
-        
+
         // Participants subcollection - users can enroll themselves
         match /participants/{userId} {
           allow read: if request.auth != null;
@@ -50,6 +50,16 @@ service cloud.firestore {
              request.auth.token.role == "admin" ||
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
         }
+      }
+
+      // Attendees subcollection - users can record their own attendance
+      match /attendees/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update, delete: if request.auth != null && 
+          (request.auth.uid == userId || 
+           request.auth.token.role == "admin" ||
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
       }
     }
 
