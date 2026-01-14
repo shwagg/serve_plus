@@ -1,4 +1,10 @@
+
+
+
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+
+// Main component for the Service-Learning Proposal multi-step form
 export default function ProposeProject() {
   const location = useLocation();
   // Set initial page based on query param
@@ -9,28 +15,55 @@ export default function ProposeProject() {
   })();
   const [page, setPage] = useState(queryPage);
 
-  // Store activities in state, initialize with demo if needed
-  const [activities, setActivities] = useState([]);
-  // Store all form data
-  const [formData, setFormData] = useState({
-    title: '',
-    date: '',
-    faculty: '',
-    sections: '',
-    courseTitle: '',
-    courseCode: '',
-    stakeholders: '',
-    targetDates: '',
-    targetLocation: '',
-    volunteerHours: '',
-    sdgs: [],
-    description: '',
-    objectives: '',
-    indicators: '',
-    budget: '',
-  });
+  // Load from localStorage if available
+  // Returns initial form data, loading from localStorage if available
+  const getInitialFormData = () => {
+    try {
+      const saved = localStorage.getItem('proposalFormData');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      title: '',
+      date: '',
+      faculty: '',
+      sections: '',
+      courseTitle: '',
+      courseCode: '',
+      stakeholders: '',
+      targetDates: '',
+      targetLocation: '',
+      volunteerHours: '',
+      sdgs: [],
+      description: '',
+      objectives: '',
+      indicators: '',
+      budget: '',
+    };
+  };
+  // Returns initial activities array, loading from localStorage if available
+  const getInitialActivities = () => {
+    try {
+      const saved = localStorage.getItem('proposalActivities');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  };
+
+  const [formData, setFormData] = useState(getInitialFormData);
+  const [activities, setActivities] = useState(getInitialActivities);
+
+  // Persist formData and activities to localStorage on change
+  // Persist formData to localStorage whenever it changes
+  React.useEffect(() => {
+    localStorage.setItem('proposalFormData', JSON.stringify(formData));
+  }, [formData]);
+  // Persist activities to localStorage whenever it changes
+  React.useEffect(() => {
+    localStorage.setItem('proposalActivities', JSON.stringify(activities));
+  }, [activities]);
 
   // If coming back from EventActivity, add new activity
+  // Handles adding activities when returning from EventActivity page
   React.useEffect(() => {
     if (location.state && location.state.activities) {
       setActivities(location.state.activities);
@@ -70,7 +103,10 @@ export default function ProposeProject() {
   );
 }
 
+// All component functions below are now outside ProposeProject
+// Page 1: Basic proposal details and SDGs selection
 function PageOne({ onNext, formData, setFormData }) {
+  // Handles input changes for Page 1 fields
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     if (type === 'checkbox') {
@@ -165,7 +201,9 @@ function PageOne({ onNext, formData, setFormData }) {
   );
 }
 
+// Page 2: Description, objectives, and success indicators
 function PageTwo({ onPrev, onNext, formData, setFormData }) {
+  // Handles input changes for Page 2 fields
   const handleChange = e => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -198,15 +236,17 @@ function PageTwo({ onPrev, onNext, formData, setFormData }) {
   );
 }
 
-import React, { useState } from "react";
-
+// Page 3: Add specific activities and budget
 function PageThree({ onPrev, onNext, activities, setActivities, formData, setFormData }) {
   const navigate = useNavigate();
 
+  // Navigates to add a new activity
   const addActivity = () => {
     navigate("/event/placeholder/activity", { state: { fromProposal: true, activities } });
   };
+  // Removes an activity from the list
   const removeActivity = id => setActivities(activities.filter(a => a.id !== id));
+  // Handles budget input change
   const handleBudgetChange = e => {
     setFormData(prev => ({ ...prev, budget: e.target.value }));
   };
@@ -257,11 +297,12 @@ function PageThree({ onPrev, onNext, activities, setActivities, formData, setFor
   );
 }
 
+// Page 4: Final review and submit page
 function PageFour({ onPrev, activities, formData }) {
   // Final review and submit page
   return (
     <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); alert('Submitted!'); }}>
-      <h3 style={{ fontWeight: 700, marginBottom: 16 }}>Final Review & Submit</h3>
+      <h3 style={{ fontWeight: 700, marginBottom: 16, textAlign: 'center' }}>Final Review & Submit</h3>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>Service-Learning Proposal Details:</div>
         <div style={{ marginBottom: 8 }}><b>Title:</b> {formData.title}</div>
@@ -289,8 +330,9 @@ function PageFour({ onPrev, activities, formData }) {
       <div style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>
         Please review all information before submitting. You will not be able to edit after submission.
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button type="button" style={buttonStyle} onClick={onPrev}>PREVIOUS</button>
+        <button type="button" style={{ ...buttonStyle, background: '#f0f4fa', color: '#3386e6', border: '1.5px solid #3386e6', margin: '0 12px' }}>EXPORT</button>
         <button type="submit" style={{ ...buttonStyle, background: '#3386e6', color: '#fff', border: 'none' }}>SUBMIT</button>
       </div>
     </form>
