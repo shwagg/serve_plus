@@ -2,6 +2,8 @@
 
 
 import React, { useState } from "react";
+// Import pdf-lib for PDF manipulation
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Main component for the Service-Learning Proposal multi-step form
@@ -101,7 +103,7 @@ export default function ProposeProject() {
       </div>
     </div>
   );
-}
+
 
 // All component functions below are now outside ProposeProject
 // Page 1: Basic proposal details and SDGs selection
@@ -299,6 +301,80 @@ function PageThree({ onPrev, onNext, activities, setActivities, formData, setFor
 
 // Page 4: Final review and submit page
 function PageFour({ onPrev, activities, formData }) {
+  // Handler for exporting the filled proposal as a PDF
+  const handleExport = async () => {
+    try {
+      // 1. Fetch the PDF template (adjust path if needed)
+      const url = '/assets/Proposal Form 32.pdf';
+      const existingPdfBytes = await fetch(url).then(res => res.arrayBuffer());
+
+      // 2. Load PDF and get pages
+      const pdfDoc = await PDFDocument.load(existingPdfBytes);
+      const pages = pdfDoc.getPages();
+      const page1 = pages[0];
+      const page2 = pages[1];
+
+      // 3. Embed font
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // 4. Draw text for each field (coordinates are approximate, adjust as needed)
+      // --- PAGE 1 ---
+      page1.drawText(formData.title || '', { x: 90, y: 690, size: 10, font });
+      page1.drawText(formData.date || '', { x: 470, y: 690, size: 10, font });
+      page1.drawText(formData.faculty || '', { x: 60, y: 660, size: 10, font });
+      page1.drawText(formData.sections || '', { x: 320, y: 660, size: 10, font });
+      page1.drawText(formData.courseTitle || '', { x: 60, y: 640, size: 10, font });
+      page1.drawText(formData.courseCode || '', { x: 320, y: 640, size: 10, font });
+      page1.drawText(formData.stakeholders || '', { x: 60, y: 620, size: 10, font });
+      page1.drawText(formData.targetDates || '', { x: 320, y: 620, size: 10, font });
+      page1.drawText(formData.targetLocation || '', { x: 60, y: 600, size: 10, font });
+      page1.drawText(String(formData.volunteerHours || ''), { x: 320, y: 600, size: 10, font });
+
+      // SDGs: Draw an 'X' for each selected SDG (coordinates must be measured for each box)
+      const sdgCoords = {
+        'No Poverty': { x: 70, y: 580 },
+        'Zero Hunger': { x: 140, y: 580 },
+        'Good Health and Well-Being': { x: 210, y: 580 },
+        'Quality Education': { x: 280, y: 580 },
+        'Gender Equality': { x: 350, y: 580 },
+        'Clean Water and Sanitation': { x: 420, y: 580 },
+        'Affordable and Clean Energy': { x: 70, y: 560 },
+        'Decent Work and Economic Growth': { x: 140, y: 560 },
+        'Industry, Innovation, and Infrastructure': { x: 210, y: 560 },
+        'Reduced Inequalities': { x: 280, y: 560 },
+        'Sustainable Cities and Communities': { x: 350, y: 560 },
+        'Responsible Consumption and Production': { x: 420, y: 560 },
+        'Climate Action': { x: 70, y: 540 },
+        'Life Below Water': { x: 140, y: 540 },
+        'Life on Land': { x: 210, y: 540 },
+        'Peace, Justice, and Strong Institutions': { x: 280, y: 540 },
+        'Partnership for the Goals': { x: 350, y: 540 },
+      };
+      (formData.sdgs || []).forEach(sdg => {
+        if (sdgCoords[sdg]) {
+          page1.drawText('X', { x: sdgCoords[sdg].x, y: sdgCoords[sdg].y, size: 12, font, color: rgb(1, 0, 0) });
+        }
+      });
+
+      // Description (wrap text if needed)
+      page1.drawText(formData.description || '', { x: 60, y: 500, size: 10, font, maxWidth: 480, lineHeight: 12 });
+
+      // --- PAGE 2 ---
+      page2.drawText(formData.objectives || '', { x: 60, y: 670, size: 10, font, maxWidth: 480, lineHeight: 12 });
+      page2.drawText((activities && activities.length > 0 ? activities.map(a => a.name).join(', ') : ''), { x: 60, y: 600, size: 10, font, maxWidth: 200, lineHeight: 12 });
+      page2.drawText(formData.indicators || '', { x: 320, y: 600, size: 10, font, maxWidth: 200, lineHeight: 12 });
+      page2.drawText(formData.budget || '', { x: 60, y: 540, size: 10, font, maxWidth: 480, lineHeight: 12 });
+
+      // 5. Save and open in new tab
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch (err) {
+      alert('Failed to export PDF. Make sure the template exists and you are online.');
+      console.error(err);
+    }
+  };
+
   // Final review and submit page
   return (
     <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} onSubmit={e => { e.preventDefault(); alert('Submitted!'); }}>
@@ -332,11 +408,13 @@ function PageFour({ onPrev, activities, formData }) {
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button type="button" style={buttonStyle} onClick={onPrev}>PREVIOUS</button>
-        <button type="button" style={{ ...buttonStyle, background: '#f0f4fa', color: '#3386e6', border: '1.5px solid #3386e6', margin: '0 12px' }}>EXPORT</button>
+        {/* Export button triggers handleExport */}
+        <button type="button" style={{ ...buttonStyle, background: '#f0f4fa', color: '#3386e6', border: '1.5px solid #3386e6', margin: '0 12px' }} onClick={handleExport}>EXPORT</button>
         <button type="submit" style={{ ...buttonStyle, background: '#3386e6', color: '#fff', border: 'none' }}>SUBMIT</button>
       </div>
     </form>
   );
+}
 }
 
 const addBtnStyle = {
