@@ -27,6 +27,18 @@ export default function EventActivity() {
         return;
       }
       try {
+        // Verify QR code contains correct eventId
+        let parsed = null;
+        try {
+          parsed = JSON.parse(decodedText);
+        } catch (e) {
+          setQRStatus("Invalid QR code format.");
+          return;
+        }
+        if (!parsed || parsed.eventId !== projectId) {
+          setQRStatus("This QR code is not valid for this event.");
+          return;
+        }
         // Fetch user info from users collection
         const userDoc = await getDoc(doc(db, "users", user.uid));
         let name = "";
