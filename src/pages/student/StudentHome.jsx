@@ -6,6 +6,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import React, { useState, useEffect } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import Header from "../../components/Header";
+import GlobalAnnouncements from "../../components/GlobalAnnouncements";
 import "../../styles/ui.css";
 
 const defaultLeaderboard = [
@@ -198,19 +199,8 @@ const StudentHome = () => {
           </section>
         </div>
 
-        {/* Global Notification (copied from EventDetails.jsx) */}
-        <aside style={{ flex: 1, background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 2px 8px #0001', minWidth: 320, maxWidth: 360, marginLeft: 8, marginRight: 32, border: '2px solid #30bdb7' }}>
-          <h3 style={{ color: '#234e7b', fontWeight: 700, marginBottom: 16 }}>Global Notification</h3>
-          <div style={{ color: '#234e7b', fontWeight: 500, lineHeight: '1.7', fontSize: 15 }}>
-            {globalNotifications.map((notif, idx) => (
-              <div key={idx} style={{ marginTop: idx === 0 ? 0 : 16 }}>
-                {notif.title && <span style={{ fontWeight: 700 }}>{notif.title} </span>}
-                {notif.bold && <span style={{ fontWeight: 700 }}>{notif.bold} </span>}
-                {notif.text && <span>{notif.text}</span>}
-              </div>
-            ))}
-          </div>
-        </aside>
+        {/* Global Announcements */}
+        <GlobalAnnouncements />
       </div>
     </div>
   );
