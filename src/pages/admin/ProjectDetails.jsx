@@ -16,6 +16,7 @@ export default function ProjectDetails() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [attendees, setAttendees] = useState([]);
+  const [taskCount, setTaskCount] = useState(0);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,8 +103,19 @@ export default function ProjectDetails() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadTaskCount();
   }, [projectId]);
+
+  const loadTaskCount = async () => {
+    try {
+      const tasksRef = collection(db, "Missions", projectId, "task");
+      const snap = await getDocs(tasksRef);
+      setTaskCount(snap.size);
+    } catch (e) {
+      console.error("Error loading task count:", e);
+      setTaskCount(0);
+    }
+  };
 
   useEffect(() => {
     if (projectId && showQR) {
@@ -329,8 +341,24 @@ export default function ProjectDetails() {
       <hr />
 
       <h3 style={{ color: "#111" }}>Tasks</h3>
-      <p style={{ color: "#111" }}>dito gawa ni jc.</p>
-      <p style={{ color: "#111" }}><b>projectId:</b> {projectId}</p>
+      <button
+        onClick={() => navigate(`/admin/projects/${projectId}/tasks`)}
+        style={{
+          background: '#007bff',
+          color: '#fff',
+          padding: '10px 20px',
+          border: 'none',
+          borderRadius: 4,
+          cursor: 'pointer',
+          fontWeight: 600,
+          marginBottom: 12
+        }}
+      >
+        Manage Tasks
+      </button>
+      <p style={{ color: "#888", fontSize: 14 }}>
+        {taskCount > 0 ? `${taskCount} task(s) for this project` : 'No tasks yet'}
+      </p>
 
       {/* Hidden div for PDF export */}
       <div className="pdf-export-wrap">
