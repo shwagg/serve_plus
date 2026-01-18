@@ -3,19 +3,19 @@ import { auth, functions, db } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import Header from "../../components/Header";
 import GlobalAnnouncements from "../../components/GlobalAnnouncements";
+import "../../styles/student.css";
 import "../../styles/ui.css";
+import { WestIcon, EastIcon } from "../../components/icons";
 
-const defaultLeaderboard = [
-  { name: "JC", level: 15, points: 2030 },
-  { name: "Alyzza", level: 12, points: 1580 },
-  { name: "Austine", level: 11, points: 1010 },
-  { name: "Jiengrey", level: 8, points: 730 },
-  { name: "Vaughn", level: 7, points: 690 },
-];
+//sample-- to be paltan ng saved profile pic sa firestore
+import mission1 from '../../assets/mission1.jpg';
+import podium1 from '../../assets/user1.png';
+import podium2 from '../../assets/user2.png';
+import podium3 from '../../assets/user3.png';
 
 const StudentHome = () => {
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
@@ -23,6 +23,7 @@ const StudentHome = () => {
   const [menuOverlayOpen, setMenuOverlayOpen] = useState(false);
   const [chatOverlayOpen, setChatOverlayOpen] = useState(false);
   const [notificationOverlayOpen, setNotificationOverlayOpen] = useState(false);
+  const [open, setOpen] = useState(false); // Global feed panel state
   const button2Ref = React.useRef(null);
   const button3Ref = React.useRef(null);
 
@@ -32,8 +33,10 @@ const StudentHome = () => {
   const [nextLevelPoints, setNextLevelPoints] = useState(500);
   const [studentName, setStudentName] = useState("Joshua");
   const [studentRank, setStudentRank] = useState(8);
-  const [leaderboard, setLeaderboard] = useState(defaultLeaderboard);
+  const currentUserRef = useRef(null);
+  const leaderboardListRef = useRef(null);
   const [missionCards, setMissionCards] = useState([]);
+
   // Fetch missions from Firestore
   useEffect(() => {
     const fetchMissions = async () => {
@@ -47,13 +50,7 @@ const StudentHome = () => {
     };
     fetchMissions();
   }, []);
-  const [globalNotifications, setGlobalNotifications] = useState([
-    { title: "New Event Added:", bold: "The Disaster Risk Reduction Training in Los Baños is now open!", text: "Sign up and secure your slot today." },
-    { title: "2 New Volunteers Joined the Hydroponics Workshop!", text: "You are now 80% full. Get your tasks before they run out" },
-    { title: "Leaderboard Alert!", bold: "You have surpassed Alyzza Ocoma and are now ranked #2.", text: "Keep earning those points!" },
-    { title: "Opportunity Alert:", bold: "The 'Bayan Ko, Titser Ko' team needs one (1) more volunteer skilled in Literacy Coaching.", text: "Are you ready to serve?" },
-    { title: "Certificate Ready:", bold: "Your official Certificate of Participation for the Laguna Lake Cleanup is now available in your Profile!" }
-  ]);
+
   const [menuProfileName, setMenuProfileName] = useState("Joshua Garcia");
   const [chatList, setChatList] = useState([
     { name: "The Literacy Lighthouse Foundation", msg: "Request to expedite the reflection journal r..." },
@@ -61,6 +58,7 @@ const StudentHome = () => {
     { name: "Project Green Lungs Alliance", msg: "Need Admin approval for the revised Task L..." },
     { name: "Alaga Kabataan Outreach Group", msg: "Please confirm if all certificates are ready fo..." },
   ]);
+
   // Notification overlay content
   const [notificationContent, setNotificationContent] = useState([
     {
@@ -124,8 +122,143 @@ const StudentHome = () => {
   const handleChatOverlayToggle = () => setChatOverlayOpen((open) => !open);
   const handleNotificationOverlayToggle = () => setNotificationOverlayOpen((open) => !open);
 
+
+  //leaderboard firestore-ready
+  //change this when points for user accounts are set
+  const [leaderboard, setLeaderboard] = useState([
+    { uid: "u1", name: "Juan", points: 1400, avatar: podium1 },
+    { uid: "u2", name: "Aly", points: 1300, avatar: podium2 },
+    { uid: "u3", name: "Jien", points: 1200, avatar: podium3 },
+    { uid: "u4", name: "Vaughn", points: 1100, avatar: podium1 },
+  ]);
+
+  //for leaderboards ranking in the podium UI
+  //do not delete
+  const sortedLeaderboard = [...leaderboard].sort(
+    (a, b) => b.points - a.points
+  );
+  const top1 = sortedLeaderboard[0];
+  const top2 = sortedLeaderboard[1];
+  const top3 = sortedLeaderboard[2];
+  const podium = [top2, top1, top3].filter(Boolean);
+
+  //change this currentUserId to user account when defined
+  const currentUserId = "u2";
+  const currentUserIndex = leaderboard.findIndex(
+    (user) => user.uid === currentUserId
+  );
+  const currentUserRank =
+    currentUserIndex !== -1 ? currentUserIndex + 1 : null;
+
+
+  const visibleLeaderboard = leaderboard.slice(
+    Math.max(0, currentUserIndex - 1),
+    currentUserIndex + 2
+  );
+
+  //purpose: scroll the leaderboard-list to current rank of user logged in
+  useEffect(() => {
+    const container = leaderboardListRef.current;
+    const item = currentUserRef.current;
+
+    if (!container || !item) return;
+
+    requestAnimationFrame(() => {
+      const containerHeight = container.getBoundingClientRect().height;
+      const itemRect = item.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      const itemCenter =
+        itemRect.top - containerRect.top + itemRect.height / 2;
+
+      const scrollTop =
+        itemCenter - containerHeight / 2 + container.scrollTop;
+
+      container.scrollTo({
+        top: scrollTop,
+        behavior: "auto",
+      });
+    });
+  }, []);
+
+  //for the ranking of the user logged in for label
+  const getOrdinal = (rank) => {
+    if (!rank) return "";
+
+    const j = rank % 10;
+    const k = rank % 100;
+
+    if (j === 1 && k !== 11) return `${rank}st`;
+    if (j === 2 && k !== 12) return `${rank}nd`;
+    if (j === 3 && k !== 13) return `${rank}rd`;
+    return `${rank}th`;
+  };
+
+
+
+
+  //global notification items (temporary) BUT firestore-ready
+  const [globalUpdates, setGlobalUpdates] = useState([
+    {
+      id: 1,
+      icon: "🆕",
+      title: "New Mission Published",
+      desc: "Laguna Lake Cleanup Drive",
+      time: "2 hours ago",
+      className: "new"
+    },
+    {
+      id: 2,
+      icon: "📣",
+      title: "Announcement",
+      desc: "Volunteer points policy updated",
+      time: "Yesterday",
+      className: ""
+    },
+    {
+      id: 3,
+      icon: "🆕",
+      title: "Community Event Added",
+      desc: "Tree Planting Initiative scheduled for March 15.",
+      time: "5 hours ago",
+      className: ""
+    },
+    {
+      id: 4,
+      icon: "⌛",
+      title: "Mission Closing Soon",
+      desc: "only 2 days left to join 'Coastal Cleanup Day.'",
+      time: "18 hours ago",
+      className: ""
+    },
+    {
+      id: 5,
+      icon: "🏆",
+      title: "Milestone Reached",
+      desc: "500+ students have joined missions this month!",
+      time: "Yesterday",
+      className: ""
+    },
+    {
+      id: 6,
+      icon: "📣",
+      title: "System Announcement",
+      desc: "Volunteer point calculation has been updated.",
+      time: "6 days ago",
+      className: ""
+    },
+    {
+      id: 7,
+      icon: "🤝",
+      title: "Community Partner Spotlight",
+      desc: "Welcome Latian Elementary School as our new partner!",
+      time: "7 days ago",
+      className: ""
+    }
+  ]);
+
   return (
-    <div className="main-page" >
+    <div className="full-page" >
       {/* Logout Popup */}
       {showLogoutPopup && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -138,77 +271,182 @@ const StudentHome = () => {
       )}
       {/* Header */}
       <Header />
-      {/* ...existing code... */}
 
-      <div style={{ position: "fixed", top: '-28px', right: '280px', zIndex: 1000 }}>
-        <button className="ui-btn" type="button"
-          onClick={() => navigate("/student/home/newHome")}
-        >
-          New Home
-        </button>
-      </div>
-      {/* Main Dashboard */}
-      <div style={{ display: 'flex', gap: 24, padding: '32px 0 32px 0', width: '100%', boxSizing: 'border-box', justifyContent: 'center', margin: '0 16px 16px 16px' }}>
-        {/* Missions & Leaderboard */}
-
-        <div style={{ flex: 2 }}>
-          {/* Find Your Next Mission */}
-          <section style={{ background: '#7bb661', borderRadius: 20, padding: 24, marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h2 style={{ color: '#fff', fontWeight: 700 }}>Find Your Next Mission</h2>
-              <a href="#" style={{ color: '#fff', textDecoration: 'underline', fontWeight: 500 }}>View All Events</a>
+      <div className="header-spacer"></div>
+      <div className="content-page">
+        {/* LANDING PAGE */}
+        <section className="landing-section" >
+          <h2 style={{ color: '#000' }}>Anouncement Image Page Here</h2>
+          <div className="landing-page-content">
+            <div className="landing-page-num">
+              <button className="ui-btn-page"><WestIcon /></button>
+              <span className="ui-smallText"> 01 / 05</span>
+              <button className="ui-btn-page"><EastIcon /></button>
             </div>
-            <div style={{ display: 'flex', gap: 24, overflowX: 'auto', width: '100%', paddingBottom: 8 }}>
-              {/* Mission Cards */}
-              {missionCards.length === 0 ? (
-                <div style={{ color: '#fff', fontWeight: 500 }}>No missions available.</div>
-              ) : (
-                missionCards.map((mission, idx) => (
-                  <div
-                    key={mission.id}
-                    style={{ background: '#fff', borderRadius: 16, minWidth: 250, maxWidth: 300, flex: '0 0 auto', padding: 0, boxShadow: '0 2px 8px #0001', cursor: 'pointer' }}
-                    onClick={() => window.location.href = `/event/${mission.id}`}
-                  >
-                    <img src={mission.img || "/assets/mission1.jpg"} alt={mission.alt || mission.title} style={{ width: '100%', height: 100, objectFit: 'cover', borderTopLeftRadius: 16, borderTopRightRadius: 16 }} />
-                    <div style={{ padding: 16, textAlign: 'center', fontWeight: 600, color: '#2e5d3b' }}>
-                      {mission.title}
+            <button className="ui-btn">Click for more info</button>
+          </div>
+
+        </section>
+        {/* PROFILE LEVEL RANK */}
+        <section className="player-strip">
+          <div className="player-strip-inner">
+            <div className="player-level">
+              <span className="level-label">Level 1</span>
+              <div className="level-bar">
+                <div className="level-bar-fill" style={{ width: '50%' }}></div>
+              </div>
+              <span className="level-points">50/ 100 pts</span>
+            </div>
+
+            <div className="player-missions">
+              <span className="missions-label">Missions Completed</span>
+              <span className="missions-count">0</span>
+            </div>
+
+            <div className="player-profile">
+              <img src={podium2} alt="Profile"
+                className="player-avatar" />
+              <span className="player-greeting">Hi, Aly!</span>
+            </div>
+          </div>
+        </section>
+        {/* MISSION */}
+        <section className="mission-section">
+          <div className="mission-section-header">
+            <h2 style={{ color: '#000' }}>Find Your Next Mission</h2>
+            <div className="mission-section-header links">
+              <a href="#" onClick={(e) => e.preventDefault()}>
+                All Missions
+              </a>
+              <a href="#" onClick={(e) => e.preventDefault()}>
+                Your Missions
+              </a>
+            </div>
+          </div>
+          <div className="mission-list">
+            {missionCards.length === 0 ? (
+              <div className="ui-smallText">No missions available.</div>
+            ) : (
+              missionCards.map((mission, idx) => (
+                <div
+                  key={mission.id}
+                  className="mission-card"
+                  onClick={() => window.location.href = `/event/${mission.id}`}
+                >
+                  <div className="mission-card-image">
+                    <img src={mission.img || mission1} alt={mission.alt || mission.title} />
+                  </div>
+                  <div className="mission-card-body">
+                    <h3 className="mission-card-title">{mission.title}</h3>
+                    <div className="mission-card-meta">
+                      <span className="mission-card-participants">
+                        👥 124 Joined
+                      </span>
+                      <span className="mission-card-date">{mission.date}</span>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </section>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+        {/* LEADERBOARD */}
+        <section className="leaderboard-section">
+          <div className="mission-section-header">
+            <h2 style={{ color: '#000' }}>Leaderboard</h2>
+            <div style={{ color: '#000' }} >You are in {getOrdinal(currentUserRank)} place.</div>
+          </div>
+          <div className="leaderboard-body">
+            <div className="leaderboard-podium">
+              {podium.map((user) => {
+                const rank =
+                  user.uid === top1?.uid ? 1 :
+                    user.uid === top2?.uid ? 2 :
+                      3;
 
-          {/* Leaderboard */}
-          <section style={{ background: '#7bb661', borderRadius: 20, padding: 24, display: 'flex', alignItems: 'center', gap: 32 }}>
-            <div style={{ background: '#234e7b', borderRadius: 16, padding: 24, color: '#fff', textAlign: 'center', minWidth: 180 }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fff', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className="icon-user" style={{ fontSize: 36, color: '#234e7b' }}></i>
-              </div>
-              <div style={{ fontWeight: 700, fontSize: 20 }}>{studentName}</div>
-              <div style={{ fontWeight: 500, fontSize: 16, marginBottom: 8 }}>{`Rank ${studentRank}`}</div>
-              <div style={{ background: '#ffa726', borderRadius: 8, height: 24, width: '100%', margin: '0 auto', color: '#fff', fontWeight: 600, lineHeight: '24px' }}>{currentPoints}</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ color: '#fff', fontWeight: 700, marginBottom: 16 }}>Leaderboard</h3>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {leaderboard.map((user, idx) => (
-                  <li key={user.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 8, background: idx === 0 ? '#fff8e1' : '#e3f2fd', borderRadius: 8, padding: '8px 16px', fontWeight: idx === 0 ? 700 : 500 }}>
-                    <span style={{ width: 32, textAlign: 'center', color: idx === 0 ? '#ffa726' : '#234e7b', fontWeight: 700 }}>{idx + 1}</span>
-                    <span style={{ flex: 1, color: '#234e7b' }}>{user.name}</span>
-                    <span style={{ width: 80, color: '#7bb661', fontWeight: 600 }}>{`Level ${user.level}`}</span>
-                    <span style={{ width: 90, background: '#ffa726', color: '#fff', borderRadius: 6, textAlign: 'center', fontWeight: 700 }}>{user.points} PTS</span>
-                  </li>
-                ))}
-                <li style={{ marginTop: 8, color: '#fff', fontWeight: 600 }}>{`#${studentRank} ${studentName}`} <span style={{ background: '#ffa726', borderRadius: 6, padding: '2px 8px', marginLeft: 8 }}>{currentPoints} PTS</span></li>
-              </ul>
-            </div>
-          </section>
-        </div>
+                return (
+                  <div
+                    key={user.uid}
+                    className={`podium-item rank-${rank}`}
+                  >
+                    <div className="podium-top">
+                      <div className="podium-avatar-wrap">
+                        <img
+                          src={user.avatar}
+                          alt={user.name}
+                        />
+                        <span className="podium-rank">{rank}</span>
 
-        {/* Global Announcements */}
-        <GlobalAnnouncements />
+                      </div>
+
+                      <div className="podium-info">
+                        <div className="podium-name">{user.name}</div>
+                        <div className="podium-points">{user.points} pts</div>
+                      </div>
+                    </div>
+                    <div className={`podium-base rank-${rank}`}></div>
+                  </div>
+                );
+              })}
+
+            </div>
+            <div className="leaderboard-list" ref={leaderboardListRef}>
+              {leaderboard.map((user) => {
+                const rank = leaderboard.findIndex((u) => u.uid === user.uid) + 1;
+                return (
+                  <div
+                    key={user.uid}
+                    ref={user.uid === currentUserId ? currentUserRef : null}
+                    className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""
+                      }`}
+                  >
+                    <span className="rank-num">{rank}</span>
+                    <img
+                      src={user.avatar}
+                      alt={`${user.name}'s avatar`}
+                      className="leaderboard-avatar"></img>
+                    <span className="rank-name">{user.name}</span>
+                    <span className="rank-points">{user.points} pts</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+        <section className="landing-section" style={{ display: 'none' }}>
+        </section>
       </div>
+      {/* TOGGLE BUTTON */}
+      <button
+        className="global-feed-toggle"
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-label="Toggle Community Updates"
+      >
+        📰
+        <span className="global-feed-badge">1</span>
+      </button>
+
+      {/* SLIDE-IN PANEL */}
+      <aside className={`global-feed ${open ? "open" : ""}`}>
+        <div className="global-feed-header">
+          <h3 className="global-feed-title">Community Updates</h3>
+          <p className="global-feed-subtitle">Whats happening this week</p>
+        </div>
+        {/* GLOBAL FEED ITEMS */}
+        <div className="global-feed-list">
+          {globalUpdates.map(item => (
+            <div key={item.id} className={`global-feed-item ${item.className}`}>
+              <span className="feed-icon">{item.icon}</span>
+              <div className="feed-content">
+                <p className="feed-title">{item.title}</p>
+                <p className="feed-desc">{item.desc}</p>
+                <span className="feed-time">{item.time}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
     </div>
   );
 }
