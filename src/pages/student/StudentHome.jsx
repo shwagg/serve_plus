@@ -140,10 +140,17 @@ const StudentHome = () => {
       <Header />
       {/* ...existing code... */}
 
-
+      <div style={{ position: "fixed", top: '-28px', right: '280px', zIndex: 1000 }}>
+        <button className="ui-btn" type="button"
+          onClick={() => navigate("/student/home/newHome")}
+        >
+          New Home
+        </button>
+      </div>
       {/* Main Dashboard */}
       <div style={{ display: 'flex', gap: 24, padding: '32px 0 32px 0', width: '100%', boxSizing: 'border-box', justifyContent: 'center', margin: '0 16px 16px 16px' }}>
         {/* Missions & Leaderboard */}
+
         <div style={{ flex: 2 }}>
           {/* Find Your Next Mission */}
           <section style={{ background: '#7bb661', borderRadius: 20, padding: 24, marginBottom: 24 }}>

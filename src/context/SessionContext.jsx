@@ -23,7 +23,7 @@ export function SessionProvider({ children }) {
     // Set new timer
     //Note: Commment this to avoid loggin out while designing
     //i'll uncomment after designing some pages
-    
+
     //inactivityTimerRef.current = setTimeout(() => {
     //  handleSessionTimeout();
     //}, SESSION_TIMEOUT);
