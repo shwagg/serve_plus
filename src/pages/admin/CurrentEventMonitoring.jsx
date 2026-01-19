@@ -107,7 +107,7 @@ export default function CurrentEventMonitoring() {
           <h1 className="cem-title">Current Event Monitoring</h1>
         </div>
         <div className="cem-header-right">
-          <span className="cem-stats">Active: 9 | Complete: 7</span>
+          <span className="cem-stats">Active: (wala pa) | Complete: (wala pa)</span>
           {isHappeningToday() && (
             <span className="cem-badge happening">Happening Today</span>
           )}
@@ -238,7 +238,7 @@ export default function CurrentEventMonitoring() {
                 <span className="cem-metric-label">
                   Community Feedback Score
                 </span>
-                <span className="cem-metric-badge feedback">4.7 / 5.0</span>
+                <span className="cem-metric-badge feedback">wala pa sa firestore</span>
               </div>
             </div>
           </div>
