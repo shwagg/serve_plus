@@ -29,6 +29,16 @@ const GlobalAnnouncements = () => {
     fetchAnnouncements();
   }, []);
 
+
+  // Helper: is event closing soon (within 4 days before the event, but not after)
+  const isClosingSoon = (dateAt) => {
+    if (!dateAt) return false;
+    const now = new Date();
+    const eventTime = dateAt?.toDate ? dateAt.toDate() : new Date(dateAt);
+    const diffDays = (eventTime - now) / (1000 * 60 * 60 * 24);
+    return diffDays > 0 && diffDays <= 4;
+  };
+
   const getIconAndClass = (event) => {
     return { icon: '🆕', className: 'new' };
   };
@@ -38,11 +48,14 @@ const GlobalAnnouncements = () => {
       {announcements.length === 0 ? (
         <div style={{ color: '#888', padding: 16 }}>No new announcements.</div>
       ) : (
-        announcements.map((event, idx) => {
+        announcements.flatMap((event, idx) => {
           const { icon, className } = getIconAndClass(event);
-          return (
+          const closingSoon = isClosingSoon(event.targetDates);
+          const announcementsToShow = [];
+          // Default announcement
+          announcementsToShow.push(
             <div
-              key={event.id}
+              key={event.id + '-default'}
               className={`global-feed-item ${className}`}
               style={{
                 marginBottom: 16,
@@ -69,6 +82,40 @@ const GlobalAnnouncements = () => {
               </div>
             </div>
           );
+          // Closing soon announcement
+          if (closingSoon) {
+            announcementsToShow.push(
+              <div
+                key={event.id + '-closing'}
+                className="global-feed-item closing-soon"
+                style={{
+                  marginBottom: 16,
+                  cursor: 'pointer',
+                  borderRadius: 10,
+                  padding: 12,
+                  transition: 'background 0.2s',
+                  background: '#f8f8f8',
+                  boxShadow: '0 1px 4px #0001',
+                  border: '1px solid #e0e0e0',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                }}
+                onClick={() => window.location.href = `/event/${event.id}`}
+                onMouseOver={e => e.currentTarget.style.background = '#e6f7ff'}
+                onMouseOut={e => e.currentTarget.style.background = '#f8f8f8'}
+              >
+                <span className="feed-icon" style={{ fontSize: 28, marginTop: 2 }}>⌛</span>
+                <div className="feed-content" style={{ flex: 1 }}>
+                  <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0 }}>Mission Closing Soon</p>
+                  <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>Only a few days left to join this event!</p>
+                  <p className="feed-event-title" style={{ color: '#315488', fontWeight: 400, fontFamily: 'inherit', margin: '2px 0 0 0', fontSize: 15 }}>{event.title || 'Untitled Event'}</p>
+                  <span className="feed-time" style={{ fontSize: 12, color: '#999' }}>{event.targetDates?.toDate ? event.targetDates.toDate().toLocaleString() : ''}</span>
+                </div>
+              </div>
+            );
+          }
+          return announcementsToShow;
         })
       )}
     </>
