@@ -132,6 +132,7 @@ export default function ProposeProject() {
 
     // PDF Export Handler
     const handleExport = async () => {
+              // ...existing code...
       try {
         const formUrl = '/assets/Proposal Form 32.pdf';
         const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
@@ -148,40 +149,77 @@ export default function ProposeProject() {
         fields.forEach(f => {
           console.log('PDF Field:', f.getName(), f.constructor.name);
         });
-        // Fill each field with the correct form value (using actual field names)
-        // Set each PDF field with the verified correct mapping
-        // Optimized and corrected mapping for each field
-        form.getTextField('text_1qumh').setText(formData.title || ''); // Title of Service-Learning Initiative
-        form.getTextField('text_2cqku').setText(formData.faculty || ''); // Faculty-in-Charge / Proponent(s)
-        form.getTextField('text_3hyab').setText(formData.courseTitle || ''); // Course Title
-        form.getTextField('text_4khrw').setText(formData.sections || ''); // Sections
-        form.getTextField('text_5gjvd').setText(formData.stakeholders || ''); // Stakeholders
-        form.getTextField('text_6yoaj').setText(formData.targetLocation || ''); // Target Location
-        form.getTextField('text_7cwym').setText(formData.courseCode || ''); // Course Code
-        form.getTextField('text_8dgmn').setText(formData.date || ''); // Date Proposed
-        form.getTextField('text_9snnr').setText(formData.targetDates || ''); // Target Dates
-        form.getTextField('text_10qqqs').setText(formData.volunteerHours?.toString() || ''); // Number of Volunteer Hours
-        // SDG Checkboxes
-        const sdgCheckboxFields = [
-          'checkbox_11wuka', 'checkbox_12lffm', 'checkbox_13etqk', 'checkbox_14pkvy', 'checkbox_15yqds', 'checkbox_16lqoh',
-          'checkbox_17hgn', 'checkbox_18poak', 'checkbox_19guet', 'checkbox_20hglu', 'checkbox_21rdsy', 'checkbox_22tqfr',
-          'checkbox_23kyba', 'checkbox_24nqki', 'checkbox_25vtns', 'checkbox_26wkuj', 'checkbox_27ocax'
-        ];
-        sdgCheckboxFields.forEach((field, idx) => {
-          const checked = formData.sdgs.includes(sdgList[idx].label);
-          form.getCheckBox(field).check(checked);
-        });
-        form.getTextField('textarea_28tick').setText(formData.description || ''); // Description
-        form.getTextField('textarea_29rtox').setText(formData.objectives || ''); // Objectives
-        form.getTextField('textarea_30wmtd').setText(
-          activities && activities.length > 0
+        // Fill each field with the correct form value (using new PDF field mapping)
+        form.getTextField('text_2cqcm').setText(formData.title || ''); // Title of Service-Learning Initiative
+        form.getTextField('text_3hzck').setText(formData.faculty || formData.proponent || ''); // Faculty-in-Charge / Proponent(s)
+        form.getTextField('text_4opji').setText(formData.courseTitle || formData.coursetitle || ''); // Course Title
+        form.getTextField('text_5fdvm').setText(formData.stakeholders || ''); // Stakeholders
+        form.getTextField('text_6avjw').setText(formData.targetLocation || formData.targetlocation || ''); // Target Location
+        form.getTextField('text_7cxg').setText(formData.date || formData.dateproposed || ''); // Date Proposed
+        form.getTextField('text_8ylsk').setText(formData.sections || ''); // Participating Section/s
+        form.getTextField('text_9nnpw').setText(formData.courseCode || formData.coursecode || ''); // Course Code
+        form.getTextField('text_10dky').setText(formData.targetDates || formData.targetdates || ''); // Target Dates
+        form.getTextField('text_11ecqo').setText(formData.volunteerHours?.toString() || formData.hours?.toString() || ''); // Number of Volunteer Hours
+        form.getTextField('textarea_31qotr').setText(formData.description || ''); // Description
+        form.getTextField('textarea_32sqrh').setText(formData.objectives || ''); // Objectives
+        form.getTextField('textarea_33vrob').setText(
+          (activities && activities.length > 0)
             ? activities.map((act, idx) => `${idx+1}. ${act.title}`).join('\n')
-            : ''
+            : formData.specificactivities || ''
         ); // Specific Activities
-        form.getTextField('textarea_31nwsn').setText(formData.indicators || ''); // Success Indicators
+        form.getTextField('textarea_34pgia').setText(formData.indicators || formData.successindicators || ''); // Success Indicators
         // Replace Peso symbol with 'PHP' to avoid encoding error
-        const safeBudget = (formData.budget || '').replace(/₱/g, 'PHP');
-        form.getTextField('text_32xo').setText(safeBudget); // Budget
+        form.getTextField('text_35uwrn').setText((formData.budget || '').replace(/₱/g, 'PHP')); // Budget
+                // SDG Checkboxes mapping (only use new field names)
+                const sdgCheckboxMap = [
+                  { field: 'checkbox_13ofpt', label: 'No Poverty' },
+                  { field: 'checkbox_17idjm', label: 'Zero Hunger' },
+                  { field: 'checkbox_20womi', label: 'Good Health and Well-Being' },
+                  { field: 'checkbox_23svwh', label: 'Quality Education' },
+                  { field: 'checkbox_26shtn', label: 'Gender Equality' },
+                  { field: 'checkbox_29apra', label: 'Clean Water and Sanitation' },
+                  { field: 'checkbox_14zvvw', label: 'Affordable and Clean Energy' },
+                  { field: 'checkbox_18fzxs', label: 'Decent Work and Economic Growth' },
+                  { field: 'checkbox_21kwei', label: 'Industry, Innovation, and Infrastructure' },
+                  { field: 'checkbox_24wogc', label: 'Reduced Inequalities' },
+                  { field: 'checkbox_27wlsf', label: 'Sustainable Cities and Communities' },
+                  { field: 'checkbox_30ultz', label: 'Responsible Consumption and Production' },
+                  { field: 'checkbox_15cxua', label: 'Climate Action' },
+                  { field: 'checkbox_19bdjk', label: 'Life Below Water' },
+                  { field: 'checkbox_22mcqk', label: 'Life on Land' },
+                  { field: 'checkbox_25sdjc', label: 'Peace, Justice, and Strong Institutions' },
+                  { field: 'checkbox_28rpwo', label: 'Partnership for the Goals' },
+                ];
+        if (formData.sdgs && Array.isArray(formData.sdgs)) {
+          console.log('formData.sdgs:', formData.sdgs);
+          sdgCheckboxMap.forEach(({ field, label }) => {
+            try {
+              const cb = form.getCheckBox(field);
+              const shouldCheck = formData.sdgs.some(sdg => sdg.trim().toLowerCase() === label.trim().toLowerCase());
+              if (shouldCheck) {
+                // Try both .check() and setValue('Yes') for compatibility
+                if (typeof cb.check === 'function') {
+                  cb.check();
+                  console.log('Checked SDG:', label, '->', field);
+                }
+                // Fallback for some PDFs
+                if (typeof cb.setValue === 'function') {
+                  cb.setValue('Yes');
+                  console.log('Set value Yes for SDG:', label, '->', field);
+                }
+              } else {
+                if (typeof cb.uncheck === 'function') {
+                  cb.uncheck();
+                }
+                if (typeof cb.setValue === 'function') {
+                  cb.setValue('Off');
+                }
+              }
+            } catch (e) {
+              console.warn('SDG checkbox field not found:', field);
+            }
+          });
+        }
         form.flatten();
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -202,34 +240,7 @@ export default function ProposeProject() {
     };
 
     // DEBUG: List all PDF form field names (run automatically on mount for user convenience)
-    /*
-    React.useEffect(() => {
-      (async () => {
-        try {
-          const formUrl = '/assets/Proposal Form 32.pdf';
-          const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
-          const pdfDoc = await PDFDocument.load(existingPdfBytes);
-          let form;
-          try {
-            form = pdfDoc.getForm();
-          } catch {
-            setError('No form fields found in this PDF.');
-            setLoading(false);
-            return;
-          }
-            form.getTextField('text_1qumh').setText(formData.title || ''); // Title of Service-Learning Initiative
-            form.getTextField('text_5gjvd').setText(formData.courseTitle || ''); // Course Title
-          // Optionally show field names for debugging
-          // alert('PDF Form Fields:\n' + names.join('\n'));
-          setLoading(false);
-            form.getTextField('text_1qumh').setText(formData.title || ''); // Title of Service-Learning Initiative
-            form.getTextField('text_9snnr').setText(formData.date || ''); // Date Proposed
-            form.getTextField('text_2cqku').setText(formData.faculty || ''); // Faculty-in-Charge / Proponent(s)
-            form.getTextField('text_5gjvd').setText(formData.courseTitle || ''); // Course Title
-            form.getTextField('text_7cwym').setText(formData.targetLocation || ''); // Target Location
-            form.getTextField('text_4khrw').setText(formData.courseCode || ''); // Course Code
-    }, []);
-    */
+    // ...existing code...
 
     return (
       <div style={{ background: '#f7f9fa', minHeight: '100vh', padding: '2rem' }}>
