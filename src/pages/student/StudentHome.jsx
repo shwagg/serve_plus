@@ -52,31 +52,6 @@ const StudentHome = () => {
   }, []);
 
   const [menuProfileName, setMenuProfileName] = useState("Joshua Garcia");
-  const [chatList, setChatList] = useState([
-    { name: "The Literacy Lighthouse Foundation", msg: "Request to expedite the reflection journal r..." },
-    { name: "Barangay Masikap Development Council", msg: "Just sent over the attendance sheet and GP...", unread: true },
-    { name: "Project Green Lungs Alliance", msg: "Need Admin approval for the revised Task L..." },
-    { name: "Alaga Kabataan Outreach Group", msg: "Please confirm if all certificates are ready fo..." },
-  ]);
-
-  // Notification overlay content
-  const [notificationContent, setNotificationContent] = useState([
-    {
-      title: "Action Required: Riverbank Cleanup Evidence",
-      items: [
-        "Your Task 1 documentation for the Laguna Lake Cleanup is overdue. Please submit your photos and reflection to get your points!"
-      ]
-    },
-    {
-      title: "Hooray! You're In!",
-      text: "You have successfully joined the Hydroponics & Sustainable Livelihood Workshop. Check the event page for your assigned group and pre-event materials."
-    },
-    {
-      title: "You Reached Level 5!",
-      text: "Congratulations! You've earned the 'Service Coordinator' title and unlocked new profile customizations. Keep serving to achieve Level 6!"
-    }
-  ]);
-
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -193,70 +168,7 @@ const StudentHome = () => {
     if (j === 3 && k !== 13) return `${rank}rd`;
     return `${rank}th`;
   };
-
-
-
-
-  //global notification items (temporary) BUT firestore-ready
-  const [globalUpdates, setGlobalUpdates] = useState([
-    {
-      id: 1,
-      icon: "🆕",
-      title: "New Mission Published",
-      desc: "Laguna Lake Cleanup Drive",
-      time: "2 hours ago",
-      className: "new"
-    },
-    {
-      id: 2,
-      icon: "📣",
-      title: "Announcement",
-      desc: "Volunteer points policy updated",
-      time: "Yesterday",
-      className: ""
-    },
-    {
-      id: 3,
-      icon: "🆕",
-      title: "Community Event Added",
-      desc: "Tree Planting Initiative scheduled for March 15.",
-      time: "5 hours ago",
-      className: ""
-    },
-    {
-      id: 4,
-      icon: "⌛",
-      title: "Mission Closing Soon",
-      desc: "only 2 days left to join 'Coastal Cleanup Day.'",
-      time: "18 hours ago",
-      className: ""
-    },
-    {
-      id: 5,
-      icon: "🏆",
-      title: "Milestone Reached",
-      desc: "500+ students have joined missions this month!",
-      time: "Yesterday",
-      className: ""
-    },
-    {
-      id: 6,
-      icon: "📣",
-      title: "System Announcement",
-      desc: "Volunteer point calculation has been updated.",
-      time: "6 days ago",
-      className: ""
-    },
-    {
-      id: 7,
-      icon: "🤝",
-      title: "Community Partner Spotlight",
-      desc: "Welcome Latian Elementary School as our new partner!",
-      time: "7 days ago",
-      className: ""
-    }
-  ]);
-
+  
   return (
     <div className="full-page" >
       {/* Logout Popup */}
@@ -433,18 +345,9 @@ const StudentHome = () => {
           <h3 className="global-feed-title">Community Updates</h3>
           <p className="global-feed-subtitle">Whats happening this week</p>
         </div>
-        {/* GLOBAL FEED ITEMS */}
+        {/* Use GlobalAnnouncements component for feed */}
         <div className="global-feed-list">
-          {globalUpdates.map(item => (
-            <div key={item.id} className={`global-feed-item ${item.className}`}>
-              <span className="feed-icon">{item.icon}</span>
-              <div className="feed-content">
-                <p className="feed-title">{item.title}</p>
-                <p className="feed-desc">{item.desc}</p>
-                <span className="feed-time">{item.time}</span>
-              </div>
-            </div>
-          ))}
+          <GlobalAnnouncements />
         </div>
       </aside>
     </div>

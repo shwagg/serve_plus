@@ -259,7 +259,6 @@ export default function EventActivity() {
       }
     }
     fetchEventAndJournals();
-    // eslint-disable-next-line
   }, [id, auth.currentUser]);
   // Edit journal handler
   const handleEditJournal = (journal) => {
@@ -287,7 +286,6 @@ export default function EventActivity() {
       });
       setEditingJournalId(null);
       setEditingJournalText("");
-      // Refresh journals
       await fetchUserJournals();
     } catch (err) {
       alert("Failed to update journal.");
@@ -365,7 +363,6 @@ export default function EventActivity() {
     const navigate = useNavigate();
     const [activityTitle, setActivityTitle] = useState("");
     const [roleDescription, setRoleDescription] = useState("");
-    // ...existing code...
     const location = useLocation();
     const handleSubmit = (e) => {
       e.preventDefault();

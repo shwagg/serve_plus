@@ -1,11 +1,14 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import Header from '../../../components/Header';
+import GlobalAnnouncements from '../../../components/GlobalAnnouncements';
 
 
 export default function EventDetails() {
+    const [open, setOpen] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
@@ -44,14 +47,6 @@ export default function EventDetails() {
   }, [id, navigate]);
 
 
-  // Example notifications (replace with real data as needed)
-  const notifications = [
-    { title: "New Event Added:", bold: "The Disaster Risk Reduction Training in Los Baños is now open!", text: "Sign up and secure your slot today." },
-    { title: "2 New Volunteers Joined the Hydroponics Workshop!", text: "You are now 80% full. Get your tasks before they run out" },
-    { title: "Leaderboard Alert!", bold: "You have surpassed Alyzza Ocoma and are now ranked #2.", text: "Keep earning those points!" },
-    { title: "Opportunity Alert:", bold: "The 'Bayan Ko, Titser Ko' team needs one (1) more volunteer skilled in Literacy Coaching.", text: "Are you ready to serve?" },
-    { title: "Certificate Ready:", bold: "Your official Certificate of Participation for the Laguna Lake Cleanup is now available in your Profile!" }
-  ];
 
   if (loading) {
     return <div style={{ padding: 32 }}>Loading...</div>;
@@ -118,19 +113,30 @@ export default function EventDetails() {
               </div>
             </div>
           </div>
-          {/* Notification Panel */}
-          <aside style={{ flex: 1, background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 2px 8px #0001', minWidth: 320, maxWidth: 360, marginLeft: 8, marginRight: 16, alignSelf: 'flex-start', border: '2px solid #30bdb7' }}>
-            <h3 style={{ color: '#234e7b', fontWeight: 700, marginBottom: 16 }}>Global Notification</h3>
-            <div style={{ color: '#234e7b', fontWeight: 500, lineHeight: '1.7', fontSize: 15 }}>
-              {notifications.map((notif, idx) => (
-                <div key={idx} style={{ marginTop: idx === 0 ? 0 : 16 }}>
-                  {notif.title && <span style={{ fontWeight: 700 }}>{notif.title} </span>}
-                  {notif.bold && <span style={{ fontWeight: 700 }}>{notif.bold} </span>}
-                  {notif.text && <span>{notif.text}</span>}
-                </div>
-              ))}
-            </div>
-          </aside>
+          {/* Community Updates Toggle Button and Slide-in Panel (like StudentHome) */}
+          <button
+            className="global-feed-toggle"
+            type="button"
+            onClick={() => setOpen((prev) => !prev)}
+            aria-label="Toggle Community Updates"
+            style={{ position: 'fixed', top: 120, right: 24, zIndex: 3000 }}
+          >
+            📰
+            <span className="global-feed-badge">1</span>
+          </button>
+
+          {open && (
+            <aside className="global-feed open"
+              style={{ position: 'fixed', top: 80, right: 0, height: 'calc(100vh - 80px)', width: 380, background: '#fff', boxShadow: '0 2px 8px #0001', borderLeft: '2px solid #30bdb7', zIndex: 3001, transition: 'transform 0.3s' }}>
+              <div className="global-feed-header">
+                <h3 className="global-feed-title">Community Updates</h3>
+                <p className="global-feed-subtitle">Whats happening this week</p>
+              </div>
+              <div className="global-feed-list">
+                <GlobalAnnouncements />
+              </div>
+            </aside>
+          )}
         </div>
       </div>
     </>
