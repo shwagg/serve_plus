@@ -1,10 +1,9 @@
 //first page for admin after login
-import { db, auth } from "../../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { Form, Link, useNavigate } from "react-router-dom";
-import { useSession } from "../../context/SessionContext";
-import "../../styles/AdminDashboard.css"
+import { useNavigate } from "react-router-dom";
+import { db } from "../../firebaseConfig";
+import "../../styles/AdminDashboard.css";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -36,7 +35,9 @@ export default function AdminDashboard() {
         const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
         // only published missions should be visible as "events" (after complete approval)
-        const published = rows.filter((m) => (m.status || "draft") === "published");
+        const published = rows.filter(
+          (m) => (m.status || "draft") === "published",
+        );
 
         const today = startOfToday();
 
@@ -44,21 +45,24 @@ export default function AdminDashboard() {
         const upcoming = [];
 
         for (const m of published) {
-          const md =
-            m.dateAt?.toDate
-              ? m.dateAt.toDate()
-              : parseMissionDate(m.date);
+          const md = m.dateAt?.toDate
+            ? m.dateAt.toDate()
+            : parseMissionDate(m.date);
 
           if (!md) continue;
 
-          const missionDay = new Date(md.getFullYear(), md.getMonth(), md.getDate());
+          const missionDay = new Date(
+            md.getFullYear(),
+            md.getMonth(),
+            md.getDate(),
+          );
 
           if (isSameDay(missionDay, today)) todayEvents.push(m);
           else if (missionDay > today) upcoming.push(m);
         }
 
         // (optional) sort upcoming by soonest date
-        upcoming.sort((a, b) => (new Date(a.date)) - (new Date(b.date)));
+        upcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         setEventsToday(todayEvents);
         setUpcomingEvents(upcoming);
@@ -97,14 +101,19 @@ export default function AdminDashboard() {
                   <div className="bar-row" key={x.label}>
                     <div className="bar-label">{x.label}</div>
                     <div className="bar-track">
-                      <div className="bar-fill" style={{ width: `${x.value}%` }} />
+                      <div
+                        className="bar-fill"
+                        style={{ width: `${x.value}%` }}
+                      />
                       <div className="bar-value">{x.value}%</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <p className="card-note">*Sample only for demo. Replace with real metrics later.</p>
+              <p className="card-note">
+                *Sample only for demo. Replace with real metrics later.
+              </p>
             </div>
           </div>
 
@@ -129,7 +138,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <p className="card-note">*Leave blank for now. You can compute later from surveys.</p>
+              <p className="card-note">
+                *Leave blank for now. You can compute later from surveys.
+              </p>
             </div>
           </div>
         </section>
@@ -140,7 +151,9 @@ export default function AdminDashboard() {
           <div className="panel">
             <div className="panel-header">
               <span>Events Today</span>
-              <button className="panel-link" type="button"
+              <button
+                className="panel-link"
+                type="button"
                 onClick={() => navigate("/admin/projects")}
               >
                 View all Events
@@ -152,8 +165,8 @@ export default function AdminDashboard() {
                 <div className="empty-state">
                   <p className="empty-title">No events today yet</p>
                   <p className="empty-desc">
-                    Once you create projects/events (with today’s date + active status),
-                    they will appear here automatically.
+                    Once you create projects/events (with today’s date + active
+                    status), they will appear here automatically.
                   </p>
                 </div>
               ) : (
@@ -162,22 +175,26 @@ export default function AdminDashboard() {
                     <div
                       className="event-card"
                       key={e.id}
-                      role="button"
-                      tabIndex={0}
                       onClick={() => navigate(`/admin/projects/${e.id}`)}
-                      onKeyDown={(eKey) => {
-                        if (eKey.key === "Enter") {
-                          navigate(`/admin/projects/${e.id}`);
-                        }
-                      }}
+                      style={{ cursor: "pointer" }}
                     >
-                      <div className="event-date">{e.date}</div>
                       <div className="event-title">
                         {e.title || e.alt || "Untitled Event"}
                       </div>
-                      <div className="event-details">{e.description || "Unknown Location"}</div>
+                      <div className="event-footer">
+                        <span className="event-date">{e.date}</span>
+                        <button
+                          className="event-details"
+                          type="button"
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            navigate(`/admin/projects/${e.id}`);
+                          }}
+                        >
+                          Details
+                        </button>
+                      </div>
                     </div>
-
                   ))}
                 </div>
               )}
@@ -201,13 +218,25 @@ export default function AdminDashboard() {
               ) : (
                 <div className="event-grid">
                   {upcomingEvents.map((e) => (
-                    <div className="event-card" key={e.id}>
+                    <div
+                      className="event-card"
+                      key={e.id}
+                      onClick={() => navigate(`/admin/projects/${e.id}`)}
+                      style={{ cursor: "pointer" }}
+                    >
                       <div className="event-title">
                         {e.title || e.alt || e.name || "Untitled Event"}
                       </div>
                       <div className="event-footer">
                         <span className="event-date">{e.date}</span>
-                        <button className="event-details" type="button">
+                        <button
+                          className="event-details"
+                          type="button"
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            navigate(`/admin/projects/${e.id}`);
+                          }}
+                        >
                           Details
                         </button>
                       </div>
@@ -222,6 +251,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-
-
