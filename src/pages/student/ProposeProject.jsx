@@ -84,112 +84,54 @@ function ActivityModal({ open, onClose, onSave }) {
 }
 
 export default function ProposeProject() {
-  // State and persistence
-  const getInitialFormData = () => {
-    try {
-      const saved = localStorage.getItem('proposalFormData');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      title: '', date: '', faculty: '', sections: '', courseTitle: '', courseCode: '', stakeholders: '', targetDates: '', targetLocation: '', volunteerHours: '', sdgs: [], description: '', objectives: '', indicators: '', budget: '',
+  try {
+    // State and persistence
+    const getInitialFormData = () => {
+      try {
+        const saved = localStorage.getItem('proposalFormData');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+      return {
+        title: '', date: '', faculty: '', sections: '', courseTitle: '', courseCode: '', stakeholders: '', targetDates: '', targetLocation: '', volunteerHours: '', sdgs: [], description: '', objectives: '', indicators: '', budget: '',
+      };
     };
-  };
-  const getInitialActivities = () => {
-    try {
-      const saved = localStorage.getItem('proposalActivities');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [];
-  };
-  const [formData, setFormData] = useState(getInitialFormData);
-  const [activities, setActivities] = useState(getInitialActivities);
-  const [activityModalOpen, setActivityModalOpen] = useState(false);
-  React.useEffect(() => { localStorage.setItem('proposalFormData', JSON.stringify(formData)); }, [formData]);
-  React.useEffect(() => { localStorage.setItem('proposalActivities', JSON.stringify(activities)); }, [activities]);
-
-  // Handlers
-  const handleChange = e => {
-    const { name, value, type, checked } = e.target;
-    if (type === 'checkbox') {
-      setFormData(prev => {
-        let sdgs = prev.sdgs;
-        if (checked) sdgs = [...sdgs, value];
-        else sdgs = sdgs.filter(s => s !== value);
-        return { ...prev, sdgs };
-      });
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
-  const addActivity = () => {
-    setActivities(prev => ([...prev, { id: Date.now(), title: '', date: '' }]));
-  };
-  const updateActivity = (id, field, value) => {
-    setActivities(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
-  };
-  const removeActivity = id => setActivities(prev => prev.filter(a => a.id !== id));
-
-  // PDF Export Handler
-  const handleExport = async () => {
-    try {
-      const formUrl = '/assets/Proposal Form 32.pdf';
-      const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
-      const pdfDoc = await PDFDocument.load(existingPdfBytes);
-      let form;
+    const getInitialActivities = () => {
       try {
-        form = pdfDoc.getForm();
-      } catch {
-        alert('No form fields found in this PDF.');
-        return;
-      }
-      // Map form fields to your data (fix typos and mapping)
-      try {
-        form.getTextField('proposalTitle').setText(formData.title || '');
-        form.getTextField('proposedDate').setText(formData.date || '');
-        form.getTextField('proponent').setText(formData.faculty || '');
-        form.getTextField('participatingSections').setText(formData.sections || '');
-        form.getTextField('courseTitle').setText(formData.courseTitle || ''); // fixed typo
-        form.getTextField('courseCode').setText(formData.courseCode || '');
-        form.getTextField('stakeholders').setText(formData.stakeholders || '');
-        form.getTextField('targetDate').setText(formData.targetDates || '');
-        form.getTextField('targetLocation').setText(formData.targetLocation || ''); // fixed mapping
-        form.getTextField('volunteerHours').setText(formData.volunteerHours?.toString() || '');
-        form.getTextField('SDGs').setText((formData.sdgs && formData.sdgs.length > 0) ? formData.sdgs.join(', ') : '');
-        form.getTextField('proposalDescription').setText(formData.description || '');
-        form.getTextField('objectives').setText(formData.objectives || '');
-        form.getTextField('successIndicators').setText(formData.indicators || '');
-        form.getTextField('budget').setText(formData.budget || '');
-        form.getTextField('specificActivities').setText(
-          activities && activities.length > 0
-            ? activities.map((act, idx) => `${idx+1}. ${act.title}`).join('\n')
-            : ''
-        );
-      } catch (e) {
-        alert('Some fields could not be filled. Please check the PDF form field names.\n' + e);
-      }
-      form.flatten();
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${formData.title || 'proposal'}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
-    } catch (err) {
-      alert('PDF Export Error: ' + err);
-      console.error('PDF Export Error:', err);
-    }
-  };
+        const saved = localStorage.getItem('proposalActivities');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+      return [];
+    };
+    const [formData, setFormData] = useState(getInitialFormData);
+    const [activities, setActivities] = useState(getInitialActivities);
+    const [activityModalOpen, setActivityModalOpen] = useState(false);
+    React.useEffect(() => { localStorage.setItem('proposalFormData', JSON.stringify(formData)); }, [formData]);
+    React.useEffect(() => { localStorage.setItem('proposalActivities', JSON.stringify(activities)); }, [activities]);
 
-  // DEBUG: List all PDF form field names (run automatically on mount for user convenience)
-  /*
-  React.useEffect(() => {
-    (async () => {
+    // Handlers
+    const handleChange = e => {
+      const { name, value, type, checked } = e.target;
+      if (type === 'checkbox') {
+        setFormData(prev => {
+          let sdgs = prev.sdgs;
+          if (checked) sdgs = [...sdgs, value];
+          else sdgs = sdgs.filter(s => s !== value);
+          return { ...prev, sdgs };
+        });
+      } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+      }
+    };
+    const addActivity = () => {
+      setActivities(prev => ([...prev, { id: Date.now(), title: '', date: '' }]));
+    };
+    const updateActivity = (id, field, value) => {
+      setActivities(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+    };
+    const removeActivity = id => setActivities(prev => prev.filter(a => a.id !== id));
+
+    // PDF Export Handler
+    const handleExport = async () => {
       try {
         const formUrl = '/assets/Proposal Form 32.pdf';
         const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
@@ -198,162 +140,238 @@ export default function ProposeProject() {
         try {
           form = pdfDoc.getForm();
         } catch {
-          setError('No form fields found in this PDF.');
-          setLoading(false);
+          alert('No form fields found in this PDF.');
           return;
         }
+        // DEBUG: Log all PDF form field names and types
         const fields = form.getFields();
-        const names = fields.map(f => f.getName());
-        // Optionally show field names for debugging
-        // alert('PDF Form Fields:\n' + names.join('\n'));
-        setLoading(false);
+        fields.forEach(f => {
+          console.log('PDF Field:', f.getName(), f.constructor.name);
+        });
+        // Fill each field with the correct form value (using actual field names)
+        // Set each PDF field with the verified correct mapping
+        // Optimized and corrected mapping for each field
+        form.getTextField('text_1qumh').setText(formData.title || ''); // Title of Service-Learning Initiative
+        form.getTextField('text_2cqku').setText(formData.faculty || ''); // Faculty-in-Charge / Proponent(s)
+        form.getTextField('text_3hyab').setText(formData.courseTitle || ''); // Course Title
+        form.getTextField('text_4khrw').setText(formData.sections || ''); // Sections
+        form.getTextField('text_5gjvd').setText(formData.stakeholders || ''); // Stakeholders
+        form.getTextField('text_6yoaj').setText(formData.targetLocation || ''); // Target Location
+        form.getTextField('text_7cwym').setText(formData.courseCode || ''); // Course Code
+        form.getTextField('text_8dgmn').setText(formData.date || ''); // Date Proposed
+        form.getTextField('text_9snnr').setText(formData.targetDates || ''); // Target Dates
+        form.getTextField('text_10qqqs').setText(formData.volunteerHours?.toString() || ''); // Number of Volunteer Hours
+        // SDG Checkboxes
+        const sdgCheckboxFields = [
+          'checkbox_11wuka', 'checkbox_12lffm', 'checkbox_13etqk', 'checkbox_14pkvy', 'checkbox_15yqds', 'checkbox_16lqoh',
+          'checkbox_17hgn', 'checkbox_18poak', 'checkbox_19guet', 'checkbox_20hglu', 'checkbox_21rdsy', 'checkbox_22tqfr',
+          'checkbox_23kyba', 'checkbox_24nqki', 'checkbox_25vtns', 'checkbox_26wkuj', 'checkbox_27ocax'
+        ];
+        sdgCheckboxFields.forEach((field, idx) => {
+          const checked = formData.sdgs.includes(sdgList[idx].label);
+          form.getCheckBox(field).check(checked);
+        });
+        form.getTextField('textarea_28tick').setText(formData.description || ''); // Description
+        form.getTextField('textarea_29rtox').setText(formData.objectives || ''); // Objectives
+        form.getTextField('textarea_30wmtd').setText(
+          activities && activities.length > 0
+            ? activities.map((act, idx) => `${idx+1}. ${act.title}`).join('\n')
+            : ''
+        ); // Specific Activities
+        form.getTextField('textarea_31nwsn').setText(formData.indicators || ''); // Success Indicators
+        // Replace Peso symbol with 'PHP' to avoid encoding error
+        const safeBudget = (formData.budget || '').replace(/₱/g, 'PHP');
+        form.getTextField('text_32xo').setText(safeBudget); // Budget
+        form.flatten();
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${formData.title || 'proposal'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
       } catch (err) {
-        setError('Error loading or parsing Proposal Form 32 PDF. Please check the file. ' + err);
-        setLoading(false);
-        console.error('PDF useEffect error:', err);
+        alert('PDF Export Error: ' + err);
+        console.error('PDF Export Error:', err);
       }
-    })();
-  }, []);
-  */
+    };
 
-  return (
-    <div style={{ background: '#f7f9fa', minHeight: '100vh', padding: '2rem' }}>
-      <ActivityModal
-        open={activityModalOpen}
-        onClose={() => setActivityModalOpen(false)}
-        onSave={activity => setActivities(prev => [...prev, activity])}
-      />
-      <div style={{ maxWidth: 900, margin: '2rem auto', background: 'linear-gradient(180deg, #3386e6 0%, #2566b3 100%)', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', padding: 32, color: '#fff', position: 'relative' }}>
-        <h2 style={{ margin: 0, fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Service-Learning Proposal</h2>
-        <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} autoComplete="off">
-          {/* Basic Info */}
-          <h3 style={{ marginBottom: 16 }}>Basic Information</h3>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <div style={{ flex: 2 }}>
-              <label style={labelStyle}>Title of Service-Learning Initiative</label>
-              <input style={inputStyle} type="text" name="title" value={formData.title} onChange={handleChange} />
+    // DEBUG: List all PDF form field names (run automatically on mount for user convenience)
+    /*
+    React.useEffect(() => {
+      (async () => {
+        try {
+          const formUrl = '/assets/Proposal Form 32.pdf';
+          const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
+          const pdfDoc = await PDFDocument.load(existingPdfBytes);
+          let form;
+          try {
+            form = pdfDoc.getForm();
+          } catch {
+            setError('No form fields found in this PDF.');
+            setLoading(false);
+            return;
+          }
+            form.getTextField('text_1qumh').setText(formData.title || ''); // Title of Service-Learning Initiative
+            form.getTextField('text_5gjvd').setText(formData.courseTitle || ''); // Course Title
+          // Optionally show field names for debugging
+          // alert('PDF Form Fields:\n' + names.join('\n'));
+          setLoading(false);
+            form.getTextField('text_1qumh').setText(formData.title || ''); // Title of Service-Learning Initiative
+            form.getTextField('text_9snnr').setText(formData.date || ''); // Date Proposed
+            form.getTextField('text_2cqku').setText(formData.faculty || ''); // Faculty-in-Charge / Proponent(s)
+            form.getTextField('text_5gjvd').setText(formData.courseTitle || ''); // Course Title
+            form.getTextField('text_7cwym').setText(formData.targetLocation || ''); // Target Location
+            form.getTextField('text_4khrw').setText(formData.courseCode || ''); // Course Code
+    }, []);
+    */
+
+    return (
+      <div style={{ background: '#f7f9fa', minHeight: '100vh', padding: '2rem' }}>
+        <ActivityModal
+          open={activityModalOpen}
+          onClose={() => setActivityModalOpen(false)}
+          onSave={activity => setActivities(prev => [...prev, activity])}
+        />
+        <div style={{ maxWidth: 900, margin: '2rem auto', background: 'linear-gradient(180deg, #3386e6 0%, #2566b3 100%)', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', padding: 32, color: '#fff', position: 'relative' }}>
+          <h2 style={{ margin: 0, fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Service-Learning Proposal</h2>
+          <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} autoComplete="off">
+            {/* Basic Info */}
+            <h3 style={{ marginBottom: 16 }}>Basic Information</h3>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+              <div style={{ flex: 2 }}>
+                <label style={labelStyle}>Title of Service-Learning Initiative</label>
+                <input style={inputStyle} type="text" name="title" value={formData.title} onChange={handleChange} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Date Proposed</label>
+                <input style={inputStyle} type="date" name="date" value={formData.date} onChange={handleChange} />
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Date Proposed</label>
-              <input style={inputStyle} type="date" name="date" value={formData.date} onChange={handleChange} />
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Faculty-In-Charge / Proponent(s)</label>
+                <input style={inputStyle} type="text" name="faculty" value={formData.faculty} onChange={handleChange} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Participating Section(s)</label>
+                <input style={inputStyle} type="text" name="sections" value={formData.sections} onChange={handleChange} />
+              </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Faculty-In-Charge / Proponent(s)</label>
-              <input style={inputStyle} type="text" name="faculty" value={formData.faculty} onChange={handleChange} />
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Course Title</label>
+                <input style={inputStyle} type="text" name="courseTitle" value={formData.courseTitle} onChange={handleChange} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Course Code</label>
+                <input style={inputStyle} type="text" name="courseCode" value={formData.courseCode} onChange={handleChange} />
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Participating Section(s)</label>
-              <input style={inputStyle} type="text" name="sections" value={formData.sections} onChange={handleChange} />
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Stakeholders</label>
+                <input style={inputStyle} type="text" name="stakeholders" value={formData.stakeholders} onChange={handleChange} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Target Dates</label>
+                <input style={inputStyle} type="date" name="targetDates" value={formData.targetDates} onChange={handleChange} />
+              </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Course Title</label>
-              <input style={inputStyle} type="text" name="courseTitle" value={formData.courseTitle} onChange={handleChange} />
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Target Location</label>
+                <input style={inputStyle} type="text" name="targetLocation" value={formData.targetLocation} onChange={handleChange} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Number of Volunteer Hours</label>
+                <input style={inputStyle} type="number" name="volunteerHours" value={formData.volunteerHours} onChange={handleChange} />
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Course Code</label>
-              <input style={inputStyle} type="text" name="courseCode" value={formData.courseCode} onChange={handleChange} />
+            {/* SDGs */}
+            <div style={{ marginBottom: 8, fontWeight: 600 }}>SDG(s)</div>
+            <div style={{ marginBottom: 8, fontSize: 13, color: '#888' }}>Note: Please check the targeted SDG Number and Goal that applies.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, background: '#f7f9fa', border: '1px solid #b3d1f7', borderRadius: 8, padding: 16, marginBottom: 24 }}>
+              {sdgList.map((sdg, i) => (
+                <label key={sdg.num} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 500 }}>
+                  <input type="checkbox" style={{ accentColor: '#3386e6', width: 18, height: 18 }} name="sdgs" value={sdg.label} checked={formData.sdgs.includes(sdg.label)} onChange={handleChange} />
+                  {sdg.num}. {sdg.label}
+                </label>
+              ))}
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Stakeholders</label>
-              <input style={inputStyle} type="text" name="stakeholders" value={formData.stakeholders} onChange={handleChange} />
+            {/* Description, Objectives, Indicators, Budget */}
+            <h3 style={{ marginBottom: 16 }}>Project Details</h3>
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Description</label>
+              <textarea style={textareaStyle} rows={4} name="description" value={formData.description} onChange={handleChange} />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Target Dates</label>
-              <input style={inputStyle} type="date" name="targetDates" value={formData.targetDates} onChange={handleChange} />
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Objectives</label>
+              <textarea style={textareaStyle} rows={4} name="objectives" value={formData.objectives} onChange={handleChange} />
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Target Location</label>
-              <input style={inputStyle} type="text" name="targetLocation" value={formData.targetLocation} onChange={handleChange} />
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Success Indicators</label>
+              <textarea style={textareaStyle} rows={4} name="indicators" value={formData.indicators} onChange={handleChange} />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Number of Volunteer Hours</label>
-              <input style={inputStyle} type="number" name="volunteerHours" value={formData.volunteerHours} onChange={handleChange} />
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Budget</label>
+              <input style={inputStyle} type="text" name="budget" value={formData.budget} onChange={handleChange} />
             </div>
-          </div>
-          {/* SDGs */}
-          <div style={{ marginBottom: 8, fontWeight: 600 }}>SDG(s)</div>
-          <div style={{ marginBottom: 8, fontSize: 13, color: '#888' }}>Note: Please check the targeted SDG Number and Goal that applies.</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, background: '#f7f9fa', border: '1px solid #b3d1f7', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-            {sdgList.map((sdg, i) => (
-              <label key={sdg.num} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 500 }}>
-                <input type="checkbox" style={{ accentColor: '#3386e6', width: 18, height: 18 }} name="sdgs" value={sdg.label} checked={formData.sdgs.includes(sdg.label)} onChange={handleChange} />
-                {sdg.num}. {sdg.label}
-              </label>
+            {/* Activities */}
+            <h3 style={{ marginBottom: 16 }}>Activities</h3>
+            <div style={{ marginBottom: 16 }}>
+              <button type="button" style={addBtnStyle} onClick={() => setActivityModalOpen(true)}>Add Activity</button>
+            </div>
+            {activities.length === 0 && <div style={{ color: '#888', marginBottom: 16 }}>No activities added yet.</div>}
+            {activities.map((act, idx) => (
+              <div key={act.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <input style={{ ...inputStyle, flex: 1 }} type="text" placeholder="Activity Title" value={act.title} onChange={e => updateActivity(act.id, 'title', e.target.value)} />
+                <button type="button" style={removeBtnStyle} onClick={() => removeActivity(act.id)} title="Remove Activity">×</button>
+              </div>
             ))}
-          </div>
-          {/* Description, Objectives, Indicators, Budget */}
-          <h3 style={{ marginBottom: 16 }}>Project Details</h3>
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Description</label>
-            <textarea style={textareaStyle} rows={4} name="description" value={formData.description} onChange={handleChange} />
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Objectives</label>
-            <textarea style={textareaStyle} rows={4} name="objectives" value={formData.objectives} onChange={handleChange} />
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Success Indicators</label>
-            <textarea style={textareaStyle} rows={4} name="indicators" value={formData.indicators} onChange={handleChange} />
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Budget</label>
-            <input style={inputStyle} type="text" name="budget" value={formData.budget} onChange={handleChange} />
-          </div>
-          {/* Activities */}
-          <h3 style={{ marginBottom: 16 }}>Activities</h3>
-          <div style={{ marginBottom: 16 }}>
-            <button type="button" style={addBtnStyle} onClick={() => setActivityModalOpen(true)}>Add Activity</button>
-          </div>
-          {activities.length === 0 && <div style={{ color: '#888', marginBottom: 16 }}>No activities added yet.</div>}
-          {activities.map((act, idx) => (
-            <div key={act.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-              <input style={{ ...inputStyle, flex: 1 }} type="text" placeholder="Activity Title" value={act.title} onChange={e => updateActivity(act.id, 'title', e.target.value)} />
-              <button type="button" style={removeBtnStyle} onClick={() => removeActivity(act.id)} title="Remove Activity">×</button>
+            {/* Review/Export */}
+            <h3 style={{ margin: '32px 0 16px 0' }}>Review & Export</h3>
+            <div style={{ marginBottom: 16 }}>
+              <strong>Title:</strong> {formData.title}<br />
+              <strong>Date Proposed:</strong> {formData.date}<br />
+              <strong>Faculty-In-Charge:</strong> {formData.faculty}<br />
+              <strong>Sections:</strong> {formData.sections}<br />
+              <strong>Course Title:</strong> {formData.courseTitle}<br />
+              <strong>Course Code:</strong> {formData.courseCode}<br />
+              <strong>Stakeholders:</strong> {formData.stakeholders}<br />
+              <strong>Target Dates:</strong> {formData.targetDates}<br />
+              <strong>Target Location:</strong> {formData.targetLocation}<br />
+              <strong>Volunteer Hours:</strong> {formData.volunteerHours}<br />
+              <strong>SDGs:</strong> {(formData.sdgs && formData.sdgs.length > 0) ? formData.sdgs.join(', ') : '-'}<br />
+              <strong>Description:</strong> {formData.description}<br />
+              <strong>Objectives:</strong> {formData.objectives}<br />
+              <strong>Indicators:</strong> {formData.indicators}<br />
+              <strong>Budget:</strong> {formData.budget}<br />
             </div>
-          ))}
-          {/* Review/Export */}
-          <h3 style={{ margin: '32px 0 16px 0' }}>Review & Export</h3>
-          <div style={{ marginBottom: 16 }}>
-            <strong>Title:</strong> {formData.title}<br />
-            <strong>Date Proposed:</strong> {formData.date}<br />
-            <strong>Faculty-In-Charge:</strong> {formData.faculty}<br />
-            <strong>Sections:</strong> {formData.sections}<br />
-            <strong>Course Title:</strong> {formData.courseTitle}<br />
-            <strong>Course Code:</strong> {formData.courseCode}<br />
-            <strong>Stakeholders:</strong> {formData.stakeholders}<br />
-            <strong>Target Dates:</strong> {formData.targetDates}<br />
-            <strong>Target Location:</strong> {formData.targetLocation}<br />
-            <strong>Volunteer Hours:</strong> {formData.volunteerHours}<br />
-            <strong>SDGs:</strong> {(formData.sdgs && formData.sdgs.length > 0) ? formData.sdgs.join(', ') : '-'}<br />
-            <strong>Description:</strong> {formData.description}<br />
-            <strong>Objectives:</strong> {formData.objectives}<br />
-            <strong>Indicators:</strong> {formData.indicators}<br />
-            <strong>Budget:</strong> {formData.budget}<br />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <strong>Activities:</strong>
-            <ul>
-              {activities && activities.length > 0 ? activities.map((act, idx) => (
-                <li key={idx}>{act.title} ({act.date})</li>
-              )) : <li>No activities listed.</li>}
-            </ul>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
-            <button type="button" style={buttonStyle} onClick={handleExport}>EXPORT TO PDF</button>
-            <button type="submit" style={{ ...buttonStyle, background: '#3386e6', color: '#fff', border: '1.5px solid #3386e6' }}>SUBMIT</button>
-          </div>
-        </form>
+            <div style={{ marginBottom: 16 }}>
+              <strong>Activities:</strong>
+              <ul>
+                {activities && activities.length > 0 ? activities.map((act, idx) => (
+                  <li key={idx}>{act.title} ({act.date})</li>
+                )) : <li>No activities listed.</li>}
+              </ul>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+              <button type="button" style={buttonStyle} onClick={handleExport}>EXPORT TO PDF</button>
+              <button type="submit" style={{ ...buttonStyle, background: '#3386e6', color: '#fff', border: '1.5px solid #3386e6' }}>SUBMIT</button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  );
+    );
+  } catch (err) {
+    return <div style={{padding: 40, color: 'red', fontSize: 22}}>A rendering error occurred: {err && err.message ? err.message : String(err)}</div>;
+  }
 }
 
 // Style constants and SDG list

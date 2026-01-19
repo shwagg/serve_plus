@@ -41,4 +41,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# PDF FORMS
 public/assets/Proposal Form 32.pdf
