@@ -175,7 +175,7 @@ export default function AdminDashboard() {
                     <div
                       className="event-card"
                       key={e.id}
-                      onClick={() => navigate(`/admin/projects/${e.id}`)}
+                      onClick={() => navigate(`/admin/events/${e.id}`)}
                       style={{ cursor: "pointer" }}
                     >
                       <div className="event-title">
@@ -188,7 +188,7 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={(evt) => {
                             evt.stopPropagation();
-                            navigate(`/admin/projects/${e.id}`);
+                            navigate(`/admin/events/${e.id}`);
                           }}
                         >
                           Details
@@ -221,7 +221,7 @@ export default function AdminDashboard() {
                     <div
                       className="event-card"
                       key={e.id}
-                      onClick={() => navigate(`/admin/projects/${e.id}`)}
+                      onClick={() => navigate(`/admin/events/${e.id}`)}
                       style={{ cursor: "pointer" }}
                     >
                       <div className="event-title">
@@ -234,7 +234,7 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={(evt) => {
                             evt.stopPropagation();
-                            navigate(`/admin/projects/${e.id}`);
+                            navigate(`/admin/events/${e.id}`);
                           }}
                         >
                           Details

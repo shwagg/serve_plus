@@ -1,0 +1,358 @@
+:root {
+  --cem-navy: #1f3b73;
+  --cem-teal: #30bdb7;
+  --cem-green: #7ed321;
+  --cem-yellow: #9bc53d;
+  --cem-border: #e0e7ed;
+  --cem-bg: #f6f7fb;
+  --cem-text: #2c3e50;
+  --cem-text-light: #64748b;
+}
+
+.current-event-monitoring {
+  padding: 1.5rem;
+  background: var(--cem-bg);
+  min-height: 100vh;
+}
+
+/* Header */
+.cem-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+}
+
+.cem-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cem-back-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--cem-border);
+  background: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: var(--cem-text-light);
+  transition: all 0.2s;
+}
+
+.cem-back-btn:hover {
+  background: #f8f9fa;
+  color: var(--cem-navy);
+}
+
+.cem-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--cem-navy);
+}
+
+.cem-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cem-stats {
+  font-size: 0.9rem;
+  color: var(--cem-text);
+  font-weight: 600;
+}
+
+.cem-badge {
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.cem-badge.happening {
+  background: #e8f8f5;
+  color: var(--cem-yellow);
+  border: 1px solid var(--cem-yellow);
+}
+
+/* Main Content */
+.cem-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Panels */
+.cem-panel {
+  background: white;
+  border: 1px solid var(--cem-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.cem-panel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.cem-panel-title {
+  margin: 0 0 1.25rem 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cem-navy);
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--cem-border);
+}
+
+/* Summary Panel */
+.cem-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cem-project-name {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--cem-navy);
+  line-height: 1.4;
+}
+
+.cem-published,
+.cem-partner {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cem-text);
+}
+
+.cem-published strong,
+.cem-partner strong {
+  color: var(--cem-navy);
+  font-weight: 600;
+}
+
+.cem-link-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--cem-teal);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  margin-top: 0.25rem;
+}
+
+.cem-link-btn:hover {
+  color: #0f766e;
+}
+
+.cem-description {
+  margin: 0.75rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-left: 3px solid var(--cem-teal);
+  border-radius: 6px;
+}
+
+.cem-description p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--cem-text);
+}
+
+.cem-info-section {
+  margin-top: 1rem;
+}
+
+.cem-info-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cem-navy);
+}
+
+.cem-info-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.cem-info-list li {
+  font-size: 0.85rem;
+  color: var(--cem-text);
+  line-height: 1.5;
+  margin-bottom: 0.25rem;
+}
+
+/* Analytics Panel */
+.cem-analytics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cem-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cem-metric-row:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+}
+
+.cem-metric-label {
+  font-size: 0.85rem;
+  color: var(--cem-text);
+  font-weight: 500;
+}
+
+.cem-metric-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cem-navy);
+}
+
+.cem-metric-badge {
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.cem-metric-badge.success {
+  background: #e8f8f5;
+  color: var(--cem-green);
+  border: 1px solid var(--cem-green);
+}
+
+.cem-metric-badge.feedback {
+  background: #fff9e6;
+  color: #f59e0b;
+  border: 1px solid #fbbf24;
+}
+
+/* Buttons */
+.cem-btn-primary {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: var(--cem-teal);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 1rem;
+  transition: background 0.2s;
+}
+
+.cem-btn-primary:hover {
+  background: #0f766e;
+}
+
+.cem-btn-secondary {
+  width: 100%;
+  padding: 0.7rem 1.5rem;
+  background: white;
+  color: var(--cem-teal);
+  border: 2px solid var(--cem-teal);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cem-btn-secondary:hover {
+  background: var(--cem-teal);
+  color: white;
+}
+
+/* Action Buttons */
+.cem-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cem-btn-action {
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  background: var(--cem-teal);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.cem-btn-action:hover {
+  background: #0f766e;
+}
+
+/* Loading & Error States */
+.loading,
+.error {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+  color: var(--cem-text-light);
+}
+
+.error {
+  color: #dc2626;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .cem-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .current-event-monitoring {
+    padding: 1rem;
+  }
+
+  .cem-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .cem-header-right {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cem-title {
+    font-size: 1.25rem;
+  }
+
+  .cem-panel {
+    padding: 1rem;
+  }
+}

@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import ForgotPass from "./pages/ForgotPass";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import CurrentEventMonitoring from "./pages/admin/CurrentEventMonitoring";
 import ProjectList from "./pages/global/ProjectList";
 import CreateProject from "./pages/global/CreateProject";
 import ProjectDetails from "./pages/admin/ProjectDetails";
@@ -39,6 +40,7 @@ function App() {
             }
           >
             <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="events/:eventId" element={<CurrentEventMonitoring />} />
             <Route path="projects" element={<ProjectList />} />
             <Route path="projects/new" element={<CreateProject />} />
             <Route path="projects/:projectId" element={<ProjectDetails />} />
