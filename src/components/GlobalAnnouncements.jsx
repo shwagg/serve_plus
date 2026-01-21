@@ -8,20 +8,51 @@ const GlobalAnnouncements = () => {
   const [unreadAnnouncementIds, setUnreadAnnouncementIds] = useState([]); // ids of unread announcements
   const [lastAnnouncementTimestamp, setLastAnnouncementTimestamp] = useState(null); // last announcement time
 
+  const [milestones, setMilestones] = useState([]); // [{eventId, title, count}]
+
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
         // Fetch the latest event proposals from Firestore (from 'Missions' collection)
-        const q = query(collection(db, "Missions"), orderBy("createdAt", "desc"), limit(5));
+        const q = query(collection(db, "Missions"));
         const querySnapshot = await getDocs(q);
         const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('Fetched event IDs:', events.map(e => e.id));
         setAnnouncements(events);
         setAnnouncementCount(querySnapshot.size);
         if (events.length > 0) {
           setLastAnnouncementTimestamp(events[0].createdAt?.toDate ? events[0].createdAt.toDate() : null);
         }
-        // Placeholder: In future, fetch unread IDs from user profile or DB
         setUnreadAnnouncementIds([]);
+
+        // For each event, check volunteer count in subcollection 'volunteer'
+        const milestoneArr = [];
+        for (const event of events) {
+          try {
+            const volunteerCol = collection(db, `Missions/${event.id}/volunteer`);
+            const volunteerSnap = await getDocs(volunteerCol);
+            const count = volunteerSnap.size;
+            let milestoneTime = null;
+            if (count >= 3) {
+              // Collect all joinedAt dates, sort, and pick the 3rd
+              const joinDates = [];
+              volunteerSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.joinedAt) {
+                  const ts = new Date(data.joinedAt);
+                  if (!isNaN(ts.getTime())) joinDates.push(ts);
+                }
+              });
+              joinDates.sort((a, b) => a - b);
+              milestoneTime = joinDates[2] || null; // 3rd joined
+              milestoneArr.push({ eventId: event.id, title: event.title || 'Untitled Event', count, milestoneTime });
+            }
+            console.log(`Event: ${event.title || event.id}, ID: ${event.id}, Volunteers: ${count}`);
+          } catch (err) {
+            console.warn(`Error checking volunteers for event ${event.id}:`, err);
+          }
+        }
+        setMilestones(milestoneArr);
       } catch (error) {
         console.error("Error fetching announcements:", error);
       }
@@ -44,7 +75,35 @@ const GlobalAnnouncements = () => {
   };
 
   return (
-    <>
+    <div style={{ height: 650, overflowY: 'auto', paddingRight: 8 }}>
+      {/* Milestone announcements for events with 3+ volunteers */}
+      {milestones.map(milestone => (
+        <div
+          key={milestone.eventId + '-milestone'}
+          className="global-feed-item milestone"
+          style={{
+            marginBottom: 16,
+            borderRadius: 10,
+            padding: 12,
+            background: '#e6ffe6',
+            border: '1px solid #b2e6b2',
+            boxShadow: '0 1px 4px #0001',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+          }}
+        >
+          <span className="feed-icon" style={{ fontSize: 28, marginTop: 2 }}>🏆</span>
+          <div className="feed-content" style={{ flex: 1 }}>
+            <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0 }}>Milestone Reached!</p>
+            <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>3+ volunteers have joined <b>{milestone.title}</b>!</p>
+            <span className="feed-time" style={{ fontSize: 12, color: '#999' }}>
+              {milestone.milestoneTime ? milestone.milestoneTime.toLocaleString() : ''}
+            </span>
+          </div>
+        </div>
+      ))}
+      {/* Existing announcements */}
       {announcements.length === 0 ? (
         <div style={{ color: '#888', padding: 16 }}>No new announcements.</div>
       ) : (
@@ -118,7 +177,7 @@ const GlobalAnnouncements = () => {
           return announcementsToShow;
         })
       )}
-    </>
+    </div>
   );
 };
 
