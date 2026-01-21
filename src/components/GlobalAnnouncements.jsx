@@ -33,8 +33,7 @@ const GlobalAnnouncements = () => {
             const volunteerSnap = await getDocs(volunteerCol);
             const count = volunteerSnap.size;
             let milestoneTime = null;
-            if (count >= 3) {
-              // Collect all joinedAt dates, sort, and pick the 3rd
+            if (count >= 3) { // Change to desired milestone number
               const joinDates = [];
               volunteerSnap.forEach(doc => {
                 const data = doc.data();
@@ -44,7 +43,7 @@ const GlobalAnnouncements = () => {
                 }
               });
               joinDates.sort((a, b) => a - b);
-              milestoneTime = joinDates[2] || null; // 3rd joined
+              milestoneTime = joinDates[2] || null; // change index based on milestone number
               milestoneArr.push({ eventId: event.id, title: event.title || 'Untitled Event', count, milestoneTime });
             }
             console.log(`Event: ${event.title || event.id}, ID: ${event.id}, Volunteers: ${count}`);
@@ -76,7 +75,7 @@ const GlobalAnnouncements = () => {
 
   return (
     <div style={{ height: 650, overflowY: 'auto', paddingRight: 8 }}>
-      {/* Milestone announcements for events with 3+ volunteers */}
+      {/* Milestone announcements for events*/}
       {milestones.map(milestone => (
         <div
           key={milestone.eventId + '-milestone'}
