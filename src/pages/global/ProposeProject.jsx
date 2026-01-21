@@ -138,14 +138,31 @@ export default function ProposeProject() {
       e.preventDefault();
       try {
         const user = auth.currentUser;
-        await addDoc(collection(db, "proposalSubmission"), {
-          ...formData,
+        if (!user) throw new Error("User not authenticated");
+        // Map formData to required Firestore fields
+        const proposalData = {
           activities,
-          status: "pending",
-          submittedAt: serverTimestamp(),
-          submittedBy: user ? user.uid : "anonymous",
-          sdgs: Array.isArray(formData.sdgs) ? formData.sdgs.join(", ") : formData.sdgs // store as string
-        });
+          budget: formData.budget || "",
+          courseCode: formData.courseCode || "",
+          courseTitle: formData.courseTitle || "",
+          date: formData.date || "",
+          description: formData.description || "",
+          objectives: formData.objectives || "",
+          participatingSection: formData.sections || formData.participatingSection || "",
+          facultyInCharge: formData.faculty || formData.facultyInCharge || "",
+          sdgs: Array.isArray(formData.sdgs) ? formData.sdgs : [],
+          stakeholders: formData.stakeholders || "",
+          submittedBy: user.uid,
+          successIndicators: formData.indicators || formData.successIndicators || "",
+          targetDates: formData.targetDates || "",
+          targetLocation: formData.targetLocation || "",
+          title: formData.title || "",
+          volunteerHours: Number(formData.volunteerHours) || 0
+        };
+        await addDoc(
+          collection(db, "proposalSubmission", user.uid, "serviceLearning"),
+          proposalData
+        );
         alert("Proposal submitted for admin approval!");
         // Optionally clear form or redirect
       } catch (err) {
