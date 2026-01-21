@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { db, auth } from '../../firebaseConfig';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 function ActivityModal({ open, onClose, onSave }) {
@@ -108,6 +110,7 @@ export default function ProposeProject() {
     React.useEffect(() => { localStorage.setItem('proposalFormData', JSON.stringify(formData)); }, [formData]);
     React.useEffect(() => { localStorage.setItem('proposalActivities', JSON.stringify(activities)); }, [activities]);
 
+
     // Handlers
     const handleChange = e => {
       const { name, value, type, checked } = e.target;
@@ -129,6 +132,26 @@ export default function ProposeProject() {
       setActivities(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
     };
     const removeActivity = id => setActivities(prev => prev.filter(a => a.id !== id));
+
+    // Firestore submit handler
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const user = auth.currentUser;
+        await addDoc(collection(db, "proposalSubmission"), {
+          ...formData,
+          activities,
+          status: "pending",
+          submittedAt: serverTimestamp(),
+          submittedBy: user ? user.uid : "anonymous",
+          sdgs: Array.isArray(formData.sdgs) ? formData.sdgs.join(", ") : formData.sdgs // store as string
+        });
+        alert("Proposal submitted for admin approval!");
+        // Optionally clear form or redirect
+      } catch (err) {
+        alert("Submission failed: " + err.message);
+      }
+    };
 
     // PDF Export Handler
     const handleExport = async () => {
@@ -251,7 +274,7 @@ export default function ProposeProject() {
         />
         <div style={{ maxWidth: 900, margin: '2rem auto', background: 'linear-gradient(180deg, #3386e6 0%, #2566b3 100%)', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', padding: 32, color: '#fff', position: 'relative' }}>
           <h2 style={{ margin: 0, fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Service-Learning Proposal</h2>
-          <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} autoComplete="off">
+          <form style={{ background: '#fff', borderRadius: 12, padding: 24, color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }} autoComplete="off" onSubmit={handleSubmit}>
             {/* Basic Info */}
             <h3 style={{ marginBottom: 16 }}>Basic Information</h3>
             <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
