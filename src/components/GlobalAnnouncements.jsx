@@ -74,7 +74,7 @@ const GlobalAnnouncements = () => {
   };
 
   return (
-    <div style={{ height: 650, overflowY: 'auto', paddingRight: 8 }}>
+    <div style={{ height: '100%', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', paddingRight: 8 }}>
       {/* Milestone announcements for events*/}
       {milestones.map(milestone => (
         <div
@@ -107,8 +107,9 @@ const GlobalAnnouncements = () => {
         <div style={{ color: '#888', padding: 16 }}>No new announcements.</div>
       ) : (
         announcements.flatMap((event, idx) => {
+          console.log('Announcement:', event.title, 'targetDates:', event.targetDates);
           const { icon, className } = getIconAndClass(event);
-          const closingSoon = isClosingSoon(event.targetDates);
+          const closingSoon = isClosingSoon(event.date);
           const announcementsToShow = [];
           // Default announcement
           announcementsToShow.push(
@@ -116,7 +117,7 @@ const GlobalAnnouncements = () => {
               key={event.id + '-default'}
               className={`global-feed-item ${className}`}
               style={{
-                marginBottom: 16,
+                marginBottom: 30,
                 cursor: 'pointer',
                 borderRadius: 10,
                 padding: 12,
@@ -134,9 +135,26 @@ const GlobalAnnouncements = () => {
             >
               <span className="feed-icon" style={{ fontSize: 28, marginTop: 2 }}>{icon}</span>
               <div className="feed-content" style={{ flex: 1 }}>
-                <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0 }}>{event.title || 'New Event Proposal'}</p>
+                <div style={{ maxWidth: '200px', overflow: 'hidden' }}>
+                  <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', display: 'block' }}>{event.title || 'New Event Proposal'}</p>
+                </div>
                 <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>A new event has been proposed.</p>
-                <span className="feed-time" style={{ fontSize: 12, color: '#999' }}>{event.createdAt?.toDate ? event.createdAt.toDate().toLocaleString() : ''}</span>
+                <span className="feed-time" style={{ fontSize: 12, color: '#999' }}>{
+                  (() => {
+                    let created = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : null);
+                    if (!created) return '';
+                    const now = new Date();
+                    const diffMs = now - created;
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const diffMin = Math.floor(diffSec / 60);
+                    const diffHour = Math.floor(diffMin / 60);
+                    const diffDay = Math.floor(diffHour / 24);
+                    if (diffDay > 0) return diffDay === 1 ? '1 day ago' : `${diffDay} days ago`;
+                    if (diffHour > 0) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+                    if (diffMin > 0) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+                    return 'just now';
+                  })()
+                }</span>
               </div>
             </div>
           );
@@ -152,7 +170,7 @@ const GlobalAnnouncements = () => {
                   borderRadius: 10,
                   padding: 12,
                   transition: 'background 0.2s',
-                  background: '#f8f8f8',
+                   background: '#e6f3ff',
                   boxShadow: '0 1px 4px #0001',
                   border: '1px solid #e0e0e0',
                   display: 'flex',
@@ -166,9 +184,30 @@ const GlobalAnnouncements = () => {
                 <span className="feed-icon" style={{ fontSize: 28, marginTop: 2 }}>⌛</span>
                 <div className="feed-content" style={{ flex: 1 }}>
                   <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0 }}>Mission Closing Soon</p>
-                  <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>Only a few days left to join this event!</p>
-                  <p className="feed-event-title" style={{ color: '#315488', fontWeight: 400, fontFamily: 'inherit', margin: '2px 0 0 0', fontSize: 15 }}>{event.title || 'Untitled Event'}</p>
-                  <span className="feed-time" style={{ fontSize: 12, color: '#999' }}>{event.targetDates?.toDate ? event.targetDates.toDate().toLocaleString() : ''}</span>
+                  <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>
+                    {(() => {
+                      let eventDate = event.date ? new Date(event.date) : null;
+                      if (!eventDate || isNaN(eventDate.getTime())) return '';
+                      const now = new Date();
+                      const diffMs = eventDate - now;
+                      const diffSec = Math.floor(diffMs / 1000);
+                      const diffMin = Math.floor(diffSec / 60);
+                      const diffHour = Math.floor(diffMin / 60);
+                      const diffDay = Math.floor(diffHour / 24);
+                      if (diffDay > 0) return `Only ${diffDay === 1 ? '1 more day' : diffDay + ' more days to join this event!'}`;
+                      if (diffHour > 0) return `Only ${diffHour === 1 ? '1 more hour' : diffHour + ' more hours to join this event!'}`;
+                      if (diffMin > 0) return `Only ${diffMin === 1 ? '1 more minute' : diffMin + ' more minutes to join this event!'}`;
+                      return 'Closing very soon!';
+                    })()}
+                  </p>
+                  <p className="feed-event-title" style={{ color: '#315488', fontWeight: 400, fontFamily: 'inherit', margin: '2px 0 0 0', fontSize: 15 }}>
+                    {event.title || 'Untitled Event'}
+                    {event.date && (
+                      <span style={{ fontSize: 13, color: '#df3131', marginLeft: 8 }}>
+                        {new Date(event.date).toLocaleDateString()}
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
             );
