@@ -74,7 +74,7 @@ const GlobalAnnouncements = () => {
   };
 
   return (
-    <div style={{ height: '100%', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', paddingRight: 8 }}>
+    <div style={{ height: '110%', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', paddingRight: 8 }}>
       {/* Milestone announcements for events*/}
       {milestones.map(milestone => (
         <div
@@ -200,14 +200,14 @@ const GlobalAnnouncements = () => {
                       return 'Closing very soon!';
                     })()}
                   </p>
-                  <p className="feed-event-title" style={{ color: '#315488', fontWeight: 400, fontFamily: 'inherit', margin: '2px 0 0 0', fontSize: 15 }}>
+                  <span className="feed-event-title" style={{ color: '#555', margin: '2px 0 0 0', fontWeight: 700, fontSize: 15, fontFamily: 'inherit', display: 'inline-block' }}>
                     {event.title || 'Untitled Event'}
                     {event.date && (
-                      <span style={{ fontSize: 13, color: '#df3131', marginLeft: 8 }}>
+                      <span style={{ fontSize: 13, color: '#df3131', marginLeft: 8, fontWeight: 400 }}>
                         {new Date(event.date).toLocaleDateString()}
                       </span>
                     )}
-                  </p>
+                  </span>
                 </div>
               </div>
             );
