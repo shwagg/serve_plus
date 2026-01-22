@@ -3,7 +3,7 @@ import '../styles/Menu.css';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
-export default function PartnerMenu({ userName, userEmail, onLogout, onClose }) {
+export default function PartnerMenu({ userName, userEmail, onLogout, onClose, onCreateProposal }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
     navigate(path);

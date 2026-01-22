@@ -4,12 +4,18 @@ import createIcon from '../../assets/menuassets/Create.svg';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
-export default function AdminMenu({ userName, userEmail, onLogout, onClose }) {
+export default function AdminMenu({ userName, userEmail, onLogout, onClose, onCreateProposal }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
     navigate(path);
     onClose();
   };
+
+  const handleCreateProposal = () => {
+    onClose();
+    onCreateProposal();
+  };
+
   return (
     <div className="menu-dropdown">
       <button className="menu-header-btn" onClick={() => handleMenuClick('/profile')}>
@@ -21,7 +27,7 @@ export default function AdminMenu({ userName, userEmail, onLogout, onClose }) {
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">
-        <button className="menu-item" onClick={() => handleMenuClick('/global/menu/create')}>
+        <button className="menu-item" onClick={handleCreateProposal}>
           <img src={createIcon} alt="Create" className="menu-icon" />
           Create Proposal
         </button>
