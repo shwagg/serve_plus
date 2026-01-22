@@ -13,7 +13,7 @@ export default function StudentMenu({ userName, userEmail, onLogout, onClose }) 
   };
   return (
     <div className="menu-dropdown">
-      <button className="menu-header-btn" onClick={() => handleMenuClick('/global/menu/profile')}>
+      <button className="menu-header-btn" onClick={() => handleMenuClick('/profile')}>
         <div className="user-avatar">{userName.charAt(0).toUpperCase()}</div>
         <div className="user-info">
           <p className="user-name">{userName}</p>
