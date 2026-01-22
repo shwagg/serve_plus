@@ -10,6 +10,8 @@ import ProjectProposal from "../pages/global/proposal/ProjectProposal";
 import StudentHome from "../pages/student/StudentHome";
 import EventActivity from "../pages/student/missions/EventActivity";
 import EventDetails from "../pages/student/missions/EventDetails";
+import Profile from "../pages/global/Profile";
+import { ProtectedRoute } from "./ProtectedRoute";
 
 export default function AppRouter() {
   return (
@@ -19,6 +21,7 @@ export default function AppRouter() {
         <Route path="/student" element={<StudentHome />} />
         <Route path="/event/:id" element={<EventDetails />} />
         <Route path="/event/:id/activity" element={<EventActivity />} />
+        <Route path="/profile" element={<Profile />} />
 
         {/* Global routes */}
         <Route path="/global/project-proposal" element={<ProjectProposal />} />

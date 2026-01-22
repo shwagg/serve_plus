@@ -21,6 +21,7 @@ import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
 import EventDetails from "./pages/student/missions/EventDetails";
 import EventActivity from "./pages/student/missions/EventActivity";
+import Profile from "./pages/global/Profile";
 import "./App.css";
 
 function App() {
@@ -103,6 +104,14 @@ function App() {
           <Route
             path="/event/:id/activity"
             element={<EventActivity />}
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
           />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>

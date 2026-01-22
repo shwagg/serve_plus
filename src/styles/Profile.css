@@ -1,0 +1,210 @@
+/* Profile Page Styles */
+.profile-page-bg {
+  min-height: 100vh;
+  background: #fff;
+  width: 100vw;
+  position: relative;
+  padding-top: 80px; /* Add space for header */
+}
+.profile-main-flex {
+  display: flex;
+  gap: 32px;
+  padding: 32px;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.profile-card {
+  background: #fff;
+  border-radius: 18px;
+  color: #222;
+  flex: 0 1 400px;
+  min-width: 340px;
+  max-width: 420px;
+  min-height: 600px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2px 16px rgba(30, 64, 175, 0.10);
+  border: 1.5px solid #e5e7eb;
+}
+.profile-avatar {
+  background: #e5e7eb;
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.profile-skills, .profile-interests {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.profile-skills-label, .profile-interests-label, .profile-achievements-label {
+  color: #234e7b;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.profile-skill-badge {
+  background: #30bdb7;
+  color: #fff;
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+.profile-interest-badge {
+  background: #68e1ab;
+  color: #fff;
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+.profile-achievements {
+  width: 100%;
+  margin-bottom: 16px;
+}
+.profile-achievements-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.profile-achievements-list {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.profile-badge {
+  width: 60px;
+  height: 60px;
+  background: #e5e7eb;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-edit-btn {
+  margin-top: auto;
+  background: #30bdb7;
+  color: #fff;
+  width: 100%;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  padding: 12px 0;
+}
+.profile-event-history-card {
+  flex: 1 1 0%;
+  min-width: 400px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 2px 16px rgba(30, 64, 175, 0.10);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 100%;
+  border: 1.5px solid #e5e7eb;
+}
+.profile-level-label {
+  font-weight: 600;
+  font-size: 22px;
+  color: #234e7b;
+}
+.profile-level-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.profile-level-bar-bg {
+  flex: 1;
+  background: #e5e7eb;
+  border-radius: 12px;
+  height: 28px;
+  position: relative;
+}
+.profile-level-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #30bdb7, #68e1ab);
+  border-radius: 12px;
+  transition: width 0.3s;
+}
+.profile-level-bar-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #234e7b;
+  font-weight: 600;
+}
+.profile-earn-btn {
+  background: #fff;
+  color: #30bdb7;
+  font-weight: 600;
+  border: 1.5px solid #30bdb7;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 14px;
+}
+.profile-event-history-box {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  min-height: 320px;
+  box-shadow: 0 1px 8px #0001;
+}
+.profile-event-history-title {
+  font-weight: 700;
+  font-size: 24px;
+  color: #234e7b;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.profile-event-section-label {
+  font-weight: 600;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+.profile-event-item {
+  background: #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profile-event-item-label {
+  color: #234e7b;
+  font-weight: 500;
+  font-size: 15px;
+}
+.profile-event-item-dots {
+  margin-left: auto;
+  color: #888;
+}
+@media (max-width: 1100px) {
+  .profile-main-flex {
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 16px;
+  }
+  .profile-card, .profile-event-history-card {
+    width: 100%;
+    min-width: unset;
+    max-width: 100%;
+  }
+}

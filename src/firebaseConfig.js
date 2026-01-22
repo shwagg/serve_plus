@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectAuthEmulator, getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
@@ -17,6 +17,7 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize services
 const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence); // Ensure persistence
 const db = getFirestore(app);
 const functions = getFunctions(app, "us-central1");
 
