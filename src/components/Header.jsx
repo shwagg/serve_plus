@@ -13,11 +13,54 @@ import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
 import PartnerMenu from './menu/PartnerMenu';
+
+
+const CreateProposalModal = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
+
+  if (!isOpen) return null;
+
+  const handleSelection = (type) => {
+    navigate('/global/project-proposal', { state: { projectType: type } });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h2>Create Project Proposal</h2>
+        <p>Select the type of project you want to propose:</p>
+        
+        <div className="proposal-type-buttons">
+          <button 
+            className="proposal-type-btn service-learning"
+            onClick={() => handleSelection('service-learning')}
+          >
+            <h3>Service Learning</h3>
+            <p>Academic-based community service projects</p>
+          </button>
+          
+          <button 
+            className="proposal-type-btn community-engagement"
+            onClick={() => handleSelection('community-engagement')}
+          >
+            <h3>Community Engagement</h3>
+            <p>Direct community partnership initiatives</p>
+          </button>
+        </div>
+        
+        <button className="modal-close-btn" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+};
+
 export default function Header() {
   const [userRole, setUserRole] = useState(null);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [showMenu, setShowMenu] = useState(false);
+  const [showProposalModal, setShowProposalModal] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -80,14 +123,19 @@ export default function Header() {
       console.error('Logout error:', error);
     }
   };
+
+  const handleOpenProposalModal = () => {
+    setShowProposalModal(true);
+  };
+
   const renderMenu = () => {
     switch (userRole) {
       case 'student':
-        return <StudentMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
+        return <StudentMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
       case 'faculty':
-        return <FacultyMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
+        return <FacultyMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
       case 'admin':
-        return <AdminMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
+        return <AdminMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
       case 'partner':
         return <PartnerMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
       default:
@@ -95,37 +143,44 @@ export default function Header() {
     }
   };
   return (
-    <header className="serve-header">
-      <div className="header-container">
-        {/* Logo */}
-        <button className="header-logo" onClick={handleLogoClick}>
-          <div className="logo-icon">
-            <img src={serveIcon} alt="Serve Plus Logo" width="32" height="32" />
-          </div>
-        </button>
-        {/* Right Side Icons */}
-        <div className="header-actions">
-          <button 
-            className="icon-button"
-            aria-label="Chat">
-            <img src={chatIcon} alt="Chat" width="24" height="24" />
+    <>
+      <header className="serve-header">
+        <div className="header-container">
+          {/* Logo */}
+          <button className="header-logo" onClick={handleLogoClick}>
+            <div className="logo-icon">
+              <img src={serveIcon} alt="Serve Plus Logo" width="32" height="32" />
+            </div>
           </button>
-          <button 
-            className="icon-button"
-            aria-label="Notification">
-            <img src={notificationIcon} alt="Notifications" width="24" height="24" />
-          </button>
-          <div className="menu-container" ref={menuRef}>
+          {/* Right Side Icons */}
+          <div className="header-actions">
             <button 
-              className="icon-button menu-button"
-              aria-label="Menu"
-              onClick={() => setShowMenu(!showMenu)}>
-              <img src={menuIcon} alt="Menu" width="24" height="24" />
+              className="icon-button"
+              aria-label="Chat">
+              <img src={chatIcon} alt="Chat" width="24" height="24" />
             </button>
-            {showMenu && renderMenu()}
+            <button 
+              className="icon-button"
+              aria-label="Notification">
+              <img src={notificationIcon} alt="Notifications" width="24" height="24" />
+            </button>
+            <div className="menu-container" ref={menuRef}>
+              <button 
+                className="icon-button menu-button"
+                aria-label="Menu"
+                onClick={() => setShowMenu(!showMenu)}>
+                <img src={menuIcon} alt="Menu" width="24" height="24" />
+              </button>
+              {showMenu && renderMenu()}
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+      
+      <CreateProposalModal 
+        isOpen={showProposalModal} 
+        onClose={() => setShowProposalModal(false)} 
+      />
+    </>
   );
 }

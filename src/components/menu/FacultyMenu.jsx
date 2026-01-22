@@ -5,12 +5,18 @@ import createIcon from '../../assets/menuassets/Create.svg';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
-export default function FacultyMenu({ userName, userEmail, onLogout, onClose }) {
+export default function FacultyMenu({ userName, userEmail, onLogout, onClose, onCreateProposal }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
     navigate(path);
     onClose();
   };
+
+  const handleCreateProposal = () => {
+    onClose();
+    onCreateProposal();
+  };
+
   return (
     <div className="menu-dropdown">
       <button className="menu-header-btn" onClick={() => handleMenuClick('/global/menu/profile')}>
@@ -26,7 +32,7 @@ export default function FacultyMenu({ userName, userEmail, onLogout, onClose }) 
           <img src={leaderboardIcon} alt="Leaderboard" className="menu-icon" />
           Leaderboard
         </button>
-        <button className="menu-item" onClick={() => handleMenuClick('/global/menu/create')}>
+        <button className="menu-item" onClick={handleCreateProposal}>
           <img src={createIcon} alt="Create" className="menu-icon" />
           Create Proposal
         </button>
