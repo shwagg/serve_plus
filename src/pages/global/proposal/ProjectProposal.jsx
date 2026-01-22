@@ -11,8 +11,7 @@ function ProjectProposal({ projectType, onClose }) {
   // Common fields
   const [formData, setFormData] = useState({
     title: '',
-    dateProposed: '',
-    sdg: '',
+    sdg: [],
     targetDate: '',
     stakeholders: '',
     location: '',
@@ -35,7 +34,32 @@ function ProjectProposal({ projectType, onClose }) {
   const [ceFields, setCeFields] = useState({
     nature: '',
     learningOutcomes: '',
+    customLearningOutcome: '',
   });
+
+  // SDG dropdown state
+  const [showSdgDropdown, setShowSdgDropdown] = useState(false);
+
+  // All 17 SDGs
+  const sdgOptions = [
+    { number: 1, name: 'No Poverty' },
+    { number: 2, name: 'Zero Hunger' },
+    { number: 3, name: 'Good Health and Well-being' },
+    { number: 4, name: 'Quality Education' },
+    { number: 5, name: 'Gender Equality' },
+    { number: 6, name: 'Clean Water and Sanitation' },
+    { number: 7, name: 'Affordable and Clean Energy' },
+    { number: 8, name: 'Decent Work and Economic Growth' },
+    { number: 9, name: 'Industry, Innovation and Infrastructure' },
+    { number: 10, name: 'Reduced Inequality' },
+    { number: 11, name: 'Sustainable Cities and Communities' },
+    { number: 12, name: 'Responsible Consumption and Production' },
+    { number: 13, name: 'Climate Action' },
+    { number: 14, name: 'Life Below Water' },
+    { number: 15, name: 'Life on Land' },
+    { number: 16, name: 'Peace and Justice Strong Institutions' },
+    { number: 17, name: 'Partnerships to achieve the Goal' },
+  ];
 
   const getProjectTypeTitle = () => {
     return projectType === 'service-learning' 
@@ -67,6 +91,30 @@ function ProjectProposal({ projectType, onClose }) {
     }));
   };
 
+  const handleSdgToggle = (sdgNumber) => {
+    setFormData(prev => {
+      const currentSdgs = prev.sdg || [];
+      if (currentSdgs.includes(sdgNumber)) {
+        return {
+          ...prev,
+          sdg: currentSdgs.filter(num => num !== sdgNumber)
+        };
+      } else {
+        return {
+          ...prev,
+          sdg: [...currentSdgs, sdgNumber].sort((a, b) => a - b)
+        };
+      }
+    });
+  };
+
+  const handleRemoveSdg = (sdgNumber) => {
+    setFormData(prev => ({
+      ...prev,
+      sdg: prev.sdg.filter(num => num !== sdgNumber)
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -78,14 +126,21 @@ function ProjectProposal({ projectType, onClose }) {
         return;
       }
 
-      // Prepare proposal data
+      // Create main proposal document
       const proposalData = {
         proponent: user.uid,
         dateCreated: serverTimestamp(),
         status: 'pending',
         proposalType: projectType === 'service-learning' ? 'sl' : 'ce',
+      };
+
+      // Add proposal to main collection
+      const proposalRef = await addDoc(collection(db, 'proposal'), proposalData);
+
+      // Prepare details data
+      const detailsData = {
         title: formData.title,
-        dateProposed: formData.dateProposed,
+        dateProposed: serverTimestamp(),
         sdg: formData.sdg,
         targetDate: formData.targetDate,
         stakeholders: formData.stakeholders,
@@ -105,13 +160,13 @@ function ProjectProposal({ projectType, onClose }) {
 
       // Add type-specific fields
       if (projectType === 'service-learning') {
-        proposalData.slFields = slFields;
+        detailsData.slFields = slFields;
       } else {
-        proposalData.ceFields = ceFields;
+        detailsData.ceFields = ceFields;
       }
 
-      // Submit to Firestore
-      await addDoc(collection(db, 'proposal'), proposalData);
+      // Add details to subcollection
+      await addDoc(collection(db, 'proposal', proposalRef.id, 'details'), detailsData);
 
       alert('Proposal submitted successfully!');
       onClose();
@@ -148,43 +203,72 @@ function ProjectProposal({ projectType, onClose }) {
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="dateProposed">Date Proposed *</label>
-              <input
-                type="date"
-                id="dateProposed"
-                name="dateProposed"
-                value={formData.dateProposed}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="targetDate">Target Date *</label>
-              <input
-                type="date"
-                id="targetDate"
-                name="targetDate"
-                value={formData.targetDate}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
+          <div className="form-group">
+            <label htmlFor="targetDate">Target Date *</label>
+            <input
+              type="date"
+              id="targetDate"
+              name="targetDate"
+              value={formData.targetDate}
+              onChange={handleInputChange}
+              required
+            />
           </div>
 
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="sdg">Sustainable Development Goal (SDG)</label>
-              <input
-                type="text"
-                id="sdg"
-                name="sdg"
-                value={formData.sdg}
-                onChange={handleInputChange}
-                placeholder="e.g., SDG 4: Quality Education"
-              />
+              <div className="sdg-selector">
+                {/* Selected SDGs Display */}
+                {formData.sdg && formData.sdg.length > 0 && (
+                  <div className="sdg-selected-tags">
+                    {formData.sdg.map(sdgNum => (
+                      <span key={sdgNum} className="sdg-tag">
+                        {sdgNum}
+                        <button
+                          type="button"
+                          className="sdg-tag-remove"
+                          onClick={() => handleRemoveSdg(sdgNum)}
+                          aria-label={`Remove SDG ${sdgNum}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Dropdown */}
+                <div className="sdg-dropdown-wrapper">
+                  <button
+                    type="button"
+                    className="sdg-dropdown-toggle"
+                    onClick={() => setShowSdgDropdown(!showSdgDropdown)}
+                  >
+                    {formData.sdg.length === 0 
+                      ? 'Select SDG(s)' 
+                      : `${formData.sdg.length} SDG${formData.sdg.length > 1 ? 's' : ''} selected`}
+                    <span className="dropdown-arrow">{showSdgDropdown ? '▲' : '▼'}</span>
+                  </button>
+                  
+                  {showSdgDropdown && (
+                    <div className="sdg-dropdown-menu">
+                      {sdgOptions.map(sdg => (
+                        <label key={sdg.number} className="sdg-option">
+                          <input
+                            type="checkbox"
+                            checked={formData.sdg.includes(sdg.number)}
+                            onChange={() => handleSdgToggle(sdg.number)}
+                          />
+                          <span className="sdg-option-text">
+                            <strong>SDG {sdg.number}:</strong> {sdg.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="form-group">
@@ -306,14 +390,29 @@ function ProjectProposal({ projectType, onClose }) {
                 required
               >
                 <option value="">Select learning outcomes level</option>
-                <option value="0">Level 0</option>
-                <option value="1">Level 1</option>
-                <option value="2">Level 2</option>
-                <option value="3">Level 3</option>
-                <option value="4">Level 4</option>
-                <option value="5">Level 5</option>
+                <option value="0">Intellectual Development</option>
+                <option value="1">Collaboration</option>
+                <option value="2">Appreciation of Culture and Diversity</option>
+                <option value="3">Career Exploration</option>
+                <option value="4">Socio-Civic Responsibility</option>
+                <option value="5">Others, pls. Specify</option>
               </select>
             </div>
+
+            {ceFields.learningOutcomes === '5' && (
+              <div className="form-group">
+                <label htmlFor="customLearningOutcome">Specify Learning Outcome *</label>
+                <input
+                  type="text"
+                  id="customLearningOutcome"
+                  name="customLearningOutcome"
+                  value={ceFields.customLearningOutcome}
+                  onChange={handleCeFieldChange}
+                  required
+                  placeholder="Please specify the learning outcome"
+                />
+              </div>
+            )}
           </div>
         )}
 
