@@ -6,6 +6,7 @@ import ProjectDetails from "../pages/admin/ProjectDetails";
 import ProjectTasks from "../pages/admin/ProjectTasks";
 import CreateProject from "../pages/global/CreateProject";
 import ProjectList from "../pages/global/ProjectList";
+import ProjectProposal from "../pages/global/proposal/ProjectProposal";
 import StudentHome from "../pages/student/StudentHome";
 import EventActivity from "../pages/student/missions/EventActivity";
 import EventDetails from "../pages/student/missions/EventDetails";
@@ -18,6 +19,9 @@ export default function AppRouter() {
         <Route path="/student" element={<StudentHome />} />
         <Route path="/event/:id" element={<EventDetails />} />
         <Route path="/event/:id/activity" element={<EventActivity />} />
+
+        {/* Global routes */}
+        <Route path="/global/project-proposal" element={<ProjectProposal />} />
 
         {/* Admin routes with sidebar layout */}
         <Route path="/admin" element={<AdminLayout />}>

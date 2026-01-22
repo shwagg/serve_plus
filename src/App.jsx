@@ -11,6 +11,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import CurrentEventMonitoring from "./pages/admin/CurrentEventMonitoring";
 import ProjectList from "./pages/global/ProjectList";
 import CreateProject from "./pages/global/CreateProject";
+import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ProjectDetails from "./pages/admin/ProjectDetails";
 import ProjectTasks from "./pages/admin/ProjectTasks";
 import AuditLogs from "./pages/admin/AuditLogs";
@@ -60,6 +61,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["student"]}>
                 <StudentHome />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/global/project-proposal"
+            element={
+              <ProtectedRoute allowedRoles={["student", "faculty", "admin"]}>
+                <ProjectProposal />
               </ProtectedRoute>
             }
           />
