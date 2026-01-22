@@ -13,15 +13,14 @@ import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
 import PartnerMenu from './menu/PartnerMenu';
+import ProjectProposal from '../pages/global/proposal/ProjectProposal';
 
 
-const CreateProposalModal = ({ isOpen, onClose }) => {
-  const navigate = useNavigate();
-
+const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
   if (!isOpen) return null;
 
   const handleSelection = (type) => {
-    navigate('/global/project-proposal', { state: { projectType: type } });
+    onSelectType(type);
     onClose();
   };
 
@@ -61,6 +60,8 @@ export default function Header() {
   const [userEmail, setUserEmail] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [showProposalModal, setShowProposalModal] = useState(false);
+  const [showProposalForm, setShowProposalForm] = useState(false);
+  const [selectedProjectType, setSelectedProjectType] = useState('');
   const menuRef = useRef(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -128,6 +129,16 @@ export default function Header() {
     setShowProposalModal(true);
   };
 
+  const handleSelectProjectType = (type) => {
+    setSelectedProjectType(type);
+    setShowProposalForm(true);
+  };
+
+  const handleCloseProposalForm = () => {
+    setShowProposalForm(false);
+    setSelectedProjectType('');
+  };
+
   const renderMenu = () => {
     switch (userRole) {
       case 'student':
@@ -179,8 +190,16 @@ export default function Header() {
       
       <CreateProposalModal 
         isOpen={showProposalModal} 
-        onClose={() => setShowProposalModal(false)} 
+        onClose={() => setShowProposalModal(false)}
+        onSelectType={handleSelectProjectType}
       />
+
+      {showProposalForm && (
+        <ProjectProposal 
+          projectType={selectedProjectType}
+          onClose={handleCloseProposalForm}
+        />
+      )}
     </>
   );
 }
