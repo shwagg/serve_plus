@@ -5,6 +5,20 @@
  * @returns {Promise<void>} - Triggers a download of the filled PDF.
  */
 export async function exportCommunityEngagementProposalPDF(formData, formUrl = '/assets/Community Engagement Proposal.pdf') {
+      // DEBUG: Log all field names and types
+      try {
+        const allFields = form.getFields();
+        console.log('PDF Form Fields:');
+        allFields.forEach(f => {
+          try {
+            const name = f.getName();
+            const type = f.constructor.name;
+            let value = '';
+            try { value = f.getText ? f.getText() : ''; } catch {}
+            console.log(`Field: ${name}, Type: ${type}, Value: ${value}`);
+          } catch {}
+        });
+      } catch (e) { console.log('Field debug error', e); }
   try {
     const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
@@ -88,25 +102,65 @@ export async function exportCommunityEngagementProposalPDF(formData, formUrl = '
       }
     }
 
-    // Learning Outcomes
-    if (formData.learningOutcomes) {
-      const loMap = {
-        '0': 'checkbox_30btwq', // Intellectual Development
-        '1': 'checkbox_33savz', // Career Exploration
-        '2': 'checkbox_31tkfd', // Collaboration
-        '3': 'checkbox_34kdal', // Socio-civic responsibility
-        '4': 'checkbox_32qnm', // Appreciation, culture and Diversity
-        '5': 'checkbox_35vxii', // Others, pls. specify
-      };
-      const field = loMap[formData.learningOutcomes];
-      if (field) {
-        try {
-          const cb = form.getCheckBox(field);
-          if (typeof cb.check === 'function') cb.check();
-          if (typeof cb.setValue === 'function') cb.setValue('Yes');
-        } catch {}
+    // Learning Outcomes (robust mapping, clear all, then set selected)
+    const loMap = {
+      'intellectual development': 'checkbox_30btwq',
+      'career exploration': 'checkbox_33savz',
+      'collaboration': 'checkbox_31tkfd',
+      'socio-civic responsibility': 'checkbox_34kdal',
+      'appreciation of culture and diversity': 'checkbox_32qnm',
+      'others': 'checkbox_35vxii',
+      'others, pls. specify': 'checkbox_35vxii',
+    };
+    const normalizeLO = s => String(s).replace(/\s+/g, ' ').replace(/\./g, '').replace(/,/g, '').trim().toLowerCase();
+    // Clear all LO fields first
+    Object.values(loMap).forEach(field => {
+      try {
+        const cb = form.getCheckBox(field);
+        if (typeof cb.uncheck === 'function') cb.uncheck();
+        if (typeof cb.setValue === 'function') cb.setValue('Off');
+      } catch {}
+    });
+    // Accept both string and number keys (e.g., '0', '1', ... or label)
+    const loKeyMap = {
+      '0': 'intellectual development',
+      '1': 'career exploration',
+      '2': 'collaboration',
+      '3': 'socio-civic responsibility',
+      '4': 'appreciation of culture and diversity',
+      '5': 'others',
+    };
+    let learningOutcomesArr = [];
+    if (formData.learningOutcomes !== undefined && formData.learningOutcomes !== null) {
+      if (Array.isArray(formData.learningOutcomes)) {
+        learningOutcomesArr = formData.learningOutcomes;
+      } else if (typeof formData.learningOutcomes === 'string' || typeof formData.learningOutcomes === 'number') {
+        learningOutcomesArr = [formData.learningOutcomes];
       }
     }
+    const selectedLOs = learningOutcomesArr.map(lo => {
+      if (typeof lo === 'string' && loKeyMap[lo.trim()]) {
+        return loKeyMap[lo.trim()];
+      }
+      return normalizeLO(lo);
+    });
+    Object.entries(loMap).forEach(([lo, field]) => {
+      try {
+        if (selectedLOs.includes(lo)) {
+          // Try checkbox logic first
+          try {
+            const cb = form.getCheckBox(field);
+            if (typeof cb.check === 'function') cb.check();
+            if (typeof cb.setValue === 'function') cb.setValue('Yes');
+          } catch {
+            // Fallback to text field logic
+            try {
+              form.getTextField(field).setText('X');
+            } catch {}
+          }
+        }
+      } catch {}
+    });
 
     // Other fields
     form.getTextField('text_36gklh').setText(formData.targetDate || '');
@@ -157,8 +211,31 @@ import { PDFDocument } from 'pdf-lib';
 // Service Learning (SL) Export
 // =============================
 export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
+      // Debug: Log missing or undefined fields
+      const requiredFields = [
+        'proposalTitle',
+        'dateProposed',
+        'participatingSections',
+        'proponent',
+        'courseTitle',
+        'courseCode',
+        'targetDates',
+        'targetLocation',
+        'sdgs',
+        'proposalDescription',
+        'proposalObjectives',
+        'specificActivities',
+        'successIndicators',
+        'budget',
+        'stakeholders',
+        'volunteerHours'
+      ];
+      const missingFields = requiredFields.filter(f => formData[f] === undefined || formData[f] === null);
+      if (missingFields.length > 0) {
+        console.warn('SL Export: Missing or undefined fields:', missingFields);
+      }
   try {
-    const formUrl = '/assets/Proposal Form 32.pdf';
+    const formUrl = '/assets/SL-Proposal-Form-32.pdf';
     const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
     let form;
@@ -168,73 +245,64 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
       alert('No form fields found in this PDF.');
       return;
     }
-    // Map SDG numbers to names
-    const sdgNames = formData.sdg && Array.isArray(formData.sdg)
-      ? formData.sdg.map(num => {
-          const sdgObj = sdgOptions.find(opt => opt.number === num);
-          return sdgObj ? sdgObj.name : '';
-        })
-      : [];
-    // Fill each field with the correct form value
-    form.getTextField('text_2cqcm').setText(formData.title || '');
-    form.getTextField('text_3hzck').setText(formData.faculty || formData.proponent || '');
-    form.getTextField('text_4opji').setText(slFields.course || '');
-    form.getTextField('text_5fdvm').setText(formData.stakeholders || '');
-    form.getTextField('text_6avjw').setText(formData.location || '');
-    form.getTextField('text_7cxg').setText(formData.targetDate || formData.dateproposed || '');
-    form.getTextField('text_8ylsk').setText(slFields.section || '');
-    form.getTextField('text_9nnpw').setText(slFields.courseCode || '');
-    form.getTextField('text_10dky').setText(formData.targetDate || '');
-    form.getTextField('text_11ecqo').setText(formData.volunteerHours?.toString() || formData.hours?.toString() || '');
-    form.getTextField('textarea_31qotr').setText(formData.description || '');
-    form.getTextField('textarea_32sqrh').setText(formData.objectives || '');
-    form.getTextField('textarea_33vrob').setText(formData.specificActivities || '');
-    form.getTextField('textarea_34pgia').setText(formData.successIndicators || '');
-    form.getTextField('text_35uwrn').setText((formData.budget || '').replace(/₱/g, 'PHP'));
-    // SDG Checkboxes mapping (SL)
+    // Fill each field with the correct form value (NEW MAPPING)
+    form.getTextField('text_19pykj').setText(formData.proposalTitle || '');
+    form.getTextField('text_20ta').setText(formData.dateProposed || '');
+    form.getTextField('text_21ezok').setText(formData.proponent || '');
+    form.getTextField('textarea_25nitg').setText(formData.participatingSections || '');
+    form.getTextField('text_22bjc').setText(formData.courseTitle || '');
+    form.getTextField('text_27xsue').setText(formData.courseCode || '');
+    form.getTextField('textarea_23zuvj').setText(formData.stakeholders || '');
+    form.getTextField('text_28odnz').setText(formData.targetDates || '');
+    form.getTextField('text_24dmff').setText(formData.targetLocation || '');
+    form.getTextField('text_29svdr').setText(formData.volunteerHours?.toString() || '');
+
+    // SDG Checkboxes mapping (NEW)
     const slSdgCheckboxMap = [
-      { field: 'checkbox_13ofpt', label: 'No Poverty' },
-      { field: 'checkbox_17idjm', label: 'Zero Hunger' },
-      { field: 'checkbox_20womi', label: 'Good Health and Well-Being' },
-      { field: 'checkbox_23svwh', label: 'Quality Education' },
-      { field: 'checkbox_26shtn', label: 'Gender Equality' },
-      { field: 'checkbox_29apra', label: 'Clean Water and Sanitation' },
-      { field: 'checkbox_14zvvw', label: 'Affordable and Clean Energy' },
-      { field: 'checkbox_18fzxs', label: 'Decent Work and Economic Growth' },
-      { field: 'checkbox_21kwei', label: 'Industry, Innovation, and Infrastructure' },
-      { field: 'checkbox_24wogc', label: 'Reduced Inequalities' },
-      { field: 'checkbox_27wlsf', label: 'Sustainable Cities and Communities' },
-      { field: 'checkbox_30ultz', label: 'Responsible Consumption and Production' },
-      { field: 'checkbox_15cxua', label: 'Climate Action' },
-      { field: 'checkbox_19bdjk', label: 'Life Below Water' },
-      { field: 'checkbox_22mcqk', label: 'Life on Land' },
-      { field: 'checkbox_25sdjc', label: 'Peace, Justice, and Strong Institutions' },
-      { field: 'checkbox_28rpwo', label: 'Partnership for the Goals' },
+      { field: 'text_1pjgf', label: 'No Poverty' },
+      { field: 'text_2hjju', label: 'Zero Hunger' },
+      { field: 'text_3zkwd', label: 'Good Health and Well-Being' },
+      { field: 'text_4xduz', label: 'Quality Education' },
+      { field: 'text_5olaq', label: 'Gender Equality' },
+      { field: 'text_6htvl', label: 'Clean Water and Sanitation' },
+      { field: 'text_7dqvy', label: 'Affordable and Clean Energy' },
+      { field: 'text_8twfk', label: 'Decent Work and Economic Growth' },
+      { field: 'text_9zsjb', label: 'Industry Innovation and Infrastructure' },
+      { field: 'text_10aovh', label: 'Reduced Inequalities' },
+      { field: 'text_11qwwf', label: 'Sustainable Cities and Communities' },
+      { field: 'text_12omwb', label: 'Responsible Consumption and Production' },
+      { field: 'text_13fwno', label: 'Climate Action' },
+      { field: 'text_14qicw', label: 'Life Below Water' },
+      { field: 'text_15lzmv', label: 'Life on Land' },
+      { field: 'text_16yome', label: 'Peace, Justice and Strong Institutions' },
+      { field: 'text_17qdvc', label: 'Partnership for the Goals' },
     ];
-    if (sdgNames && Array.isArray(sdgNames)) {
+    if (formData.sdgs && Array.isArray(formData.sdgs)) {
+      const normalize = s => String(s).replace(/\s+/g, ' ').replace(/\(.*?\)/g, '').replace(/\./g, '').trim().toLowerCase();
+      const normalizedSelected = formData.sdgs.map(sdg => normalize(sdg));
       slSdgCheckboxMap.forEach(({ field, label }) => {
         try {
-          const cb = form.getCheckBox(field);
-          const shouldCheck = sdgNames.some(sdg => sdg.trim().toLowerCase() === label.trim().toLowerCase());
-          if (shouldCheck) {
-            if (typeof cb.check === 'function') cb.check();
-            if (typeof cb.setValue === 'function') cb.setValue('Yes');
-          } else {
-            if (typeof cb.uncheck === 'function') cb.uncheck();
-            if (typeof cb.setValue === 'function') cb.setValue('Off');
-          }
+          const normalizedLabel = normalize(label);
+          const shouldCheck = normalizedSelected.includes(normalizedLabel);
+          form.getTextField(field).setText(shouldCheck ? 'X' : '');
         } catch (e) {
           // Field not found, skip
         }
       });
     }
+
+    form.getTextField('textarea_30spbk').setText(formData.proposalDescription || '');
+    form.getTextField('textarea_31waid').setText(formData.proposalObjectives || '');
+    form.getTextField('textarea_32gfbz').setText(formData.specificActivities || '');
+    form.getTextField('textarea_33pffk').setText(formData.successIndicators || '');
+    form.getTextField('textarea_35lsbz').setText((formData.budget || '').replace(/₱/g, 'PHP'));
     form.flatten();
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${formData.title || 'proposal'}.pdf`;
+    a.download = `${formData.proposalTitle || 'proposal'}.pdf`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -251,8 +319,32 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
 // Community Engagement (CE) Export
 // =============================
 export async function exportCEProposalPDF({ formData, ceFields, sdgOptions }) {
+      // Learning Outcomes (robust mapping, only mark selected, clear others)
+      const loMap = {
+        'intellectual development': 'text_26ucos',
+        'collaboration': 'text_27rrgo',
+        'appreciation of culture and diversity': 'text_28tubq',
+        'career exploration': 'text_29pnil',
+        'socio-civic responsibility': 'text_30weng',
+        'others, pls. specify': 'text_31llnn',
+        'others': 'text_31llnn', // fallback for legacy
+      };
+      // Normalize function for robust matching
+      const normalize = s => String(s).replace(/\s+/g, ' ').replace(/\./g, '').replace(/,/g, '').trim().toLowerCase();
+      const selectedLOs = formData.learningOutcomes
+        ? (Array.isArray(formData.learningOutcomes) ? formData.learningOutcomes.map(lo => normalize(lo)) : [normalize(formData.learningOutcomes)])
+        : [];
+      Object.entries(loMap).forEach(([lo, field]) => {
+        try {
+          if (selectedLOs.includes(normalize(lo))) {
+            form.getTextField(field).setText('X');
+          } else {
+            form.getTextField(field).setText('');
+          }
+        } catch {}
+      });
   try {
-    const formUrl = '/assets/Community Engagement Proposal.pdf';
+    const formUrl = '/assets/CE-Proposal-Form-33.pdf';
     const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
     let form;
@@ -262,114 +354,139 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions }) {
       alert('No form fields found in this PDF.');
       return;
     }
-    // Map SDG numbers to names
-    const sdgNames = formData.sdg && Array.isArray(formData.sdg)
-      ? formData.sdg.map(num => {
-          const sdgObj = sdgOptions.find(opt => opt.number === num);
-          return sdgObj ? sdgObj.name : '';
-        })
-      : [];
-    // Fill each field with the correct form value
-    form.getTextField('text_50ryuo').setText(formData.title || '');
-    form.getTextField('text_2unkt').setText(formData.targetDate || '');
-    form.getTextField('text_3xesj').setText(formData.faculty || formData.proponent || '');
-    form.getTextField('textarea_48tipb').setText(ceFields.customLearningOutcome || '');
-    // SDG Checkboxes mapping (CE)
+    // Fill each field with the correct form value (NEW MAPPING)
+    form.getTextField('text_1gjss').setText(formData.communityEngagementTitle || '');
+    form.getTextField('text_2empx').setText(formData.dateProposed || '');
+    form.getTextField('text_3ting').setText(formData.proponent || '');
+    form.getTextField('text_4uee').setText(formData.studentOutcomes || '');
+
+    // SDG Checkboxes mapping (NEW)
     const ceSdgCheckboxMap = [
-      { field: 'checkbox_9ghlq', label: 'No Poverty' },
-      { field: 'checkbox_10qofh', label: 'Zero Hunger' },
-      { field: 'checkbox_11eb', label: 'Good Health and Well-being' },
-      { field: 'checkbox_12busz', label: 'Quality Education' },
-      { field: 'checkbox_14ogu', label: 'Gender Equality' },
-      { field: 'checkbox_15anqh', label: 'Clean Water and Sanitation' },
-      { field: 'checkbox_16sgix', label: 'A ordable and Clean Energy' },
-      { field: 'checkbox_17bnjhdbw', label: 'Decent Work and Economic growth' },
-      { field: 'checkbox_18qrua', label: 'Industry, Innovation, and Infrastructure' },
-      { field: 'checkbox_19kzlh', label: 'Reduced Inequalities' },
-      { field: 'checkbox_21mmcs', label: 'Responsible Consumption and Production' },
-      { field: 'checkbox_22tcpr', label: 'Climate Action' },
-      { field: 'checkbox_23ea', label: 'Life Below Water' },
-      { field: 'checkbox_24opun', label: 'Life on Land' },
-      { field: 'checkbox_25awsq', label: 'Peace, Justice, and Strong Institutions' },
-      { field: 'checkbox_26xiot', label: 'Partnership for the Goals' },
-      { field: 'checkbox_19kzlh', label: 'Sustainable Cities and Communities' }, // Only once, at the end for clarity if needed
+      { field: 'text_5fity', label: 'No Poverty' },
+      { field: 'text_6spsk', label: 'Zero Hunger' },
+      { field: 'text_7sezy', label: 'Good Health and Well-Being' },
+      { field: 'text_8wldo', label: 'Quality Education' },
+      { field: 'text_9gaan', label: 'Gender Equality' },
+      { field: 'text_10qqqf', label: 'Clean Water and Sanitation' },
+      { field: 'text_11whun', label: 'Affordable and Clean Energy' },
+      { field: 'text_18zynl', label: 'Decent Work and Economic Growth' },
+      { field: 'text_13jokq', label: 'Industry Innovation and Infrastructure' },
+      { field: 'text_14jpbh', label: 'Reduced Inequalities' },
+      { field: 'text_15owud', label: 'Sustainable Cities and Communities' },
+      { field: 'text_16ilet', label: 'Responsible Consumption and Production' },
+      { field: 'text_17ixtn', label: 'Climate Action' },
+      { field: 'text_19eahq', label: 'Life Below Water' },
+      { field: 'text_20uagp', label: 'Life on Land' },
+      { field: 'text_21juni', label: 'Peace, Justice and Strong Institutions' },
+      { field: 'text_22bcgy', label: 'Partnership for the Goals' },
     ];
-    if (sdgNames && Array.isArray(sdgNames)) {
+    if (formData.sdgs && Array.isArray(formData.sdgs)) {
+      const normalize = s => String(s).replace(/\s+/g, ' ').replace(/\(.*?\)/g, '').replace(/\./g, '').trim().toLowerCase();
+      const normalizedSelected = formData.sdgs.map(sdg => normalize(sdg));
       ceSdgCheckboxMap.forEach(({ field, label }) => {
         try {
-          const cb = form.getCheckBox(field);
-          const shouldCheck = sdgNames.some(sdg => sdg.trim().toLowerCase() === label.trim().toLowerCase());
-          if (shouldCheck) {
-            if (typeof cb.check === 'function') cb.check();
-            if (typeof cb.setValue === 'function') cb.setValue('Yes');
-          } else {
-            if (typeof cb.uncheck === 'function') cb.uncheck();
-            if (typeof cb.setValue === 'function') cb.setValue('Off');
-          }
+          const normalizedLabel = normalize(label);
+          const shouldCheck = normalizedSelected.includes(normalizedLabel);
+          form.getTextField(field).setText(shouldCheck ? 'X' : '');
         } catch (e) {
           // Field not found, skip
         }
       });
     }
-    // Nature of Engagement
-    if (ceFields.nature) {
-      const natureMap = {
-        'program': 'checkbox_27iorz',
-        'project/advocacy': 'checkbox_28qjyy',
-        'consultation/extension': 'checkbox_29rrbl',
-      };
-      const field = natureMap[ceFields.nature.toLowerCase()];
-      if (field) {
-        try {
-          const cb = form.getCheckBox(field);
-          if (typeof cb.check === 'function') cb.check();
-          if (typeof cb.setValue === 'function') cb.setValue('Yes');
-        } catch {}
-      }
-    }
-    // Learning Outcomes
-    if (ceFields.learningOutcomes) {
-      const loMap = {
-        '0': 'checkbox_30btwq', // Intellectual Development
-        '1': 'checkbox_33savz', // Career Exploration
-        '2': 'checkbox_31tkfd', // Collaboration
-        '3': 'checkbox_34kdal', // Socio-civic responsibility
-        '4': 'checkbox_32qnm', // Appreciation, culture and Diversity
-        '5': 'checkbox_35vxii', // Others, pls. specify
-      };
-      const field = loMap[ceFields.learningOutcomes];
-      if (field) {
-        try {
-          const cb = form.getCheckBox(field);
-          if (typeof cb.check === 'function') cb.check();
-          if (typeof cb.setValue === 'function') cb.setValue('Yes');
-        } catch {}
-      }
-    }
-    // Other fields
-    form.getTextField('text_36gklh').setText(formData.targetDate || '');
-    form.getTextField('textarea_40zyhk').setText(formData.stakeholders || '');
-    form.getTextField('textarea_41fakl').setText(formData.location || '');
-    form.getTextField('textarea_43umtx').setText(formData.description || '');
-    form.getTextField('textarea_44xwjd').setText(formData.objectives || '');
-    form.getTextField('textarea_45oxhg').setText(formData.specificActivities || '');
-    form.getTextField('textarea_46hsmz').setText(formData.successIndicators || '');
-    form.getTextField('textarea_47lzdh').setText((formData.budget || '').replace(/₱/g, 'PHP'));
-    // Volunteer Hours (for CE form)
-    if (form.getTextField && formData.volunteerHours !== undefined) {
+
+    // Nature of Engagement and Learning Outcomes with unique field names
+    const natureMap = {
+      'program': 'text_23fcew',
+      'project/advocacy': 'text_24acgi',
+      'consultation/extension': 'text_25iyvh',
+    };
+    const loMap = {
+      'intellectual development': 'text_26ucos',
+      'career exploration': 'text_29pnil',
+      'collaboration': 'text_27rrgo',
+      'socio-civic responsibility': 'text_30weng',
+      'appreciation of culture and diversity': 'text_28tubq',
+      'others': 'text_31llnn',
+    };
+    const normalize = s => String(s).replace(/\s+/g, ' ').replace(/\./g, '').replace(/,/g, '').trim().toLowerCase();
+    // Clear all fields for Nature of Engagement and Learning Outcomes
+    const allNatureFields = Object.values(natureMap);
+    const allLOFields = Object.values(loMap);
+    allNatureFields.forEach(field => {
+      try { form.getTextField(field).setText(''); } catch {}
+    });
+    allLOFields.forEach(field => {
+      try { form.getTextField(field).setText(''); } catch {}
+    });
+    // Set Nature of Engagement
+    const selectedNatures = formData.natureOfEngagement
+      ? (Array.isArray(formData.natureOfEngagement) ? formData.natureOfEngagement.map(n => normalize(n)) : [normalize(formData.natureOfEngagement)])
+      : [];
+    Object.entries(natureMap).forEach(([nature, field]) => {
       try {
-        form.getTextField('text_37volh').setText(formData.volunteerHours.toString());
-      } catch (e) {
-        // Field not found, skip
+        if (selectedNatures.includes(normalize(nature))) {
+          form.getTextField(field).setText('X');
+        }
+      } catch {}
+    });
+    // Set Learning Outcomes (robust: support both string/number keys and labels, handle undefined/null)
+    let learningOutcomesArr = [];
+    if (formData.learningOutcomes !== undefined && formData.learningOutcomes !== null) {
+      if (Array.isArray(formData.learningOutcomes)) {
+        learningOutcomesArr = formData.learningOutcomes;
+      } else if (typeof formData.learningOutcomes === 'string' || typeof formData.learningOutcomes === 'number') {
+        learningOutcomesArr = [formData.learningOutcomes];
       }
     }
+    // Accept both string and number keys (e.g., '0', '1', ... or label)
+    const loKeyMap = {
+      '0': 'intellectual development',
+      '1': 'collaboration',
+      '2': 'appreciation of culture and diversity',
+      '3': 'career exploration',
+      '4': 'socio-civic responsibility',
+      '5': 'others',
+    };
+    const normalizeLO = s => String(s).replace(/\s+/g, ' ').replace(/\./g, '').replace(/,/g, '').trim().toLowerCase();
+    const selectedLOs = learningOutcomesArr.map(lo => {
+      if (typeof lo === 'string' && loKeyMap[lo.trim()]) {
+        return loKeyMap[lo.trim()];
+      }
+      return normalizeLO(lo);
+    });
+    // Set only selected LO fields
+    Object.entries(loMap).forEach(([lo, field]) => {
+      try {
+        if (selectedLOs.includes(lo)) {
+          // DEBUG: Log before
+          try { console.log('Before setText', field, form.getTextField(field).getText()); } catch {}
+          // Try all common checkbox values
+          try { form.getTextField(field).setText('Yes'); } catch {}
+          try { form.getTextField(field).setText('On'); } catch {}
+          try { form.getTextField(field).setText('X'); } catch {}
+          // DEBUG: Log after
+          try { console.log('After setText', field, form.getTextField(field).getText()); } catch {}
+        }
+      } catch {}
+    });
+
+    form.getTextField('text_32nsrl').setText(formData.targetDate || '');
+    form.getTextField('text_33olvu').setText(formData.location || '');
+    form.getTextField('text_34nwi').setText(formData.stakeholders || '');
+    form.getTextField('text_35fgvb').setText(formData.numberOfVolunteerHours?.toString() || '');
+    form.getTextField('textarea_36deco').setText(formData.ceDescription || '');
+    form.getTextField('textarea_37phsy').setText(formData.ceObjectives || '');
+    form.getTextField('textarea_38xian').setText(formData.specificActivities || '');
+    form.getTextField('textarea_39zrqx').setText(formData.successIndicators || '');
+    form.getTextField('text_40bmwp').setText((formData.budget || '').replace(/₱/g, 'PHP'));
+    form.getTextField('text_41upqr').setText(formData.preparedBy || '');
     form.flatten();
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${formData.title || 'community_engagement_proposal'}.pdf`;
+    a.download = `${formData.communityEngagementTitle || 'community_engagement_proposal'}.pdf`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {

@@ -57,7 +57,7 @@ function ProjectProposal({ projectType, onClose }) {
   // Community Engagement specific fields
   const [ceFields, setCeFields] = useState({
     nature: '',
-    learningOutcomes: '',
+    learningOutcomes: '0', // Default to first option (Intellectual Development)
     customLearningOutcome: '',
   });
 
@@ -564,10 +564,124 @@ function ProjectProposal({ projectType, onClose }) {
             onClick={async () => {
               try {
                 setLoading(true);
-                // Call single export handler in exportProposalPDF.js
+                // Map formData to SL export keys if projectType is service-learning
+                let exportFormData = formData;
+                if (projectType === 'service-learning') {
+                  // Map SDG numbers to SDG labels for X placement
+                  const sdgNumberToLabel = {
+                    1: 'No Poverty',
+                    2: 'Zero Hunger',
+                    3: 'Good Health and Well-Being',
+                    4: 'Quality Education',
+                    5: 'Gender Equality',
+                    6: 'Clean Water and Sanitation',
+                    7: 'Affordable and Clean Energy',
+                    8: 'Decent Work and Economic Growth',
+                    9: 'Industry Innovation and Infrastructure',
+                    10: 'Reduced Inequalities',
+                    11: 'Sustainable Cities and Communities',
+                    12: 'Responsible Consumption and Production',
+                    13: 'Climate Action',
+                    14: 'Life Below Water',
+                    15: 'Life on Land',
+                    16: 'Peace, Justice and Strong Institutions',
+                    17: 'Partnership for the Goals'
+                  };
+                  exportFormData = {
+                    proposalTitle: formData.title,
+                    dateProposed: new Date().toLocaleString(),
+                    participatingSections: slFields.section || '',
+                    proponent: formData.faculty,
+                    courseTitle: slFields.course || '',
+                    courseCode: slFields.courseCode || '',
+                    targetDates: formData.targetDate,
+                    targetLocation: formData.location,
+                    sdgs: (formData.sdg || []).map(num => sdgNumberToLabel[num] || num),
+                    proposalDescription: formData.description,
+                    proposalObjectives: formData.objectives,
+                    specificActivities: formData.specificActivities,
+                    successIndicators: formData.successIndicators,
+                    budget: formData.budget,
+                    stakeholders: formData.stakeholders,
+                    volunteerHours: formData.volunteerHours
+                  };
+                }
+                // Map formData to CE export keys if projectType is community-engagement
+                if (projectType === 'community-engagement') {
+                              // Validation: Prevent export if not selected
+                              if (!ceFields.learningOutcomes || ceFields.learningOutcomes === '') {
+                                alert('Please select a Learning Outcomes Level before exporting.');
+                                setLoading(false);
+                                return;
+                              }
+                  const ceSdgNumberToLabel = {
+                    1: 'No Poverty',
+                    2: 'Zero Hunger',
+                    3: 'Good Health and Well-Being',
+                    4: 'Quality Education',
+                    5: 'Gender Equality',
+                    6: 'Clean Water and Sanitation',
+                    7: 'Affordable and Clean Energy',
+                    8: 'Decent Work and Economic Growth',
+                    9: 'Industry Innovation and Infrastructure',
+                    10: 'Reduced Inequalities',
+                    11: 'Sustainable Cities and Communities',
+                    12: 'Responsible Consumption and Production',
+                    13: 'Climate Action',
+                    14: 'Life Below Water',
+                    15: 'Life on Land',
+                    16: 'Peace, Justice and Strong Institutions',
+                    17: 'Partnership for the Goals'
+                  };
+                  // Normalize and filter only valid selections
+                  const normalize = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
+                  const validNatures = ['program', 'project/advocacy', 'consultation/extension'];
+                  const validLOs = [
+                    'intellectual development',
+                    'collaboration',
+                    'appreciation of culture and diversity',
+                    'career exploration',
+                    'socio-civic responsibility',
+                    'others',
+                    'others, pls. specify'
+                  ];
+                  let natureArr = ceFields.nature;
+                  if (!Array.isArray(natureArr)) natureArr = natureArr ? [natureArr] : [];
+                  natureArr = natureArr.map(normalize).filter(n => validNatures.includes(n));
+                  let loArr = [];
+                  if (ceFields.learningOutcomes) {
+                    if (Array.isArray(ceFields.learningOutcomes)) {
+                      loArr = ceFields.learningOutcomes;
+                    } else if (typeof ceFields.learningOutcomes === 'string' || typeof ceFields.learningOutcomes === 'number') {
+                      loArr = [ceFields.learningOutcomes];
+                    }
+                  }
+                  loArr = loArr.map(normalize).filter(lo => validLOs.includes(lo));
+                  // Always set learningOutcomes in exportFormData
+                  exportFormData = {
+                    communityEngagementTitle: formData.title,
+                    dateProposed: new Date().toLocaleString(),
+                    proponent: formData.faculty,
+                    studentOutcomes: formData.studentOutcomes || '',
+                    sdgs: (formData.sdg || []).map(num => ceSdgNumberToLabel[num] || num),
+                    natureOfEngagement: natureArr,
+                    learningOutcomes: loArr,
+                    targetDate: formData.targetDate,
+                    location: formData.location,
+                    stakeholders: formData.stakeholders,
+                    numberOfVolunteerHours: formData.volunteerHours,
+                    ceDescription: formData.description,
+                    ceObjectives: formData.objectives,
+                    specificActivities: formData.specificActivities,
+                    successIndicators: formData.successIndicators,
+                    budget: formData.budget,
+                    preparedBy: formData.faculty
+                  };
+                  console.log('DEBUG: Full exportFormData for CE', exportFormData);
+                }
                 await exportProposalPDF({
                   projectType,
-                  formData,
+                  formData: exportFormData,
                   slFields,
                   ceFields,
                   sdgOptions
