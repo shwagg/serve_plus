@@ -33,7 +33,7 @@ function Register() {
             const userCred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = userCred.user.uid;
 
-            // 2. Create user profile in Firestore
+            // 2. Create user profile in Firestore with sample structure
             await setDoc(doc(db, "users", uid), {
                 uid,
                 name,
@@ -42,6 +42,16 @@ function Register() {
                 role: "student", // Default role for new registrations
                 status: "active",
                 createdAt: new Date(),
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || username)}&background=30bdb7&color=fff&size=120`,
+                level: 1,
+                levelProgress: 0,
+                skills: ["React", "Firebase", "UI/UX"],
+                interests: ["Design", "Coding", "Music"],
+                achievements: ["Welcome!"],
+                                eventHistory: [
+                                    { label: "Registered", date: new Date().toISOString().slice(0, 10) },
+                                    { label: "Joined Event: Sample Orientation", date: new Date().toISOString().slice(0, 10) }
+                                ]
             });
 
             // 3. Redirect to login
