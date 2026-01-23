@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { exportProposalPDF } from '../exportProposalPDF';
+import { useState, useEffect } from 'react';
+import { exportProposalPDF, exportCommunityEngagementProposalPDF } from '../exportProposalPDF';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -8,8 +8,6 @@ import '../../../styles/ProjectProposal.css';
 function ProjectProposal({ projectType, onClose }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-
-  // Common fields
   const [formData, setFormData] = useState({
     title: '',
     sdg: [],
@@ -22,8 +20,32 @@ function ProjectProposal({ projectType, onClose }) {
     specificActivities: '',
     successIndicators: '',
     budget: '',
-    faculty: '', // Faculty in Charge
+    faculty: '', // Faculty in Charge/Proponent
+    college: '', // College/Program/Department/Student Org
   });
+  // Get user info and update formData.faculty on mount or when user changes
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user?.displayName) {
+        setFormData(prev => ({ ...prev, faculty: user.displayName }));
+      } else if (user?.uid) {
+        // Try to fetch name from Firestore user profile
+        try {
+          const { getDoc, doc } = await import('firebase/firestore');
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            if (data.name) {
+              setFormData(prev => ({ ...prev, faculty: data.name }));
+            }
+          }
+        } catch (err) {
+          // Ignore errors
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Service Learning specific fields
   const [slFields, setSlFields] = useState({
@@ -204,6 +226,24 @@ function ProjectProposal({ projectType, onClose }) {
               required
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="faculty">
+              {projectType === 'service-learning'
+                ? 'Faculty-in-Charge / Proponent(s) *'
+                : 'Name of Proponent(s) and College / Program / Department / Student Organization *'}
+            </label>
+            <input
+              type="text"
+              id="faculty"
+              name="faculty"
+              value={formData.faculty}
+              readOnly
+              required
+              placeholder={projectType === 'service-learning'
+                ? 'e.g., Dr. Juan Dela Cruz'
+                : 'e.g., Juan Dela Cruz, College of Science'}
+            />
+          </div>
 
           <div className="form-group">
             <label htmlFor="targetDate">Target Date *</label>
@@ -315,6 +355,7 @@ function ProjectProposal({ projectType, onClose }) {
         </div>
 
         {/* Type-specific fields */}
+        {/* --- Service Learning (SL) Specific Fields --- */}
         {projectType === 'service-learning' && (
           <div className="form-section">
             <h2>Academic Information</h2>
@@ -370,7 +411,12 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
           </div>
         )}
+        {/* --- End of Service Learning (SL) Specific Fields --- */}
 
+
+
+
+        {/* --- Community Engagement (CE) Specific Fields --- */}
         {projectType === 'community-engagement' && (
           <div className="form-section">
             <h2>Engagement Details</h2>
@@ -426,6 +472,11 @@ function ProjectProposal({ projectType, onClose }) {
             )}
           </div>
         )}
+        {/* --- End of Community Engagement (CE) Specific Fields --- */}
+
+
+
+
 
         {/* Project Details */}
         <div className="form-section">
@@ -511,42 +562,25 @@ function ProjectProposal({ projectType, onClose }) {
             className="btn-submit"
             disabled={loading}
             onClick={async () => {
-              // Map formData and fields to match exportProposalPDF expectations
-              const pdfData = {
-                title: formData.title,
-                faculty: formData.faculty,
-                proponent: '', // Or map from user context
-                courseTitle: slFields.course || '',
-                coursetitle: slFields.course || '',
-                stakeholders: formData.stakeholders,
-                targetLocation: formData.location,
-                targetlocation: formData.location,
-                date: formData.targetDate,
-                dateproposed: formData.targetDate,
-                sections: slFields.section || '',
-                courseCode: slFields.courseCode || '',
-                coursecode: slFields.courseCode || '',
-                targetDates: formData.targetDate,
-                targetdates: formData.targetDate,
-                volunteerHours: formData.volunteerHours,
-                hours: formData.volunteerHours,
-                description: formData.description,
-                objectives: formData.objectives,
-                specificactivities: formData.specificActivities,
-                indicators: formData.successIndicators,
-                successindicators: formData.successIndicators,
-                budget: formData.budget,
-                sdgs: formData.sdg
-                  ? formData.sdg.map(num => {
-                      const sdgObj = sdgOptions.find(opt => opt.number === num);
-                      return sdgObj ? sdgObj.name : '';
-                    })
-                  : [],
-              };
-              await exportProposalPDF(pdfData, []); // [] for activities, adjust if you have activities
+              try {
+                setLoading(true);
+                // Call single export handler in exportProposalPDF.js
+                await exportProposalPDF({
+                  projectType,
+                  formData,
+                  slFields,
+                  ceFields,
+                  sdgOptions
+                });
+              } catch (err) {
+                alert('Export error: ' + err);
+                console.error('Export error:', err);
+              } finally {
+                setLoading(false);
+              }
             }}
           >
-            Export
+            {loading ? 'Exporting...' : 'Export'}
           </button>
           <button 
             type="submit" 
