@@ -41,6 +41,17 @@ function Auth() {
     setError("");
 
     try {
+      //Check if account is locked
+      const checkLoginAttempts = httpsCallable(functions, "checkLoginAttempts");
+      const lockCheck = await checkLoginAttempts({ email });
+      
+      if (lockCheck.data?.isLocked) {
+        const lockUntil = new Date(lockCheck.data.lockUntil);
+        const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
+        setError(`Account locked due to too many failed attempts. Try again in ${minutesLeft} minute(s).`);
+        return;
+      }
+
       // ✅ 1. Firebase Authentication
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
@@ -71,6 +82,15 @@ function Auth() {
       } catch (auditErr) {
         console.warn("Audit log failed:", auditErr);
         // Don't block login if audit log fails
+      }
+
+      // Reset login attempts on successful login
+      try {
+        const resetLoginAttempts = httpsCallable(functions, "resetLoginAttempts");
+        await resetLoginAttempts({ email });
+        console.log("Login attempts reset for:", email);
+      } catch (resetErr) {
+        console.warn("Failed to reset login attempts:", resetErr);
       }
 
       // ✅ 4. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
@@ -123,6 +143,24 @@ function Auth() {
 
     } catch (err) {
       if (isDev) console.error("Login error:", err);
+
+      //Record login failure
+      try {
+        const recordLoginFailure = httpsCallable(functions, "recordLoginFailure");
+        const failureResult = await recordLoginFailure({ email });
+        
+        if (failureResult.data?.isLocked) {
+          const lockUntil = new Date(failureResult.data.lockUntil);
+          const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
+          setError(`Too many failed attempts. Account locked for ${minutesLeft} minute(s).`);
+          return;
+        } else if (failureResult.data?.attempts) {
+          const attemptsLeft = failureResult.data.maxAttempts - failureResult.data.attempts;
+          console.log(`${attemptsLeft} attempts remaining before account lock`);
+        }
+      } catch (recordErr) {
+        console.warn("Failed to record login failure:", recordErr);
+      }
 
       const code = err?.code || "";
       let userMsg = "Login failed. Please try again.";
