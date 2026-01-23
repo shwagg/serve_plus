@@ -362,8 +362,10 @@
 }
 
 .btn-submit:hover:not(:disabled) {
+  background: #32CD32 !important; /* Lime Green */
+  color: #fff !important;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 20px rgba(50, 205, 50, 0.3);
 }
 
 .btn-cancel:disabled,

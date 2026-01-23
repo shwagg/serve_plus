@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { exportProposalPDF } from '../exportProposalPDF';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -21,6 +22,7 @@ function ProjectProposal({ projectType, onClose }) {
     specificActivities: '',
     successIndicators: '',
     budget: '',
+    faculty: '', // Faculty in Charge
   });
 
   // Service Learning specific fields
@@ -316,7 +318,6 @@ function ProjectProposal({ projectType, onClose }) {
         {projectType === 'service-learning' && (
           <div className="form-section">
             <h2>Academic Information</h2>
-            
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="course">Course *</label>
@@ -330,7 +331,6 @@ function ProjectProposal({ projectType, onClose }) {
                   placeholder="e.g., Introduction to Community Development"
                 />
               </div>
-
               <div className="form-group">
                 <label htmlFor="courseCode">Course Code *</label>
                 <input
@@ -344,7 +344,18 @@ function ProjectProposal({ projectType, onClose }) {
                 />
               </div>
             </div>
-
+            <div className="form-group">
+              <label htmlFor="faculty">Faculty in Charge *</label>
+              <input
+                type="text"
+                id="faculty"
+                name="faculty"
+                value={formData.faculty}
+                onChange={handleInputChange}
+                required
+                placeholder="e.g., Dr. Juan Dela Cruz"
+              />
+            </div>
             <div className="form-group">
               <label htmlFor="section">Section *</label>
               <input
@@ -494,6 +505,48 @@ function ProjectProposal({ projectType, onClose }) {
             disabled={loading}
           >
             Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-submit"
+            disabled={loading}
+            onClick={async () => {
+              // Map formData and fields to match exportProposalPDF expectations
+              const pdfData = {
+                title: formData.title,
+                faculty: formData.faculty,
+                proponent: '', // Or map from user context
+                courseTitle: slFields.course || '',
+                coursetitle: slFields.course || '',
+                stakeholders: formData.stakeholders,
+                targetLocation: formData.location,
+                targetlocation: formData.location,
+                date: formData.targetDate,
+                dateproposed: formData.targetDate,
+                sections: slFields.section || '',
+                courseCode: slFields.courseCode || '',
+                coursecode: slFields.courseCode || '',
+                targetDates: formData.targetDate,
+                targetdates: formData.targetDate,
+                volunteerHours: formData.volunteerHours,
+                hours: formData.volunteerHours,
+                description: formData.description,
+                objectives: formData.objectives,
+                specificactivities: formData.specificActivities,
+                indicators: formData.successIndicators,
+                successindicators: formData.successIndicators,
+                budget: formData.budget,
+                sdgs: formData.sdg
+                  ? formData.sdg.map(num => {
+                      const sdgObj = sdgOptions.find(opt => opt.number === num);
+                      return sdgObj ? sdgObj.name : '';
+                    })
+                  : [],
+              };
+              await exportProposalPDF(pdfData, []); // [] for activities, adjust if you have activities
+            }}
+          >
+            Export
           </button>
           <button 
             type="submit" 
