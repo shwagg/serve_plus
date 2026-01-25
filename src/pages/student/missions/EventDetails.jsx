@@ -99,14 +99,14 @@ export default function EventDetails() {
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-label="Toggle Community Updates"
-        style={{ position: 'fixed', top: 120, right: 24, zIndex: 3000 }}
+        style={{ position: 'fixed', top: 120, right: 24, zIndex: 999 }}
       >
         📰
         <span className="global-feed-badge">1</span>
       </button>
       {open && (
         <aside className="global-feed open"
-          style={{ position: 'fixed', top: 80, right: 0, height: 'calc(100vh - 80px)', width: 380, background: '#fff', boxShadow: '0 2px 8px #0001', borderLeft: '2px solid #30bdb7', zIndex: 3001, transition: 'transform 0.3s' }}>
+          style={{ position: 'fixed', top: 80, right: 0, height: 'calc(100vh - 80px)', width: 380, background: '#fff', boxShadow: '0 2px 8px #0001', borderLeft: '2px solid #30bdb7', zIndex: 999, transition: 'transform 0.3s' }}>
           <div className="global-feed-header">
             <h3 className="global-feed-title">Community Updates</h3>
             <p className="global-feed-subtitle">Whats happening this week</p>
