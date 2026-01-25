@@ -1,42 +1,104 @@
 import React, { useContext, useEffect, useState } from "react";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm }) {
+  const presetSkills = ["React", "Firebase", "UI/UX", "Design", "Coding", "Music", "Python", "JavaScript", "Leadership", "Communication"];
+  const presetInterests = ["Design", "Coding", "Music", "Art", "Sports", "Reading", "Travel", "Gaming", "Science", "Technology"];
   const [avatar, setAvatar] = useState(profile.avatar || "");
   const [name, setName] = useState(profile.name || "");
   const [email, setEmail] = useState(profile.email || "");
-  const [skills, setSkills] = useState(profile.skills ? profile.skills.join(", ") : "");
-  const [interests, setInterests] = useState(profile.interests ? profile.interests.join(", ") : "");
+  const [skills, setSkills] = useState(profile.skills || []);
+  const [interests, setInterests] = useState(profile.interests || []);
+  const [otherSkill, setOtherSkill] = useState("");
+  const [otherInterest, setOtherInterest] = useState("");
 
   if (!open) return null;
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 2px 16px rgba(0,0,0,0.15)' }}>
-        <h2 style={{ marginBottom: 18, color: '#234e7b' }}>Edit Profile</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ textAlign: 'center' }}>
-            <img src={avatar} alt="avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginBottom: 8 }} />
-            <input type="text" value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="Profile Picture URL" style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+    <div className="profile-modal-bg">
+      <div className="profile-modal-card">
+        <h2 className="profile-modal-title">Edit Profile</h2>
+        <div className="profile-modal-fields">
+          <div className="profile-modal-avatar-box">
+            <img src={avatar} alt="avatar" className="profile-modal-avatar" />
+            <input type="text" value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="Profile Picture URL" className="profile-modal-input" />
           </div>
           <div>
-            <label style={{ fontWeight: 600 }}>Name</label><br />
-            <input type="text" value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+            <label className="profile-modal-label">Name</label><br />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="profile-modal-input" />
           </div>
           <div>
-            <label style={{ fontWeight: 600 }}>Email</label><br />
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+            <label className="profile-modal-label">Email</label><br />
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="profile-modal-input" />
           </div>
           <div>
-            <label style={{ fontWeight: 600 }}>Skills (comma separated)</label><br />
-            <input type="text" value={skills} onChange={e => setSkills(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+            <label className="profile-modal-label">Skills</label><br />
+            <div className="profile-modal-badge-list">
+              {presetSkills.map(skill => (
+                <button
+                  key={skill}
+                  type="button"
+                  onClick={() => setSkills(skills.includes(skill) ? skills.filter(s => s !== skill) : [...skills, skill])}
+                  className={`profile-modal-badge-btn${skills.includes(skill) ? ' selected' : ''}`}
+                >
+                  {skill}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={`profile-modal-badge-btn${otherSkill ? ' selected' : ''}`}
+                onClick={() => setOtherSkill("")}
+              >
+                Others
+              </button>
+            </div>
+            <input
+              type="text"
+              value={otherSkill}
+              onChange={e => setOtherSkill(e.target.value)}
+              placeholder="Enter other skill"
+              className="profile-modal-input"
+              style={{ marginBottom: 8 }}
+            />
           </div>
           <div>
-            <label style={{ fontWeight: 600 }}>Interests (comma separated)</label><br />
-            <input type="text" value={interests} onChange={e => setInterests(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+            <label className="profile-modal-label">Interests</label><br />
+            <div className="profile-modal-badge-list">
+              {presetInterests.map(interest => (
+                <button
+                  key={interest}
+                  type="button"
+                  onClick={() => setInterests(interests.includes(interest) ? interests.filter(i => i !== interest) : [...interests, interest])}
+                  className={`profile-modal-badge-btn${interests.includes(interest) ? ' selected' : ''}`}
+                >
+                  {interest}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={`profile-modal-badge-btn${otherInterest ? ' selected' : ''}`}
+                onClick={() => setOtherInterest("")}
+              >
+                Others
+              </button>
+            </div>
+            <input
+              type="text"
+              value={otherInterest}
+              onChange={e => setOtherInterest(e.target.value)}
+              placeholder="Enter other interest"
+              className="profile-modal-input"
+              style={{ marginBottom: 8 }}
+            />
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ background: '#ccc', color: '#234e7b', border: 'none', borderRadius: 6, padding: '8px 18px', fontWeight: 600 }}>Cancel</button>
-          <button onClick={() => onConfirm({ avatar, name, email, skills: skills.split(",").map(s => s.trim()).filter(Boolean), interests: interests.split(",").map(i => i.trim()).filter(Boolean) })} style={{ background: '#30bdb7', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 18px', fontWeight: 600 }}>Confirm</button>
+        <div className="profile-modal-btn-row">
+          <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
+          <button onClick={() => {
+            let finalSkills = skills;
+            if (otherSkill && !skills.includes(otherSkill)) finalSkills = [...skills, otherSkill];
+            let finalInterests = interests;
+            if (otherInterest && !interests.includes(otherInterest)) finalInterests = [...interests, otherInterest];
+            onConfirm({ avatar, name, email, skills: finalSkills, interests: finalInterests });
+          }} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
@@ -123,7 +185,14 @@ export default function Profile() {
           <div className="profile-avatar">
             <img src={profile.avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%" }} />
           </div>
-          <h2 style={{ color: "#234e7b", fontWeight: 700, fontSize: 28, marginBottom: 8 }}>{profile.name}</h2>
+          {/* Username above name */}
+          {profile.username && (
+            <h2 style={{ color: "#234e7b", fontWeight: 700, fontSize: 28, marginBottom: 4 }}>{profile.username}</h2>
+          )}
+          {!profile.username && profile.email && (
+            <h2 style={{ color: "#234e7b", fontWeight: 700, fontSize: 28, marginBottom: 4 }}>{profile.email.split('@')[0]}</h2>
+          )}
+          <div style={{ color: '#30bdb7', fontWeight: 600, fontSize: 18, marginBottom: 8 }}>{profile.name}</div>
           <div style={{ color: "#555", fontSize: 16, marginBottom: 18 }}>{profile.email}</div>
           <div className="profile-level-label">Level {profile.level}</div>
           <div style={{ width: "100%", margin: "16px 0" }}>
@@ -163,10 +232,28 @@ export default function Profile() {
             open={editOpen}
             onClose={() => setEditOpen(false)}
             profile={profile || {}}
-            onConfirm={updated => {
-              // You can add Firestore update logic here
-              setProfile(prev => ({ ...prev, ...updated }));
-              setEditOpen(false);
+            onConfirm={async updated => {
+              try {
+                const user = auth.currentUser;
+                if (!user) throw new Error("No user logged in");
+                // Update Firestore user profile
+                const userRef = doc(db, "users", user.uid);
+                await import("firebase/firestore").then(({ updateDoc, setDoc }) =>
+                  updateDoc(userRef, updated).catch(async err => {
+                    // If doc doesn't exist, create it
+                    if (err.code === "not-found") {
+                      await setDoc(userRef, updated);
+                    } else {
+                      throw err;
+                    }
+                  })
+                );
+                setProfile(prev => ({ ...prev, ...updated }));
+              } catch (err) {
+                alert("Failed to update profile: " + (err.message || err));
+              } finally {
+                setEditOpen(false);
+              }
             }}
           />
         </div>

@@ -4,7 +4,7 @@
   background: #fff;
   width: 100vw;
   position: relative;
-  padding-top: 80px; /* Add space for header */
+  padding-top: 80px;
 }
 .profile-main-flex {
   display: flex;
@@ -67,7 +67,7 @@
 }
 .profile-achievements {
   width: 100%;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .profile-achievements-label {
   font-weight: 600;
@@ -77,6 +77,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  margin-bottom: 24px;
 }
 .profile-badge {
   width: 60px;
@@ -86,6 +87,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 16px;
 }
 .profile-edit-btn {
   margin-top: auto;
@@ -195,6 +197,99 @@
   margin-left: auto;
   color: #888;
 }
+
+/* Modal background */
+.profile-modal-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.25);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  min-width: 320px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.15);
+}
+.profile-modal-title {
+  margin-bottom: 18px;
+  color: #234e7b;
+}
+.profile-modal-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.profile-modal-avatar-box {
+  text-align: center;
+}
+.profile-modal-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 8px;
+}
+.profile-modal-label {
+  font-weight: 600;
+}
+.profile-modal-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+.profile-modal-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.profile-modal-badge-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #234e7b;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.profile-modal-badge-btn.selected {
+  border: 2px solid #30bdb7;
+  background: #30bdb7;
+  color: #fff;
+}
+.profile-modal-btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  justify-content: flex-end;
+}
+.profile-modal-cancel-btn {
+  background: #ccc;
+  color: #234e7b;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-weight: 600;
+}
+.profile-modal-confirm-btn {
+  background: #30bdb7;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-weight: 600;
+}
+
 @media (max-width: 1100px) {
   .profile-main-flex {
     flex-direction: column;
