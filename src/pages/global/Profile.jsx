@@ -8,8 +8,6 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
   const [email, setEmail] = useState(profile.email || "");
   const [skills, setSkills] = useState(profile.skills || []);
   const [interests, setInterests] = useState(profile.interests || []);
-  const [otherSkill, setOtherSkill] = useState("");
-  const [otherInterest, setOtherInterest] = useState("");
 
   if (!open) return null;
   return (
@@ -42,22 +40,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
                   {skill}
                 </button>
               ))}
-              <button
-                type="button"
-                className={`profile-modal-badge-btn${otherSkill ? ' selected' : ''}`}
-                onClick={() => setOtherSkill("")}
-              >
-                Others
-              </button>
             </div>
-            <input
-              type="text"
-              value={otherSkill}
-              onChange={e => setOtherSkill(e.target.value)}
-              placeholder="Enter other skill"
-              className="profile-modal-input"
-              style={{ marginBottom: 8 }}
-            />
           </div>
           <div>
             <label className="profile-modal-label">Interests</label><br />
@@ -72,33 +55,12 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
                   {interest}
                 </button>
               ))}
-              <button
-                type="button"
-                className={`profile-modal-badge-btn${otherInterest ? ' selected' : ''}`}
-                onClick={() => setOtherInterest("")}
-              >
-                Others
-              </button>
             </div>
-            <input
-              type="text"
-              value={otherInterest}
-              onChange={e => setOtherInterest(e.target.value)}
-              placeholder="Enter other interest"
-              className="profile-modal-input"
-              style={{ marginBottom: 8 }}
-            />
           </div>
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
-          <button onClick={() => {
-            let finalSkills = skills;
-            if (otherSkill && !skills.includes(otherSkill)) finalSkills = [...skills, otherSkill];
-            let finalInterests = interests;
-            if (otherInterest && !interests.includes(otherInterest)) finalInterests = [...interests, otherInterest];
-            onConfirm({ avatar, name, email, skills: finalSkills, interests: finalInterests });
-          }} className="profile-modal-confirm-btn">Confirm</button>
+          <button onClick={() => onConfirm({ avatar, name, email, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
