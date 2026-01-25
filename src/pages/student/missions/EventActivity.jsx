@@ -14,59 +14,63 @@ import QRScanner from "../../../components/QRScanner";
 import { db } from "../../../firebaseConfig";
 
 export default function EventActivity() {
-    const [showQRModal, setShowQRModal] = useState(false);
-    const [qrStatus, setQRStatus] = useState("");
-    const handleQRScan = async (decodedText) => {
-      setQRStatus("");
-      // Use event id from this page
-      const projectId = id;
-      // Get current user
-      const user = auth.currentUser;
-      if (!user) {
-        setQRStatus("You must be logged in to record attendance.");
-        return;
-      }
-      try {
-        // Verify QR code contains correct eventId
-        let parsed = null;
-        try {
-          parsed = JSON.parse(decodedText);
-        } catch (e) {
-          setQRStatus("Invalid QR code format.");
-          return;
-        }
-        if (!parsed || parsed.eventId !== projectId) {
-          setQRStatus("This QR code is not valid for this event.");
-          return;
-        }
-        // Fetch user info from users collection
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        let name = "";
-        let email = "";
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          name = data.name || data.username || "";
-          email = data.email || "";
-        } else {
-          name = user.displayName || "";
-          email = user.email || "";
-        }
-        await setDoc(
-          doc(db, "Missions", projectId, "volunteer", user.uid),
-          {
-            name,
-            email,
-            attendanceStatus: "present"
-          },
-          { merge: true }
-        );
-        setQRStatus("Attendance recorded!");
-      } catch (err) {
-        setQRStatus("Failed to record attendance.");
-      }
-    };
   const { id } = useParams();
   const navigate = useNavigate();
+  const auth = getAuth();
+  
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrStatus, setQRStatus] = useState("");
+  
+  const handleQRScan = async (decodedText) => {
+    setQRStatus("");
+    // Use event id from this page
+    const projectId = id;
+    // Get current user
+    const user = auth.currentUser;
+    if (!user) {
+      setQRStatus("You must be logged in to record attendance.");
+      return;
+    }
+    try {
+      // Verify QR code contains correct eventId
+      let parsed = null;
+      try {
+        parsed = JSON.parse(decodedText);
+      } catch (e) {
+        setQRStatus("Invalid QR code format.");
+        return;
+      }
+      if (!parsed || parsed.eventId !== projectId) {
+        setQRStatus("This QR code is not valid for this event.");
+        return;
+      }
+      // Fetch user info from users collection
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      let name = "";
+      let email = "";
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        name = data.name || data.username || "";
+        email = data.email || "";
+      } else {
+        name = user.displayName || "";
+        email = user.email || "";
+      }
+      await setDoc(
+        doc(db, "Missions", projectId, "volunteer", user.uid),
+        {
+          name,
+          email,
+          attendanceStatus: "present"
+        },
+        { merge: true }
+      );
+      setQRStatus("Attendance recorded!");
+    } catch (err) {
+      setQRStatus("Failed to record attendance.");
+    }
+  };
+  
   // All hooks at top level
   // Placeholder form hooks
   const coreSkills = [
@@ -123,7 +127,6 @@ export default function EventActivity() {
   const [editingJournalId, setEditingJournalId] = useState(null);
   const [editingJournalText, setEditingJournalText] = useState("");
   const [enrolledTasks, setEnrolledTasks] = useState({});
-  const auth = getAuth();
 
   // Handler for adding a skill to a level (for placeholder)
   const handleAddSkill = (skill, level) => {
@@ -1003,54 +1006,13 @@ export default function EventActivity() {
   // ...existing code...
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100vw",
-        display: "flex",
-        flexDirection: "column",
-        background: "#f6f6f6",
-        position: "relative",
-      }}
-    >
+    <div className="event-activity-page">
       <Header />
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          gap: 24,
-          padding: 32,
-          justifyContent: "center",
-          boxSizing: "border-box",
-          overflowY: "auto",
-          paddingTop: 120,
-        }}
-      >
+      <div className="event-activity-container">
         {/* Left: Event Summary styled as per screenshot */}
-        <div
-          style={{
-            flex: "0 0 40%",
-            maxWidth: "40%",
-            minWidth: 340,
-            background: "transparent",
-            borderRadius: 24,
-            padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
+        <div className="event-summary-card">
           {/* Top image */}
-          <div
-            style={{
-              width: "100%",
-              height: 180,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              overflow: "hidden",
-              position: "relative",
-            }}
-          >
+          <div className="event-summary-image">
             <img
               src={event.img || "/assets/mission1.jpg"}
               alt={event.alt || "Event"}
@@ -1058,56 +1020,15 @@ export default function EventActivity() {
             />
           </div>
           {/* Green card */}
-          <div
-            style={{
-              background: "#7bb661",
-              borderBottomLeftRadius: 24,
-              borderBottomRightRadius: 24,
-              padding: "32px 24px 24px 24px",
-              width: "100%",
-              boxSizing: "border-box",
-              marginTop: -4,
-              minHeight: 420,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "stretch",
-              position: "relative"
-            }}
-          >
-            <h2
-              style={{
-                color: "#fff",
-                fontWeight: 700,
-                marginBottom: 12,
-                fontSize: 26,
-                lineHeight: 1.2,
-              }}
-            >
+          <div className="event-summary-body">
+            <h2 className="event-summary-title">
               {event.title}
             </h2>
-            <p
-              style={{
-                color: "#fff",
-                fontSize: 15,
-                marginBottom: 18,
-                fontWeight: 400,
-                lineHeight: 1.5,
-              }}
-            >
+            <p className="event-summary-description">
               {event.description}
             </p>
             {/* White info box */}
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: 16,
-                padding: 20,
-                marginBottom: 18,
-                color: "#222",
-                fontSize: 15,
-                boxShadow: "0 2px 8px #0001",
-              }}
-            >
+            <div className="event-info-box">
               <div style={{ marginBottom: 10 }}>
                 <strong>Location:</strong>{" "}
                 <span style={{ color: "#234e7b" }}>{event.location}</span>
@@ -1140,43 +1061,12 @@ export default function EventActivity() {
               {/* View Event Page Button */}
               <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
                 <button
-                  style={{
-                    background: "#2566b3",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "10px 24px",
-                    fontWeight: 600,
-                    fontSize: 16,
-                    cursor: "pointer",
-                    boxShadow: "0 2px 8px #0001",
-                  }}
+                  className="event-qr-button"
                   onClick={() => setShowQRModal(true)}
                 >
                   Scan Attendance QR Code
                 </button>
               </div>
-              {showQRModal && (
-                <div style={{
-                  position: "fixed",
-                  top: 0,
-                  left: 0,
-                  width: "100vw",
-                  height: "100vh",
-                  background: "rgba(0,0,0,0.4)",
-                  zIndex: 9999,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>
-                  <div style={{ background: "#fff", borderRadius: 16, padding: 32, boxShadow: "0 4px 24px #0003", minWidth: 340, textAlign: "center", position: "relative" }}>
-                    <button style={{ position: "absolute", top: 12, right: 12, background: "#eee", border: "none", borderRadius: 8, padding: "4px 12px", cursor: "pointer", fontWeight: 700 }} onClick={() => setShowQRModal(false)}>X</button>
-                    <h3 style={{ marginBottom: 16, color: "#2566b3" }}>Scan or Upload QR Code</h3>
-                    <QRScanner onScan={handleQRScan} />
-                    {qrStatus && <div style={{ marginTop: 16, color: qrStatus === "Attendance recorded!" ? "green" : "red" }}>{qrStatus}</div>}
-                  </div>
-                </div>
-              )}
               {event.waiver && (
                 <div
                   style={{
@@ -1200,41 +1090,15 @@ export default function EventActivity() {
                 </div>
               )}
             </div>
-            <button
-              style={{
-                background: "#bdbdbd",
-                color: "#fff",
-                border: "none",
-                borderRadius: 10,
-                padding: "14px 0",
-                fontWeight: 600,
-                fontSize: 18,
-                cursor: "not-allowed",
-                width: "100%",
-                marginTop: 8,
-                letterSpacing: 1,
-              }}
-              disabled
-            >
+            <button className="event-incomplete-button" disabled>
               INCOMPLETE
             </button>
           </div>
         </div>
         {/* Activities Section with journals below each activity title */}
         {/* Right: Activity Section */}
-        <div
-          style={{
-            flex: "0 0 60%",
-            maxWidth: "60%",
-            minWidth: 400,
-            background: "#7bb661",
-            borderRadius: 20,
-            padding: 24,
-            height: "75vh",
-            overflowY: "auto",
-          }}
-        >
-          <h2 style={{ color: "#fff", fontWeight: 700, marginBottom: 16 }}>
+        <div className="event-activities-panel">
+          <h2 className="event-activities-title">
             Activity
           </h2>
           {tasks &&
@@ -1244,43 +1108,15 @@ export default function EventActivity() {
                 (j) => j.activityId === activity.title
               );
               return (
-                <div
-                  key={idx}
-                  style={{
-                    background: "#fff",
-                    borderRadius: 16,
-                    padding: 20,
-                    marginBottom: 24,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 8,
-                    }}
-                  >
-                    <h3 style={{ color: "#234e7b", fontWeight: 700 }}>
+                <div key={idx} className="activity-card">
+                  <div className="activity-header">
+                    <h3 className="activity-title">
                       {activity.title}
                     </h3>
                     <button
                       onClick={() => handleJoinActivity(activity.id)}
                       disabled={enrolledTasks[activity.id]}
-                      style={{
-                        background: enrolledTasks[activity.id]
-                          ? "#bdbdbd"
-                          : "#7bb661",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 8,
-                        padding: "8px 18px",
-                        fontWeight: 600,
-                        fontSize: 14,
-                        cursor: enrolledTasks[activity.id]
-                          ? "not-allowed"
-                          : "pointer",
-                      }}
+                      className="activity-join-button"
                     >
                       {enrolledTasks[activity.id]
                         ? "ENROLLED"
@@ -1290,16 +1126,7 @@ export default function EventActivity() {
                   {/* User's journals for this activity */}
                   {journalsForActivity.length > 0 &&
                     journalsForActivity.map((journal) => (
-                      <div
-                        key={journal.id}
-                        style={{
-                          background: "#f9f9f9",
-                          border: "1px solid #eee",
-                          borderRadius: 8,
-                          padding: 12,
-                          marginBottom: 10,
-                        }}
-                      >
+                      <div key={journal.id} className="journal-card">
                         {editingJournalId === journal.taskId ? (
                           <>
                             <textarea
@@ -1307,62 +1134,29 @@ export default function EventActivity() {
                               onChange={(e) =>
                                 setEditingJournalText(e.target.value)
                               }
-                              style={{
-                                width: "100%",
-                                minHeight: 60,
-                                margin: "8px 0",
-                                borderRadius: 6,
-                                border: "1px solid #ccc",
-                                padding: 8,
-                              }}
+                              className="journal-edit-textarea"
                             />
                             <button
                               onClick={() => handleSaveEditJournal(journal)}
-                              style={{
-                                marginRight: 8,
-                                background: "#1ea7fd",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 6,
-                                padding: "6px 18px",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
+                              className="journal-button journal-button-save"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingJournalId(null)}
-                              style={{
-                                background: "#bdbdbd",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 6,
-                                padding: "6px 18px",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
+                              className="journal-button journal-button-cancel"
                             >
                               Cancel
                             </button>
                           </>
                         ) : (
                           <>
-                            <div style={{ margin: "8px 0", color: "#234e7b" }}>
+                            <div className="journal-text">
                               {journal.reflection}
                             </div>
                             <button
                               onClick={() => handleEditJournal(journal)}
-                              style={{
-                                marginRight: 8,
-                                background: "#7bb661",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 6,
-                                padding: "6px 18px",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
+                              className="journal-button journal-button-edit"
                             >
                               Edit
                             </button>
@@ -1370,15 +1164,7 @@ export default function EventActivity() {
                               onClick={() =>
                                 handleDeleteJournal(journal.taskId)
                               }
-                              style={{
-                                background: "#d32f2f",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 6,
-                                padding: "6px 18px",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
+                              className="journal-button journal-button-delete"
                             >
                               Delete
                             </button>
@@ -1386,74 +1172,35 @@ export default function EventActivity() {
                         )}
                       </div>
                     ))}
-                  <ul
-                    style={{ color: "#234e7b", fontSize: 15, marginBottom: 8 }}
-                  >
+                  <ul className="activity-details-list">
                     {activity.details &&
                       activity.details.map((detail, i) => (
                         <li key={i}>{detail}</li>
                       ))}
                   </ul>
                   {activity.required && (
-                    <div
-                      style={{
-                        color: "#234e7b",
-                        fontSize: 15,
-                        marginBottom: 8,
-                      }}
-                    >
+                    <div className="activity-required">
                       <strong>Required:</strong> {activity.required}
                     </div>
                   )}
                   <textarea
                     placeholder="Journal Reflection"
-                    style={{
-                      width: "100%",
-                      minHeight: 60,
-                      marginBottom: 8,
-                      borderRadius: 6,
-                      border: "1px solid #ccc",
-                      padding: 8,
-                    }}
+                    className="journal-textarea"
                     value={journalReflections[idx] || ""}
                     onChange={(e) => handleJournalChange(idx, e.target.value)}
                   />
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
+                  <div className="task-progress-row">
                     <span>Task Progress</span>
                     <progress
                       value={
                         submitStatus[idx] === "Reflection submitted!" ? 100 : 0
                       }
                       max="100"
-                      style={{ flex: 1 }}
+                      className="task-progress-bar"
                     />
                   </div>
                   <button
-                    style={{
-                      background:
-                        journalReflections[idx] &&
-                        journalReflections[idx].trim()
-                          ? "#1ea7fd"
-                          : "#bdbdbd",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "8px 24px",
-                      fontWeight: 600,
-                      fontSize: 14,
-                      cursor:
-                        journalReflections[idx] &&
-                        journalReflections[idx].trim()
-                          ? "pointer"
-                          : "not-allowed",
-                    }}
+                    className="activity-submit-button"
                     disabled={
                       !journalReflections[idx] ||
                       !journalReflections[idx].trim()
@@ -1464,14 +1211,11 @@ export default function EventActivity() {
                   </button>
                   {submitStatus[idx] && (
                     <div
-                      style={{
-                        marginTop: 8,
-                        color:
-                          submitStatus[idx] === "Reflection submitted!"
-                            ? "#7bb661"
-                            : "#d32f2f",
-                        fontWeight: 600,
-                      }}
+                      className={`submit-status ${
+                        submitStatus[idx] === "Reflection submitted!"
+                          ? "submit-status-success"
+                          : "submit-status-error"
+                      }`}
                     >
                       {submitStatus[idx]}
                     </div>
@@ -1481,6 +1225,18 @@ export default function EventActivity() {
             })}
         </div>
       </div>
+      
+      {/* QR Modal - at root level to prevent flickering */}
+      {showQRModal && (
+        <div className="qr-modal-overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="qr-modal-close" onClick={() => setShowQRModal(false)}>X</button>
+            <h3 className="qr-modal-title">Scan or Upload QR Code</h3>
+            <QRScanner onScan={handleQRScan} />
+            {qrStatus && <div className={`qr-status ${qrStatus === "Attendance recorded!" ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

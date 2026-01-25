@@ -6,38 +6,76 @@ export default function QRScanner({ onScan }) {
   const scannerRef = useRef(null);
   const html5QrCodeRef = useRef(null);
   const runningRef = useRef(false);
+  const initializingRef = useRef(false);
+  const [error, setError] = React.useState(null);
+  const [cameraStatus, setCameraStatus] = React.useState("Initializing...");
 
   useEffect(() => {
-    if (!scannerRef.current) return;
+    if (!scannerRef.current || runningRef.current || initializingRef.current) return;
+    
     const qrCodeRegionId = "qr-reader-region";
-    html5QrCodeRef.current = new Html5Qrcode(qrCodeRegionId);
+    
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(async () => {
+      if (initializingRef.current) return;
+      
+      try {
+        initializingRef.current = true;
+        setCameraStatus("Requesting camera permission...");
+        html5QrCodeRef.current = new Html5Qrcode(qrCodeRegionId);
 
-    html5QrCodeRef.current.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: 250,
-      },
-      (decodedText, decodedResult) => {
-        if (onScan) onScan(decodedText);
-        if (runningRef.current) {
-          html5QrCodeRef.current.stop();
-          runningRef.current = false;
+        await html5QrCodeRef.current.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 0.75, // Portrait ratio (3:4)
+          },
+          (decodedText, decodedResult) => {
+            if (onScan) onScan(decodedText);
+            if (runningRef.current && html5QrCodeRef.current) {
+              html5QrCodeRef.current.stop();
+              runningRef.current = false;
+            }
+          },
+          (errorMessage) => {
+            // Optionally handle scan errors
+          }
+        );
+        
+        runningRef.current = true;
+        setCameraStatus("Camera active");
+        setError(null);
+      } catch (err) {
+        console.error("Camera error:", err);
+        setError(err.message || "Failed to access camera");
+        setCameraStatus("Camera failed");
+        
+        if (err.message?.includes("Permission") || err.message?.includes("NotAllowedError")) {
+          setError("Camera permission denied. Please allow camera access in your browser settings.");
+        } else if (err.message?.includes("NotFound") || err.message?.includes("OverconstrainedError")) {
+          setError("No camera found on this device.");
+        } else {
+          setError(`Camera error: ${err.message}`);
         }
-      },
-      (errorMessage) => {
-        // Optionally handle scan errors
       }
-    ).then(() => {
-      runningRef.current = true;
-    });
+    }, 100);
 
     return () => {
+      clearTimeout(timer);
       if (html5QrCodeRef.current && runningRef.current) {
-        html5QrCodeRef.current.stop().then(() => {
-          html5QrCodeRef.current.clear();
-        });
-        runningRef.current = false;
+        html5QrCodeRef.current
+          .stop()
+          .then(() => {
+            html5QrCodeRef.current.clear();
+            runningRef.current = false;
+            initializingRef.current = false;
+          })
+          .catch((err) => {
+            console.error("Error stopping scanner:", err);
+            runningRef.current = false;
+            initializingRef.current = false;
+          });
       }
     };
   }, [onScan]);
@@ -70,10 +108,30 @@ export default function QRScanner({ onScan }) {
 
   return (
     <div>
+      {error && (
+        <div style={{ 
+          padding: "12px", 
+          marginBottom: "16px", 
+          backgroundColor: "#fee", 
+          border: "1px solid #fcc",
+          borderRadius: "4px",
+          color: "#c00"
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+      
+      <div style={{ marginBottom: "8px", color: "#666", fontSize: "14px" }}>
+        Status: {cameraStatus}
+      </div>
+      
       <div
         id="qr-reader-region"
         ref={scannerRef}
-        style={{ width: 300, height: 300 }}
+        style={{ 
+          width: "100%", 
+          maxWidth: 400
+        }}
       />
       <div style={{ marginTop: 16 }}>
         <label style={{ fontWeight: 600 }}>
