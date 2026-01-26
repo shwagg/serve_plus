@@ -10,12 +10,23 @@ export default function CurrentEventMonitoring() {
   const [mission, setMission] = useState(null);
   const [volunteers, setVolunteers] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [allMissions, setAllMissions] = useState([]);
+  const [taskParticipants, setTaskParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchEventData = async () => {
       try {
         setLoading(true);
+
+        // fetch missions for completion statistics
+        const missionsRef = collection(db, "Missions");
+        const missionsSnap = await getDocs(missionsRef);
+        const missionsData = missionsSnap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setAllMissions(missionsData);
 
         // Fetch mission data
         const missionRef = doc(db, "Missions", eventId);
@@ -46,6 +57,28 @@ export default function CurrentEventMonitoring() {
             ...doc.data(),
           }));
           setTasks(tasksData);
+
+          // Fetch all participants from all tasks
+          const allParticipants = [];
+          for (const task of tasksData) {
+            const participantsRef = collection(
+              db,
+              "Missions",
+              eventId,
+              "task",
+              task.id,
+              "participants"
+            );
+            const participantsSnap = await getDocs(participantsRef);
+            participantsSnap.docs.forEach((doc) => {
+              allParticipants.push({
+                id: doc.id,
+                taskId: task.id,
+                ...doc.data(),
+              });
+            });
+          }
+          setTaskParticipants(allParticipants);
         }
       } catch (error) {
         console.error("Error fetching event data:", error);
@@ -65,6 +98,14 @@ export default function CurrentEventMonitoring() {
     return <div className="error">Event not found</div>;
   }
 
+  // calculate completion stats
+  const activeMissions = allMissions.filter(
+    (m) => m.status === "published"
+  ).length;
+  const completedMissions = allMissions.filter(
+    (m) => m.status === "completed"
+  ).length;
+
   // Calculate metrics
   const volunteersRegistered = volunteers.length;
   const studentsPresent = volunteers.filter(
@@ -77,9 +118,14 @@ export default function CurrentEventMonitoring() {
       : 0;
 
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((t) => t.status === "completed").length;
+  const totalTaskParticipants = taskParticipants.length;
+  const completedTaskParticipants = taskParticipants.filter(
+    (p) => p.status === "completed"
+  ).length;
   const taskCompletionRate =
-    totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(0) : 0;
+    totalTaskParticipants > 0
+      ? ((completedTaskParticipants / totalTaskParticipants) * 100).toFixed(0)
+      : 0;
 
   const isHappeningToday = () => {
     const today = new Date();
@@ -107,7 +153,7 @@ export default function CurrentEventMonitoring() {
           <h1 className="cem-title">Current Event Monitoring</h1>
         </div>
         <div className="cem-header-right">
-          <span className="cem-stats">Active: (wala pa) | Complete: (wala pa)</span>
+          <span className="cem-stats">Active: {activeMissions} | Complete: {completedMissions}</span>
           {isHappeningToday() && (
             <span className="cem-badge happening">Happening Today</span>
           )}
@@ -247,12 +293,6 @@ export default function CurrentEventMonitoring() {
           <div className="cem-actions">
             <button className="cem-btn-action">
               Review Submitted Activity Files
-            </button>
-            <button className="cem-btn-action">
-               Generate Final Service Report (PDF)
-            </button>
-            <button className="cem-btn-action">
-              Partner Communication History
             </button>
           </div>
         </div>
