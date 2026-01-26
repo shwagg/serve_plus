@@ -1,13 +1,54 @@
 import React, { useContext, useEffect, useState } from "react";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm }) {
-  const presetSkills = ["React", "Firebase", "UI/UX", "Design", "Coding", "Music", "Python", "JavaScript", "Leadership", "Communication"];
+  const softSkills = [
+    "Teamwork", "Communication", "Problem Solving", "Leadership", "Time Management", 
+    "Adaptability", "Conflict Resolution", "Empathy", "Critical Thinking", "Responsibility"
+  ];
+  const technicalSkills = [
+    "Data Analysis", "Coding/Programming", "Web Design", "Social Media Management", 
+    "Digital Literacy", "Spreadsheet Skills", "Presentation Software", "Video Editing", 
+    "IT Troubleshooting", "Database Management"
+  ];
+  const specializedSkills = [
+    "Project Planning", "Grant Writing", "Event Coordination", "Research Methods", 
+    "Survey Design", "Workshop Facilitation", "Community Assessment", "Policy Analysis", 
+    "Report Writing", "Monitoring & Evaluation"
+  ];
   const presetInterests = ["Design", "Coding", "Music", "Art", "Sports", "Reading", "Travel", "Gaming", "Science", "Technology"];
   const [avatar, setAvatar] = useState(profile.avatar || "");
   const [name, setName] = useState(profile.name || "");
   const [email, setEmail] = useState(profile.email || "");
+  const [username, setUsername] = useState(profile.username || "");
   const [skills, setSkills] = useState(profile.skills || []);
   const [interests, setInterests] = useState(profile.interests || []);
+
+  // Reset state when modal opens or profile changes
+  useEffect(() => {
+    if (open) {
+      setAvatar(profile.avatar || "");
+      setName(profile.name || "");
+      setEmail(profile.email || "");
+      setUsername(profile.username || "");
+      setSkills(profile.skills || []);
+      setInterests(profile.interests || []);
+    }
+  }, [open, profile]);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image size should be less than 5MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatar(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   if (!open) return null;
   return (
@@ -16,8 +57,23 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
         <h2 className="profile-modal-title">Edit Profile</h2>
         <div className="profile-modal-fields">
           <div className="profile-modal-avatar-box">
-            <img src={avatar} alt="avatar" className="profile-modal-avatar" />
-            <input type="text" value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="Profile Picture URL" className="profile-modal-input" />
+            <div className="profile-modal-avatar-wrapper">
+              <img src={avatar} alt="avatar" className="profile-modal-avatar" />
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: 'none' }}
+                id="avatar-upload"
+              />
+              <label htmlFor="avatar-upload" className="profile-modal-upload-btn">
+                📷 Change Picture
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className="profile-modal-label">Username</label><br />
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="profile-modal-input" placeholder="Choose a username" />
           </div>
           <div>
             <label className="profile-modal-label">Name</label><br />
@@ -29,17 +85,50 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
           </div>
           <div>
             <label className="profile-modal-label">Skills</label><br />
-            <div className="profile-modal-badge-list">
-              {presetSkills.map(skill => (
-                <button
-                  key={skill}
-                  type="button"
-                  onClick={() => setSkills(skills.includes(skill) ? skills.filter(s => s !== skill) : [...skills, skill])}
-                  className={`profile-modal-badge-btn${skills.includes(skill) ? ' selected' : ''}`}
-                >
-                  {skill}
-                </button>
-              ))}
+            <div className="profile-modal-skill-section">
+              <div className="profile-modal-skill-section-title">Soft Skills</div>
+              <div className="profile-modal-badge-list">
+                {softSkills.map(skill => (
+                  <button
+                    key={skill}
+                    type="button"
+                    onClick={() => setSkills(skills.includes(skill) ? skills.filter(s => s !== skill) : [...skills, skill])}
+                    className={`profile-modal-badge-btn${skills.includes(skill) ? ' selected' : ''}`}
+                  >
+                    {skill}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="profile-modal-skill-section">
+              <div className="profile-modal-skill-section-title">Technical Skills</div>
+              <div className="profile-modal-badge-list">
+                {technicalSkills.map(skill => (
+                  <button
+                    key={skill}
+                    type="button"
+                    onClick={() => setSkills(skills.includes(skill) ? skills.filter(s => s !== skill) : [...skills, skill])}
+                    className={`profile-modal-badge-btn${skills.includes(skill) ? ' selected' : ''}`}
+                  >
+                    {skill}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="profile-modal-skill-section">
+              <div className="profile-modal-skill-section-title">Specialized Skills</div>
+              <div className="profile-modal-badge-list">
+                {specializedSkills.map(skill => (
+                  <button
+                    key={skill}
+                    type="button"
+                    onClick={() => setSkills(skills.includes(skill) ? skills.filter(s => s !== skill) : [...skills, skill])}
+                    className={`profile-modal-badge-btn${skills.includes(skill) ? ' selected' : ''}`}
+                  >
+                    {skill}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div>
@@ -60,7 +149,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
-          <button onClick={() => onConfirm({ avatar, name, email, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
+          <button onClick={() => onConfirm({ avatar, name, email, username, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
@@ -78,7 +167,7 @@ const mockProfile = {
   avatar: "https://ui-avatars.com/api/?name=Jane+Doe&background=30bdb7&color=fff&size=120",
   level: 1,
   levelProgress: 0,
-  skills: ["React", "Firebase", "UI/UX"],
+  skills: ["Communication", "Project Planning", "Web Design"],
   interests: ["Design", "Coding", "Music"],
   achievements: ["Welcome!"],
   eventHistory: [

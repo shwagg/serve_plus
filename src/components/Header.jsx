@@ -58,6 +58,8 @@ export default function Header() {
   const [userRole, setUserRole] = useState(null);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [userUsername, setUserUsername] = useState('');
+  const [userAvatar, setUserAvatar] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [showProposalForm, setShowProposalForm] = useState(false);
@@ -74,6 +76,8 @@ export default function Header() {
             const userData = userDoc.data();
             setUserRole(userData.role);
             setUserName(userData.name || user.displayName || 'User');
+            setUserUsername(userData.username || '');
+            setUserAvatar(userData.avatar || '');
           }
           setUserEmail(user.email || '');
         } catch (error) {
@@ -142,13 +146,13 @@ export default function Header() {
   const renderMenu = () => {
     switch (userRole) {
       case 'student':
-        return <StudentMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
+        return <StudentMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
       case 'faculty':
-        return <FacultyMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
+        return <FacultyMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
       case 'admin':
-        return <AdminMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
+        return <AdminMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
       case 'partner':
-        return <PartnerMenu userName={userName} userEmail={userEmail} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
+        return <PartnerMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
       default:
         return null;
     }

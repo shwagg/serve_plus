@@ -4,7 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import React, { useState, useEffect, useRef } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import Header from "../../components/Header";
 import GlobalAnnouncements from "../../components/GlobalAnnouncements";
 import "../../styles/student.css";
@@ -28,10 +28,12 @@ const StudentHome = () => {
   const button3Ref = React.useRef(null);
 
   // Dynamic placeholders
-  const [level, setLevel] = useState(5);
-  const [currentPoints, setCurrentPoints] = useState(350);
-  const [nextLevelPoints, setNextLevelPoints] = useState(500);
-  const [studentName, setStudentName] = useState("Joshua");
+  const [level, setLevel] = useState(1);
+  const [currentPoints, setCurrentPoints] = useState(0);
+  const [nextLevelPoints, setNextLevelPoints] = useState(100);
+  const [studentName, setStudentName] = useState("");
+  const [studentUsername, setStudentUsername] = useState("");
+  const [studentAvatar, setStudentAvatar] = useState("");
   const [studentRank, setStudentRank] = useState(8);
   const currentUserRef = useRef(null);
   const leaderboardListRef = useRef(null);
@@ -56,13 +58,36 @@ const StudentHome = () => {
 
   useEffect(() => {
     // use firebase auth state
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
         setShowLogoutPopup(false);
         const resolvedName = user.displayName || user.email || "Student";
         setStudentName(resolvedName);
         setMenuProfileName(resolvedName);
+        
+        // Fetch user profile data from Firestore
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            console.log("Fetched user data:", userData); // Debug log
+            setStudentUsername(userData.username || "");
+            setStudentAvatar(userData.avatar || "");
+            setStudentName(userData.name || resolvedName);
+            if (userData.level !== undefined) setLevel(userData.level);
+            if (userData.levelProgress !== undefined) {
+              // levelProgress is a percentage (0-100)
+              const progress = userData.levelProgress;
+              setCurrentPoints(progress);
+              setNextLevelPoints(100);
+            }
+          } else {
+            console.log("No user document found in Firestore");
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
       } else {
         setShowLogoutPopup(true);
       }
@@ -203,11 +228,11 @@ const StudentHome = () => {
         <section className="player-strip">
           <div className="player-strip-inner">
             <div className="player-level">
-              <span className="level-label">Level 1</span>
+              <span className="level-label">Level {level}</span>
               <div className="level-bar">
-                <div className="level-bar-fill" style={{ width: '50%' }}></div>
+                <div className="level-bar-fill" style={{ width: `${currentPoints}%` }}></div>
               </div>
-              <span className="level-points">50/ 100 pts</span>
+              <span className="level-points">{currentPoints}%</span>
             </div>
 
             <div className="player-missions">
@@ -216,9 +241,14 @@ const StudentHome = () => {
             </div>
 
             <div className="player-profile">
-              <img src={podium2} alt="Profile"
-                className="player-avatar" />
-              <span className="player-greeting">Hi, Aly!</span>
+              {studentAvatar ? (
+                <img src={studentAvatar} alt="Profile" className="player-avatar" />
+              ) : (
+                <img src={podium2} alt="Profile" className="player-avatar" />
+              )}
+              <span className="player-greeting">
+                Hi, {studentUsername || (currentUser?.email ? currentUser.email.split('@')[0] : studentName)}!
+              </span>
             </div>
           </div>
         </section>

@@ -5,7 +5,7 @@ import createIcon from '../../assets/menuassets/Create.svg';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
-export default function StudentMenu({ userName, userEmail, onLogout, onClose, onCreateProposal }) {
+export default function StudentMenu({ userName, userEmail, userUsername, userAvatar, onLogout, onClose, onCreateProposal }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
     navigate(path);
@@ -17,12 +17,21 @@ export default function StudentMenu({ userName, userEmail, onLogout, onClose, on
     onCreateProposal();
   };
 
+  // Use username if available, otherwise fall back to email prefix
+  const displayUsername = userUsername || (userEmail ? userEmail.split('@')[0] : 'User');
+  // Get first letter for avatar fallback
+  const avatarLetter = displayUsername.charAt(0).toUpperCase();
+
   return (
     <div className="menu-dropdown">
       <button className="menu-header-btn" onClick={() => handleMenuClick('/profile')}>
-        <div className="user-avatar">{userName.charAt(0).toUpperCase()}</div>
+        {userAvatar ? (
+          <img src={userAvatar} alt="avatar" className="user-avatar-img" />
+        ) : (
+          <div className="user-avatar">{avatarLetter}</div>
+        )}
         <div className="user-info">
-          <p className="user-name">{userName}</p>
+          <p className="user-name">{displayUsername}</p>
           <p className="user-email">{userEmail}</p>
         </div>
       </button>
