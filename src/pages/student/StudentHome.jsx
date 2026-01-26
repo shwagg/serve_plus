@@ -361,25 +361,51 @@ const StudentHome = () => {
       {/* TOGGLE BUTTON */}
       <button
         className="global-feed-toggle"
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-label="Toggle Community Updates"
+        onClick={() => setOpen(!open)}
+        style={{
+          position: 'fixed',
+          top: 90,
+          right: 20,
+          background: '#30bdb7',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          padding: '10px 16px',
+          cursor: 'pointer',
+          fontWeight: 600,
+          fontSize: 14,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          zIndex: 1000
+        }}
       >
-        📰
+        📢 Update
         <span className="global-feed-badge">1</span>
       </button>
 
       {/* SLIDE-IN PANEL */}
-      <aside className={`global-feed ${open ? "open" : ""}`}>
-        <div className="global-feed-header">
-          <h3 className="global-feed-title">Community Updates</h3>
-          <p className="global-feed-subtitle">Whats happening this week</p>
-        </div>
-        {/* Use GlobalAnnouncements component for feed */}
-        <div className="global-feed-list">
-          <GlobalAnnouncements />
-        </div>
-      </aside>
+      {open && (
+        <aside className="global-feed open"
+          style={{
+            position: 'fixed',
+            top: 80,
+            right: 0,
+            height: 'calc(100vh - 80px)',
+            width: 380,
+            background: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderLeft: '2px solid #30bdb7',
+            zIndex: 999,
+            transition: 'transform 0.3s'
+          }}>
+          <div className="global-feed-header">
+            <h3 className="global-feed-title">Community Updates</h3>
+            <p className="global-feed-subtitle">Whats happening this week</p>
+          </div>
+          <div className="global-feed-list">
+            <GlobalAnnouncements />
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

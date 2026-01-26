@@ -10,6 +10,7 @@ import {
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
+import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { db } from "../../../firebaseConfig";
 
@@ -18,6 +19,7 @@ export default function EventActivity() {
   const navigate = useNavigate();
   const auth = getAuth();
   
+  const [open, setOpen] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrStatus, setQRStatus] = useState("");
   
@@ -1236,6 +1238,55 @@ export default function EventActivity() {
             {qrStatus && <div className={`qr-status ${qrStatus === "Attendance recorded!" ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>}
           </div>
         </div>
+      )}
+      
+      {/* Global Announcements Toggle Button */}
+      <button
+        className="global-feed-toggle"
+        onClick={() => setOpen(!open)}
+        style={{
+          position: 'fixed',
+          top: 90,
+          right: 20,
+          background: '#30bdb7',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          padding: '10px 16px',
+          cursor: 'pointer',
+          fontWeight: 600,
+          fontSize: 14,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          zIndex: 1000
+        }}
+      >
+        📢 Update
+        <span className="global-feed-badge">1</span>
+      </button>
+
+      {/* SLIDE-IN PANEL */}
+      {open && (
+        <aside className="global-feed open"
+          style={{
+            position: 'fixed',
+            top: 80,
+            right: 0,
+            height: 'calc(100vh - 80px)',
+            width: 380,
+            background: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderLeft: '2px solid #30bdb7',
+            zIndex: 999,
+            transition: 'transform 0.3s'
+          }}>
+          <div className="global-feed-header">
+            <h3 className="global-feed-title">Community Updates</h3>
+            <p className="global-feed-subtitle">Whats happening this week</p>
+          </div>
+          <div className="global-feed-list">
+            <GlobalAnnouncements />
+          </div>
+        </aside>
       )}
     </div>
   );

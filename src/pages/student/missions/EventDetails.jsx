@@ -93,20 +93,43 @@ export default function EventDetails() {
           </button>
         </div>
       </div>
-      {/* Community Updates Toggle Button and Slide-in Panel (like StudentHome) */}
+      {/* Community Updates Toggle Button and Slide-in Panel */}
       <button
         className="global-feed-toggle"
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-label="Toggle Community Updates"
-        style={{ position: 'fixed', top: 120, right: 24, zIndex: 999 }}
+        onClick={() => setOpen(!open)}
+        style={{
+          position: 'fixed',
+          top: 90,
+          right: 20,
+          background: '#30bdb7',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          padding: '10px 16px',
+          cursor: 'pointer',
+          fontWeight: 600,
+          fontSize: 14,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          zIndex: 1000
+        }}
       >
-        📰
+        📢 Update
         <span className="global-feed-badge">1</span>
       </button>
       {open && (
         <aside className="global-feed open"
-          style={{ position: 'fixed', top: 80, right: 0, height: 'calc(100vh - 80px)', width: 380, background: '#fff', boxShadow: '0 2px 8px #0001', borderLeft: '2px solid #30bdb7', zIndex: 999, transition: 'transform 0.3s' }}>
+          style={{
+            position: 'fixed',
+            top: 80,
+            right: 0,
+            height: 'calc(100vh - 80px)',
+            width: 380,
+            background: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderLeft: '2px solid #30bdb7',
+            zIndex: 999,
+            transition: 'transform 0.3s'
+          }}>
           <div className="global-feed-header">
             <h3 className="global-feed-title">Community Updates</h3>
             <p className="global-feed-subtitle">Whats happening this week</p>
