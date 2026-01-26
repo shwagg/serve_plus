@@ -16,12 +16,31 @@ export default function ProjectDetails() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [attendees, setAttendees] = useState([]);
+  const [allVolunteers, setAllVolunteers] = useState([]);
   const [taskCount, setTaskCount] = useState(0);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
+  const [showAttendanceReport, setShowAttendanceReport] = useState(false);
+  const [qrTimestamp, setQrTimestamp] = useState(Date.now());
+
+  // Function to regenerate QR and update Firestore
+  const handleRegenerateQR = async () => {
+    const newTimestamp = Date.now();
+    try {
+      const ref = doc(db, "Missions", projectId);
+      await updateDoc(ref, {
+        validQRTimestamp: newTimestamp,
+        updatedAt: serverTimestamp()
+      });
+      setQrTimestamp(newTimestamp);
+    } catch (error) {
+      console.error("Error updating QR timestamp:", error);
+      alert("Failed to regenerate QR code");
+    }
+  };
 
   // Fetch attendees from Firestore subcollection
   useEffect(() => {
@@ -30,6 +49,16 @@ export default function ProjectDetails() {
       try {
         const volunteerRef = collection(db, "Missions", projectId, "volunteer");
         const snap = await getDocs(volunteerRef);
+        
+        // All volunteers with their status
+        const allVols = snap.docs.map(doc => ({
+          name: doc.data().name || doc.data().email || "Unknown",
+          status: doc.data().attendanceStatus || "pending",
+          email: doc.data().email || ""
+        }));
+        setAllVolunteers(allVols);
+        
+        // Only present attendees for quick view
         setAttendees(
           snap.docs
             .filter(doc => doc.data().attendanceStatus === "present")
@@ -37,6 +66,7 @@ export default function ProjectDetails() {
         );
       } catch (err) {
         setAttendees([]);
+        setAllVolunteers([]);
       }
     };
     fetchAttendees();
@@ -119,11 +149,35 @@ export default function ProjectDetails() {
 
   useEffect(() => {
     if (projectId && showQR) {
-      QRCode.toDataURL(JSON.stringify({ eventId: projectId }), (err, url) => {
+      // Initialize validQRTimestamp in Firestore if it doesn't exist
+      const initializeQRTimestamp = async () => {
+        try {
+          const ref = doc(db, "Missions", projectId);
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            const data = snap.data();
+            if (!data.validQRTimestamp) {
+              // First time showing QR, set the initial timestamp
+              await updateDoc(ref, {
+                validQRTimestamp: qrTimestamp,
+                updatedAt: serverTimestamp()
+              });
+            } else {
+              // Use the existing valid timestamp
+              setQrTimestamp(data.validQRTimestamp);
+            }
+          }
+        } catch (error) {
+          console.error("Error initializing QR timestamp:", error);
+        }
+      };
+      initializeQRTimestamp();
+      
+      QRCode.toDataURL(JSON.stringify({ eventId: projectId, timestamp: qrTimestamp }), (err, url) => {
         if (!err) setQrUrl(url);
       });
     }
-  }, [projectId, showQR]);
+  }, [projectId, showQR, qrTimestamp]);
 
   const setStatus = async (nextStatus) => {
     setSaving(true);
@@ -317,24 +371,196 @@ export default function ProjectDetails() {
       </div>
 
       {showQR && qrUrl && (
-        <div style={{ marginTop: 24, display: 'flex', alignItems: 'flex-start', gap: 32 }}>
-          <div>
-            <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} style={{ display: 'block' }} />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-              Scan this code to mark attendance for this event.
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} style={{ display: 'block' }} />
+              <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
+                Scan this code to mark attendance for this event.
+              </div>
             </div>
+            <button
+              style={{
+                background: '#6c757d',
+                color: '#fff',
+                padding: '8px',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: 24,
+                width: 40,
+                height: 40,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onClick={handleRegenerateQR}
+              type="button"
+              title="Regenerate QR Code"
+            >
+              🔄
+            </button>
           </div>
-          <div style={{ minWidth: 180 }}>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: '#111' }}>Attendees</div>
-            {attendees.length === 0 ? (
-              <div style={{ color: '#888', fontSize: 13 }}>No scans yet.</div>
+          <button
+            style={{
+              marginTop: 16,
+              background: '#30bdb7',
+              color: '#fff',
+              padding: '10px 20px',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14
+            }}
+            onClick={() => setShowAttendanceReport(true)}
+            type="button"
+          >
+            Attendance Report
+          </button>
+        </div>
+      )}
+
+      {/* Attendance Report Modal */}
+      {showAttendanceReport && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }} onClick={() => setShowAttendanceReport(false)}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 32,
+            maxWidth: 600,
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative'
+          }} onClick={(e) => e.stopPropagation()}>
+            <button
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                background: '#f3f4f6',
+                border: 'none',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                cursor: 'pointer',
+                fontSize: 18,
+                fontWeight: 600,
+                color: '#555'
+              }}
+              onClick={() => setShowAttendanceReport(false)}
+            >
+              ×
+            </button>
+            
+            <h2 style={{ margin: '0 0 8px 0', color: '#234e7b', fontSize: 24 }}>Attendance Report</h2>
+            <p style={{ margin: '0 0 24px 0', color: '#666', fontSize: 14 }}>
+              {project.title || project.alt || 'Untitled Event'}
+            </p>
+            
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#234e7b', marginBottom: 8 }}>
+                Total Registered: {allVolunteers.length}
+              </div>
+              <div style={{ fontWeight: 600, color: '#30bdb7', marginBottom: 8 }}>
+                Present: {allVolunteers.filter(v => v.status === 'present').length}
+              </div>
+              <div style={{ fontSize: 14, color: '#666', marginBottom: 16 }}>
+                Date: {project.date || '—'}
+              </div>
+            </div>
+
+            {allVolunteers.length === 0 ? (
+              <div style={{
+                padding: 40,
+                textAlign: 'center',
+                color: '#888',
+                background: '#f9fafb',
+                borderRadius: 8
+              }}>
+                No students have joined this event yet.
+              </div>
             ) : (
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 15, color: '#111' }}>
-                {attendees.map((name, idx) => (
-                  <li key={idx} style={{ marginBottom: 4 }}>{name}</li>
-                ))}
-              </ul>
+              <div>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: 14
+                }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', color: '#234e7b', fontWeight: 600 }}>#</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', color: '#234e7b', fontWeight: 600 }}>Name</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', color: '#234e7b', fontWeight: 600 }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allVolunteers.map((volunteer, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '12px 8px', color: '#555' }}>{idx + 1}</td>
+                        <td style={{ padding: '12px 8px', color: '#111' }}>{volunteer.name}</td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <span style={{
+                            background: volunteer.status === 'present' ? '#d4edda' : '#fff3cd',
+                            color: volunteer.status === 'present' ? '#155724' : '#856404',
+                            padding: '4px 12px',
+                            borderRadius: 12,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            textTransform: 'capitalize'
+                          }}>
+                            {volunteer.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
+
+            <div style={{ marginTop: 24 }}>
+              <button
+                style={{
+                  width: '100%',
+                  background: '#30bdb7',
+                  color: '#fff',
+                  padding: '12px 24px',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+                onClick={() => {
+                  // Export as CSV
+                  const csvContent = "data:text/csv;charset=utf-8," 
+                    + "No,Name,Email,Status\n"
+                    + allVolunteers.map((v, idx) => `${idx + 1},${v.name},${v.email},${v.status}`).join("\n");
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", `attendance_${projectId}.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+              >
+                Export as CSV
+              </button>
+            </div>
           </div>
         </div>
       )}

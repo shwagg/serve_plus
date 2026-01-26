@@ -46,6 +46,17 @@ export default function EventActivity() {
         setQRStatus("This QR code is not valid for this event.");
         return;
       }
+      
+      // Validate QR timestamp against stored valid timestamp
+      const missionDoc = await getDoc(doc(db, "Missions", projectId));
+      if (missionDoc.exists()) {
+        const validTimestamp = missionDoc.data()?.validQRTimestamp;
+        if (validTimestamp && parsed.timestamp !== validTimestamp) {
+          setQRStatus("This QR code has been invalidated. Please use the current code.");
+          return;
+        }
+      }
+      
       // Fetch user info from users collection
       const userDoc = await getDoc(doc(db, "users", user.uid));
       let name = "";
