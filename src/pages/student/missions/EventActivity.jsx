@@ -191,6 +191,7 @@ export default function EventActivity() {
 
       await updateDoc(participantRef, {
         reflection: journalReflections[activityIdx],
+        status: "completed",
         lastUpdated: new Date().toISOString(),
       });
 
@@ -325,6 +326,7 @@ export default function EventActivity() {
       );
       await updateDoc(participantRef, {
         reflection: "",
+        status: "todo",
         lastUpdated: new Date().toISOString(),
       });
       setUserJournals(userJournals.filter((j) => j.taskId !== taskId));
