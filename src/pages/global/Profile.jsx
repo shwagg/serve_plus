@@ -42,9 +42,48 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
         alert("Image size should be less than 5MB");
         return;
       }
+      
+      // Compress image before uploading
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result);
+      reader.onload = (event) => {
+        img.src = event.target.result;
+        img.onload = () => {
+          // Resize to max 400x400 while maintaining aspect ratio
+          const maxSize = 400;
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > height) {
+            if (width > maxSize) {
+              height *= maxSize / width;
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width *= maxSize / height;
+              height = maxSize;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to base64 with compression (0.7 quality)
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          
+          // Check if still too large (Firestore limit ~1MB)
+          if (compressedDataUrl.length > 1000000) {
+            alert("Image is still too large after compression. Please choose a smaller image.");
+            return;
+          }
+          
+          setAvatar(compressedDataUrl);
+        };
       };
       reader.readAsDataURL(file);
     }

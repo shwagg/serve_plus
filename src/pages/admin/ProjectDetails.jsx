@@ -314,29 +314,30 @@ export default function ProjectDetails() {
         >
           {showQR ? "Hide QR Code" : "Show Attendance QR Code"}
         </button>
-        {showQR && qrUrl && (
-          <div style={{ marginTop: 24, display: 'flex', alignItems: 'flex-start', gap: 32 }}>
-            <div>
-              <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} style={{ display: 'block' }} />
-              <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-                Scan this code to mark attendance for this event.
-              </div>
-            </div>
-            <div style={{ minWidth: 180 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8, color: '#111' }}>Attendees</div>
-              {attendees.length === 0 ? (
-                <div style={{ color: '#888', fontSize: 13 }}>No scans yet.</div>
-              ) : (
-                <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 15, color: '#111' }}>
-                  {attendees.map((name, idx) => (
-                    <li key={idx} style={{ marginBottom: 4 }}>{name}</li>
-                  ))}
-                </ul>
-              )}
+      </div>
+
+      {showQR && qrUrl && (
+        <div style={{ marginTop: 24, display: 'flex', alignItems: 'flex-start', gap: 32 }}>
+          <div>
+            <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} style={{ display: 'block' }} />
+            <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
+              Scan this code to mark attendance for this event.
             </div>
           </div>
-        )}
-      </div>
+          <div style={{ minWidth: 180 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, color: '#111' }}>Attendees</div>
+            {attendees.length === 0 ? (
+              <div style={{ color: '#888', fontSize: 13 }}>No scans yet.</div>
+            ) : (
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 15, color: '#111' }}>
+                {attendees.map((name, idx) => (
+                  <li key={idx} style={{ marginBottom: 4 }}>{name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       <hr />
 
