@@ -332,7 +332,8 @@
 }
 
 .btn-cancel,
-.btn-submit {
+.btn-submit,
+.btn-next {
   padding: 0.9rem 2.5rem;
   border-radius: 8px;
   border: none;
@@ -375,6 +376,32 @@
   transform: none !important;
 }
 
+.btn-next {
+  background: #fff;
+  color: #222;
+  border: 1.5px solid #bdbdbd;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 1rem;
+  padding: 0.5rem 1.5rem;
+  margin-right: 0.5rem;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+  cursor: pointer;
+  box-shadow: none;
+  outline: none;
+}
+
+.btn-next:hover:not(:disabled) {
+  background: #f5f5f5;
+  color: #1976d2;
+  border-color: #1976d2;
+}
+
+.btn-next:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .project-proposal-container {
     padding: 1rem;
@@ -413,7 +440,8 @@
   }
 
   .btn-cancel,
-  .btn-submit {
+  .btn-submit,
+  .btn-next {
     width: 100%;
   }
 }

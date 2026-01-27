@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import '../../../styles/ProjectProposal.css';
+import SummaryPanel from '../SummaryPanel';
 
 function ProjectProposal({ projectType, onClose }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     sdg: [],
@@ -22,6 +24,7 @@ function ProjectProposal({ projectType, onClose }) {
     budget: '',
     faculty: '', // Faculty in Charge/Proponent
     college: '', // College/Program/Department/Student Org
+    studentOutcomes: '',
   });
   // Get user info and update formData.faculty on mount or when user changes
   useEffect(() => {
@@ -202,385 +205,441 @@ function ProjectProposal({ projectType, onClose }) {
     }
   };
 
+  // PDF preview url state (assume this is set somewhere in your logic)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
+
+  useEffect(() => {
+    const generatePdfPreview = async () => {
+      if (!showSummary) return;
+      // Load the template PDF from public/assets
+      const templateUrl = projectType === 'service-learning'
+        ? '/assets/SL-Proposal-Form-32.pdf'
+        : '/assets/CE-Proposal-Form-33.pdf';
+      const existingPdfBytes = await fetch(templateUrl).then(res => res.arrayBuffer());
+      const pdfDoc = await PDFDocument.load(existingPdfBytes);
+      const form = pdfDoc.getForm();
+      // Try to fill fields by name (update these names to match your PDF form fields)
+      try {
+        form.getTextField('ProjectTitle').setText(formData.title || '');
+        form.getTextField('Faculty').setText(formData.faculty || '');
+        form.getTextField('TargetDate').setText(formData.targetDate || '');
+        form.getTextField('SDG').setText((formData.sdg || []).join(', '));
+        form.getTextField('VolunteerHours').setText(formData.volunteerHours || '');
+        form.getTextField('Location').setText(formData.location || '');
+        form.getTextField('Stakeholders').setText(formData.stakeholders || '');
+        form.getTextField('Course').setText(slFields.course || '');
+        form.getTextField('CourseCode').setText(slFields.courseCode || '');
+        form.getTextField('Section').setText(slFields.section || '');
+        form.getTextField('Description').setText(formData.description || '');
+        form.getTextField('Objectives').setText(formData.objectives || '');
+        form.getTextField('SpecificActivities').setText(formData.specificActivities || '');
+        form.getTextField('SuccessIndicators').setText(formData.successIndicators || '');
+        form.getTextField('Budget').setText(formData.budget || '');
+      } catch (e) {
+        // If field names do not match, nothing will be filled
+        // You may need to inspect your PDF to get the correct field names
+      }
+      form.flatten();
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setPdfPreviewUrl(url);
+    };
+    generatePdfPreview();
+    return () => {
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+    };
+  }, [showSummary, formData, slFields]);
+
   return (
-    <div className="project-proposal-container" onClick={onClose}>
-      <div className="proposal-content-wrapper" onClick={(e) => e.stopPropagation()}>
-        <div className="proposal-header">
-          <h1>{getProjectTypeTitle()}</h1>
-          <span className="project-type-badge">{projectType}</span>
-        </div>
-
-        <form className="proposal-form" onSubmit={handleSubmit}>
-        {/* Basic Information */}
-        <div className="form-section">
-          <h2>Basic Information</h2>
-          
-          <div className="form-group">
-            <label htmlFor="title">Project Title *</label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="faculty">
-              {projectType === 'service-learning'
-                ? 'Faculty-in-Charge / Proponent(s) *'
-                : 'Name of Proponent(s) and College / Program / Department / Student Organization *'}
-            </label>
-            <input
-              type="text"
-              id="faculty"
-              name="faculty"
-              value={formData.faculty}
-              readOnly
-              required
-              placeholder={projectType === 'service-learning'
-                ? 'e.g., Dr. Juan Dela Cruz'
-                : 'e.g., Juan Dela Cruz, College of Science'}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="targetDate">Target Date *</label>
-            <input
-              type="date"
-              id="targetDate"
-              name="targetDate"
-              value={formData.targetDate}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-
-          <div className="form-row">
+    <div className="project-proposal-container">
+      <div className="proposal-content-wrapper">
+        {!showSummary ? (
+          <form className="proposal-form" onSubmit={handleSubmit}>
+          {/* Basic Information */}
+          <div className="form-section">
+            <h2>Basic Information</h2>
+            
             <div className="form-group">
-              <label htmlFor="sdg">Sustainable Development Goal (SDG)</label>
-              <div className="sdg-selector">
-                {/* Selected SDGs Display */}
-                {formData.sdg && formData.sdg.length > 0 && (
-                  <div className="sdg-selected-tags">
-                    {formData.sdg.map(sdgNum => (
-                      <span key={sdgNum} className="sdg-tag">
-                        {sdgNum}
-                        <button
-                          type="button"
-                          className="sdg-tag-remove"
-                          onClick={() => handleRemoveSdg(sdgNum)}
-                          aria-label={`Remove SDG ${sdgNum}`}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Dropdown */}
-                <div className="sdg-dropdown-wrapper">
-                  <button
-                    type="button"
-                    className="sdg-dropdown-toggle"
-                    onClick={() => setShowSdgDropdown(!showSdgDropdown)}
-                  >
-                    {formData.sdg.length === 0 
-                      ? 'Select SDG(s)' 
-                      : `${formData.sdg.length} SDG${formData.sdg.length > 1 ? 's' : ''} selected`}
-                    <span className="dropdown-arrow">{showSdgDropdown ? '▲' : '▼'}</span>
-                  </button>
-                  
-                  {showSdgDropdown && (
-                    <div className="sdg-dropdown-menu">
-                      {sdgOptions.map(sdg => (
-                        <label key={sdg.number} className="sdg-option">
-                          <input
-                            type="checkbox"
-                            checked={formData.sdg.includes(sdg.number)}
-                            onChange={() => handleSdgToggle(sdg.number)}
-                          />
-                          <span className="sdg-option-text">
-                            <strong>SDG {sdg.number}:</strong> {sdg.name}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="volunteerHours">Volunteer Hours *</label>
+              <label htmlFor="title">Project Title *</label>
               <input
-                type="number"
-                id="volunteerHours"
-                name="volunteerHours"
-                value={formData.volunteerHours}
+                type="text"
+                id="title"
+                name="title"
+                value={formData.title}
                 onChange={handleInputChange}
                 required
-                min="0"
               />
             </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="location">Location *</label>
-            <input
-              type="text"
-              id="location"
-              name="location"
-              value={formData.location}
-              onChange={handleInputChange}
-              required
-              placeholder="Venue or community where project will take place"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="stakeholders">Stakeholders *</label>
-            <textarea
-              id="stakeholders"
-              name="stakeholders"
-              value={formData.stakeholders}
-              onChange={handleInputChange}
-              required
-              rows="3"
-              placeholder="List all stakeholders involved in the project"
-            />
-          </div>
-        </div>
-
-        {/* Type-specific fields */}
-        {/* --- Service Learning (SL) Specific Fields --- */}
-        {projectType === 'service-learning' && (
-          <div className="form-section">
-            <h2>Academic Information</h2>
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="course">Course *</label>
-                <input
-                  type="text"
-                  id="course"
-                  name="course"
-                  value={slFields.course}
-                  onChange={handleSlFieldChange}
-                  required
-                  placeholder="e.g., Introduction to Community Development"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="courseCode">Course Code *</label>
-                <input
-                  type="text"
-                  id="courseCode"
-                  name="courseCode"
-                  value={slFields.courseCode}
-                  onChange={handleSlFieldChange}
-                  required
-                  placeholder="e.g., CD 101"
-                />
-              </div>
-            </div>
             <div className="form-group">
-              <label htmlFor="faculty">Faculty in Charge *</label>
+              <label htmlFor="faculty">
+                {projectType === 'service-learning'
+                  ? 'Faculty-in-Charge / Proponent(s) *'
+                  : 'Name of Proponent(s) and College / Program / Department / Student Organization *'}
+              </label>
               <input
                 type="text"
                 id="faculty"
                 name="faculty"
                 value={formData.faculty}
+                readOnly
+                required
+                placeholder={projectType === 'service-learning'
+                  ? 'e.g., Dr. Juan Dela Cruz'
+                  : 'e.g., Juan Dela Cruz, College of Science'}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="targetDate">Target Date *</label>
+              <input
+                type="date"
+                id="targetDate"
+                name="targetDate"
+                value={formData.targetDate}
                 onChange={handleInputChange}
                 required
-                placeholder="e.g., Dr. Juan Dela Cruz"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="section">Section *</label>
-              <input
-                type="text"
-                id="section"
-                name="section"
-                value={slFields.section}
-                onChange={handleSlFieldChange}
-                required
-                placeholder="e.g., Section A"
-              />
-            </div>
-          </div>
-        )}
-        {/* --- End of Service Learning (SL) Specific Fields --- */}
-
-
-
-
-        {/* --- Community Engagement (CE) Specific Fields --- */}
-        {projectType === 'community-engagement' && (
-          <div className="form-section">
-            <h2>Engagement Details</h2>
-            
-            <div className="form-group">
-              <label htmlFor="nature">Nature of Engagement *</label>
-              <select
-                id="nature"
-                name="nature"
-                value={ceFields.nature}
-                onChange={handleCeFieldChange}
-                required
-              >
-                <option value="">Select nature of engagement</option>
-                <option value="program">Program</option>
-                <option value="project/advocacy">Project/Advocacy</option>
-                <option value="consultation/extension">Consultation/Extension</option>
-              </select>
-            </div>
-
-            {/* Student Outcomes Field */}
-            <div className="form-group">
-              <label htmlFor="studentOutcomes">Student Outcomes</label>
-              <input
-                type="text"
-                id="studentOutcomes"
-                name="studentOutcomes"
-                value={formData.studentOutcomes || ''}
-                onChange={handleInputChange}
-                placeholder="Describe expected student outcomes"
               />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="learningOutcomes">Learning Outcomes Level *</label>
-              <select
-                id="learningOutcomes"
-                name="learningOutcomes"
-                value={ceFields.learningOutcomes}
-                onChange={handleCeFieldChange}
-                required
-              >
-                <option value="">Select learning outcomes level</option>
-                <option value="0">Intellectual Development</option>
-                <option value="1">Collaboration</option>
-                <option value="2">Appreciation of Culture and Diversity</option>
-                <option value="3">Career Exploration</option>
-                <option value="4">Socio-Civic Responsibility</option>
-                <option value="5">Others, pls. Specify</option>
-              </select>
-            </div>
-
-            {ceFields.learningOutcomes === '5' && (
+            <div className="form-row">
               <div className="form-group">
-                <label htmlFor="customLearningOutcome">Specify Learning Outcome *</label>
+                <label htmlFor="sdg">Sustainable Development Goal (SDG)</label>
+                <div className="sdg-selector">
+                  {/* Selected SDGs Display */}
+                  {formData.sdg && formData.sdg.length > 0 && (
+                    <div className="sdg-selected-tags">
+                      {formData.sdg.map(sdgNum => (
+                        <span key={sdgNum} className="sdg-tag">
+                          {sdgNum}
+                          <button
+                            type="button"
+                            className="sdg-tag-remove"
+                            onClick={() => handleRemoveSdg(sdgNum)}
+                            aria-label={`Remove SDG ${sdgNum}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Dropdown */}
+                  <div className="sdg-dropdown-wrapper">
+                    <button
+                      type="button"
+                      className="sdg-dropdown-toggle"
+                      onClick={() => setShowSdgDropdown(!showSdgDropdown)}
+                    >
+                      {formData.sdg.length === 0 
+                        ? 'Select SDG(s)' 
+                        : `${formData.sdg.length} SDG${formData.sdg.length > 1 ? 's' : ''} selected`}
+                      <span className="dropdown-arrow">{showSdgDropdown ? '▲' : '▼'}</span>
+                    </button>
+                    
+                    {showSdgDropdown && (
+                      <div className="sdg-dropdown-menu">
+                        {sdgOptions.map(sdg => (
+                          <label key={sdg.number} className="sdg-option">
+                            <input
+                              type="checkbox"
+                              checked={formData.sdg.includes(sdg.number)}
+                              onChange={() => handleSdgToggle(sdg.number)}
+                            />
+                            <span className="sdg-option-text">
+                              <strong>SDG {sdg.number}:</strong> {sdg.name}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="volunteerHours">Volunteer Hours *</label>
                 <input
-                  type="text"
-                  id="customLearningOutcome"
-                  name="customLearningOutcome"
-                  value={ceFields.customLearningOutcome}
-                  onChange={handleCeFieldChange}
+                  type="number"
+                  id="volunteerHours"
+                  name="volunteerHours"
+                  value={formData.volunteerHours}
+                  onChange={handleInputChange}
                   required
-                  placeholder="Please specify the learning outcome"
+                  min="0"
                 />
               </div>
-            )}
-          </div>
-        )}
-        {/* --- End of Community Engagement (CE) Specific Fields --- */}
+            </div>
 
+            <div className="form-group">
+              <label htmlFor="location">Location *</label>
+              <input
+                type="text"
+                id="location"
+                name="location"
+                value={formData.location}
+                onChange={handleInputChange}
+                required
+                placeholder="Venue or community where project will take place"
+              />
+            </div>
 
-
-
-
-        {/* Project Details */}
-        <div className="form-section">
-          <h2>Project Details</h2>
-          
-          <div className="form-group">
-            <label htmlFor="description">Project Description *</label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              required
-              rows="5"
-              placeholder="Provide a detailed description of the project"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="objectives">Objectives *</label>
-            <textarea
-              id="objectives"
-              name="objectives"
-              value={formData.objectives}
-              onChange={handleInputChange}
-              required
-              rows="4"
-              placeholder="List the main objectives of the project"
-            />
+            <div className="form-group">
+              <label htmlFor="stakeholders">Stakeholders *</label>
+              <textarea
+                id="stakeholders"
+                name="stakeholders"
+                value={formData.stakeholders}
+                onChange={handleInputChange}
+                required
+                rows="3"
+                placeholder="List all stakeholders involved in the project"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="specificActivities">Specific Activities *</label>
-            <textarea
-              id="specificActivities"
-              name="specificActivities"
-              value={formData.specificActivities}
-              onChange={handleInputChange}
-              required
-              rows="5"
-              placeholder="Describe the specific activities planned for this project"
-            />
+          {/* Type-specific fields */}
+          {/* --- Service Learning (SL) Specific Fields --- */}
+          {projectType === 'service-learning' && (
+            <div className="form-section">
+              <h2>Academic Information</h2>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="course">Course *</label>
+                  <input
+                    type="text"
+                    id="course"
+                    name="course"
+                    value={slFields.course}
+                    onChange={handleSlFieldChange}
+                    required
+                    placeholder="e.g., Introduction to Community Development"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="courseCode">Course Code *</label>
+                  <input
+                    type="text"
+                    id="courseCode"
+                    name="courseCode"
+                    value={slFields.courseCode}
+                    onChange={handleSlFieldChange}
+                    required
+                    placeholder="e.g., CD 101"
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label htmlFor="faculty">Faculty in Charge *</label>
+                <input
+                  type="text"
+                  id="faculty"
+                  name="faculty"
+                  value={formData.faculty}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="e.g., Dr. Juan Dela Cruz"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="section">Section *</label>
+                <input
+                  type="text"
+                  id="section"
+                  name="section"
+                  value={slFields.section}
+                  onChange={handleSlFieldChange}
+                  required
+                  placeholder="e.g., Section A"
+                />
+              </div>
+            </div>
+          )}
+          {/* --- End of Service Learning (SL) Specific Fields --- */}
+
+
+
+
+          {/* --- Community Engagement (CE) Specific Fields --- */}
+          {projectType === 'community-engagement' && (
+            <div className="form-section">
+              <h2>Engagement Details</h2>
+              
+              <div className="form-group">
+                <label htmlFor="nature">Nature of Engagement *</label>
+                <select
+                  id="nature"
+                  name="nature"
+                  value={ceFields.nature}
+                  onChange={handleCeFieldChange}
+                  required
+                >
+                  <option value="">Select nature of engagement</option>
+                  <option value="program">Program</option>
+                  <option value="project/advocacy">Project/Advocacy</option>
+                  <option value="consultation/extension">Consultation/Extension</option>
+                </select>
+              </div>
+
+              {/* Student Outcomes Field */}
+              <div className="form-group">
+                <label htmlFor="studentOutcomes">Student Outcomes</label>
+                <input
+                  type="text"
+                  id="studentOutcomes"
+                  name="studentOutcomes"
+                  value={formData.studentOutcomes || ''}
+                  onChange={handleInputChange}
+                  placeholder="Describe expected student outcomes"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="learningOutcomes">Learning Outcomes Level *</label>
+                <select
+                  id="learningOutcomes"
+                  name="learningOutcomes"
+                  value={ceFields.learningOutcomes}
+                  onChange={handleCeFieldChange}
+                  required
+                >
+                  <option value="">Select learning outcomes level</option>
+                  <option value="0">Intellectual Development</option>
+                  <option value="1">Collaboration</option>
+                  <option value="2">Appreciation of Culture and Diversity</option>
+                  <option value="3">Career Exploration</option>
+                  <option value="4">Socio-Civic Responsibility</option>
+                  <option value="5">Others, pls. Specify</option>
+                </select>
+              </div>
+
+              {ceFields.learningOutcomes === '5' && (
+                <div className="form-group">
+                  <label htmlFor="customLearningOutcome">Specify Learning Outcome *</label>
+                  <input
+                    type="text"
+                    id="customLearningOutcome"
+                    name="customLearningOutcome"
+                    value={ceFields.customLearningOutcome}
+                    onChange={handleCeFieldChange}
+                    required
+                    placeholder="Please specify the learning outcome"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          {/* --- End of Community Engagement (CE) Specific Fields --- */}
+
+
+
+
+
+          {/* Project Details */}
+          <div className="form-section">
+            <h2>Project Details</h2>
+            
+            <div className="form-group">
+              <label htmlFor="description">Project Description *</label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                required
+                rows="5"
+                placeholder="Provide a detailed description of the project"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="objectives">Objectives *</label>
+              <textarea
+                id="objectives"
+                name="objectives"
+                value={formData.objectives}
+                onChange={handleInputChange}
+                required
+                rows="4"
+                placeholder="List the main objectives of the project"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="specificActivities">Specific Activities *</label>
+              <textarea
+                id="specificActivities"
+                name="specificActivities"
+                value={formData.specificActivities}
+                onChange={handleInputChange}
+                required
+                rows="5"
+                placeholder="Describe the specific activities planned for this project"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="successIndicators">Success Indicators *</label>
+              <textarea
+                id="successIndicators"
+                name="successIndicators"
+                value={formData.successIndicators}
+                onChange={handleInputChange}
+                required
+                rows="4"
+                placeholder="How will you measure the success of this project?"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="budget">Budget *</label>
+              <textarea
+                id="budget"
+                name="budget"
+                value={formData.budget}
+                onChange={handleInputChange}
+                required
+                rows="4"
+                placeholder="Provide a detailed budget breakdown"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="successIndicators">Success Indicators *</label>
-            <textarea
-              id="successIndicators"
-              name="successIndicators"
-              value={formData.successIndicators}
-              onChange={handleInputChange}
-              required
-              rows="4"
-              placeholder="How will you measure the success of this project?"
-            />
+          <div className="form-actions">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="btn-cancel"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-next"
+              disabled={loading}
+              onClick={() => setShowSummary(true)}
+            >
+              Next
+            </button>
           </div>
-
-          <div className="form-group">
-            <label htmlFor="budget">Budget *</label>
-            <textarea
-              id="budget"
-              name="budget"
-              value={formData.budget}
-              onChange={handleInputChange}
-              required
-              rows="4"
-              placeholder="Provide a detailed budget breakdown"
-            />
-          </div>
-        </div>
-
-        <div className="form-actions">
-          <button 
-            type="button" 
-            onClick={onClose} 
-            className="btn-cancel"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-submit"
-            disabled={loading}
-            onClick={async () => {
+        </form>
+        ) : (
+          <SummaryPanel
+            formData={formData}
+            slFields={slFields}
+            ceFields={ceFields}
+            projectType={projectType}
+            pdfPreviewUrl={pdfPreviewUrl}
+            loading={loading}
+            onBack={() => setShowSummary(false)}
+            onExport={async () => {
               try {
                 setLoading(true);
                 // Map formData to SL export keys if projectType is service-learning
                 let exportFormData = formData;
                 if (projectType === 'service-learning') {
-                  // Map SDG numbers to SDG labels for X placement
                   const sdgNumberToLabel = {
                     1: 'No Poverty',
                     2: 'Zero Hunger',
@@ -619,78 +678,72 @@ function ProjectProposal({ projectType, onClose }) {
                     volunteerHours: formData.volunteerHours
                   };
                 }
-                // Map formData to CE export keys if projectType is community-engagement
                 if (projectType === 'community-engagement') {
-                // Validation: Prevent export if not selected
-                if (!ceFields.learningOutcomes || ceFields.learningOutcomes === '') {
-                  alert('Please select a Learning Outcomes Level before exporting.');
-                  setLoading(false);
-                  return;
-                }
-                const ceSdgNumberToLabel = {
-                  1: 'No Poverty',
-                  2: 'Zero Hunger',
-                  3: 'Good Health and Well-Being',
-                  4: 'Quality Education',
-                  5: 'Gender Equality',
-                  6: 'Clean Water and Sanitation',
-                  7: 'Affordable and Clean Energy',
-                  8: 'Decent Work and Economic Growth',
-                  9: 'Industry Innovation and Infrastructure',
-                  10: 'Reduced Inequalities',
-                  11: 'Sustainable Cities and Communities',
-                  12: 'Responsible Consumption and Production',
-                  13: 'Climate Action',
-                  14: 'Life Below Water',
-                  15: 'Life on Land',
-                  16: 'Peace, Justice and Strong Institutions',
-                  17: 'Partnership for the Goals'
-                };
-                // Normalize and filter only valid selections
-                const normalize = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
-                const validNatures = ['program', 'project/advocacy', 'consultation/extension'];
-                // Map select values to labels for Learning Outcomes
-                const ceLOKeyMap = {
-                  '0': 'intellectual development',
-                  '1': 'collaboration',
-                  '2': 'appreciation of culture and diversity',
-                  '3': 'career exploration',
-                  '4': 'socio-civic responsibility',
-                  '5': 'others'
-                };
-                let natureArr = ceFields.nature;
-                if (!Array.isArray(natureArr)) natureArr = natureArr ? [natureArr] : [];
-                natureArr = natureArr.map(normalize).filter(n => validNatures.includes(n));
-                let loArr = [];
-                if (ceFields.learningOutcomes) {
-                  if (Array.isArray(ceFields.learningOutcomes)) {
-                    loArr = ceFields.learningOutcomes.map(lo => ceLOKeyMap[lo] || normalize(lo));
-                  } else if (typeof ceFields.learningOutcomes === 'string' || typeof ceFields.learningOutcomes === 'number') {
-                    loArr = [ceLOKeyMap[ceFields.learningOutcomes] || normalize(ceFields.learningOutcomes)];
+                  if (!ceFields.learningOutcomes || ceFields.learningOutcomes === '') {
+                    alert('Please select a Learning Outcomes Level before exporting.');
+                    setLoading(false);
+                    return;
                   }
+                  const ceSdgNumberToLabel = {
+                    1: 'No Poverty',
+                    2: 'Zero Hunger',
+                    3: 'Good Health and Well-Being',
+                    4: 'Quality Education',
+                    5: 'Gender Equality',
+                    6: 'Clean Water and Sanitation',
+                    7: 'Affordable and Clean Energy',
+                    8: 'Decent Work and Economic Growth',
+                    9: 'Industry Innovation and Infrastructure',
+                    10: 'Reduced Inequalities',
+                    11: 'Sustainable Cities and Communities',
+                    12: 'Responsible Consumption and Production',
+                    13: 'Climate Action',
+                    14: 'Life Below Water',
+                    15: 'Life on Land',
+                    16: 'Peace, Justice and Strong Institutions',
+                    17: 'Partnership for the Goals'
+                  };
+                  const normalize = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
+                  const validNatures = ['program', 'project/advocacy', 'consultation/extension'];
+                  const ceLOKeyMap = {
+                    '0': 'intellectual development',
+                    '1': 'collaboration',
+                    '2': 'appreciation of culture and diversity',
+                    '3': 'career exploration',
+                    '4': 'socio-civic responsibility',
+                    '5': 'others'
+                  };
+                  let natureArr = ceFields.nature;
+                  if (!Array.isArray(natureArr)) natureArr = natureArr ? [natureArr] : [];
+                  natureArr = natureArr.map(normalize).filter(n => validNatures.includes(n));
+                  let loArr = [];
+                  if (ceFields.learningOutcomes) {
+                    if (Array.isArray(ceFields.learningOutcomes)) {
+                      loArr = ceFields.learningOutcomes.map(lo => ceLOKeyMap[lo] || normalize(lo));
+                    } else if (typeof ceFields.learningOutcomes === 'string' || typeof ceFields.learningOutcomes === 'number') {
+                      loArr = [ceLOKeyMap[ceFields.learningOutcomes] || normalize(ceFields.learningOutcomes)];
+                    }
+                  }
+                  exportFormData = {
+                    communityEngagementTitle: formData.title,
+                    dateProposed: new Date().toLocaleString(),
+                    proponent: formData.faculty,
+                    studentOutcomes: formData.studentOutcomes || '',
+                    sdgs: (formData.sdg || []).map(num => ceSdgNumberToLabel[num] || num),
+                    natureOfEngagement: natureArr,
+                    learningOutcomes: loArr,
+                    targetDate: formData.targetDate,
+                    location: formData.location,
+                    stakeholders: formData.stakeholders,
+                    numberOfVolunteerHours: formData.volunteerHours,
+                    ceDescription: formData.description,
+                    ceObjectives: formData.objectives,
+                    specificActivities: formData.specificActivities,
+                    successIndicators: formData.successIndicators,
+                    budget: formData.budget,
+                    preparedBy: formData.faculty
+                  };
                 }
-                // Always set learningOutcomes in exportFormData
-                exportFormData = {
-                  communityEngagementTitle: formData.title,
-                  dateProposed: new Date().toLocaleString(),
-                  proponent: formData.faculty,
-                  studentOutcomes: formData.studentOutcomes || '', // Will be mapped to text_4uee in export
-                  sdgs: (formData.sdg || []).map(num => ceSdgNumberToLabel[num] || num),
-                  natureOfEngagement: natureArr,
-                  learningOutcomes: loArr,
-                  targetDate: formData.targetDate,
-                  location: formData.location,
-                  stakeholders: formData.stakeholders,
-                  numberOfVolunteerHours: formData.volunteerHours,
-                  ceDescription: formData.description,
-                  ceObjectives: formData.objectives,
-                  specificActivities: formData.specificActivities,
-                  successIndicators: formData.successIndicators,
-                  budget: formData.budget,
-                  preparedBy: formData.faculty
-                };
-                console.log('DEBUG: Full exportFormData for CE', exportFormData);
-              }
                 await exportProposalPDF({
                   projectType,
                   formData: exportFormData,
@@ -705,20 +758,11 @@ function ProjectProposal({ projectType, onClose }) {
                 setLoading(false);
               }
             }}
-          >
-            {loading ? 'Exporting...' : 'Export'}
-          </button>
-          <button 
-            type="submit" 
-            className="btn-submit"
-            disabled={loading}
-          >
-            {loading ? 'Submitting...' : 'Submit Proposal'}
-          </button>
-        </div>
-      </form>
-        </div>
+            onSubmit={handleSubmit}
+          />
+        )}
       </div>
+    </div>
   );
 }
 
