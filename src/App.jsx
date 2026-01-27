@@ -15,8 +15,8 @@ import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ProjectDetails from "./pages/admin/ProjectDetails";
 import ProjectTasks from "./pages/admin/ProjectTasks";
 import AuditLogs from "./pages/admin/AuditLogs";
+import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import StudentHome from "./pages/student/StudentHome";
-//import ProposeProject from "./pages/global/ProposeProject";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
 import EventDetails from "./pages/student/missions/EventDetails";
@@ -47,16 +47,10 @@ function App() {
             <Route path="projects/new" element={<CreateProject />} />
             <Route path="projects/:projectId" element={<ProjectDetails />} />
             <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
+            <Route path="roster" element={<RosterAccountManagement />} />
+            <Route path="audit-logs" element={<AuditLogs />} />
           </Route>
 
-          <Route
-            path="/admin/audit-logs"
-            element={
-              <ProtectedRoute>
-                <AuditLogs />
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="/student/home"
             element={

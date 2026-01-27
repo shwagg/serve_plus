@@ -23,6 +23,9 @@ export default function AdminLayout() {
                             Project Proposal
                         </NavLink>
                         <p className="sidebar-item">Current Event Monitoring</p>
+                        <NavLink to="/admin/roster" className="sidebar-item-link">
+                            Roster Account Management
+                        </NavLink>
                         <NavLink to="/admin/audit-logs" className="sidebar-item-link">
                             Audit Logs
                         </NavLink>

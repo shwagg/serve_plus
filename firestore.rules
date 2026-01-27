@@ -2,10 +2,13 @@ rules_version='2'
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User profiles - users can read their own profile
+    // User profiles - users can read their own profile, admins can manage all users
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && 
+        (request.auth.uid == userId || 
+         request.auth.token.role == "admin" ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
     }
 
     // Allow open read access for development

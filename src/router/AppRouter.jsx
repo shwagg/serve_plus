@@ -4,6 +4,7 @@ import AdminLayout from "../pages/admin/AdminLayout";
 import AuditLogs from "../pages/admin/AuditLogs";
 import ProjectDetails from "../pages/admin/ProjectDetails";
 import ProjectTasks from "../pages/admin/ProjectTasks";
+import RosterAccountManagement from "../pages/admin/RosterAccountManagement";
 import CreateProject from "../pages/global/CreateProject";
 import ProjectList from "../pages/global/ProjectList";
 import ProjectProposal from "../pages/global/proposal/ProjectProposal";
@@ -34,6 +35,7 @@ export default function AppRouter() {
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
           <Route path="audit-logs" element={<AuditLogs />} />
+          <Route path="roster" element={<RosterAccountManagement />} />
         </Route>
       </Routes>
     </Router>
