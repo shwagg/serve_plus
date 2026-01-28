@@ -24,8 +24,23 @@ const StudentHome = () => {
   const [chatOverlayOpen, setChatOverlayOpen] = useState(false);
   const [notificationOverlayOpen, setNotificationOverlayOpen] = useState(false);
   const [open, setOpen] = useState(false); // Global feed panel state
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const button2Ref = React.useRef(null);
   const button3Ref = React.useRef(null);
+
+  // Update unread count from GlobalAnnouncements
+  useEffect(() => {
+    // Check immediately
+    const checkCount = () => {
+      if (window.announcementActions?.getUnreadCount) {
+        setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
+      }
+    };
+    
+    checkCount();
+    const interval = setInterval(checkCount, 500);
+    return () => clearInterval(interval);
+  }, []);
 
   // Dynamic placeholders
   const [level, setLevel] = useState(1);
@@ -379,7 +394,9 @@ const StudentHome = () => {
         }}
       >
         📢 Update
-        <span className="global-feed-badge">1</span>
+        {announcementUnreadCount > 0 && (
+          <span className="global-feed-badge">{announcementUnreadCount}</span>
+        )}
       </button>
 
       {/* SLIDE-IN PANEL */}
@@ -397,13 +414,7 @@ const StudentHome = () => {
             zIndex: 999,
             transition: 'transform 0.3s'
           }}>
-          <div className="global-feed-header">
-            <h3 className="global-feed-title">Community Updates</h3>
-            <p className="global-feed-subtitle">Whats happening this week</p>
-          </div>
-          <div className="global-feed-list">
             <GlobalAnnouncements />
-          </div>
         </aside>
       )}
     </div>

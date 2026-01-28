@@ -1,14 +1,87 @@
 import React, { useEffect, useState } from "react";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import "../styles/GlobalAnnouncements.css";
 
 const GlobalAnnouncements = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [announcementCount, setAnnouncementCount] = useState(0); // total announcements
-  const [unreadAnnouncementIds, setUnreadAnnouncementIds] = useState([]); // ids of unread announcements
+  const [unreadCount, setUnreadCount] = useState(0); // count of unseen announcements
   const [lastAnnouncementTimestamp, setLastAnnouncementTimestamp] = useState(null); // last announcement time
 
   const [milestones, setMilestones] = useState([]); // [{eventId, title, count}]
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [modalType, setModalType] = useState('event'); // 'event', 'closing', or 'milestone'
+
+  // Load seen announcements from localStorage
+  const getSeenAnnouncements = () => {
+    try {
+      const seen = localStorage.getItem('seenAnnouncements');
+      return seen ? JSON.parse(seen) : { events: [], milestones: [], closingSoon: [] };
+    } catch {
+      return { events: [], milestones: [], closingSoon: [] };
+    }
+  };
+
+  // Mark announcement as seen
+  const markAsSeen = (id, type = 'event') => {
+    const seen = getSeenAnnouncements();
+    if (type === 'milestone' && !seen.milestones.includes(id)) {
+      seen.milestones.push(id);
+    } else if (type === 'closing' && !seen.closingSoon.includes(id)) {
+      seen.closingSoon.push(id);
+    } else if (type === 'event' && !seen.events.includes(id)) {
+      seen.events.push(id);
+    }
+    localStorage.setItem('seenAnnouncements', JSON.stringify(seen));
+    calculateUnreadCount();
+  };
+
+  const markAllAsRead = () => {
+    const allEventIds = announcements.map(a => a.id);
+    const allMilestoneIds = milestones.map(m => m.eventId + '-milestone');
+    const allClosingIds = announcements.filter(a => isClosingSoon(a.date)).map(a => a.id);
+    
+    const seen = {
+      events: allEventIds,
+      milestones: allMilestoneIds,
+      closingSoon: allClosingIds
+    };
+    localStorage.setItem('seenAnnouncements', JSON.stringify(seen));
+    calculateUnreadCount();
+  };
+
+  const markAllAsUnread = () => {
+    localStorage.setItem('seenAnnouncements', JSON.stringify({ events: [], milestones: [], closingSoon: [] }));
+    calculateUnreadCount();
+  };
+
+  const calculateUnreadCount = () => {
+    const seen = getSeenAnnouncements();
+    let count = 0;
+
+    // Count unseen event announcements
+    announcements.forEach(event => {
+      if (!seen.events.includes(event.id)) {
+        count++;
+      }
+      // Count unseen closing soon announcements
+      if (isClosingSoon(event.date) && !seen.closingSoon.includes(event.id)) {
+        count++;
+      }
+    });
+
+    // Count unseen milestones
+    milestones.forEach(milestone => {
+      const milestoneId = milestone.eventId + '-milestone';
+      if (!seen.milestones.includes(milestoneId)) {
+        count++;
+      }
+    });
+
+    setUnreadCount(count);
+  };
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
@@ -23,7 +96,6 @@ const GlobalAnnouncements = () => {
         if (events.length > 0) {
           setLastAnnouncementTimestamp(events[0].createdAt?.toDate ? events[0].createdAt.toDate() : null);
         }
-        setUnreadAnnouncementIds([]);
 
         // For each event, check volunteer count in subcollection 'volunteer'
         const milestoneArr = [];
@@ -59,161 +131,361 @@ const GlobalAnnouncements = () => {
     fetchAnnouncements();
   }, []);
 
+  // Recalculate unread count when announcements or milestones change
+  useEffect(() => {
+    calculateUnreadCount();
+  }, [announcements, milestones]);
 
-  // Helper: is event closing soon (within 4 days before the event, but not after)
+
+  // Helper: get registration closing date (2 days before event)
+  const getClosingDate = (eventDate) => {
+    if (!eventDate) return null;
+    const eventTime = eventDate?.toDate ? eventDate.toDate() : new Date(eventDate);
+    const closingTime = new Date(eventTime);
+    closingTime.setDate(closingTime.getDate() - 2);
+    return closingTime;
+  };
+
+  // Helper: is event closing soon (within 2 days before the event, but not after)
   const isClosingSoon = (dateAt) => {
     if (!dateAt) return false;
+    const closingDate = getClosingDate(dateAt);
+    if (!closingDate) return false;
     const now = new Date();
-    const eventTime = dateAt?.toDate ? dateAt.toDate() : new Date(dateAt);
-    const diffDays = (eventTime - now) / (1000 * 60 * 60 * 24);
-    return diffDays > 0 && diffDays <= 4;
+    const diffDays = (closingDate - now) / (1000 * 60 * 60 * 24);
+    // Show closing soon if we're within 2 days of the closing date and haven't passed it
+    return diffDays > 0 && diffDays <= 2;
   };
 
   const getIconAndClass = (event) => {
     return { icon: '🆕', className: 'new' };
   };
 
+  const openModal = (event, type = 'event') => {
+    setSelectedEvent(event);
+    setModalType(type);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedEvent(null);
+  };
+
+  const seen = getSeenAnnouncements();
+
+  // Combine all announcements and sort by timestamp
+  const getAllAnnouncements = () => {
+    const allItems = [];
+
+    // Add milestones
+    milestones.forEach(milestone => {
+      allItems.push({
+        type: 'milestone',
+        id: milestone.eventId + '-milestone',
+        timestamp: milestone.milestoneTime || new Date(0),
+        data: milestone
+      });
+    });
+
+    // Add regular announcements and closing soon
+    announcements.forEach(event => {
+      const eventTimestamp = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : new Date(0));
+      
+      // Add regular event announcement
+      allItems.push({
+        type: 'event',
+        id: event.id,
+        timestamp: eventTimestamp,
+        data: event
+      });
+
+      // Add closing soon if applicable
+      if (isClosingSoon(event.date)) {
+        allItems.push({
+          type: 'closing',
+          id: event.id + '-closing',
+          timestamp: eventTimestamp, // Use same timestamp as event
+          data: event
+        });
+      }
+    });
+
+    // Sort by timestamp, newest first
+    return allItems.sort((a, b) => b.timestamp - a.timestamp);
+  };
+
+  const sortedAnnouncements = getAllAnnouncements();
+
+  // Expose functions and unreadCount to parent component
+  React.useEffect(() => {
+    if (window) {
+      window.announcementActions = {
+        markAllAsRead,
+        markAllAsUnread,
+        getUnreadCount: () => unreadCount
+      };
+    }
+  }, [announcements, milestones, unreadCount]);
+
   return (
-    <div style={{ height: '110%', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', paddingRight: 8 }}>
-      {/* Milestone announcements for events*/}
-      {milestones.map(milestone => (
-        <div
-          key={milestone.eventId + '-milestone'}
-          className="global-feed-item milestone"
-          style={{
-            marginBottom: 16,
-            borderRadius: 10,
-            padding: 12,
-            background: '#e6ffe6',
-            border: '1px solid #b2e6b2',
-            boxShadow: '0 1px 4px #0001',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 12,
-          }}
-        >
-          <span className="feed-icon" style={{ fontSize: 28, marginTop: 2 }}>🏆</span>
-          <div className="feed-content" style={{ flex: 1 }}>
-            <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0 }}>Milestone Reached!</p>
-            <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>3+ volunteers have joined <b>{milestone.title}</b>!</p>
-            <span className="feed-time" style={{ fontSize: 12, color: '#999' }}>
-              {milestone.milestoneTime ? milestone.milestoneTime.toLocaleString() : ''}
-            </span>
-          </div>
+    <div className="global-announcements-container">
+      {/* Header with title and buttons */}
+      <div className="global-feed-header">
+        <h3 className="global-feed-title">Community Updates</h3>
+        <p className="global-feed-subtitle">Whats happening this week</p>
+        <div className="mark-all-buttons">
+          <button className="mark-all-btn" onClick={markAllAsRead}>
+            ✓ Read
+          </button>
+          <button className="mark-all-btn" onClick={markAllAsUnread}>
+            ↻ Unread
+          </button>
         </div>
-      ))}
-      {/* Existing announcements */}
-      {announcements.length === 0 ? (
-        <div style={{ color: '#888', padding: 16 }}>No new announcements.</div>
+      </div>
+      
+      {/* Display unread count badge if there are unseen announcements */}
+      {unreadCount > 0 && (
+        <div className="unread-badge">
+          {unreadCount} unread announcement{unreadCount !== 1 ? 's' : ''}
+        </div>
+      )}
+      
+      {/* All announcements sorted by timestamp */}
+      {sortedAnnouncements.length === 0 ? (
+        <div className="no-announcements">No new announcements.</div>
       ) : (
-        announcements.flatMap((event, idx) => {
-          console.log('Announcement:', event.title, 'targetDates:', event.targetDates);
-          const { icon, className } = getIconAndClass(event);
-          const closingSoon = isClosingSoon(event.date);
-          const announcementsToShow = [];
-          // Default announcement
-          announcementsToShow.push(
-            <div
-              key={event.id + '-default'}
-              className={`global-feed-item ${className}`}
-              style={{
-                marginBottom: 30,
-                cursor: 'pointer',
-                borderRadius: 10,
-                padding: 12,
-                transition: 'background 0.2s',
-                background: '#f8f8f8',
-                boxShadow: '0 1px 4px #0001',
-                border: '1px solid #e0e0e0',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 12,
-              }}
-              onClick={() => window.location.href = `/event/${event.id}`}
-              onMouseOver={e => e.currentTarget.style.background = '#e6f7ff'}
-              onMouseOut={e => e.currentTarget.style.background = '#f8f8f8'}
-            >
-              <span className="feed-icon" style={{ fontSize: 28, marginTop: 2 }}>{icon}</span>
-              <div className="feed-content" style={{ flex: 1 }}>
-                <div style={{ maxWidth: '200px', overflow: 'hidden' }}>
-                  <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', display: 'block' }}>{event.title || 'New Event Proposal'}</p>
-                </div>
-                <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>A new event has been proposed.</p>
-                <span className="feed-time" style={{ fontSize: 12, color: '#999' }}>{
-                  (() => {
-                    let created = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : null);
-                    if (!created) return '';
-                    const now = new Date();
-                    const diffMs = now - created;
-                    const diffSec = Math.floor(diffMs / 1000);
-                    const diffMin = Math.floor(diffSec / 60);
-                    const diffHour = Math.floor(diffMin / 60);
-                    const diffDay = Math.floor(diffHour / 24);
-                    if (diffDay > 0) return diffDay === 1 ? '1 day ago' : `${diffDay} days ago`;
-                    if (diffHour > 0) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
-                    if (diffMin > 0) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
-                    return 'just now';
-                  })()
-                }</span>
-              </div>
-            </div>
-          );
-          // Closing soon announcement
-          if (closingSoon) {
-            announcementsToShow.push(
+        sortedAnnouncements.map(item => {
+          if (item.type === 'milestone') {
+            const milestone = item.data;
+            const isUnseen = !seen.milestones.includes(item.id);
+            return (
               <div
-                key={event.id + '-closing'}
-                className="global-feed-item closing-soon"
-                style={{
-                  marginBottom: 16,
-                  cursor: 'pointer',
-                  borderRadius: 10,
-                  padding: 12,
-                  transition: 'background 0.2s',
-                   background: '#e6f3ff',
-                  boxShadow: '0 1px 4px #0001',
-                  border: '1px solid #e0e0e0',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 12,
+                key={item.id}
+                className={`global-feed-item milestone ${isUnseen ? 'unseen' : 'seen'}`}
+                onClick={() => {
+                  markAsSeen(item.id, 'milestone');
+                  openModal({ ...milestone, id: milestone.eventId }, 'milestone');
                 }}
-                onClick={() => window.location.href = `/event/${event.id}`}
-                onMouseOver={e => e.currentTarget.style.background = '#e6f7ff'}
-                onMouseOut={e => e.currentTarget.style.background = '#f8f8f8'}
               >
-                <span className="feed-icon" style={{ fontSize: 28, marginTop: 2 }}>⌛</span>
-                <div className="feed-content" style={{ flex: 1 }}>
-                  <p className="feed-title" style={{ fontWeight: 700, color: '#234e7b', margin: 0 }}>Mission Closing Soon</p>
-                  <p className="feed-desc" style={{ color: '#555', margin: '2px 0 0 0' }}>
+                <span className="feed-icon">🏆</span>
+                <div className="feed-content">
+                  {isUnseen && <span className="unread-dot"></span>}
+                  <p className="feed-title">Milestone Reached!</p>
+                  <p className="feed-desc">3+ volunteers have joined <b>{milestone.title}</b>!</p>
+                  <span className="feed-time">
+                    {milestone.milestoneTime ? milestone.milestoneTime.toLocaleString() : ''}
+                  </span>
+                </div>
+              </div>
+            );
+          } else if (item.type === 'closing') {
+            const event = item.data;
+            const isClosingUnseen = !seen.closingSoon.includes(event.id);
+            return (
+              <div
+                key={item.id}
+                className={`global-feed-item closing-soon ${isClosingUnseen ? 'unseen' : 'seen'}`}
+                onClick={() => {
+                  markAsSeen(event.id, 'closing');
+                  openModal(event, 'closing');
+                }}
+              >
+                <span className="feed-icon">⌛</span>
+                <div className="feed-content">
+                  {isClosingUnseen && <span className="unread-dot"></span>}
+                  <p className="feed-title">Mission Closing Soon</p>
+                  <p className="feed-desc">
                     {(() => {
-                      let eventDate = event.date ? new Date(event.date) : null;
-                      if (!eventDate || isNaN(eventDate.getTime())) return '';
+                      const closingDate = getClosingDate(event.date);
+                      if (!closingDate || isNaN(closingDate.getTime())) return '';
                       const now = new Date();
-                      const diffMs = eventDate - now;
+                      const diffMs = closingDate - now;
                       const diffSec = Math.floor(diffMs / 1000);
                       const diffMin = Math.floor(diffSec / 60);
                       const diffHour = Math.floor(diffMin / 60);
                       const diffDay = Math.floor(diffHour / 24);
-                      if (diffDay > 0) return `Only ${diffDay === 1 ? '1 more day' : diffDay + ' more days to join this event!'}`;
-                      if (diffHour > 0) return `Only ${diffHour === 1 ? '1 more hour' : diffHour + ' more hours to join this event!'}`;
-                      if (diffMin > 0) return `Only ${diffMin === 1 ? '1 more minute' : diffMin + ' more minutes to join this event!'}`;
-                      return 'Closing very soon!';
+                      if (diffDay > 0) return `Registration closes in ${diffDay === 1 ? '1 day' : diffDay + ' days'}`;
+                      if (diffHour > 0) return `Registration closes in ${diffHour === 1 ? '1 hour' : diffHour + ' hours'}`;
+                      if (diffMin > 0) return `Registration closes in ${diffMin === 1 ? '1 minute' : diffMin + ' minutes'}`;
+                      return 'Registration closing very soon!';
                     })()}
                   </p>
-                  <span className="feed-event-title" style={{ color: '#555', margin: '2px 0 0 0', fontWeight: 700, fontSize: 15, fontFamily: 'inherit', display: 'inline-block' }}>
+                  <span className="feed-event-title">
                     {event.title || 'Untitled Event'}
                     {event.date && (
-                      <span style={{ fontSize: 13, color: '#df3131', marginLeft: 8, fontWeight: 400 }}>
-                        {new Date(event.date).toLocaleDateString()}
+                      <span className="event-date-badge">
+                        Registration Closes: {getClosingDate(event.date)?.toLocaleDateString()} at {getClosingDate(event.date)?.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
                       </span>
                     )}
                   </span>
                 </div>
               </div>
             );
+          } else {
+            // Regular event announcement
+            const event = item.data;
+            const { icon, className } = getIconAndClass(event);
+            const isEventUnseen = !seen.events.includes(event.id);
+            return (
+              <div
+                key={item.id}
+                className={`global-feed-item ${className} ${isEventUnseen ? 'unseen' : 'seen'}`}
+                onClick={() => {
+                  markAsSeen(event.id, 'event');
+                  openModal(event, 'event');
+                }}
+              >
+                <span className="feed-icon">{icon}</span>
+                <div className="feed-content">
+                  {isEventUnseen && <span className="unread-dot"></span>}
+                  <p className="feed-title">New Event Proposal</p>
+                  <div className="title-container">
+                    <p className="feed-desc bold ellipsis">{event.title || 'Untitled Event'}</p>
+                  </div>
+                  <span className="feed-time">{
+                    (() => {
+                      let created = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : null);
+                      if (!created) return '';
+                      const now = new Date();
+                      const diffMs = now - created;
+                      const diffSec = Math.floor(diffMs / 1000);
+                      const diffMin = Math.floor(diffSec / 60);
+                      const diffHour = Math.floor(diffMin / 60);
+                      const diffDay = Math.floor(diffHour / 24);
+                      if (diffDay > 0) return diffDay === 1 ? '1 day ago' : `${diffDay} days ago`;
+                      if (diffHour > 0) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+                      if (diffMin > 0) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+                      return 'just now';
+                    })()}
+                  </span>
+                </div>
+              </div>
+            );
           }
-          return announcementsToShow;
         })
+      )}
+
+      {/* Modal */}
+      {modalOpen && selectedEvent && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            {/* Close button */}
+            <button className="modal-close-btn" onClick={closeModal}>
+              ×
+            </button>
+
+            {/* Modal content based on type */}
+            {modalType === 'milestone' ? (
+              <>
+                <div className="modal-icon">🏆</div>
+                <h2 className="modal-title">
+                  Milestone Reached!
+                </h2>
+                <p className="modal-milestone-text">
+                  <strong>{selectedEvent.title}</strong> has reached {selectedEvent.count} volunteers!
+                </p>
+                {selectedEvent.milestoneTime && (
+                  <p className="modal-posted">
+                    Milestone achieved on {selectedEvent.milestoneTime.toLocaleString()}
+                  </p>
+                )}
+                <div className="modal-footer">
+                  <a href={`/event/${selectedEvent.id}`} className="modal-cta-btn">
+                    View Event Details
+                  </a>
+                </div>
+              </>
+            ) : modalType === 'closing' ? (
+              <>
+                <div className="modal-icon">⌛</div>
+                <h2 className="modal-title">
+                  Mission Closing Soon!
+                </h2>
+                <h3 className="modal-subtitle">
+                  {selectedEvent.title || 'Untitled Event'}
+                </h3>
+                {selectedEvent.date && (
+                  <p className="modal-date">
+                    Event Date: {new Date(selectedEvent.date).toLocaleDateString()} at {new Date(selectedEvent.date).toLocaleTimeString()}
+                  </p>
+                )}
+                {selectedEvent.description && (
+                  <div className="modal-section">
+                    <h4 className="modal-section-title">Description</h4>
+                    <p className="modal-section-content">{selectedEvent.description}</p>
+                  </div>
+                )}
+                {selectedEvent.location && (
+                  <div className="modal-section">
+                    <h4 className="modal-section-title">Location</h4>
+                    <p className="modal-section-content">{selectedEvent.location}</p>
+                  </div>
+                )}
+                <div className="modal-footer">
+                  <a href={`/event/${selectedEvent.id}`} className="modal-cta-btn">
+                    Join This Mission
+                  </a>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="modal-icon">🆕</div>
+                <h2 className="modal-title">
+                  {selectedEvent.title || 'New Event Proposal'}
+                </h2>
+                {selectedEvent.createdAt && (
+                  <p className="modal-posted">
+                    Posted {(() => {
+                      let created = selectedEvent.createdAt?.toDate ? selectedEvent.createdAt.toDate() : new Date(selectedEvent.createdAt);
+                      const now = new Date();
+                      const diffMs = now - created;
+                      const diffSec = Math.floor(diffMs / 1000);
+                      const diffMin = Math.floor(diffSec / 60);
+                      const diffHour = Math.floor(diffMin / 60);
+                      const diffDay = Math.floor(diffHour / 24);
+                      if (diffDay > 0) return diffDay === 1 ? '1 day ago' : `${diffDay} days ago`;
+                      if (diffHour > 0) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+                      if (diffMin > 0) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+                      return 'just now';
+                    })()}
+                  </p>
+                )}
+                {selectedEvent.date && (
+                  <div className="modal-date-badge">
+                    <strong>Event Date:</strong>{' '}
+                    <span>
+                      {new Date(selectedEvent.date).toLocaleDateString()} at {new Date(selectedEvent.date).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
+                {selectedEvent.description && (
+                  <div className="modal-section">
+                    <h4 className="modal-section-title">Description</h4>
+                    <p className="modal-section-content">{selectedEvent.description}</p>
+                  </div>
+                )}
+                {selectedEvent.location && (
+                  <div className="modal-section">
+                    <h4 className="modal-section-title">Location</h4>
+                    <p className="modal-section-content">{selectedEvent.location}</p>
+                  </div>
+                )}
+                {selectedEvent.organizer && (
+                  <div className="modal-section">
+                    <h4 className="modal-section-title">Organizer</h4>
+                    <p className="modal-section-content">{selectedEvent.organizer}</p>
+                  </div>
+                )}
+                <div className="modal-footer">
+                  <a href={`/event/${selectedEvent.id}`} className="modal-cta-btn">
+                    View Full Details
+                  </a>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

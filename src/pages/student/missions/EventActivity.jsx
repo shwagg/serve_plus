@@ -20,8 +20,23 @@ export default function EventActivity() {
   const auth = getAuth();
   
   const [open, setOpen] = useState(false);
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrStatus, setQRStatus] = useState("");
+
+  // Update unread count from GlobalAnnouncements
+  useEffect(() => {
+    // Check immediately
+    const checkCount = () => {
+      if (window.announcementActions?.getUnreadCount) {
+        setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
+      }
+    };
+    
+    checkCount();
+    const interval = setInterval(checkCount, 500);
+    return () => clearInterval(interval);
+  }, []);
   
   const handleQRScan = async (decodedText) => {
     setQRStatus("");
@@ -1274,33 +1289,27 @@ export default function EventActivity() {
         }}
       >
         📢 Update
-        <span className="global-feed-badge">1</span>
+        {announcementUnreadCount > 0 && (
+          <span className="global-feed-badge">{announcementUnreadCount}</span>
+        )}
       </button>
 
       {/* SLIDE-IN PANEL */}
-      {open && (
-        <aside className="global-feed open"
-          style={{
-            position: 'fixed',
-            top: 80,
-            right: 0,
-            height: 'calc(100vh - 80px)',
-            width: 380,
-            background: '#fff',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            borderLeft: '2px solid #30bdb7',
-            zIndex: 999,
-            transition: 'transform 0.3s'
-          }}>
-          <div className="global-feed-header">
-            <h3 className="global-feed-title">Community Updates</h3>
-            <p className="global-feed-subtitle">Whats happening this week</p>
-          </div>
-          <div className="global-feed-list">
-            <GlobalAnnouncements />
-          </div>
-        </aside>
-      )}
-    </div>
+      <aside className={`global-feed ${open ? 'open' : ''}`}
+        style={{
+          position: 'fixed',
+          top: 80,
+          right: 0,
+          height: 'calc(100vh - 80px)',
+          width: 380,
+          background: '#fff',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          borderLeft: '2px solid #30bdb7',
+          zIndex: 999,
+          transition: 'transform 0.3s',
+          transform: open ? 'translateX(0)' : 'translateX(100%)'
+        }}>
+        <GlobalAnnouncements />
+      </aside>    </div>
   );
 }
