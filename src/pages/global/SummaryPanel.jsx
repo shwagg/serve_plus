@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
 
+import { exportProposalPDF } from './exportProposalPDF';
+
 function SummaryPanel({
   formData,
   slFields,
@@ -8,8 +10,9 @@ function SummaryPanel({
   projectType,
   loading,
   onBack,
-  onExport,
-  onSubmit
+  onSubmit,
+  sdgOptions,
+  setLoading
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
 
@@ -142,7 +145,130 @@ function SummaryPanel({
           type="button"
           className="btn-export"
           disabled={loading}
-          onClick={onExport}
+          onClick={async () => {
+            try {
+              setLoading(true);
+              // Map formData to SL export keys if projectType is service-learning
+              let exportFormData = formData;
+              if (projectType === 'service-learning') {
+                const sdgNumberToLabel = {
+                  1: 'No Poverty',
+                  2: 'Zero Hunger',
+                  3: 'Good Health and Well-Being',
+                  4: 'Quality Education',
+                  5: 'Gender Equality',
+                  6: 'Clean Water and Sanitation',
+                  7: 'Affordable and Clean Energy',
+                  8: 'Decent Work and Economic Growth',
+                  9: 'Industry Innovation and Infrastructure',
+                  10: 'Reduced Inequalities',
+                  11: 'Sustainable Cities and Communities',
+                  12: 'Responsible Consumption and Production',
+                  13: 'Climate Action',
+                  14: 'Life Below Water',
+                  15: 'Life on Land',
+                  16: 'Peace, Justice and Strong Institutions',
+                  17: 'Partnership for the Goals'
+                };
+                exportFormData = {
+                  proposalTitle: formData.title,
+                  dateProposed: new Date().toLocaleString(),
+                  participatingSections: slFields.section || '',
+                  proponent: formData.faculty,
+                  courseTitle: slFields.course || '',
+                  courseCode: slFields.courseCode || '',
+                  targetDates: formData.targetDate,
+                  targetLocation: formData.location,
+                  sdgs: (formData.sdg || []).map(num => sdgNumberToLabel[num] || num),
+                  proposalDescription: formData.description,
+                  proposalObjectives: formData.objectives,
+                  specificActivities: formData.specificActivities,
+                  successIndicators: formData.successIndicators,
+                  budget: formData.budget,
+                  stakeholders: formData.stakeholders,
+                  volunteerHours: formData.volunteerHours
+                };
+              }
+              if (projectType === 'community-engagement') {
+                if (!ceFields.learningOutcomes || ceFields.learningOutcomes === '') {
+                  alert('Please select a Learning Outcomes Level before exporting.');
+                  setLoading(false);
+                  return;
+                }
+                const ceSdgNumberToLabel = {
+                  1: 'No Poverty',
+                  2: 'Zero Hunger',
+                  3: 'Good Health and Well-Being',
+                  4: 'Quality Education',
+                  5: 'Gender Equality',
+                  6: 'Clean Water and Sanitation',
+                  7: 'Affordable and Clean Energy',
+                  8: 'Decent Work and Economic Growth',
+                  9: 'Industry Innovation and Infrastructure',
+                  10: 'Reduced Inequalities',
+                  11: 'Sustainable Cities and Communities',
+                  12: 'Responsible Consumption and Production',
+                  13: 'Climate Action',
+                  14: 'Life Below Water',
+                  15: 'Life on Land',
+                  16: 'Peace, Justice and Strong Institutions',
+                  17: 'Partnership for the Goals'
+                };
+                const normalize = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
+                const validNatures = ['program', 'project/advocacy', 'consultation/extension'];
+                const ceLOKeyMap = {
+                  '0': 'intellectual development',
+                  '1': 'collaboration',
+                  '2': 'appreciation of culture and diversity',
+                  '3': 'career exploration',
+                  '4': 'socio-civic responsibility',
+                  '5': 'others'
+                };
+                let natureArr = ceFields.nature;
+                if (!Array.isArray(natureArr)) natureArr = natureArr ? [natureArr] : [];
+                natureArr = natureArr.map(normalize).filter(n => validNatures.includes(n));
+                let loArr = [];
+                if (ceFields.learningOutcomes) {
+                  if (Array.isArray(ceFields.learningOutcomes)) {
+                    loArr = ceFields.learningOutcomes.map(lo => ceLOKeyMap[lo] || normalize(lo));
+                  } else if (typeof ceFields.learningOutcomes === 'string' || typeof ceFields.learningOutcomes === 'number') {
+                    loArr = [ceLOKeyMap[ceFields.learningOutcomes] || normalize(ceFields.learningOutcomes)];
+                  }
+                }
+                exportFormData = {
+                  communityEngagementTitle: formData.title,
+                  dateProposed: new Date().toLocaleString(),
+                  proponent: formData.faculty,
+                  studentOutcomes: formData.studentOutcomes || '',
+                  sdgs: (formData.sdg || []).map(num => ceSdgNumberToLabel[num] || num),
+                  natureOfEngagement: natureArr,
+                  learningOutcomes: loArr,
+                  targetDate: formData.targetDate,
+                  location: formData.location,
+                  stakeholders: formData.stakeholders,
+                  numberOfVolunteerHours: formData.volunteerHours,
+                  ceDescription: formData.description,
+                  ceObjectives: formData.objectives,
+                  specificActivities: formData.specificActivities,
+                  successIndicators: formData.successIndicators,
+                  budget: formData.budget,
+                  preparedBy: formData.faculty
+                };
+              }
+              await exportProposalPDF({
+                projectType,
+                formData: exportFormData,
+                slFields,
+                ceFields,
+                sdgOptions
+              });
+            } catch (err) {
+              alert('Export error: ' + err);
+              console.error('Export error:', err);
+            } finally {
+              setLoading(false);
+            }
+          }}
           style={{ background: '#00bcd4', color: '#fff', fontWeight: 600, borderRadius: 20, padding: '10px 28px', fontSize: 16 }}
         >
           Export SL Proposal (PDF)
