@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 
 function Register() {
@@ -33,7 +33,61 @@ function Register() {
             const userCred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = userCred.user.uid;
 
-            // 2. Create user profile in Firestore with sample structure
+            // 2. Fetch upcoming event
+            let upcomingEventLabel = null;
+            try {
+                const missionsRef = collection(db, "Missions");
+                const missionsSnap = await getDocs(missionsRef);
+                
+                const now = new Date();
+                let nearestEvent = null;
+                let nearestDate = null;
+                
+                console.log('Fetching events for new user registration...');
+                
+                missionsSnap.docs.forEach(doc => {
+                    const data = doc.data();
+                    console.log('Event:', data.title, 'Date:', data.date, 'Status:', data.status);
+                    
+                    if (data.date && (data.status === 'published' || !data.status)) {
+                        let eventDate;
+                        if (data.dateAt?.toDate) {
+                            eventDate = data.dateAt.toDate();
+                        } else if (data.date) {
+                            // Try parsing the date string
+                            eventDate = new Date(data.date);
+                        }
+                        
+                        console.log('Parsed date:', eventDate, 'Is future:', eventDate > now);
+                        
+                        if (eventDate && eventDate > now && (!nearestDate || eventDate < nearestDate)) {
+                            nearestDate = eventDate;
+                            nearestEvent = data.title || 'Upcoming Event';
+                        }
+                    }
+                });
+                
+                console.log('Nearest event found:', nearestEvent);
+                
+                if (nearestEvent) {
+                    upcomingEventLabel = `Joined Event: ${nearestEvent}`;
+                }
+            } catch (err) {
+                console.error('Could not fetch upcoming event:', err);
+            }
+
+            // 3. Create user profile in Firestore
+            const eventHistory = [
+                { label: "Registered", date: new Date().toISOString().slice(0, 10) }
+            ];
+            
+            if (upcomingEventLabel) {
+                eventHistory.push({ 
+                    label: upcomingEventLabel, 
+                    date: new Date().toISOString().slice(0, 10) 
+                });
+            }
+
             await setDoc(doc(db, "users", uid), {
                 uid,
                 name,
@@ -48,13 +102,10 @@ function Register() {
                 skills: ["React", "Firebase", "UI/UX"],
                 interests: ["Design", "Coding", "Music"],
                 achievements: ["Welcome!"],
-                                eventHistory: [
-                                    { label: "Registered", date: new Date().toISOString().slice(0, 10) },
-                                    { label: "Joined Event: Sample Orientation", date: new Date().toISOString().slice(0, 10) }
-                                ]
+                eventHistory
             });
 
-            // 3. Redirect to login
+            // 4. Redirect to login
             alert("Account created successfully! Please log in.");
             navigate("/", { replace: true });
         } catch (err) {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ReactDOM from "react-dom";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import "../styles/GlobalAnnouncements.css";
@@ -366,8 +367,8 @@ const GlobalAnnouncements = () => {
         })
       )}
 
-      {/* Modal */}
-      {modalOpen && selectedEvent && (
+      {/* Modal - rendered at document body level using portal */}
+      {modalOpen && selectedEvent && ReactDOM.createPortal(
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             {/* Close button */}
@@ -485,7 +486,8 @@ const GlobalAnnouncements = () => {
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
