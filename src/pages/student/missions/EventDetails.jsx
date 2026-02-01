@@ -75,12 +75,20 @@ export default function EventDetails() {
                 return;
               }
               try {
+                // Get user data from users collection
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                const userData = userDoc.exists() ? userDoc.data() : {};
+                const userName = userData.name || user.displayName || '';
+                const userEmail = user.email || '';
+
                 const volunteerRef = doc(db, 'Missions', id, 'volunteer', user.uid);
                 await setDoc(volunteerRef, {
                   joinedAt: new Date().toISOString(),
                   attendanceStatus: 'pending',
                   pointsEarned: 0,
-                  verified: false
+                  verified: false,
+                  name: userName,
+                  email: userEmail
                 });
                 navigate(`/event/${id}/activity`);
               } catch (error) {
