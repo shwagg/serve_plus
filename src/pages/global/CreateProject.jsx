@@ -1,5 +1,5 @@
 import { db } from "../../firebaseConfig";
-import { addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, Timestamp, setDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import "../../styles/AdminDashboard.css";
 import { useState, useEffect } from "react";
@@ -101,6 +101,15 @@ export default function CreateProject() {
             //if (!payload.date) throw new Error("Date is required.");
 
             const docRef = await addDoc(collection(db, "Missions"), payload);
+
+            // Create chat subcollection for this mission
+            const chatMetadataRef = doc(db, "Missions", docRef.id, "chat", "metadata");
+            await setDoc(chatMetadataRef, {
+                isActive: true,
+                participants: [],
+                createdAt: serverTimestamp(),
+                lastMessageAt: null,
+            });
 
             // go to project details after saving
             navigate(`/admin/projects/${docRef.id}`);
