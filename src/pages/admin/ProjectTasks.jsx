@@ -20,6 +20,7 @@ export default function ProjectTasks() {
     title: "",
     description: "",
     dueDate: "",
+    points: 0,
   });
 
   // Load project info
@@ -91,6 +92,7 @@ export default function ProjectTasks() {
         title: formData.title,
         description: formData.description,
         dueDate: formData.dueDate,
+        points: parseInt(formData.points) || 0,
         createdAt: new Date().toISOString(),
       });
 
@@ -99,6 +101,7 @@ export default function ProjectTasks() {
         title: "",
         description: "",
         dueDate: "",
+        points: 0,
       });
       setShowForm(false);
       await loadTasks();
@@ -124,6 +127,7 @@ export default function ProjectTasks() {
         title: formData.title,
         description: formData.description,
         dueDate: formData.dueDate,
+        points: parseInt(formData.points) || 0,
       });
 
       // Reset form
@@ -131,6 +135,7 @@ export default function ProjectTasks() {
         title: "",
         description: "",
         dueDate: "",
+        points: 0,
       });
       setEditingTaskId(null);
       setShowForm(false);
@@ -165,6 +170,7 @@ export default function ProjectTasks() {
       title: task.title || "",
       description: task.description || "",
       dueDate: task.dueDate || "",
+      points: task.points || 0,
     });
     setShowForm(true);
   };
@@ -176,6 +182,7 @@ export default function ProjectTasks() {
       title: "",
       description: "",
       dueDate: "",
+      points: 0,
     });
   };
 
@@ -284,6 +291,27 @@ export default function ProjectTasks() {
                 />
               </div>
 
+              <div style={{ marginBottom: 12 }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: 4,
+                    fontWeight: 600,
+                    color: "#111",
+                  }}
+                >
+                  Points
+                </label>
+                <input
+                  type="number"
+                  name="points"
+                  value={formData.points}
+                  onChange={handleInputChange}
+                  min="0"
+                  style={{ width: "100%", padding: 8, fontSize: 14 }}
+                />
+              </div>
+
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="submit"
@@ -369,6 +397,11 @@ export default function ProjectTasks() {
                       fontSize: 13,
                     }}
                   >
+                    {task.points !== undefined && (
+                      <div style={{ color: "#388e3c", fontWeight: 600 }}>
+                        <strong>Points:</strong> {task.points}
+                      </div>
+                    )}
                     {task.dueDate && (
                       <div style={{ color: "#111" }}>
                         <strong>Due:</strong> {task.dueDate}

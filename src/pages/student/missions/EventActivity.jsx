@@ -1142,6 +1142,16 @@ export default function EventActivity() {
                   <div className="activity-header">
                     <h3 className="activity-title">
                       {activity.title}
+                      {activity.points !== undefined && (
+                        <span style={{ 
+                          marginLeft: 12, 
+                          color: "#388e3c", 
+                          fontSize: 16,
+                          fontWeight: 600 
+                        }}>
+                          ({activity.points} pts)
+                        </span>
+                      )}
                     </h3>
                     <button
                       onClick={() => handleJoinActivity(activity.id)}
