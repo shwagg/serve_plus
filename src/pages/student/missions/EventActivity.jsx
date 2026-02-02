@@ -204,15 +204,32 @@ export default function EventActivity() {
         user.uid
       );
 
+      const pointsToAward = activity.points || 0;
+
       await updateDoc(participantRef, {
         reflection: journalReflections[activityIdx],
         status: "completed",
+        pointsEarned: pointsToAward,
+        completedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       });
 
+      // Update volunteer's total points in the event
+      const volunteerRef = doc(db, "Missions", id, "volunteer", user.uid);
+      const volunteerSnap = await getDoc(volunteerRef);
+      if (volunteerSnap.exists()) {
+        const currentTotal = volunteerSnap.data().pointsEarned || 0;
+        const newTotal = currentTotal + pointsToAward;
+        await updateDoc(volunteerRef, {
+          pointsEarned: newTotal,
+        });
+        // Update the displayed total
+        setTotalPointsEarned(newTotal);
+      }
+
       setSubmitStatus((prev) => ({
         ...prev,
-        [activityIdx]: "Reflection submitted!",
+        [activityIdx]: `Reflection submitted! +${pointsToAward} points earned!`,
       }));
       setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
 
@@ -953,6 +970,7 @@ export default function EventActivity() {
   const [event, setEvent] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [totalPointsEarned, setTotalPointsEarned] = useState(0);
 
   useEffect(() => {
     async function fetchEvent() {
@@ -971,9 +989,16 @@ export default function EventActivity() {
           }));
           setTasks(tasksData);
 
-          // Check enrollment status for each task
+          // Check enrollment status for each task and get volunteer points
           const user = auth.currentUser;
           if (user) {
+            // Fetch volunteer's total points for this event
+            const volunteerRef = doc(db, "Missions", id, "volunteer", user.uid);
+            const volunteerSnap = await getDoc(volunteerRef);
+            if (volunteerSnap.exists()) {
+              setTotalPointsEarned(volunteerSnap.data().pointsEarned || 0);
+            }
+
             const enrollmentStatus = {};
             for (const task of tasksData) {
               const participantRef = doc(
@@ -1073,6 +1098,10 @@ export default function EventActivity() {
               <div style={{ marginBottom: 10 }}>
                 <strong>Points:</strong>{" "}
                 <span style={{ color: "#388e3c" }}>{event.points} PTS</span>
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <strong>Your Points Earned:</strong>{" "}
+                <span style={{ color: "#1976d2", fontWeight: 600, fontSize: 16 }}>{totalPointsEarned} PTS</span>
               </div>
               <div style={{ marginBottom: 10 }}>
                 <strong>Event Badge:</strong>

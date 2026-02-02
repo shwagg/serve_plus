@@ -237,21 +237,38 @@ export default function Profile() {
         const docSnap = await getDoc(docRef);
         let profileData = docSnap.exists() ? docSnap.data() : mockProfile;
 
-        // Get all events in Missions
+        // Calculate total points earned across all events
         const missionsRef = collection(db, "Missions");
         const missionsSnap = await getDocs(missionsRef);
+        let totalPoints = 0;
         let registeredEvents = [];
+        
         for (const eventDoc of missionsSnap.docs) {
           const eventId = eventDoc.id;
           const eventData = eventDoc.data();
           const eventTitle = eventData.title || eventId;
-          const volunteerRef = collection(db, "Missions", eventId, "volunteer");
-          const volunteerSnap = await getDocs(volunteerRef);
-          if (volunteerSnap.docs.some(doc => doc.id === user.uid)) {
+          
+          // Check if user is a volunteer
+          const volunteerRef = doc(db, "Missions", eventId, "volunteer", user.uid);
+          const volunteerSnap = await getDoc(volunteerRef);
+          
+          if (volunteerSnap.exists()) {
             registeredEvents.push({ id: eventId, title: eventTitle });
+            // Add points from this event
+            totalPoints += volunteerSnap.data().pointsEarned || 0;
           }
         }
+        
         profileData.registeredEvents = registeredEvents;
+        profileData.totalPoints = totalPoints;
+        
+        // Calculate level based on points (every 100 points = 1 level)
+        const calculatedLevel = Math.floor(totalPoints / 100) + 1;
+        profileData.level = calculatedLevel;
+        
+        // Calculate progress to next level (0-100%)
+        const pointsInCurrentLevel = totalPoints % 100;
+        profileData.levelProgress = pointsInCurrentLevel;
 
         setProfile(profileData);
       } catch (err) {
@@ -288,7 +305,9 @@ export default function Profile() {
           <div style={{ width: "100%", margin: "16px 0" }}>
             <div className="profile-level-bar-bg">
               <div className="profile-level-bar-fill" style={{ width: `${profile.levelProgress}%` }}></div>
-              <div className="profile-level-bar-label">{profile.levelProgress}%</div>
+              <div className="profile-level-bar-label">
+                {profile.totalPoints || 0} pts ({profile.levelProgress || 0}/100 to next level)
+              </div>
             </div>
           </div>
           <div style={{ width: "100%", marginTop: 18 }}>

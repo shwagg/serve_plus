@@ -100,6 +100,31 @@ const StudentHome = () => {
           } else {
             console.log("No user document found in Firestore");
           }
+
+          // Calculate total points earned across all events
+          const missionsRef = collection(db, "Missions");
+          const missionsSnap = await getDocs(missionsRef);
+          let totalPoints = 0;
+          
+          for (const missionDoc of missionsSnap.docs) {
+            const volunteerRef = doc(db, "Missions", missionDoc.id, "volunteer", user.uid);
+            const volunteerSnap = await getDoc(volunteerRef);
+            if (volunteerSnap.exists()) {
+              totalPoints += volunteerSnap.data().pointsEarned || 0;
+            }
+          }
+          
+          // Update current points with actual points earned
+          setCurrentPoints(totalPoints);
+          
+          // Calculate level based on points (every 100 points = 1 level)
+          const calculatedLevel = Math.floor(totalPoints / 100) + 1;
+          setLevel(calculatedLevel);
+          
+          // Calculate progress to next level
+          const pointsInCurrentLevel = totalPoints % 100;
+          setNextLevelPoints(100);
+          
         } catch (error) {
           console.error("Error fetching user profile:", error);
         }
@@ -138,14 +163,64 @@ const StudentHome = () => {
   const handleNotificationOverlayToggle = () => setNotificationOverlayOpen((open) => !open);
 
 
-  //leaderboard firestore-ready
-  //change this when points for user accounts are set
-  const [leaderboard, setLeaderboard] = useState([
-    { uid: "u1", name: "Juan", points: 1400, avatar: podium1 },
-    { uid: "u2", name: "Aly", points: 1300, avatar: podium2 },
-    { uid: "u3", name: "Jien", points: 1200, avatar: podium3 },
-    { uid: "u4", name: "Vaughn", points: 1100, avatar: podium1 },
-  ]);
+  //leaderboard with actual data from Firestore
+  const [leaderboard, setLeaderboard] = useState([]);
+
+  // Fetch leaderboard data
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        // Fetch all users first
+        const usersRef = collection(db, "users");
+        const usersSnap = await getDocs(usersRef);
+        
+        // Fetch all missions once
+        const missionsRef = collection(db, "Missions");
+        const missionsSnap = await getDocs(missionsRef);
+        
+        // Build a map of userId -> totalPoints by fetching all volunteers
+        const userPointsMap = new Map();
+        
+        for (const missionDoc of missionsSnap.docs) {
+          const volunteersRef = collection(db, "Missions", missionDoc.id, "volunteer");
+          const volunteersSnap = await getDocs(volunteersRef);
+          
+          volunteersSnap.docs.forEach(volunteerDoc => {
+            const userId = volunteerDoc.id;
+            const points = volunteerDoc.data().pointsEarned || 0;
+            userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + points);
+          });
+        }
+        
+        // Build leaderboard data
+        const leaderboardData = [];
+        
+        usersSnap.docs.forEach(userDoc => {
+          const userData = userDoc.data();
+          const userId = userDoc.id;
+          const totalPoints = userPointsMap.get(userId) || 0;
+          
+          // Include all users who have at least email/name data
+          if (userData.email || userData.name || userData.username) {
+            leaderboardData.push({
+              uid: userId,
+              name: userData.username || userData.name || userData.email?.split('@')[0] || 'User',
+              points: totalPoints,
+              avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || userData.name || 'User')}&background=30bdb7&color=fff&size=120`
+            });
+          }
+        });
+        
+        // Sort by points descending
+        leaderboardData.sort((a, b) => b.points - a.points);
+        setLeaderboard(leaderboardData);
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+      }
+    };
+    
+    fetchLeaderboard();
+  }, []);
 
   //for leaderboards ranking in the podium UI
   //do not delete
@@ -157,16 +232,16 @@ const StudentHome = () => {
   const top3 = sortedLeaderboard[2];
   const podium = [top2, top1, top3].filter(Boolean);
 
-  //change this currentUserId to user account when defined
-  const currentUserId = "u2";
-  const currentUserIndex = leaderboard.findIndex(
+  //use current user's actual uid
+  const currentUserId = auth.currentUser?.uid;
+  const currentUserIndex = sortedLeaderboard.findIndex(
     (user) => user.uid === currentUserId
   );
   const currentUserRank =
     currentUserIndex !== -1 ? currentUserIndex + 1 : null;
 
 
-  const visibleLeaderboard = leaderboard.slice(
+  const visibleLeaderboard = sortedLeaderboard.slice(
     Math.max(0, currentUserIndex - 1),
     currentUserIndex + 2
   );
@@ -245,9 +320,9 @@ const StudentHome = () => {
             <div className="player-level">
               <span className="level-label">Level {level}</span>
               <div className="level-bar">
-                <div className="level-bar-fill" style={{ width: `${currentPoints}%` }}></div>
+                <div className="level-bar-fill" style={{ width: `${(currentPoints % 100)}%` }}></div>
               </div>
-              <span className="level-points">{currentPoints}%</span>
+              <span className="level-points">{currentPoints} pts ({currentPoints % 100}/100 to next level)</span>
             </div>
 
             <div className="player-missions">
@@ -348,8 +423,8 @@ const StudentHome = () => {
 
             </div>
             <div className="leaderboard-list" ref={leaderboardListRef}>
-              {leaderboard.map((user) => {
-                const rank = leaderboard.findIndex((u) => u.uid === user.uid) + 1;
+              {sortedLeaderboard.map((user, index) => {
+                const rank = index + 1;
                 return (
                   <div
                     key={user.uid}

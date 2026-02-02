@@ -300,7 +300,7 @@ export default function ProjectTasks() {
                     color: "#111",
                   }}
                 >
-                  Points
+                  Points (0-1000)
                 </label>
                 <input
                   type="number"
@@ -308,6 +308,7 @@ export default function ProjectTasks() {
                   value={formData.points}
                   onChange={handleInputChange}
                   min="0"
+                  max="1000"
                   style={{ width: "100%", padding: 8, fontSize: 14 }}
                 />
               </div>
