@@ -65,14 +65,20 @@ service cloud.firestore {
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
       }
 
-      // Chat subcollection - admins can create metadata, participants can send messages
+      // Chat subcollection - messages only, participants determined from volunteer/faculty/partner subcollections
       match /chat/{messageId} {
         allow read: if request.auth != null;
-        // Allow admins to create/update metadata document
-        allow create, update: if request.auth != null &&
+        
+        // Allow admins to create/update metadata (_meta document)
+        allow create, update: if messageId == "_meta" && request.auth != null &&
           (request.auth.token.role == "admin" ||
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
-        // Allow participants to create messages (will add participant check later)
+        
+        // Allow any authenticated user to send messages (messageId != "_meta")
+        // Add participant validation using volunteer/faculty/partner subcollections
+        allow create: if messageId != "_meta" && request.auth != null;
+        
+        // Only admins can delete messages
         allow delete: if request.auth != null &&
           (request.auth.token.role == "admin" ||
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");

@@ -14,6 +14,7 @@ import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
 import PartnerMenu from './menu/PartnerMenu';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
+import ChatModal from './ChatModal';
 
 
 const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
@@ -64,6 +65,7 @@ export default function Header() {
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [selectedProjectType, setSelectedProjectType] = useState('');
+  const [showChatModal, setShowChatModal] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -171,7 +173,8 @@ export default function Header() {
           <div className="header-actions">
             <button 
               className="icon-button"
-              aria-label="Chat">
+              aria-label="Chat"
+              onClick={() => setShowChatModal(true)}>
               <img src={chatIcon} alt="Chat" width="24" height="24" />
             </button>
             <button 
@@ -191,7 +194,16 @@ export default function Header() {
           </div>
         </div>
       </header>
-      
+      <ChatModal 
+        isOpen={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        onSelectMission={(missionId) => {
+          setShowChatModal(false);
+          // TODO: Navigate to chat page or open chat modal with selected mission
+          console.log('Selected mission:', missionId);
+        }}
+      />
+
       <CreateProposalModal 
         isOpen={showProposalModal} 
         onClose={() => setShowProposalModal(false)}

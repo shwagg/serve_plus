@@ -102,13 +102,12 @@ export default function CreateProject() {
 
             const docRef = await addDoc(collection(db, "Missions"), payload);
 
-            // Create chat subcollection for this mission
+            // Create chat metadata 
             const chatMetadataRef = doc(db, "Missions", docRef.id, "chat", "metadata");
             await setDoc(chatMetadataRef, {
-                isActive: true,
-                participants: [],
                 createdAt: serverTimestamp(),
                 lastMessageAt: null,
+                messageCount: 0
             });
 
             // go to project details after saving
