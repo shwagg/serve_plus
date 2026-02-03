@@ -642,7 +642,15 @@
 }
 
 /* EVENT DETAILS */
+.pre-activity-survey-button:hover {
+  background: #32CD32 !important;
+  color: #fff !important;
+}
 .event-details-bg {
+.event-qr-button:hover {
+  background: #32CD32 !important;
+  color: #fff !important;
+}
   background: linear-gradient(135deg, #a6e4c9 0%, #8dd4b5 100%);
   min-height: 100vh;
   min-width: 100vw;
@@ -911,9 +919,10 @@
 }
 
 .event-qr-button:hover {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: #32CD32 !important;
+  color: #fff !important;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 6px 20px rgba(50, 205, 50, 0.5);
 }
 
 .event-incomplete-button {
@@ -1261,6 +1270,24 @@
   color: #1f2937;
   font-size: 18px;
   font-weight: 600;
+}
+
+.pre-activity-survey-button {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+  background: #3386e6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 0;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pre-activity-survey-button:hover {
+  background: #2566b3;
 }
 
 .qr-status {

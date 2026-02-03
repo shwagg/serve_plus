@@ -15,6 +15,11 @@ import QRScanner from "../../../components/QRScanner";
 import { db } from "../../../firebaseConfig";
 
 export default function EventActivity() {
+      // State for survey proof image
+      const [surveyProofImage, setSurveyProofImage] = useState(null);
+      const [surveyProofPreview, setSurveyProofPreview] = useState(null);
+    // State for pre-activity survey modal
+    const [showSurveyModal, setShowSurveyModal] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
   const auth = getAuth();
@@ -1117,10 +1122,45 @@ export default function EventActivity() {
                   }}
                 />
               </div>
-              {/* View Event Page Button */}
-              <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+              
+              {/* Pre-activity survey and QR buttons side by side */}
+              <div style={{ marginTop: 16, display: "flex", flexDirection: "row", justifyContent: "center", gap: 18 }}>
+                <button
+                  className="pre-activity-survey-button"
+                  style={{
+                    flex: 1,
+                    maxWidth: 320,
+                    height: 48,
+                    background: '#3386e6',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontWeight: 700,
+                    fontSize: 16,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px #0001',
+                    transition: 'background 0.2s',
+                  }}
+                  onClick={() => setShowSurveyModal(true)}
+                >
+                  Answer Pre-Activity Survey Form
+                </button>
                 <button
                   className="event-qr-button"
+                  style={{
+                    flex: 1,
+                    maxWidth: 320,
+                    height: 48,
+                    background: '#1ea7fd',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontWeight: 700,
+                    fontSize: 16,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px #0001',
+                    transition: 'background 0.2s',
+                  }}
                   onClick={() => setShowQRModal(true)}
                 >
                   Scan Attendance QR Code
@@ -1303,6 +1343,113 @@ export default function EventActivity() {
             <h3 className="qr-modal-title">Scan or Upload QR Code</h3>
             <QRScanner onScan={handleQRScan} />
             {qrStatus && <div className={`qr-status ${qrStatus === "Attendance recorded!" ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Activity Survey Modal */}
+      {showSurveyModal && (
+        <div className="qr-modal-overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="qr-modal-content" style={{ minHeight: 220, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <button className="qr-modal-close" onClick={() => setShowSurveyModal(false)}>X</button>
+            <h3 className="qr-modal-title">Pre-Activity Survey</h3>
+            <button
+              style={{
+                background: '#3386e6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                padding: '12px 32px',
+                fontWeight: 700,
+                fontSize: 16,
+                cursor: 'pointer',
+                marginTop: 24,
+                boxShadow: '0 2px 8px #0001',
+                transition: 'background 0.2s',
+              }}
+              onClick={() => window.open('https://forms.office.com/r/DnaS8u9U9m', '_blank')}
+            >
+              Pre-Activity Survey Form
+            </button>
+            <div style={{ marginTop: 32, width: '100%', textAlign: 'center' }}>
+              <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Upload Image as Proof</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => {
+                  const file = e.target.files[0];
+                  setSurveyProofImage(file);
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setSurveyProofPreview(reader.result);
+                    reader.readAsDataURL(file);
+                  } else {
+                    setSurveyProofPreview(null);
+                  }
+                }}
+                style={{ marginBottom: 16 }}
+              />
+              {surveyProofPreview && (
+                <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto 12px auto' }}>
+                  <img src={surveyProofPreview} alt="Proof Preview" style={{ width: 180, height: 180, objectFit: 'cover', borderRadius: 12, boxShadow: '0 2px 8px #0001', border: '2px solid #eee', background: '#f7f7f7', display: 'block' }} />
+                  <button
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                      background: '#d32f2f',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: 28,
+                      height: 28,
+                      fontWeight: 700,
+                      fontSize: 16,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px #0002',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 2,
+                    }}
+                    title="Delete image"
+                    onClick={() => {
+                      setSurveyProofImage(null);
+                      setSurveyProofPreview(null);
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              <button
+                style={{
+                  background: '#32CD32',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 10,
+                  padding: '10px 28px',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                  marginTop: 8,
+                  boxShadow: '0 2px 8px #0001',
+                  transition: 'background 0.2s',
+                }}
+                onClick={() => {
+                  if (!surveyProofImage) {
+                    alert('Please upload an image as proof.');
+                    return;
+                  }
+                  alert('Proof image submitted! (Demo only, not saved)');
+                  setShowSurveyModal(false);
+                  setSurveyProofImage(null);
+                  setSurveyProofPreview(null);
+                }}
+              >
+                Submit Proof
+              </button>
+            </div>
           </div>
         </div>
       )}
