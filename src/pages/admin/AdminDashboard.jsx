@@ -7,9 +7,98 @@ import "../../styles/AdminDashboard.css";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  //filled from firestore under 'Missons'
+  //Filled from firestore under 'Missons'
   const [eventsToday, setEventsToday] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
+  //(Under dashboard) SDG Analytics
+  const [sdgAnalytics, setSdgAnalytics] = useState([]);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const topSDG = sdgAnalytics
+    .slice()
+    .sort((a, b) => b.count - a.count)[0];
+  //For the pie chart
+  const CHART_SIZE = 220;
+  const RADIUS = 90;
+  const CENTER = CHART_SIZE / 2;
+  const getPieSlices = (data) => {
+    let cumulative = 0;
+
+    return data.map((item) => {
+      const startAngle = cumulative * 2 * Math.PI;
+      const sliceAngle = (item.percentage / 100) * 2 * Math.PI;
+      cumulative += item.percentage / 100;
+
+      return {
+        ...item,
+        startAngle,
+        endAngle: startAngle + sliceAngle,
+        midAngle: startAngle + sliceAngle / 2,
+      };
+    });
+  };
+  // ---------- SDG CHART DATA (Industry Standard: Top 5 + Others) ----------
+
+  // sort SDGs by percentage (descending)
+  const sortedSDGs = [...sdgAnalytics].sort(
+    (a, b) => b.percentage - a.percentage
+  );
+
+  // take top 5 SDGs
+  const topFive = sortedSDGs.slice(0, 5);
+
+  // group the rest as "Others"
+  const others = sortedSDGs.slice(5);
+
+  const othersPercentage = others.reduce(
+    (sum, x) => sum + x.percentage,
+    0
+  );
+
+  // final dataset used by the chart
+  const chartData =
+    others.length > 0
+      ? [
+        ...topFive,
+        {
+          sdgId: "Others",
+          count: others.reduce((s, x) => s + x.count, 0),
+          percentage: Number(othersPercentage.toFixed(1)),
+        },
+      ]
+      : topFive;
+
+  // build pie slices from FINAL chart data
+  const pieSlices = getPieSlices(chartData);
+
+  const visibleSlices = pieSlices.filter((x) => x.percentage >= 5);
+  const maxCount = Math.max(
+    ...visibleSlices.map((x) => x.count),
+    0
+  );
+
+  const topSDGs = visibleSlices.filter(
+    (x) => x.count === maxCount && maxCount > 0
+  );
+
+
+
+  const describeArc = (cx, cy, r, startAngle, endAngle) => {
+    const polarToCartesian = (angle) => ({
+      x: cx + r * Math.cos(angle - Math.PI / 2),
+      y: cy + r * Math.sin(angle - Math.PI / 2),
+    });
+
+    const start = polarToCartesian(endAngle);
+    const end = polarToCartesian(startAngle);
+    const largeArcFlag = endAngle - startAngle > Math.PI ? 1 : 0;
+
+    return `
+    M ${start.x} ${start.y}
+    A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}
+    L ${cx} ${cy}
+    Z
+  `;
+  };
 
   useEffect(() => {
     const parseMissionDate = (dateStr) => {
@@ -39,8 +128,30 @@ export default function AdminDashboard() {
           (m) => (m.status || "draft") === "published",
         );
 
-        const today = startOfToday();
+        // SDG analytics (only published projects are being counted)
+        const sdgCounts = {};
+        published.forEach((mission) => {
+          (mission.sdgs || []).forEach((sdgId) => {
+            sdgCounts[sdgId] = (sdgCounts[sdgId] || 0) + 1;
+          });
+        });
+        const totalSDGAssignments = Object.values(sdgCounts).reduce(
+          (sum, c) => sum + c,
+          0
+        );
 
+        const analytics = Object.entries(sdgCounts).map(([sdgId, count]) => ({
+          sdgId: Number(sdgId),
+          count,
+          percentage: totalSDGAssignments
+            ? Number(((count / totalSDGAssignments) * 100).toFixed(1))
+            : 0,
+        }));
+
+        setSdgAnalytics(analytics);
+        setTotalProjects(total);
+
+        const today = startOfToday();
         const todayEvents = [];
         const upcoming = [];
 
@@ -85,7 +196,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="admin-dashboard">
+    <div className="admin-outlet">
       <h1 className="page-title">Dashboard</h1>
       <div className="dashboard-grid">
         {/* LEFT column cards */}
@@ -143,6 +254,80 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
+          <div className="panel">
+            <div className="panel-header panel-header-analytics">
+              <span>SDG Distribution</span>
+            </div>
+
+            <div className="panel-body" style={{ textAlign: "center" }}>
+              {pieSlices.length === 0 ? (
+                <p className="card-note">No SDG data available yet.</p>
+              ) : (
+                <svg width={CHART_SIZE} height={CHART_SIZE}>
+                  {pieSlices.map((slice, index) => {
+                    const path = describeArc(
+                      CENTER,
+                      CENTER,
+                      RADIUS,
+                      slice.startAngle,
+                      slice.endAngle
+                    );
+
+                    const labelX =
+                      CENTER + (RADIUS * 0.6) * Math.cos(slice.midAngle - Math.PI / 2);
+                    const labelY =
+                      CENTER + (RADIUS * 0.6) * Math.sin(slice.midAngle - Math.PI / 2);
+
+                    return (
+                      <g key={slice.sdgId}>
+                        <path
+                          d={path}
+                          fill={`hsl(${index * 45}, 70%, 55%)`}
+                        />
+                        {slice.percentage >= 5 && (
+                          <text
+                            x={labelX}
+                            y={labelY}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fill="#fff"
+                            fontSize="12"
+                            fontWeight="600"
+                          >
+                            <tspan x={labelX} dy="-2">
+                              SDG {slice.sdgId}
+                            </tspan>
+                            <tspan x={labelX} dy="14">
+                              {slice.percentage}%
+                            </tspan>
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              )}
+
+              {/* Description text */}
+              {chartData.length > 0 && (
+                <p className="card-note" style={{ marginTop: "12px" }}>
+                  <strong>
+                    {chartData
+                      .filter((x) => x.sdgId !== "Others")
+                      .slice(0, 2)
+                      .map((x) => `SDG ${x.sdgId}`)
+                      .join(" & ")}
+                  </strong>{" "}
+                  account for the largest share of SDG engagements, with the remaining
+                  contributions grouped under <strong>Others</strong>.
+                </p>
+              )}
+
+
+            </div>
+          </div>
+
+
         </section>
 
         {/* RIGHT column panels */}

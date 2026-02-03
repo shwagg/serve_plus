@@ -795,3 +795,325 @@
   font-weight: 700;
   color: #000;
 }
+/*Learning Outcomes*/
+/* Amenities-style pills (Learning Outcomes) */
+.cp-amenities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Pill */
+.cp-amenity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  border: 1.5px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* Hover */
+.cp-amenity:hover {
+  border-color: #cbd5e1;
+}
+
+/* Active (checked) */
+.cp-amenity.active {
+  border-color: #111827;
+  color: #111827;
+}
+
+/* Check icon */
+.cp-amenityIcon {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+
+  border: 1.5px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* Checked icon */
+.cp-amenity.active .cp-amenityIcon {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+/* Label text */
+.cp-amenityLabel {
+  white-space: nowrap;
+}
+/* Other option pill */
+.cp-amenity-other {
+  padding-right: 10px;
+}
+
+/* Input inside pill */
+.cp-amenityInput {
+  border: none;
+  outline: none;
+  background: transparent;
+
+  font-size: 10px;
+  font-weight: 600;
+  color: #111827;
+
+  min-width: 120px;
+  width: auto;
+  max-width: 260px;
+
+  padding: 2px 0;
+}
+
+/* Make label smaller when input is active */
+.cp-amenity.active .cp-amenityLabel {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+/* Let pill grow naturally */
+.cp-amenity {
+  white-space: nowrap;
+}
+/*NATURE OF ENGAGEMENT*/
+/* Property-type style grid */
+.cp-propertyGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap:12px;
+}
+
+/* Card */
+.cp-propertyCard {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: center;
+  gap: 6px;
+
+  padding: 14px 10px;
+  border-radius: 12px;
+
+  border: 1.5px solid var(--border);
+  background: #fff;
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* Hover */
+.cp-propertyCard:hover {
+  border-color: #cbd5e1;
+}
+
+/* Selected */
+.cp-propertyCard.active {
+  border-color: #111827;
+  box-shadow: 0 0 0 1px #111827;
+}
+
+/* Icon */
+.cp-propertyIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+.cp-propertyIcon svg {
+  font-size: 22px;
+  color: #111827;
+}
+.cp-propertyCard.active .cp-propertyIcon svg {
+  color: var(--navy);
+}
+
+
+/* Label */
+.cp-propertyLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+}
+
+/*Specific Activities*/
+/* Tag input container */
+.cp-tagInput {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+
+  min-height: 36px;  
+  padding: 6px 10px;
+
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+
+  cursor: text;
+}
+
+/* Tag pill */
+.cp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+
+  padding: 6px 12px;    
+  font-size: 11px;      
+  font-weight: 600;
+  color: #334155;
+
+  line-height: 1;      
+}
+
+/* Remove button */
+.cp-tagRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+
+  width: 12px;
+  height: 10px;
+
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+  color: #64748b;
+}
+
+.cp-tagRemove:hover {
+  color: #ef4444;
+}
+
+/* Input inside tag area */
+.cp-tagInputField {
+  height: 20px;
+  line-height: 20px;
+
+  font-size: 11px;
+  border: none;
+  outline: none;
+  flex: 1;
+}
+
+
+/*Sucess Indicators*/
+/* Success Indicator Card */
+.cp-indicatorCard {
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+  cursor: text;
+}
+.cp-tagInput,
+.cp-indicatorCard {
+  min-height: 44px; /* 👈 SAME VALUE */
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+.cp-tagInput {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+
+  gap: 6px 8px;   /* 👈 vertical | horizontal spacing */
+
+  min-height: 40px;   /* slightly smaller */
+  padding: 8px 10px;
+
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+
+/* Indicator row */
+.cp-indicatorItem,
+.cp-indicatorInputRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+/* Number */
+.cp-indicatorIndex {
+  font-weight: 700;
+  color: var(--navy);
+  display: flex;
+  align-items: center;
+}
+
+/* Indicator text (2-line max) */
+.cp-indicatorText {
+  flex: 1;
+  color: #334155;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Remove button */
+.cp-indicatorRemove {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #94a3b8;
+}
+.cp-indicatorRemove:hover {
+  color: #ef4444;
+}
+
+/* Textarea input */
+.cp-indicatorInput {
+  flex: 1;
+
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.4;
+
+  background: transparent;
+  color: #0f172a;
+
+  min-height: 24px;
+}
+
+.cp-tagInputField,
+.cp-indicatorInput {
+  height: 24px;
+  line-height: 24px;
+  padding: 0;
+}
+
+

@@ -1,20 +1,20 @@
-import { useNavigate } from "react-router-dom";
+import { Outlet } from "react-router-dom";
+import Header from "../../components/Header";
+import Sidebar from "../../components/Sidebar"
+import "../../styles/admin.css";
+import "../../styles/student.css";
+import { partnerLinks } from "../../hooks/sidebarConfig";
+
 
 export default function PartnerHome() {
-  const navigate = useNavigate();
-  const handleLogout = async () => {
-    navigate("/auth");
-  };
-
   return (
-    <div>
-      <h1>Partner Dashboard</h1>
-      <p>Welcome, Partner.</p>
+    <div className="admin-page">
+      <Header />
+      <Sidebar links={partnerLinks} />
 
-      {/*TEST LOGOUT BUTTON*/}
-      <button onClick={handleLogout}>
-        Logout
-      </button>
+      <main className="admin-main">
+        <Outlet />
+      </main>
     </div>
   );
 }

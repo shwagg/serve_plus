@@ -1,3 +1,4 @@
+//Service-Learning Proposal Template
 import React, { useState } from "react";
 import { db, auth } from '../../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -92,7 +93,7 @@ export default function ProposeProject() {
       try {
         const saved = localStorage.getItem('proposalFormData');
         if (saved) return JSON.parse(saved);
-      } catch {}
+      } catch { }
       return {
         title: '', date: '', faculty: '', sections: '', courseTitle: '', courseCode: '', stakeholders: '', targetDates: '', targetLocation: '', volunteerHours: '', sdgs: [], description: '', objectives: '', indicators: '', budget: '',
       };
@@ -101,7 +102,7 @@ export default function ProposeProject() {
       try {
         const saved = localStorage.getItem('proposalActivities');
         if (saved) return JSON.parse(saved);
-      } catch {}
+      } catch { }
       return [];
     };
     const [formData, setFormData] = useState(getInitialFormData);
@@ -172,7 +173,7 @@ export default function ProposeProject() {
 
     // PDF Export Handler
     const handleExport = async () => {
-              // ...existing code...
+      // ...existing code...
       try {
         const formUrl = '/assets/Proposal Form 32.pdf';
         const existingPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer());
@@ -204,32 +205,32 @@ export default function ProposeProject() {
         form.getTextField('textarea_32sqrh').setText(formData.objectives || ''); // Objectives
         form.getTextField('textarea_33vrob').setText(
           (activities && activities.length > 0)
-            ? activities.map((act, idx) => `${idx+1}. ${act.title}`).join('\n')
+            ? activities.map((act, idx) => `${idx + 1}. ${act.title}`).join('\n')
             : formData.specificactivities || ''
         ); // Specific Activities
         form.getTextField('textarea_34pgia').setText(formData.indicators || formData.successindicators || ''); // Success Indicators
         // Replace Peso symbol with 'PHP' to avoid encoding error
         form.getTextField('text_35uwrn').setText((formData.budget || '').replace(/₱/g, 'PHP')); // Budget
-                // SDG Checkboxes mapping (only use new field names)
-                const sdgCheckboxMap = [
-                  { field: 'checkbox_13ofpt', label: 'No Poverty' },
-                  { field: 'checkbox_17idjm', label: 'Zero Hunger' },
-                  { field: 'checkbox_20womi', label: 'Good Health and Well-Being' },
-                  { field: 'checkbox_23svwh', label: 'Quality Education' },
-                  { field: 'checkbox_26shtn', label: 'Gender Equality' },
-                  { field: 'checkbox_29apra', label: 'Clean Water and Sanitation' },
-                  { field: 'checkbox_14zvvw', label: 'Affordable and Clean Energy' },
-                  { field: 'checkbox_18fzxs', label: 'Decent Work and Economic Growth' },
-                  { field: 'checkbox_21kwei', label: 'Industry, Innovation, and Infrastructure' },
-                  { field: 'checkbox_24wogc', label: 'Reduced Inequalities' },
-                  { field: 'checkbox_27wlsf', label: 'Sustainable Cities and Communities' },
-                  { field: 'checkbox_30ultz', label: 'Responsible Consumption and Production' },
-                  { field: 'checkbox_15cxua', label: 'Climate Action' },
-                  { field: 'checkbox_19bdjk', label: 'Life Below Water' },
-                  { field: 'checkbox_22mcqk', label: 'Life on Land' },
-                  { field: 'checkbox_25sdjc', label: 'Peace, Justice, and Strong Institutions' },
-                  { field: 'checkbox_28rpwo', label: 'Partnership for the Goals' },
-                ];
+        // SDG Checkboxes mapping (only use new field names)
+        const sdgCheckboxMap = [
+          { field: 'checkbox_13ofpt', label: 'No Poverty' },
+          { field: 'checkbox_17idjm', label: 'Zero Hunger' },
+          { field: 'checkbox_20womi', label: 'Good Health and Well-Being' },
+          { field: 'checkbox_23svwh', label: 'Quality Education' },
+          { field: 'checkbox_26shtn', label: 'Gender Equality' },
+          { field: 'checkbox_29apra', label: 'Clean Water and Sanitation' },
+          { field: 'checkbox_14zvvw', label: 'Affordable and Clean Energy' },
+          { field: 'checkbox_18fzxs', label: 'Decent Work and Economic Growth' },
+          { field: 'checkbox_21kwei', label: 'Industry, Innovation, and Infrastructure' },
+          { field: 'checkbox_24wogc', label: 'Reduced Inequalities' },
+          { field: 'checkbox_27wlsf', label: 'Sustainable Cities and Communities' },
+          { field: 'checkbox_30ultz', label: 'Responsible Consumption and Production' },
+          { field: 'checkbox_15cxua', label: 'Climate Action' },
+          { field: 'checkbox_19bdjk', label: 'Life Below Water' },
+          { field: 'checkbox_22mcqk', label: 'Life on Land' },
+          { field: 'checkbox_25sdjc', label: 'Peace, Justice, and Strong Institutions' },
+          { field: 'checkbox_28rpwo', label: 'Partnership for the Goals' },
+        ];
         if (formData.sdgs && Array.isArray(formData.sdgs)) {
           console.log('formData.sdgs:', formData.sdgs);
           sdgCheckboxMap.forEach(({ field, label }) => {
@@ -421,7 +422,7 @@ export default function ProposeProject() {
       </div>
     );
   } catch (err) {
-    return <div style={{padding: 40, color: 'red', fontSize: 22}}>A rendering error occurred: {err && err.message ? err.message : String(err)}</div>;
+    return <div style={{ padding: 40, color: 'red', fontSize: 22 }}>A rendering error occurred: {err && err.message ? err.message : String(err)}</div>;
   }
 }
 

@@ -168,14 +168,15 @@ input {
   display: flex;
   align-items: center;
   justify-content: center; 
-  background: #fff;
+  /*background: #fff;*/
+  background: transparent;
   color: #000;
   outline: #000 solid 2px; 
   box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   transition: transform 0.2s ease;
 }
 .ui-btn-page:hover{
-  background: #f1f1f1;
+  background: #ffffff63;
 }
 .ui-btn-page:active{
   transform: scale(0.85);
@@ -280,7 +281,7 @@ input {
 
   /*border-radius: 50%;*/
   border-radius: 12px;
-  border: 1px solid #30bdb7;
+  border: 1px solid #6b7280;
   background: #ffffff;
   /*background: transparent;*/
   cursor: pointer;
@@ -299,12 +300,18 @@ input {
 }
 .icon-btn:hover {
   /*background: #30bdb7;*/
+  border-color: #30bdb7;
   background: #f8fafc;
   /*filter: brightness(0.95);*/
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 .icon-btn:active {
+  border-color: #30bdb7;
   transform: scale(0.97);
+}
+.icon-btn:focus{
+  outline: none;
+  box-shadow: none;
 }
 .icon-btn:focus-visible {
   outline: none;

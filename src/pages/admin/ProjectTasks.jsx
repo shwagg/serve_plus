@@ -1,9 +1,9 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc,} from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 
-import "../../styles/AdminDashboard.css";
+import "../../styles/admin.css";
 
 export default function ProjectTasks() {
   const { projectId } = useParams();
@@ -83,10 +83,10 @@ export default function ProjectTasks() {
     try {
       const tasksRef = collection(db, "Missions", projectId, "task");
       const snap = await getDocs(tasksRef);
-      
+
       // Get next ID starting from 0
       const nextId = snap.size.toString();
-      
+
       const taskRef = doc(db, "Missions", projectId, "task", nextId);
       await setDoc(taskRef, {
         title: formData.title,
@@ -189,7 +189,7 @@ export default function ProjectTasks() {
   if (loading && !project) return <p>Loading…</p>;
 
   return (
-    <div>
+    <div className="admin-outlet">
       <button
         type="button"
         onClick={() => navigate(`/admin/projects/${projectId}`)}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseConfig";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import "../../styles/admin.css";
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState([]);
@@ -38,55 +39,12 @@ export default function AuditLogs() {
   }, []);
 
   return (
-    <div
-      className="audit-logs-page"
-      style={{
-        minHeight: "100vh",
-        width: "100vw",
-        background: "#f1f5f9",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "flex-start",
-        padding: 0,
-        margin: 0,
-      }}
-    >
-      <header
-        style={{
-          width: "100%",
-          background: "#f1f5f9",
-          color: "#111",
-          padding: "2rem 0 1.5rem 0",
-          textAlign: "center",
-          fontWeight: 700,
-          fontSize: "2.5rem",
-          letterSpacing: "-1px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-        }}
-      >
-
-
-        Audit Logs
-      </header>
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "1100px",
-          margin: "2.5rem auto 0 auto",
-          background: "#fff",
-          borderRadius: "16px",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-          padding: "2.5rem 2rem 2rem 2rem",
-          minHeight: "60vh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+    <div className="admin-outlet">
+      <div className="panel">
         {loading ? (
           <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#64748b" }}>Loading...</p>
         ) : (
-          <div style={{ width: "100%", overflowX: "auto" }}>
+          <div >
             <table
               className="audit-logs-table"
               style={{
@@ -117,20 +75,20 @@ export default function AuditLogs() {
                   </tr>
                 ) : (
                   logs.map((log) => (
-                    <tr key={log.docId} style={{ borderBottom: "1px solid #e2e8f0", color: "#111"}}>
-                        <td style={{ padding: "1rem" }}>{log.uid || log.docId}</td>
-                        <td style={{ padding: "1rem" }}>{log.email}</td>
-                        <td style={{ padding: "1rem" }}>{log.role}</td>
-                        <td style={{ padding: "1rem" }}>{log.timestamp}</td>
-                        <td style={{ padding: "1rem" }}>{log.action}</td>
-                      </tr>
+                    <tr key={log.docId} style={{ borderBottom: "1px solid #e2e8f0", color: "#111" }}>
+                      <td style={{ padding: "1rem" }}>{log.uid || log.docId}</td>
+                      <td style={{ padding: "1rem" }}>{log.email}</td>
+                      <td style={{ padding: "1rem" }}>{log.role}</td>
+                      <td style={{ padding: "1rem" }}>{log.timestamp}</td>
+                      <td style={{ padding: "1rem" }}>{log.action}</td>
+                    </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

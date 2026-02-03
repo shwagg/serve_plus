@@ -1,22 +1,35 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { db } from "../../firebaseConfig";
-import { collection, getDocs } from "firebase/firestore";
-import "../../styles/AdminDashboard.css";
+import { db, auth } from "../../firebaseConfig";
+import { doc, updateDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
+import "../../styles/admin.css";
+import { ViewKanbanOutlinedIcon, ListAltOutlinedIcon } from "../../components/icons/index";
+
+//kanban board
+const KANBAN_COLUMNS = [
+    { key: "draft", label: "Draft" },
+    { key: "for_approval", label: "For Approval" },
+    { key: "to_publish", label: "To Publish" },
+];
 
 // demo fallback image
 import fallbackImg from "../../assets/react.svg";
 
-export default function ProjectList() {
+export default function ProjectList({ mode = "admin" }) {
     const navigate = useNavigate();
+    const user = auth.currentUser;
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [view, setView] = useState(() => {
+        return localStorage.getItem("projectView") || "list";
+    });
+
+    const [showAddDropdown, setShowAddDropdown] = useState(false);
 
     //search bar
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [sortBy, setSortBy] = useState("date_asc"); // nearest date by default
-
 
     useEffect(() => {
         const fetchMissions = async () => {
@@ -38,6 +51,11 @@ export default function ProjectList() {
         fetchMissions();
     }, []);
 
+    useEffect(() => {
+        localStorage.setItem("projectView", view);
+    }, [view]);
+
+
     //search bar and filter
     const getTitle = (p) =>
         (p.title || p.alt || p.name || "Untitled").toString().trim();
@@ -50,16 +68,103 @@ export default function ProjectList() {
         const d = new Date(p.date);
         return isNaN(d.getTime()) ? null : d;
     };
+    //for approval
+    const handleSendForApproval = async (projectId) => {
+        const ref = doc(db, "Missions", projectId);
+
+        await updateDoc(ref, {
+            status: "for_approval",
+            submittedForApprovalAt: serverTimestamp(),
+            submittedBy: user.uid,
+        });
+    };
+
+
+    //updating firestore fields to "approved/rejected project"
+    const handlePartnerApprove = async (projectId) => {
+        console.log("APPROVE CLICKED:", projectId);
+        const ref = doc(db, "Missions", projectId);
+        await updateDoc(ref, {
+            status: "approved",
+            "approvals.partner.approved": true,
+            "approvals.partner.decidedAt": serverTimestamp(),
+            "approvals.partner.decidedBy": user.uid,
+        });
+    };
+
+    const handlePartnerReject = async (projectId) => {
+        const ref = doc(db, "Missions", projectId);
+
+        await updateDoc(ref, {
+            status: "rejected",
+            "partner.approved": false,
+            "partner.decidedAt": serverTimestamp(),
+            "partner.decidedBy": user?.uid,
+        });
+    };
+    const handleFacultyApprove = async (projectId) => {
+        const ref = doc(db, "Missions", projectId);
+
+        await updateDoc(ref, {
+            status: "to_publish",
+            "approvals.faculty.approved": true,
+            "approvals.faculty.decidedAt": serverTimestamp(),
+            "approvals.faculty.decidedBy": user.uid,
+        });
+    };
+
+
+    const handleFacultyReject = async (projectId) => {
+        const ref = doc(db, "Missions", projectId);
+
+        await updateDoc(ref, {
+            status: "rejected",
+
+            "approvals.faculty.approved": false,
+            "approvals.faculty.decidedAt": serverTimestamp(),
+            "approvals.faculty.decidedBy": user.uid,
+        });
+    };
+    const handlePublish = async (projectId) => {
+        const ref = doc(db, "Missions", projectId);
+
+        await updateDoc(ref, {
+            status: "published",
+            publishedAt: serverTimestamp(),
+            publishedBy: user.uid,
+        });
+    };
+
 
     const normalizedSearch = search.trim().toLowerCase();
 
     const filteredAndSorted = projects
         .filter((p) => {
-            // status filter
-            const st = p.status || "draft";
-            if (statusFilter !== "all" && st !== statusFilter) return false;
+            const st = p.status ?? "draft";
+            const partnerDecidedByMe = p.approvals?.partner?.decidedBy === user.uid;
+            const facultyDecidedByMe = p.approvals?.faculty?.decidedBy === user.uid;
+            //(PARTNER SIDE)
+            if (mode === "partner") {
+                // waiting for admin action
+                if (st === "for_approval") return true;
+                // already live projects they participated in
+                if (st === "published") return true;
+                // past projects
+                if (st === "archived") return true;
+                return false;
+            }
 
-            // search filter
+            //(FACULTY SIDE)
+            if (mode === "faculty") {
+                //this is after partner approved the project
+                if (st === "approved") return true;
+                if (facultyDecidedByMe &&
+                    (st === "rejected" || st === "to_publish")) { return true; }
+                return false;
+
+            }
+            //(ADMIN SIDE)
+            if (statusFilter !== "all" && st !== statusFilter) return false;
             if (!normalizedSearch) return true;
             const hay = `${getTitle(p)} ${p.location || ""}`.toLowerCase();
             return hay.includes(normalizedSearch);
@@ -93,119 +198,287 @@ export default function ProjectList() {
 
 
     return (
-        <div className="admin-dashboard">
-            <h1 className="page-title">Project List</h1>
+        <div className="admin-outlet">
+            <div className="admin-outlet content">
+                <h1 className="page-title">Project</h1>
 
-            <div className="panel">
-                <div className="panel-header panel-header-row">
-                    <span>Projects</span>
+                <div className="panel">
+                    <div className="panel-header panel-header-row">
+                        <span>Projects</span>
 
-                    <button
-                        className="btn-primary"
-                        type="button"
-                        onClick={() => navigate("/admin/projects/new")}
-                    >
-                        Add Project
-                    </button>
-                </div>
+                        <div className="panel-header-actions">
+                            <input
+                                type="text"
+                                placeholder="Search projects…"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="project-search"
+                            />
 
-                <div className="panel-body">
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-                        <input
-                            type="text"
-                            placeholder="Search by title (or location)…"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            style={{ padding: 8, minWidth: 220 }}
-                        />
+                            {mode === "admin" && (
+                                <div className="add-project-container">
+                                    <button
+                                        className="add-project-pill"
+                                        type="button"
+                                        onClick={() => setShowAddDropdown((v) => !v)}
+                                    >
+                                        Add Project
+                                        <span className="caret">▾</span>
+                                    </button>
 
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            style={{ padding: 8 }}
-                        >
-                            <option value="all">All statuses</option>
-                            <option value="draft">Draft</option>
-                            <option value="for_approval">For approval</option>
-                            <option value="published">Published</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="archived">Archived</option>
+                                    {showAddDropdown && (
+                                        <div className="add-project-menu">
+                                            <div className="add-project-menu-label">
+                                                Add Project
+                                            </div>
 
-                        </select>
+                                            <button
+                                                className="add-project-menu-item"
+                                                onClick={() => {
+                                                    navigate("/admin/projects/new?type=SL");
+                                                    setShowAddDropdown(false);
+                                                }}
+                                            >
+                                                Service Learning
+                                            </button>
 
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            style={{ padding: 8 }}
-                        >
-                            <option value="date_asc">Nearest date</option>
-                            <option value="date_desc">Farthest date</option>
-                            <option value="points_desc">Highest points</option>
-                            <option value="points_asc">Lowest points</option>
-                            <option value="title_asc">Title A–Z</option>
-                        </select>
-
-                        <div style={{ marginLeft: "auto", opacity: 0.8 }}>
-                            Showing: <b>{filteredAndSorted.length}</b>
+                                            <button
+                                                className="add-project-menu-item"
+                                                onClick={() => {
+                                                    navigate("/admin/projects/new?type=CE");
+                                                    setShowAddDropdown(false);
+                                                }}
+                                            >
+                                                Community Engagement
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {loading ? (
-                        <div className="empty-state">
-                            <p className="empty-title">Loading projects…</p>
-                            <p className="empty-desc">Fetching Missions from Firestore.</p>
-                        </div>
-                    ) : filteredAndSorted.length === 0 ? (
-                        <div className="empty-state">
-                            <p className="empty-title">No projects yet</p>
-                            <p className="empty-desc">No documents found in Missions.</p>
-                        </div>
-                    ) : (
-                        <div className="project-list">
-                            {filteredAndSorted.map((p) => (
-                                <div
-                                    key={p.id}
-                                    className="project-row"
-                                    onClick={() => navigate(`/admin/projects/${p.id}`)}
-                                    role="button"
-                                    tabIndex={0}
+
+                    <div className="panel-body">
+                        <div className="project-controls-row">
+                            {/* LEFT: STATUS BUTTONS */}
+                            <div className="project-status-group">
+                                {["all", "published", "for_approval", "draft", "archived"].map((st) => (
+                                    <button
+                                        key={st}
+                                        className={`status-pill filter-pill ${statusFilter === st ? "active" : ""}`}
+
+                                        onClick={() => setStatusFilter(st)}
+                                    >
+                                        {st === "all"
+                                            ? "ALL"
+                                            : st.replace("_", " ").toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* RIGHT: VIEW BUTTONS (MOVED HERE) */}
+                            <div className="project-view-toggle">
+                                {mode === "admin" && (
+                                    <button
+                                        className={`view-icon-btn ${view === "kanban" ? "active" : ""}`}
+                                        onClick={() => setView("kanban")}
+                                        title="Kanban Board"
+                                    >
+                                        <ViewKanbanOutlinedIcon />
+                                    </button>
+                                )}
+
+                                <button
+                                    className={`view-icon-btn ${view === "list" ? "active" : ""}`}
+                                    onClick={() => setView("list")}
+                                    title="Card List"
                                 >
-                                    <div className="project-row-content">
-                                        <img
-                                            src={fallbackImg}
-                                            alt={p.alt || p.title || "Project"}
-                                            className="project-thumb"
-                                        />
+                                    <ListAltOutlinedIcon />
+                                </button>
+                            </div>
 
-                                        <div className="project-info">
-                                            <div className="project-title-row">
-                                                <div className="project-title">
-                                                    {p.title || p.alt || "Untitled Mission"}
-                                                </div>
-                                                <span className={`status-pill status-${(p.status || "draft")}`}>
-                                                    {(p.status || "draft").toUpperCase()}
-                                                </span>
-                                            </div>
-
-                                            <div className="project-meta">
-                                                <span className="project-date">{p.date || "No date"}</span>
-
-                                                {p.location && (
-                                                    <span className="project-location">{p.location}</span>
-                                                )}
-
-                                                {typeof p.points === "number" && (
-                                                    <span className="project-points">{p.points} pts</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
-                    )}
+
+                        {loading ? (
+                            <div className="empty-state">
+                                <p className="empty-title">Loading projects…</p>
+                                <p className="empty-desc">Fetching Missions from Firestore.</p>
+                            </div>
+                        ) : filteredAndSorted.length === 0 ? (
+                            <div className="empty-state">
+                                <p className="empty-title">No projects yet</p>
+                                <p className="empty-desc">No documents found in Missions.</p>
+                            </div>
+                        ) : (
+                            <>
+                                {view === "kanban" && mode === "admin" && (
+                                    <div className="kanban-board">
+                                        {KANBAN_COLUMNS.map((col) => (
+                                            <div key={col.key} className="kanban-column">
+                                                <h3>{col.label}</h3>
+
+                                                {
+                                                    filteredAndSorted
+                                                        .filter((p) => p.status === col.key)
+                                                        .map((p) => (
+                                                            <ProjectCard
+                                                                key={p.id}
+                                                                project={p}
+                                                                mode={mode}
+                                                                onPartnerApprove={handlePartnerApprove}
+                                                                onPartnerReject={handlePartnerReject}
+                                                            />
+
+                                                        ))
+                                                }
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {view === "list" && (
+                                    <div className="project-list">
+                                        {filteredAndSorted.map((p) => (
+                                            <ProjectCard
+                                                key={p.id}
+                                                project={p}
+                                                mode={mode}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                            </>
+                        )}
+                    </div>
                 </div>
+            </div>
+
+        </div >
+    );
+}
+//progress bar
+function ProjectProgress({ status }) {
+    const stepMap = {
+        draft: 25,
+        for_approval: 50,
+        approved: 75,
+        published: 100,
+    };
+
+    const value = stepMap[status] || 25;
+
+    return (
+        <div style={{ marginTop: 6 }}>
+            <div className="bar-track">
+                <div
+                    className="bar-fill"
+                    style={{ width: `${value}%` }}
+                />
+                <span className="bar-value">{value}%</span>
             </div>
         </div>
     );
 }
+//kanban board card
+function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject }) {
+    const partnerApproved = p.approvals?.partner?.approved;
+    const facultyApproved = p.approvals?.faculty?.approved;
+    const completedSteps = [
+        partnerApproved,
+        facultyApproved,
+        partnerApproved && facultyApproved,
+    ].filter(Boolean).length;
+
+    const canPublish =
+        mode === "admin" &&
+        partnerApproved === true &&
+        facultyApproved === true &&
+        p.status === "to_publish";
+    //was going to set where admin would add points and badge before publishing to students view
+    return (
+        <div
+            className="kanban-card"
+            onClick={() => {
+                if (mode === "admin") {
+                    window.location.href = `/admin/projects/${p.id}`;
+                }
+            }}
+        >
+
+            <div className="project-title">{p.title || "Untitled Project"}</div>
+
+            <div className="project-meta">
+                <span>{p.date || "No date"}</span>
+                <span>{p.nature || "—"}</span>
+                <span>{p.volunteerHours || 0} hrs</span>
+            </div>
+
+            <span className={`status-pill status-${p.status}`}>
+                {(p.status || "draft").replace("_", " ").toUpperCase()}
+            </span>
+            {/* PARTNER ACTIONS */}
+            {mode === "partner" && p.status === "for_approval" && (
+                <>
+                    {!partnerApproved ? (
+                        <div className="partner-actions">
+                            <button
+                                className="btn-success"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPartnerApprove(p.id);
+                                }}
+                            >
+                                Approve
+                            </button>
+
+                            <button
+                                className="btn-danger"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPartnerReject(p.id);
+                                }}
+                            >
+                                Reject
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="partner-approved">
+                            ✔ Approved
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* ADMIN ONLY */}
+            {mode === "admin" && (
+                <>
+                    <div className="approval-progress">
+                        {[0, 1, 2].map((i) => (
+                            <div
+                                key={i}
+                                className={`approval-step ${completedSteps > i ? "done" : ""
+                                    }`}
+                            />
+                        ))}
+                    </div>
+
+                    {canPublish && (
+                        <button
+                            className="btn-success"
+                            onClick={(e) => {
+                                e.stopPropagation(); // prevents opening ProjectDetails
+                                handlePublish(p.id);
+                            }}
+                        >
+                            Publish
+                        </button>
+                    )}
+
+                </>
+            )}
+        </div>
+    );
+}
+

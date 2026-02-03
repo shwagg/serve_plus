@@ -44,7 +44,7 @@ function Auth() {
       //Check if account is locked
       const checkLoginAttempts = httpsCallable(functions, "checkLoginAttempts");
       const lockCheck = await checkLoginAttempts({ email });
-      
+
       if (lockCheck.data?.isLocked) {
         const lockUntil = new Date(lockCheck.data.lockUntil);
         const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
@@ -134,9 +134,9 @@ function Auth() {
         return;
         //navigate("/admin/dashboard", { replace: true });
       } else if (role === "faculty") {
-        navigate("/faculty/home", { replace: true });
+        navigate("/faculty/projects", { replace: true });
       } else if (role === "partner") {
-        navigate("/partner/home", { replace: true });
+        navigate("/partner/projects", { replace: true });
       } else {
         navigate("/student/home", { replace: true });
       }
@@ -148,7 +148,7 @@ function Auth() {
       try {
         const recordLoginFailure = httpsCallable(functions, "recordLoginFailure");
         const failureResult = await recordLoginFailure({ email });
-        
+
         if (failureResult.data?.isLocked) {
           const lockUntil = new Date(failureResult.data.lockUntil);
           const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
 
-import "../../styles/AdminDashboard.css";
+import "../../styles/admin.css";
 
 //for demo purposes only
 import html2canvas from "html2canvas";
@@ -190,8 +190,8 @@ export default function ProjectDetails() {
       if (nextStatus === "for_approval") {
         payload.submittedAt = serverTimestamp();
         payload.approvals = {
-          faculty: { approved: false, decidedAt: null },
-          partner: { approved: false, decidedAt: null },
+          faculty: { approved: false, decidedAt: null, decidedBy: "" },
+          partner: { approved: false, decidedAt: null, decidedBy: "" },
         };
       }
 

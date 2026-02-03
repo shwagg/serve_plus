@@ -20,12 +20,25 @@ service cloud.firestore {
     // Allow create or read in Missions (Projects/Proposals)
     match /Missions/{missionId}{
       allow read: if request.auth != null;
+
+      // ADMIN (based on users collection)
       allow create, update, delete: if
-        request.auth != null &&
-        (
-          request.auth.token.role == "admin" ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
-        );
+      request.auth != null &&
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+
+      // PARTNER APPROVAL ONLY
+      allow update: if
+      request.auth != null &&
+      resource.data.status == "for_approval" &&
+      request.resource.data.approvals.partner.decidedBy == request.auth.uid &&
+      request.resource.data.approvals.partner.decidedAt != null;
+      
+      // FACULTY APPROVAL ONLY
+      allow update: if
+      request.auth != null &&
+      resource.data.status == "approved" &&
+      request.resource.data.approvals.faculty.decidedBy == request.auth.uid &&
+      request.resource.data.approvals.faculty.decidedAt != null;
       
       // Allow authenticated users to join as volunteers
       match /volunteer/{userId} {

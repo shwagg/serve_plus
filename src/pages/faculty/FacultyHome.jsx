@@ -1,24 +1,20 @@
-import { useNavigate } from "react-router-dom";
-import Header from "../../components/Header.jsx";
+import { Outlet } from "react-router-dom";
+import Header from "../../components/Header";
+import Sidebar from "../../components/Sidebar"
+import "../../styles/admin.css";
+import "../../styles/student.css";
+import { facultyLinks } from "../../hooks/sidebarConfig";
 
-export default function FacultyHome() {
-  const navigate = useNavigate();
-  const handleLogout = async () => {
-    navigate("/auth");
-  };
 
+export default function PartnerHome() {
   return (
-    <>
-    <Header />
-    <div>
-      <h1>Faculty Dashboard</h1>
-      <p>Welcome, Faculty.</p>
+    <div className="admin-page">
+      <Header />
+      <Sidebar links={facultyLinks} />
 
-      {/*TEST LOGOUT BUTTON*/}
-      <button onClick={handleLogout}>
-        Logout
-      </button>
+      <main className="admin-main">
+        <Outlet />
+      </main>
     </div>
-    </>
   );
 }

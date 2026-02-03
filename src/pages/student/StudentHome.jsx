@@ -16,6 +16,7 @@ import mission1 from '../../assets/mission1.jpg';
 import podium1 from '../../assets/user1.png';
 import podium2 from '../../assets/user2.png';
 import podium3 from '../../assets/user3.png';
+import banner from '../../assets/banner.jpg';
 
 const StudentHome = () => {
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
@@ -25,6 +26,7 @@ const StudentHome = () => {
   const [notificationOverlayOpen, setNotificationOverlayOpen] = useState(false);
   const [open, setOpen] = useState(false); // Global feed panel state
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
+  const [activeTab, setActiveTab] = useState("all"); // All Missions are selected initially
   const button2Ref = React.useRef(null);
   const button3Ref = React.useRef(null);
 
@@ -36,7 +38,7 @@ const StudentHome = () => {
         setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
       }
     };
-    
+
     checkCount();
     const interval = setInterval(checkCount, 500);
     return () => clearInterval(interval);
@@ -53,6 +55,50 @@ const StudentHome = () => {
   const currentUserRef = useRef(null);
   const leaderboardListRef = useRef(null);
   const [missionCards, setMissionCards] = useState([]);
+
+  // Landing promos which can be created by admins for
+  //students to see
+  // Change to real data in firestore
+  const landingPromos = [
+    {
+      id: 1,
+      title: "Youth Leadership Program",
+      description: "A  hands-on journey to build confidence, strengthen teamwork, and practice real-world leadership skills.",
+      image: mission1, //image link from firestore
+      buttonText: "Learn More",
+      buttonLink: "/programs/leadership",
+    },
+    {
+      id: 2,
+      title: "Volunteer Outreach",
+      image: banner,
+      description: "An opportunity to serve communities, connect with people, and create meaningful social impact.",
+      buttonText: "Join Now",
+      buttonLink: "/activities/volunteer",
+    },
+    {
+      id: 3,
+      title: "Entrepreneurship Bootcamp",
+      description: "A practical training ground to turn ideas into ventures, with guidance on innovation, business planning, and pitching",
+      image: podium1,
+      buttonText: "Register",
+      buttonLink: "/programs/bootcamp",
+    },
+  ];
+  const [currentPage, setCurrentPage] = useState(0);
+  const totalPages = landingPromos.length;
+  const currentPromo = landingPromos[currentPage];
+  const prevPage = () => {
+    setCurrentPage((prev) =>
+      prev === 0 ? totalPages - 1 : prev - 1
+    );
+  };
+
+  const nextPage = () => {
+    setCurrentPage((prev) =>
+      prev === totalPages - 1 ? 0 : prev + 1
+    );
+  };
 
   // Fetch missions from Firestore
   useEffect(() => {
@@ -80,7 +126,7 @@ const StudentHome = () => {
         const resolvedName = user.displayName || user.email || "Student";
         setStudentName(resolvedName);
         setMenuProfileName(resolvedName);
-        
+
         // Fetch user profile data from Firestore
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -105,7 +151,7 @@ const StudentHome = () => {
           const missionsRef = collection(db, "Missions");
           const missionsSnap = await getDocs(missionsRef);
           let totalPoints = 0;
-          
+
           for (const missionDoc of missionsSnap.docs) {
             const volunteerRef = doc(db, "Missions", missionDoc.id, "volunteer", user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
@@ -113,18 +159,18 @@ const StudentHome = () => {
               totalPoints += volunteerSnap.data().pointsEarned || 0;
             }
           }
-          
+
           // Update current points with actual points earned
           setCurrentPoints(totalPoints);
-          
+
           // Calculate level based on points (every 100 points = 1 level)
           const calculatedLevel = Math.floor(totalPoints / 100) + 1;
           setLevel(calculatedLevel);
-          
+
           // Calculate progress to next level
           const pointsInCurrentLevel = totalPoints % 100;
           setNextLevelPoints(100);
-          
+
         } catch (error) {
           console.error("Error fetching user profile:", error);
         }
@@ -173,33 +219,33 @@ const StudentHome = () => {
         // Fetch all users first
         const usersRef = collection(db, "users");
         const usersSnap = await getDocs(usersRef);
-        
+
         // Fetch all missions once
         const missionsRef = collection(db, "Missions");
         const missionsSnap = await getDocs(missionsRef);
-        
+
         // Build a map of userId -> totalPoints by fetching all volunteers
         const userPointsMap = new Map();
-        
+
         for (const missionDoc of missionsSnap.docs) {
           const volunteersRef = collection(db, "Missions", missionDoc.id, "volunteer");
           const volunteersSnap = await getDocs(volunteersRef);
-          
+
           volunteersSnap.docs.forEach(volunteerDoc => {
             const userId = volunteerDoc.id;
             const points = volunteerDoc.data().pointsEarned || 0;
             userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + points);
           });
         }
-        
+
         // Build leaderboard data
         const leaderboardData = [];
-        
+
         usersSnap.docs.forEach(userDoc => {
           const userData = userDoc.data();
           const userId = userDoc.id;
           const totalPoints = userPointsMap.get(userId) || 0;
-          
+
           // Include all users who have at least email/name data
           if (userData.email || userData.name || userData.username) {
             leaderboardData.push({
@@ -210,7 +256,7 @@ const StudentHome = () => {
             });
           }
         });
-        
+
         // Sort by points descending
         leaderboardData.sort((a, b) => b.points - a.points);
         setLeaderboard(leaderboardData);
@@ -218,7 +264,7 @@ const StudentHome = () => {
         console.error("Error fetching leaderboard:", error);
       }
     };
-    
+
     fetchLeaderboard();
   }, []);
 
@@ -283,7 +329,7 @@ const StudentHome = () => {
     if (j === 3 && k !== 13) return `${rank}rd`;
     return `${rank}th`;
   };
-  
+
   return (
     <div className="full-page" >
       {/* Logout Popup */}
@@ -296,24 +342,51 @@ const StudentHome = () => {
           </div>
         </div>
       )}
-      {/* Header */}
+      {/* HEADER */}
       <Header />
 
       <div className="header-spacer"></div>
       <div className="content-page">
-        {/* LANDING PAGE */}
-        <section className="landing-section" >
-          <h2 style={{ color: '#000' }}>Anouncement Image Page Here</h2>
-          <div className="landing-page-content">
-            <div className="landing-page-num">
-              <button className="ui-btn-page"><WestIcon /></button>
-              <span className="ui-smallText"> 01 / 05</span>
-              <button className="ui-btn-page"><EastIcon /></button>
+
+        {/* LANDING or PROMO POSTER PAGE */}
+        <section className="landing-section">
+          <div className="landing-promo-page">
+            <img
+              src={currentPromo.image}
+              alt={currentPromo.title}
+              className="promo-image"
+            />
+            <div className="promo-overlay">
+              <h2>{currentPromo.title}</h2>
+              <p className="ui-smallText">{currentPromo.description}</p>
+
+              <button
+                className="ui-btn"
+                onClick={() => navigate(currentPromo.buttonLink)}
+              >
+                {currentPromo.buttonText}
+              </button>
             </div>
-            <button className="ui-btn">Click for more info</button>
           </div>
 
+          <div className="landing-page-control">
+            <button className="ui-btn-page"
+              onClick={prevPage}>
+              <WestIcon />
+            </button>
+
+            <span className="ui-smallText" style={{ color: "black" }}>
+              {String(currentPage + 1).padStart(2, "0")} /{" "}
+              {String(totalPages).padStart(2, "0")}
+            </span>
+            <button
+              className="ui-btn-page"
+              onClick={nextPage}              >
+              <EastIcon />
+            </button>
+          </div>
         </section>
+
         {/* PROFILE LEVEL RANK */}
         <section className="player-strip">
           <div className="player-strip-inner">
@@ -347,10 +420,24 @@ const StudentHome = () => {
           <div className="mission-section-header">
             <h2 style={{ color: '#000' }}>Find Your Next Mission</h2>
             <div className="mission-section-header links">
-              <a href="#" onClick={(e) => e.preventDefault()}>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab("all");
+                }}
+                className={activeTab === "all" ? "active" : ""}
+              >
                 All Missions
               </a>
-              <a href="#" onClick={(e) => e.preventDefault()}>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab("your");
+                }}
+                className={activeTab === "your" ? "active" : ""}
+              >
                 Your Missions
               </a>
             </div>
@@ -489,7 +576,7 @@ const StudentHome = () => {
             zIndex: 999,
             transition: 'transform 0.3s'
           }}>
-            <GlobalAnnouncements />
+          <GlobalAnnouncements />
         </aside>
       )}
     </div>

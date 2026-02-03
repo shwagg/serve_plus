@@ -17,6 +17,7 @@ import ProjectTasks from "./pages/admin/ProjectTasks";
 import AuditLogs from "./pages/admin/AuditLogs";
 import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import StudentHome from "./pages/student/StudentHome";
+import ProposeProject from "./pages/global/ProposeProject";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
 import EventDetails from "./pages/student/missions/EventDetails";
@@ -45,7 +46,8 @@ function App() {
             <Route path="events/:eventId" element={<CurrentEventMonitoring />} />
             <Route path="projects" element={<ProjectList />} />
             <Route path="projects/new" element={<CreateProject />} />
-            <Route path="projects/:projectId" element={<ProjectDetails />} />
+            <Route path="projects/proposal" element={<ProposeProject />} />
+            <Route path="projects/:projectId" element={<ProjectDetails mode="admin" />} />
             <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
@@ -76,21 +78,26 @@ function App() {
             }
           /> */}
           <Route
-            path="/faculty/home"
+            path="/faculty"
             element={
               <ProtectedRoute allowedRoles={["faculty"]}>
                 <FacultyHome />
               </ProtectedRoute>
             }
-          />
+          >
+            <Route path="projects" element={<ProjectList mode="faculty" />} />
+          </Route>
+
           <Route
-            path="/partner/home"
+            path="/partner"
             element={
               <ProtectedRoute allowedRoles={["partner"]}>
                 <PartnerHome />
               </ProtectedRoute>
             }
-          />
+          >
+            <Route path="projects" element={<ProjectList mode="partner" />} />
+          </Route>
           <Route
             path="/event/:id"
             element={<EventDetails />}
@@ -110,7 +117,7 @@ function App() {
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>
-    </SessionProvider>
+    </SessionProvider >
   );
 }
 
