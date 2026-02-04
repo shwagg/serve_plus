@@ -1123,28 +1123,8 @@ export default function EventActivity() {
                 />
               </div>
               
-              {/* Pre-activity survey and QR buttons side by side */}
+              {/* QR button only */}
               <div style={{ marginTop: 16, display: "flex", flexDirection: "row", justifyContent: "center", gap: 18 }}>
-                <button
-                  className="pre-activity-survey-button"
-                  style={{
-                    flex: 1,
-                    maxWidth: 320,
-                    height: 48,
-                    background: '#3386e6',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 12,
-                    fontWeight: 700,
-                    fontSize: 16,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px #0001',
-                    transition: 'background 0.2s',
-                  }}
-                  onClick={() => setShowSurveyModal(true)}
-                >
-                  Answer Pre-Activity Survey Form
-                </button>
                 <button
                   className="event-qr-button"
                   style={{
