@@ -199,8 +199,7 @@ export default function Header() {
         onClose={() => setShowChatModal(false)}
         onSelectMission={(missionId) => {
           setShowChatModal(false);
-          // TODO: Navigate to chat page or open chat modal with selected mission
-          console.log('Selected mission:', missionId);
+          navigate(`/chat/${missionId}`);
         }}
       />
 
