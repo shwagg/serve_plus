@@ -104,7 +104,7 @@ const StudentHome = () => {
   useEffect(() => {
     const fetchMissions = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "Missions"));
+        const querySnapshot = await getDocs(collection(db, "missions"));
         const missions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMissionCards(missions);
       } catch (error) {
@@ -148,12 +148,12 @@ const StudentHome = () => {
           }
 
           // Calculate total points earned across all events
-          const missionsRef = collection(db, "Missions");
+          const missionsRef = collection(db, "missions");
           const missionsSnap = await getDocs(missionsRef);
           let totalPoints = 0;
 
           for (const missionDoc of missionsSnap.docs) {
-            const volunteerRef = doc(db, "Missions", missionDoc.id, "volunteer", user.uid);
+            const volunteerRef = doc(db, "missions", missionDoc.id, "volunteer", user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
             if (volunteerSnap.exists()) {
               totalPoints += volunteerSnap.data().pointsEarned || 0;
@@ -221,14 +221,14 @@ const StudentHome = () => {
         const usersSnap = await getDocs(usersRef);
 
         // Fetch all missions once
-        const missionsRef = collection(db, "Missions");
+        const missionsRef = collection(db, "missions");
         const missionsSnap = await getDocs(missionsRef);
 
         // Build a map of userId -> totalPoints by fetching all volunteers
         const userPointsMap = new Map();
 
         for (const missionDoc of missionsSnap.docs) {
-          const volunteersRef = collection(db, "Missions", missionDoc.id, "volunteer");
+          const volunteersRef = collection(db, "missions", missionDoc.id, "volunteer");
           const volunteersSnap = await getDocs(volunteersRef);
 
           volunteersSnap.docs.forEach(volunteerDoc => {

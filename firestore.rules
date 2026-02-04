@@ -17,8 +17,8 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Allow create or read in Missions (Projects/Proposals)
-    match /Missions/{missionId}{
+    // Allow create or read in missions (Projects/Proposals)
+    match /missions/{missionId}{
       allow read: if request.auth != null;
 
       // ADMIN (based on users collection)

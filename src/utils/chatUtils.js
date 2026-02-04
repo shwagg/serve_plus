@@ -11,10 +11,10 @@ export async function getChatParticipants(missionId) {
   try {
     // Query all participant types
     const [volunteersSnap, adminsSnap, facultySnap, partnerSnap] = await Promise.all([
-      getDocs(collection(db, "Missions", missionId, "volunteer")),
+      getDocs(collection(db, "missions", missionId, "volunteer")),
       getDocs(query(collection(db, "users"), where("role", "==", "admin"))),
-      getDocs(collection(db, "Missions", missionId, "faculty")),
-      getDocs(collection(db, "Missions", missionId, "partner"))
+      getDocs(collection(db, "missions", missionId, "faculty")),
+      getDocs(collection(db, "missions", missionId, "partner"))
     ]);
 
     return {
@@ -78,7 +78,7 @@ export async function getChatParticipantIds(missionId) {
 export async function isUserChatParticipant(missionId, userId) {
   try {
     // Check if user is a volunteer
-    const volunteerRef = doc(db, "Missions", missionId, "volunteer", userId);
+    const volunteerRef = doc(db, "missions", missionId, "volunteer", userId);
     const volunteerSnap = await getDoc(volunteerRef);
     if (volunteerSnap.exists()) return true;
 
@@ -88,12 +88,12 @@ export async function isUserChatParticipant(missionId, userId) {
     if (userSnap.exists() && userSnap.data().role === "admin") return true;
 
     // Check if user is faculty
-    const facultyRef = doc(db, "Missions", missionId, "faculty", userId);
+    const facultyRef = doc(db, "missions", missionId, "faculty", userId);
     const facultySnap = await getDoc(facultyRef);
     if (facultySnap.exists()) return true;
 
     // Check if user is partner
-    const partnerRef = doc(db, "Missions", missionId, "partner", userId);
+    const partnerRef = doc(db, "missions", missionId, "partner", userId);
     const partnerSnap = await getDoc(partnerRef);
     if (partnerSnap.exists()) return true;
     

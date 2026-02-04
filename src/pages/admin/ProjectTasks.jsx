@@ -27,7 +27,7 @@ export default function ProjectTasks() {
   useEffect(() => {
     const loadProject = async () => {
       try {
-        const projectRef = doc(db, "Missions", projectId);
+        const projectRef = doc(db, "missions", projectId);
         const snap = await getDoc(projectRef);
         if (snap.exists()) {
           setProject({ id: snap.id, ...snap.data() });
@@ -43,7 +43,7 @@ export default function ProjectTasks() {
   const loadTasks = async () => {
     setLoading(true);
     try {
-      const tasksRef = collection(db, "Missions", projectId, "task");
+      const tasksRef = collection(db, "missions", projectId, "task");
       const snap = await getDocs(tasksRef);
       const taskList = snap.docs.map((doc) => ({
         id: doc.id,
@@ -81,13 +81,13 @@ export default function ProjectTasks() {
 
     setSaving(true);
     try {
-      const tasksRef = collection(db, "Missions", projectId, "task");
+      const tasksRef = collection(db, "missions", projectId, "task");
       const snap = await getDocs(tasksRef);
 
       // Get next ID starting from 0
       const nextId = snap.size.toString();
 
-      const taskRef = doc(db, "Missions", projectId, "task", nextId);
+      const taskRef = doc(db, "missions", projectId, "task", nextId);
       await setDoc(taskRef, {
         title: formData.title,
         description: formData.description,
@@ -122,7 +122,7 @@ export default function ProjectTasks() {
 
     setSaving(true);
     try {
-      const taskRef = doc(db, "Missions", projectId, "task", editingTaskId);
+      const taskRef = doc(db, "missions", projectId, "task", editingTaskId);
       await updateDoc(taskRef, {
         title: formData.title,
         description: formData.description,
@@ -153,7 +153,7 @@ export default function ProjectTasks() {
 
     setSaving(true);
     try {
-      const taskRef = doc(db, "Missions", projectId, "task", taskId);
+      const taskRef = doc(db, "missions", projectId, "task", taskId);
       await deleteDoc(taskRef);
       await loadTasks();
     } catch (e) {

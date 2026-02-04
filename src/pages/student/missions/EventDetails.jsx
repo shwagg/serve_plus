@@ -17,14 +17,14 @@ export default function EventDetails() {
   useEffect(() => {
     async function fetchMission() {
       try {
-        const missionRef = doc(db, 'Missions', id);
+        const missionRef = doc(db, 'missions', id);
         const missionSnap = await getDoc(missionRef);
         if (missionSnap.exists()) {
           setMission(missionSnap.data());
           // Check if user is already a volunteer
           const user = auth.currentUser;
           if (user) {
-            const volunteerRef = doc(db, 'Missions', id, 'volunteer', user.uid);
+            const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
             if (volunteerSnap.exists()) {
               navigate(`/event/${id}/activity`, { replace: true });
@@ -81,7 +81,7 @@ export default function EventDetails() {
                 const userName = userData.name || user.displayName || '';
                 const userEmail = user.email || '';
 
-                const volunteerRef = doc(db, 'Missions', id, 'volunteer', user.uid);
+                const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
                 await setDoc(volunteerRef, {
                   joinedAt: new Date().toISOString(),
                   attendanceStatus: 'pending',

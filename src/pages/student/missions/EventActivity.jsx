@@ -68,7 +68,7 @@ export default function EventActivity() {
       }
       
       // Validate QR timestamp against stored valid timestamp
-      const missionDoc = await getDoc(doc(db, "Missions", projectId));
+      const missionDoc = await getDoc(doc(db, "missions", projectId));
       if (missionDoc.exists()) {
         const validTimestamp = missionDoc.data()?.validQRTimestamp;
         if (validTimestamp && parsed.timestamp !== validTimestamp) {
@@ -90,7 +90,7 @@ export default function EventActivity() {
         email = user.email || "";
       }
       await setDoc(
-        doc(db, "Missions", projectId, "volunteer", user.uid),
+        doc(db, "missions", projectId, "volunteer", user.uid),
         {
           name,
           email,
@@ -201,7 +201,7 @@ export default function EventActivity() {
       // Update the reflection field in the participant document
       const participantRef = doc(
         db,
-        "Missions",
+        "missions",
         id,
         "task",
         activity.id,
@@ -220,7 +220,7 @@ export default function EventActivity() {
       });
 
       // Update volunteer's total points in the event
-      const volunteerRef = doc(db, "Missions", id, "volunteer", user.uid);
+      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
       const volunteerSnap = await getDoc(volunteerRef);
       if (volunteerSnap.exists()) {
         const currentTotal = volunteerSnap.data().pointsEarned || 0;
@@ -256,7 +256,7 @@ export default function EventActivity() {
 
     try {
       // Fetch all tasks for this mission
-      const tasksRef = collection(db, "Missions", id, "task");
+      const tasksRef = collection(db, "missions", id, "task");
       const tasksSnap = await getDocs(tasksRef);
 
       const journals = [];
@@ -264,7 +264,7 @@ export default function EventActivity() {
       for (const taskDoc of tasksSnap.docs) {
         const participantRef = doc(
           db,
-          "Missions",
+          "missions",
           id,
           "task",
           taskDoc.id,
@@ -296,7 +296,7 @@ export default function EventActivity() {
   useEffect(() => {
     async function fetchEventAndJournals() {
       try {
-        const eventRef = doc(db, "Missions", id);
+        const eventRef = doc(db, "missions", id);
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
           setEvent(eventSnap.data());
@@ -327,7 +327,7 @@ export default function EventActivity() {
     try {
       const participantRef = doc(
         db,
-        "Missions",
+        "missions",
         id,
         "task",
         journal.taskId,
@@ -354,7 +354,7 @@ export default function EventActivity() {
       // Clear the reflection field instead of deleting the participant document
       const participantRef = doc(
         db,
-        "Missions",
+        "missions",
         id,
         "task",
         taskId,
@@ -381,7 +381,7 @@ export default function EventActivity() {
     try {
       const participantRef = doc(
         db,
-        "Missions",
+        "missions",
         id,
         "task",
         taskId,
@@ -980,13 +980,13 @@ export default function EventActivity() {
   useEffect(() => {
     async function fetchEvent() {
       try {
-        const eventRef = doc(db, "Missions", id);
+        const eventRef = doc(db, "missions", id);
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
           setEvent(eventSnap.data());
 
           // Fetch tasks from tasks subcollection
-          const tasksRef = collection(db, "Missions", id, "task");
+          const tasksRef = collection(db, "missions", id, "task");
           const tasksSnap = await getDocs(tasksRef);
           const tasksData = tasksSnap.docs.map((doc) => ({
             id: doc.id,
@@ -998,7 +998,7 @@ export default function EventActivity() {
           const user = auth.currentUser;
           if (user) {
             // Fetch volunteer's total points for this event
-            const volunteerRef = doc(db, "Missions", id, "volunteer", user.uid);
+            const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
             if (volunteerSnap.exists()) {
               setTotalPointsEarned(volunteerSnap.data().pointsEarned || 0);
@@ -1008,7 +1008,7 @@ export default function EventActivity() {
             for (const task of tasksData) {
               const participantRef = doc(
                 db,
-                "Missions",
+                "missions",
                 id,
                 "task",
                 task.id,

@@ -20,7 +20,7 @@ export default function CurrentEventMonitoring() {
         setLoading(true);
 
         // fetch missions for completion statistics
-        const missionsRef = collection(db, "Missions");
+        const missionsRef = collection(db, "missions");
         const missionsSnap = await getDocs(missionsRef);
         const missionsData = missionsSnap.docs.map((doc) => ({
           id: doc.id,
@@ -29,7 +29,7 @@ export default function CurrentEventMonitoring() {
         setAllMissions(missionsData);
 
         // Fetch mission data
-        const missionRef = doc(db, "Missions", eventId);
+        const missionRef = doc(db, "missions", eventId);
         const missionSnap = await getDoc(missionRef);
 
         if (missionSnap.exists()) {
@@ -38,7 +38,7 @@ export default function CurrentEventMonitoring() {
           // Fetch volunteers
           const volunteersRef = collection(
             db,
-            "Missions",
+            "missions",
             eventId,
             "volunteer",
           );
@@ -50,7 +50,7 @@ export default function CurrentEventMonitoring() {
           setVolunteers(volunteersData);
 
           // Fetch tasks
-          const tasksRef = collection(db, "Missions", eventId, "task");
+          const tasksRef = collection(db, "missions", eventId, "task");
           const tasksSnap = await getDocs(tasksRef);
           const tasksData = tasksSnap.docs.map((doc) => ({
             id: doc.id,
@@ -63,7 +63,7 @@ export default function CurrentEventMonitoring() {
           for (const task of tasksData) {
             const participantsRef = collection(
               db,
-              "Missions",
+              "missions",
               eventId,
               "task",
               task.id,

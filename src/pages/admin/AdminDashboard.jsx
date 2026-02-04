@@ -120,7 +120,7 @@ export default function AdminDashboard() {
 
     const fetchPublishedMissions = async () => {
       try {
-        const snap = await getDocs(collection(db, "Missions"));
+        const snap = await getDocs(collection(db, "missions"));
         const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
         // only published missions should be visible as "events" (after complete approval)

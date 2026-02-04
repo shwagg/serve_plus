@@ -326,10 +326,10 @@ export default function CreateProject() {
                 setSaving(false);
                 return;
             }
-            const docRef = await addDoc(collection(db, "Missions"), payload);
+            const docRef = await addDoc(collection(db, "missions"), payload);
 
             // Create chat metadata 
-            const chatMetadataRef = doc(db, "Missions", docRef.id, "chat", "metadata");
+            const chatMetadataRef = doc(db, "missions", docRef.id, "chat", "metadata");
             await setDoc(chatMetadataRef, {
                 createdAt: serverTimestamp(),
                 lastMessageAt: null,

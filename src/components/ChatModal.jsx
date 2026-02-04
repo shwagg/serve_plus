@@ -28,7 +28,7 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
         const userMissionsSet = new Set();
 
         // Get all missions where user is a volunteer
-        const missionsRef = collection(db, 'Missions');
+        const missionsRef = collection(db, 'missions');
         const allMissionsSnap = await getDocs(missionsRef);
 
         // Get user info once
@@ -43,7 +43,7 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
           let userRoleInMission = null;
 
           // Check if user is a volunteer
-          const volunteerRef = doc(db, 'Missions', missionId, 'volunteer', user.uid);
+          const volunteerRef = doc(db, 'missions', missionId, 'volunteer', user.uid);
           const volunteerSnap = await getDoc(volunteerRef);
           if (volunteerSnap.exists()) {
             userRoleInMission = 'volunteer';
@@ -51,7 +51,7 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
 
           // Check if user is faculty
           if (!userRoleInMission) {
-            const facultyRef = doc(db, 'Missions', missionId, 'faculty', user.uid);
+            const facultyRef = doc(db, 'missions', missionId, 'faculty', user.uid);
             const facultySnap = await getDoc(facultyRef);
             if (facultySnap.exists()) {
               userRoleInMission = 'faculty';
@@ -60,7 +60,7 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
 
           // Check if user is partner
           if (!userRoleInMission) {
-            const partnerRef = doc(db, 'Missions', missionId, 'partner', user.uid);
+            const partnerRef = doc(db, 'missions', missionId, 'partner', user.uid);
             const partnerSnap = await getDoc(partnerRef);
             if (partnerSnap.exists()) {
               userRoleInMission = 'partner';
@@ -99,7 +99,7 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
   // Get last message chat
   const getLastMessage = async (missionId) => {
     try {
-      const chatRef = collection(db, 'Missions', missionId, 'chat');
+      const chatRef = collection(db, 'missions', missionId, 'chat');
       const q = query(
         chatRef,
         where('__name__', '!=', '_meta'),

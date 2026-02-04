@@ -238,7 +238,7 @@ export default function Profile() {
         let profileData = docSnap.exists() ? docSnap.data() : mockProfile;
 
         // Calculate total points earned across all events
-        const missionsRef = collection(db, "Missions");
+        const missionsRef = collection(db, "missions");
         const missionsSnap = await getDocs(missionsRef);
         let totalPoints = 0;
         let registeredEvents = [];
@@ -249,7 +249,7 @@ export default function Profile() {
           const eventTitle = eventData.title || eventId;
           
           // Check if user is a volunteer
-          const volunteerRef = doc(db, "Missions", eventId, "volunteer", user.uid);
+          const volunteerRef = doc(db, "missions", eventId, "volunteer", user.uid);
           const volunteerSnap = await getDoc(volunteerRef);
           
           if (volunteerSnap.exists()) {

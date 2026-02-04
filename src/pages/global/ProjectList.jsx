@@ -34,14 +34,14 @@ export default function ProjectList({ mode = "admin" }) {
     useEffect(() => {
         const fetchMissions = async () => {
             try {
-                const snap = await getDocs(collection(db, "Missions"));
+                const snap = await getDocs(collection(db, "missions"));
                 const rows = snap.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),
                 }));
                 setProjects(rows);
             } catch (err) {
-                console.error("Failed to load Missions:", err);
+                console.error("Failed to load missions:", err);
                 setProjects([]);
             } finally {
                 setLoading(false);
@@ -70,7 +70,7 @@ export default function ProjectList({ mode = "admin" }) {
     };
     //for approval
     const handleSendForApproval = async (projectId) => {
-        const ref = doc(db, "Missions", projectId);
+        const ref = doc(db, "missions", projectId);
 
         await updateDoc(ref, {
             status: "for_approval",
@@ -83,7 +83,7 @@ export default function ProjectList({ mode = "admin" }) {
     //updating firestore fields to "approved/rejected project"
     const handlePartnerApprove = async (projectId) => {
         console.log("APPROVE CLICKED:", projectId);
-        const ref = doc(db, "Missions", projectId);
+        const ref = doc(db, "missions", projectId);
         await updateDoc(ref, {
             status: "approved",
             "approvals.partner.approved": true,
@@ -93,7 +93,7 @@ export default function ProjectList({ mode = "admin" }) {
     };
 
     const handlePartnerReject = async (projectId) => {
-        const ref = doc(db, "Missions", projectId);
+        const ref = doc(db, "missions", projectId);
 
         await updateDoc(ref, {
             status: "rejected",
@@ -103,7 +103,7 @@ export default function ProjectList({ mode = "admin" }) {
         });
     };
     const handleFacultyApprove = async (projectId) => {
-        const ref = doc(db, "Missions", projectId);
+        const ref = doc(db, "missions", projectId);
 
         await updateDoc(ref, {
             status: "to_publish",
@@ -115,7 +115,7 @@ export default function ProjectList({ mode = "admin" }) {
 
 
     const handleFacultyReject = async (projectId) => {
-        const ref = doc(db, "Missions", projectId);
+        const ref = doc(db, "missions", projectId);
 
         await updateDoc(ref, {
             status: "rejected",
@@ -126,7 +126,7 @@ export default function ProjectList({ mode = "admin" }) {
         });
     };
     const handlePublish = async (projectId) => {
-        const ref = doc(db, "Missions", projectId);
+        const ref = doc(db, "missions", projectId);
 
         await updateDoc(ref, {
             status: "published",

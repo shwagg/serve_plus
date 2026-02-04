@@ -30,7 +30,7 @@ export default function ProjectDetails() {
   const handleRegenerateQR = async () => {
     const newTimestamp = Date.now();
     try {
-      const ref = doc(db, "Missions", projectId);
+      const ref = doc(db, "missions", projectId);
       await updateDoc(ref, {
         validQRTimestamp: newTimestamp,
         updatedAt: serverTimestamp()
@@ -47,7 +47,7 @@ export default function ProjectDetails() {
     if (!projectId || !showQR) return;
     const fetchAttendees = async () => {
       try {
-        const volunteerRef = collection(db, "Missions", projectId, "volunteer");
+        const volunteerRef = collection(db, "missions", projectId, "volunteer");
         const snap = await getDocs(volunteerRef);
         
         // All volunteers with their status
@@ -103,7 +103,7 @@ export default function ProjectDetails() {
 
   // Removed duplicate state declarations for project, loading, saving, showQR, qrUrl
 
-  const ref = doc(db, "Missions", projectId);
+  const ref = doc(db, "missions", projectId);
 
   const load = async () => {
     setLoading(true);
@@ -138,7 +138,7 @@ export default function ProjectDetails() {
 
   const loadTaskCount = async () => {
     try {
-      const tasksRef = collection(db, "Missions", projectId, "task");
+      const tasksRef = collection(db, "missions", projectId, "task");
       const snap = await getDocs(tasksRef);
       setTaskCount(snap.size);
     } catch (e) {
@@ -152,7 +152,7 @@ export default function ProjectDetails() {
       // Initialize validQRTimestamp in Firestore if it doesn't exist
       const initializeQRTimestamp = async () => {
         try {
-          const ref = doc(db, "Missions", projectId);
+          const ref = doc(db, "missions", projectId);
           const snap = await getDoc(ref);
           if (snap.exists()) {
             const data = snap.data();

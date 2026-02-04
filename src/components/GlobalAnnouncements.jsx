@@ -88,7 +88,7 @@ const GlobalAnnouncements = () => {
     const fetchAnnouncements = async () => {
       try {
         // Fetch the latest event proposals from Firestore (from 'Missions' collection)
-        const q = query(collection(db, "Missions"));
+        const q = query(collection(db, "missions"));
         const querySnapshot = await getDocs(q);
         const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('Fetched event IDs:', events.map(e => e.id));
@@ -102,7 +102,7 @@ const GlobalAnnouncements = () => {
         const milestoneArr = [];
         for (const event of events) {
           try {
-            const volunteerCol = collection(db, `Missions/${event.id}/volunteer`);
+            const volunteerCol = collection(db, `missions/${event.id}/volunteer`);
             const volunteerSnap = await getDocs(volunteerCol);
             const count = volunteerSnap.size;
             let milestoneTime = null;
