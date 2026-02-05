@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   collection,
@@ -13,7 +13,8 @@ import {
   limit,
   startAt
 } from 'firebase/firestore';
-import { auth, db } from '../../firebaseConfig';
+import { auth, db, storage } from '../../firebaseConfig';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getChatParticipants } from '../../utils/chatUtils';
 import Header from '../../components/Header';
 import '../../styles/Chat.css';
@@ -33,7 +34,19 @@ export default function Chat() {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [participants, setParticipants] = useState([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState(null);
+  const fileInputRef = useRef(null);
   const MESSAGES_PER_PAGE = 20; //pwede ichange to para ma-adjust yung messages per load
+  const ALLOWED_MIME_TYPES = new Set([
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  ]);
+  const MAX_IMAGE_DIMENSION = 1280;
+  const IMAGE_QUALITY = 0.7;
 
   // Fetch all missions for the user
   useEffect(() => {
@@ -125,7 +138,10 @@ export default function Chat() {
             .map(d => ({ id: d.id, ...d.data() }))
             .find(msg => msg.id !== '_meta');
 
-          if (lastMsg) lastMsgs[mission.id] = lastMsg.text || '';
+          if (lastMsg) {
+            lastMsgs[mission.id] =
+              lastMsg.text || lastMsg.fileName || 'Attachment';
+          }
         } catch (err) {
           console.error('Error fetching last message:', err);
         }
@@ -184,6 +200,14 @@ export default function Chat() {
   }, [selectedMission]);
 
   const handleSendMessage = async () => {
+    if (pendingAttachment) {
+      const uploadFile = pendingAttachment.type.startsWith('image/')
+        ? await compressImage(pendingAttachment)
+        : pendingAttachment;
+      await handleSendAttachment(uploadFile);
+      return;
+    }
+
     if (!messageInput.trim() || !selectedMission) return;
 
     try {
@@ -206,6 +230,100 @@ export default function Chat() {
       setMessageInput('');
     } catch (err) {
       console.error('Error sending message:', err);
+    }
+  };
+
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAttachmentChange = e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+      alert('Only JPEG, PNG, PDF, and Excel files are allowed.');
+      e.target.value = '';
+      return;
+    }
+
+    setPendingAttachment(file);
+    e.target.value = '';
+  };
+
+  const handleRemoveAttachment = () => {
+    setPendingAttachment(null);
+  };
+
+  const compressImage = async file => {
+    const bitmap = await createImageBitmap(file);
+    let { width, height } = bitmap;
+
+    if (width > height && width > MAX_IMAGE_DIMENSION) {
+      height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
+      width = MAX_IMAGE_DIMENSION;
+    } else if (height >= width && height > MAX_IMAGE_DIMENSION) {
+      width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
+      height = MAX_IMAGE_DIMENSION;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    const blob = await new Promise(resolve =>
+      canvas.toBlob(
+        resolve,
+        file.type || 'image/jpeg',
+        file.type === 'image/png' ? undefined : IMAGE_QUALITY
+      )
+    );
+
+    return new File([blob], file.name, {
+      type: blob.type || file.type,
+      lastModified: file.lastModified
+    });
+  };
+
+  const handleSendAttachment = async file => {
+    if (!selectedMission || !file) return;
+
+    try {
+      setUploadingAttachment(true);
+
+      const user = auth.currentUser;
+      if (!user) throw new Error('No user logged in');
+
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `chat-attachments/${selectedMission.id}/${user.uid}_${Date.now()}_${safeName}`;
+      const storageRef = ref(storage, storagePath);
+
+      await uploadBytes(storageRef, file, { contentType: file.type });
+      const downloadURL = await getDownloadURL(storageRef);
+
+      await addDoc(collection(db, 'missions', selectedMission.id, 'chat'), {
+        senderId: user.uid,
+        senderName: userData.name || user.displayName || 'User',
+        senderRole: selectedMission.role,
+        type: 'attachment',
+        fileUrl: downloadURL,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        timestamp: serverTimestamp()
+      });
+
+      setPendingAttachment(null);
+    } catch (err) {
+      console.error('Error sending attachment:', err);
+      alert('Failed to upload attachment. Please try again.');
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -353,9 +471,35 @@ export default function Chat() {
                             </div>
                           )}
                           <div className="chat-message-bubble">
-                            <div className="chat-message-text">
-                              {message.text}
-                            </div>
+                              {message.type === 'attachment' ? (
+                                <div className="chat-message-text">
+                                  {message.fileType?.startsWith('image/') ? (
+                                    <a
+                                      href={message.fileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      <img
+                                        src={message.fileUrl}
+                                        alt={message.fileName || 'Attachment'}
+                                        style={{ maxWidth: 220, borderRadius: 8 }}
+                                      />
+                                    </a>
+                                  ) : (
+                                    <a
+                                      href={message.fileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      {message.fileName || 'Attachment'}
+                                    </a>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="chat-message-text">
+                                  {message.text}
+                                </div>
+                              )}
                           </div>
                         </div>
                       </div>
@@ -364,10 +508,49 @@ export default function Chat() {
                 )}
               </div>
 
+              {pendingAttachment && (
+                <div className="chat-attachment-preview">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {pendingAttachment.type.startsWith('image/') ? (
+                      <img
+                        src={URL.createObjectURL(pendingAttachment)}
+                        alt="preview"
+                        style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{ width: '40px', height: '40px', backgroundColor: '#ddd', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📄</div>
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px' }}>{pendingAttachment.name}</div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>{(pendingAttachment.size / 1024).toFixed(2)} KB</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveAttachment}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <div className="chat-input-area">
-                <button className="chat-input-icon">
+                <button
+                  type="button"
+                  className="chat-input-icon"
+                  onClick={handleAttachmentClick}
+                  disabled={uploadingAttachment}
+                >
                   <img src={attachIcon} alt="Attach" width="20" height="20" />
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".jpeg,.jpg,.png,.pdf,.xls,.xlsx"
+                  style={{ display: 'none' }}
+                  onChange={handleAttachmentChange}
+                />
 
                 <input
                   type="text"
@@ -386,6 +569,7 @@ export default function Chat() {
                 <button
                   className="chat-send-button"
                   onClick={handleSendMessage}
+                  disabled={uploadingAttachment || (!messageInput.trim() && !pendingAttachment)}
                 >
                   <img src={sendIcon} alt="Send" width="20" height="20" />
                 </button>

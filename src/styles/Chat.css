@@ -450,3 +450,13 @@
     max-width: 85%;
   }
 }
+
+.chat-attachment-preview {
+  padding: 12px 16px;
+  background-color: #2DBABA;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
