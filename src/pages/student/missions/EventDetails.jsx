@@ -132,7 +132,7 @@ export default function EventDetails() {
       const userData = userDoc.exists() ? userDoc.data() : {};
       const userName = userData.name || user.displayName || '';
       const userEmail = user.email || '';
-      const volunteerRef = doc(db, 'Missions', id, 'volunteer', user.uid);
+      const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
       await setDoc(volunteerRef, {
         joinedAt: new Date().toISOString(),
         attendanceStatus: 'pending',
@@ -173,33 +173,8 @@ export default function EventDetails() {
           </ul>
           <button
             className="event-details-join-btn"
-            onClick={async () => {
-              const user = auth.currentUser;
-              if (!user) {
-                alert('Please log in to join this event.');
-                return;
-              }
-              try {
-                // Get user data from users collection
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                const userData = userDoc.exists() ? userDoc.data() : {};
-                const userName = userData.name || user.displayName || '';
-                const userEmail = user.email || '';
-
-                const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
-                await setDoc(volunteerRef, {
-                  joinedAt: new Date().toISOString(),
-                  attendanceStatus: 'pending',
-                  pointsEarned: 0,
-                  verified: false,
-                  name: userName,
-                  email: userEmail
-                });
-                navigate(`/event/${id}/activity`);
-              } catch (error) {
-                console.error('Error joining event:', error);
-                alert('Failed to join event. Please try again.');
-              }
+            onClick={() => {
+              setShowSurveyModal(true);
             }}
           >
             JOIN EVENT
@@ -211,15 +186,37 @@ export default function EventDetails() {
         onClose={() => setShowSurveyModal(false)}
         screenshot={screenshot}
         setScreenshot={setScreenshot}
-        onSubmit={() => {
+        onSubmit={async () => {
           if (!screenshot) {
             alert('Please upload a screenshot as proof.');
             return;
           }
-          setSurveyCompleted(true);
-          setShowSurveyModal(false);
-          // Redirect to event details/activity page
-          navigate(`/event/${id}/activity`);
+          const user = auth.currentUser;
+          if (!user) {
+            alert('Please log in to join this event.');
+            return;
+          }
+          try {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            const userData = userDoc.exists() ? userDoc.data() : {};
+            const userName = userData.name || user.displayName || '';
+            const userEmail = user.email || '';
+            const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
+            await setDoc(volunteerRef, {
+              joinedAt: new Date().toISOString(),
+              attendanceStatus: 'pending',
+              pointsEarned: 0,
+              verified: false,
+              name: userName,
+              email: userEmail
+            });
+            setSurveyCompleted(true);
+            setShowSurveyModal(false);
+            navigate(`/event/${id}/activity`);
+          } catch (error) {
+            console.error('Error joining event:', error);
+            alert('Failed to join event. Please try again.');
+          }
         }}
       />
       {/* Community Updates Toggle Button and Slide-in Panel */}
