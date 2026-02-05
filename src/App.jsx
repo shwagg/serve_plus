@@ -23,6 +23,7 @@ import PartnerHome from "./pages/partner/PartnerHome";
 import EventDetails from "./pages/student/missions/EventDetails";
 import EventActivity from "./pages/student/missions/EventActivity";
 import Profile from "./pages/global/Profile";
+import Chat from "./pages/global/Chat";
 import "./App.css";
 
 function App() {
@@ -111,6 +112,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat/:missionId"
+            element={
+              <ProtectedRoute>
+                <Chat />
               </ProtectedRoute>
             }
           />

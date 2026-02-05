@@ -99,6 +99,7 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
   // Get last message chat
   const getLastMessage = async (missionId) => {
     try {
+      const user = auth.currentUser;
       const chatRef = collection(db, 'missions', missionId, 'chat');
       const q = query(
         chatRef,
@@ -110,7 +111,15 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
       
       if (snapshot.empty) return '';
       const lastMsg = snapshot.docs[0].data();
-      return lastMsg.text || lastMsg.senderName || 'Message sent';
+      
+      // If sender is not the current user, show their name with the message
+      if (lastMsg.senderId !== user.uid) {
+        const senderName = lastMsg.senderName || 'User';
+        return `${senderName}: ${lastMsg.text || 'Message sent'}`;
+      }
+      
+      // If it's the current user's message, show "You" with the message
+      return `You: ${lastMsg.text || 'Message sent'}`;
     } catch (err) {
       return '';
     }

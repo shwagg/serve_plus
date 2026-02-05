@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,6 +21,7 @@ const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence); // Ensure persistence
 const db = getFirestore(app);
 const functions = getFunctions(app, "us-central1");
+const storage = getStorage(app);
 
 // Connect to emulators (LOCAL ONLY)
 let emulatorsConnected = false;
@@ -28,6 +30,7 @@ if (import.meta.env.DEV) {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);
+  connectStorageEmulator(storage, "localhost", 9199);
 }
 
-export { auth, db, functions };
+export { auth, db, functions, storage };
