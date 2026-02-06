@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { createNotification } from '../../../utils/notificationUtils';
 import Header from '../../../components/Header';
 import GlobalAnnouncements from '../../../components/GlobalAnnouncements';
 import '../../../styles/student.css';
@@ -80,6 +81,7 @@ function SurveyModal({ open, onClose, onSubmit, screenshot, setScreenshot }) {
 
 export default function EventDetails() {
   const [open, setOpen] = useState(false);
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyCompleted, setSurveyCompleted] = useState(false);
   const [screenshot, setScreenshot] = useState(null);
@@ -87,6 +89,18 @@ export default function EventDetails() {
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkCount = () => {
+      if (window.announcementActions?.getUnreadCount) {
+        setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
+      }
+    };
+
+    checkCount();
+    const interval = setInterval(checkCount, 500);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function fetchMission() {
@@ -140,6 +154,17 @@ export default function EventDetails() {
         verified: false,
         name: userName,
         email: userEmail
+      });
+
+      await createNotification(user.uid, {
+        type: 'event_registration',
+        title: 'Registration Submitted',
+        message: `Your registration for "${mission?.title || 'Event'}" is submitted.`,
+        link: `/event/${id}/activity`,
+        metadata: {
+          status: 'submitted',
+          eventId: id,
+        },
       });
       navigate(`/event/${id}/activity`);
     } catch (error) {
@@ -210,6 +235,16 @@ export default function EventDetails() {
               name: userName,
               email: userEmail
             });
+            await createNotification(user.uid, {
+              type: 'event_registration',
+              title: 'Registration Submitted',
+              message: `Your registration for "${mission?.title || 'Event'}" is submitted.`,
+              link: `/event/${id}/activity`,
+              metadata: {
+                status: 'submitted',
+                eventId: id,
+              },
+            });
             setSurveyCompleted(true);
             setShowSurveyModal(false);
             navigate(`/event/${id}/activity`);
@@ -240,31 +275,33 @@ export default function EventDetails() {
         }}
       >
         📢 Update
-        <span className="global-feed-badge">1</span>
+        {announcementUnreadCount > 0 && (
+          <span className="global-feed-badge">{announcementUnreadCount}</span>
+        )}
       </button>
-      {open && (
-        <aside className="global-feed open"
-          style={{
-            position: 'fixed',
-            top: 80,
-            right: 0,
-            height: 'calc(100vh - 80px)',
-            width: 380,
-            background: '#fff',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            borderLeft: '2px solid #30bdb7',
-            zIndex: 999,
-            transition: 'transform 0.3s'
-          }}>
-          <div className="global-feed-header">
-            <h3 className="global-feed-title">Community Updates</h3>
-            <p className="global-feed-subtitle">Whats happening this week</p>
-          </div>
-          <div className="global-feed-list">
-            <GlobalAnnouncements />
-          </div>
-        </aside>
-      )}
+      <aside className={`global-feed ${open ? 'open' : ''}`}
+        style={{
+          position: 'fixed',
+          top: 80,
+          right: 0,
+          height: 'calc(100vh - 80px)',
+          width: 380,
+          background: '#fff',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          borderLeft: '2px solid #30bdb7',
+          zIndex: 999,
+          transition: 'transform 0.3s',
+          transform: open ? 'translateX(0)' : 'translateX(100%)',
+          pointerEvents: open ? 'auto' : 'none'
+        }}>
+        <div className="global-feed-header">
+          <h3 className="global-feed-title">Community Updates</h3>
+          <p className="global-feed-subtitle">Whats happening this week</p>
+        </div>
+        <div className="global-feed-list">
+          <GlobalAnnouncements />
+        </div>
+      </aside>
     </div>
   );
 }

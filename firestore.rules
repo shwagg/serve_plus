@@ -9,6 +9,16 @@ service cloud.firestore {
         (request.auth.uid == userId || 
          request.auth.token.role == "admin" ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
+
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Global announcement read tracking
+      match /globalAnnouncementReads/{readId} {
+        allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // Allow open read access for development
@@ -103,6 +113,8 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null;
     }
+
+    
 
     // Proposal collection - authenticated users can create proposals
     match /proposal/{proposalId} {

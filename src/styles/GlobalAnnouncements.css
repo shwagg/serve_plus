@@ -60,10 +60,10 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
 .global-feed-item.milestone {
-  margin-bottom: 16px;
   background: #e6ffe6 !important;
   border: 2px solid #b2e6b2 !important;
 }
@@ -81,7 +81,7 @@
 }
 
 .global-feed-item.new {
-  margin-bottom: 30px;
+  margin-bottom: 12px;
 }
 
 .global-feed-item.new.unseen {
@@ -97,7 +97,7 @@
 }
 
 .global-feed-item.closing-soon {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   background: #ffe6e6 !important;
   border: 2px solid #ffb3b3 !important;
 }
@@ -111,6 +111,19 @@
 .global-feed-item.closing-soon.seen {
   background: #ffe6e6;
   border: 2px solid #ffb3b3;
+  opacity: 0.7;
+}
+
+.global-feed-item.info {
+  background: #e8f7ff;
+  border: 2px solid #bfe6ff;
+}
+
+.global-feed-item.info.unseen {
+  opacity: 1;
+}
+
+.global-feed-item.info.seen {
   opacity: 0.7;
 }
 

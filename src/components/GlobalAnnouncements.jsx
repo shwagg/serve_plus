@@ -1,74 +1,161 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import {
+  collection,
+  doc,
+  getDocs,
+  query,
+  orderBy,
+  limit,
+  serverTimestamp,
+  setDoc,
+  where,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "../firebaseConfig";
 import "../styles/GlobalAnnouncements.css";
 
 const GlobalAnnouncements = () => {
+  const sdgLabelMap = {
+    1: 'No Poverty',
+    2: 'Zero Hunger',
+    3: 'Good Health and Well-Being',
+    4: 'Quality Education',
+    5: 'Gender Equality',
+    6: 'Clean Water and Sanitation',
+    7: 'Affordable and Clean Energy',
+    8: 'Decent Work and Economic Growth',
+    9: 'Industry, Innovation, and Infrastructure',
+    10: 'Reduced Inequalities',
+    11: 'Sustainable Cities and Communities',
+    12: 'Responsible Consumption and Production',
+    13: 'Climate Action',
+    14: 'Life Below Water',
+    15: 'Life on Land',
+    16: 'Peace, Justice, and Strong Institutions',
+    17: 'Partnership for the Goals',
+  };
+
+  const normalizeSdgLabel = (sdg) => {
+    if (sdg === null || sdg === undefined) return '';
+    const raw = String(sdg).trim();
+    if (!raw) return '';
+    const num = Number(raw);
+    if (!Number.isNaN(num) && sdgLabelMap[num]) return sdgLabelMap[num];
+    return raw;
+  };
   const [announcements, setAnnouncements] = useState([]);
-  const [announcementCount, setAnnouncementCount] = useState(0); // total announcements
   const [unreadCount, setUnreadCount] = useState(0); // count of unseen announcements
-  const [lastAnnouncementTimestamp, setLastAnnouncementTimestamp] = useState(null); // last announcement time
+  const [userId, setUserId] = useState(null);
+  const [seenKeys, setSeenKeys] = useState(new Set());
 
   const [milestones, setMilestones] = useState([]); // [{eventId, title, count}]
+  const [extraAnnouncements, setExtraAnnouncements] = useState([]); // SDG impact announcements
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [modalType, setModalType] = useState('event'); // 'event', 'closing', or 'milestone'
+  const [modalType, setModalType] = useState('event'); // 'event', 'closing', 'milestone', or 'info'
 
-  // Load seen announcements from localStorage
-  const getSeenAnnouncements = () => {
+  const toKey = (type, id) => `${type}:${id}`;
+
+  const markAsSeen = async (id, type = 'event') => {
+    const key = toKey(type, id);
+    if (seenKeys.has(key)) return;
+
+    const next = new Set(seenKeys);
+    next.add(key);
+    setSeenKeys(next);
+
+    if (!userId) {
+      calculateUnreadCount(next);
+      return;
+    }
+
     try {
-      const seen = localStorage.getItem('seenAnnouncements');
-      return seen ? JSON.parse(seen) : { events: [], milestones: [], closingSoon: [] };
-    } catch {
-      return { events: [], milestones: [], closingSoon: [] };
+      const readRef = doc(db, 'users', userId, 'globalAnnouncementReads', key);
+      await setDoc(readRef, {
+        type,
+        announcementId: id,
+        readAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Failed to mark announcement as read:', err);
     }
   };
 
-  // Mark announcement as seen
-  const markAsSeen = (id, type = 'event') => {
-    const seen = getSeenAnnouncements();
-    if (type === 'milestone' && !seen.milestones.includes(id)) {
-      seen.milestones.push(id);
-    } else if (type === 'closing' && !seen.closingSoon.includes(id)) {
-      seen.closingSoon.push(id);
-    } else if (type === 'event' && !seen.events.includes(id)) {
-      seen.events.push(id);
+  const markAllAsRead = async () => {
+    const keys = [];
+
+    announcements.forEach((event) => {
+      keys.push(toKey('event', event.id));
+      if (isClosingSoon(event.targetDates)) {
+        keys.push(toKey('closing', event.id));
+      }
+    });
+
+    milestones.forEach((milestone) => {
+      keys.push(toKey('milestone', milestone.eventId + '-milestone'));
+    });
+
+    extraAnnouncements.forEach((info) => {
+      keys.push(toKey('info', info.id));
+    });
+
+    const next = new Set(keys);
+    setSeenKeys(next);
+
+    if (!userId) {
+      calculateUnreadCount(next);
+      return;
     }
-    localStorage.setItem('seenAnnouncements', JSON.stringify(seen));
-    calculateUnreadCount();
+
+    try {
+      const batch = writeBatch(db);
+      keys.forEach((key) => {
+        const [type, announcementId] = key.split(':');
+        const readRef = doc(db, 'users', userId, 'globalAnnouncementReads', key);
+        batch.set(readRef, {
+          type,
+          announcementId,
+          readAt: serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error('Failed to mark all announcements as read:', err);
+    }
   };
 
-  const markAllAsRead = () => {
-    const allEventIds = announcements.map(a => a.id);
-    const allMilestoneIds = milestones.map(m => m.eventId + '-milestone');
-    const allClosingIds = announcements.filter(a => isClosingSoon(a.targetDates)).map(a => a.id);
-    
-    const seen = {
-      events: allEventIds,
-      milestones: allMilestoneIds,
-      closingSoon: allClosingIds
-    };
-    localStorage.setItem('seenAnnouncements', JSON.stringify(seen));
-    calculateUnreadCount();
+  const markAllAsUnread = async () => {
+    setSeenKeys(new Set());
+
+    if (!userId) {
+      calculateUnreadCount(new Set());
+      return;
+    }
+
+    try {
+      const readSnap = await getDocs(collection(db, 'users', userId, 'globalAnnouncementReads'));
+      const batch = writeBatch(db);
+      readSnap.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error('Failed to mark all announcements as unread:', err);
+    }
   };
 
-  const markAllAsUnread = () => {
-    localStorage.setItem('seenAnnouncements', JSON.stringify({ events: [], milestones: [], closingSoon: [] }));
-    calculateUnreadCount();
-  };
-
-  const calculateUnreadCount = () => {
-    const seen = getSeenAnnouncements();
+  const calculateUnreadCount = (overrideSeen = null) => {
+    const currentSeen = overrideSeen || seenKeys;
     let count = 0;
 
     // Count unseen event announcements
     announcements.forEach(event => {
-      if (!seen.events.includes(event.id)) {
+      if (!currentSeen.has(toKey('event', event.id))) {
         count++;
       }
       // Count unseen closing soon announcements
-      if (isClosingSoon(event.targetDates) && !seen.closingSoon.includes(event.id)) {
+      if (isClosingSoon(event.targetDates) && !currentSeen.has(toKey('closing', event.id))) {
         count++;
       }
     });
@@ -76,7 +163,14 @@ const GlobalAnnouncements = () => {
     // Count unseen milestones
     milestones.forEach(milestone => {
       const milestoneId = milestone.eventId + '-milestone';
-      if (!seen.milestones.includes(milestoneId)) {
+      if (!currentSeen.has(toKey('milestone', milestoneId))) {
+        count++;
+      }
+    });
+
+    // Count unseen SDG announcements
+    extraAnnouncements.forEach(info => {
+      if (!currentSeen.has(toKey('info', info.id))) {
         count++;
       }
     });
@@ -93,13 +187,12 @@ const GlobalAnnouncements = () => {
         const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('Fetched event IDs:', events.map(e => e.id));
         setAnnouncements(events);
-        setAnnouncementCount(querySnapshot.size);
-        if (events.length > 0) {
-          setLastAnnouncementTimestamp(events[0].createdAt?.toDate ? events[0].createdAt.toDate() : null);
-        }
+        
 
         // For each event, check volunteer count in subcollection 'volunteer'
         const milestoneArr = [];
+        const extraArr = [];
+        const sdgCounts = new Map();
         for (const event of events) {
           try {
             const volunteerCol = collection(db, `missions/${event.id}/volunteer`);
@@ -119,12 +212,39 @@ const GlobalAnnouncements = () => {
               milestoneTime = joinDates[2] || null; // change index based on milestone number
               milestoneArr.push({ eventId: event.id, title: event.title || 'Untitled Event', count, milestoneTime });
             }
+            // Track SDG usage across missions
+            if (Array.isArray(event.sdgs)) {
+              event.sdgs.forEach((sdg) => {
+                const key = normalizeSdgLabel(sdg);
+                if (!key) return;
+                sdgCounts.set(key, (sdgCounts.get(key) || 0) + 1);
+              });
+            }
+
             console.log(`Event: ${event.title || event.id}, ID: ${event.id}, Volunteers: ${count}`);
           } catch (err) {
             console.warn(`Error checking volunteers for event ${event.id}:`, err);
           }
         }
+        // SDG impact announcement: most common SDG across all missions
+        if (sdgCounts.size > 0) {
+          const maxCount = Math.max(...sdgCounts.values());
+          const mostCommon = Array.from(sdgCounts.entries())
+            .filter(([, count]) => count === maxCount)
+            .map(([sdg]) => sdg);
+          const sdgLabel = mostCommon.length === 1 ? mostCommon[0] : mostCommon.join(', ');
+          extraArr.push({
+            id: 'sdg-most-common',
+            type: 'info',
+            title: 'SDG Impact',
+            message: `Most common SDG across missions: ${sdgLabel} — used in ${maxCount} mission${maxCount !== 1 ? 's' : ''}.`,
+            link: '/student/home',
+            createdAt: new Date(),
+          });
+        }
+
         setMilestones(milestoneArr);
+        setExtraAnnouncements(extraArr);
       } catch (error) {
         console.error("Error fetching announcements:", error);
       }
@@ -132,10 +252,46 @@ const GlobalAnnouncements = () => {
     fetchAnnouncements();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setUserId(user?.uid || null);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const loadReads = async () => {
+      if (!userId) {
+        setSeenKeys(new Set());
+        return;
+      }
+      try {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 200);
+
+        const readsRef = collection(db, 'users', userId, 'globalAnnouncementReads');
+        const recentSnap = await getDocs(query(readsRef, where('readAt', '>=', cutoff)));
+        const next = new Set(recentSnap.docs.map((docSnap) => docSnap.id));
+        setSeenKeys(next);
+
+        const oldSnap = await getDocs(query(readsRef, where('readAt', '<', cutoff)));
+        if (!oldSnap.empty) {
+          const batch = writeBatch(db);
+          oldSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+          await batch.commit();
+        }
+      } catch (err) {
+        console.error('Failed to load announcement reads:', err);
+      }
+    };
+
+    loadReads();
+  }, [userId]);
+
   // Recalculate unread count when announcements or milestones change
   useEffect(() => {
     calculateUnreadCount();
-  }, [announcements, milestones]);
+  }, [announcements, milestones, extraAnnouncements, seenKeys]);
 
 
   // Helper: get registration closing date (2 days before event)
@@ -173,7 +329,7 @@ const GlobalAnnouncements = () => {
     setSelectedEvent(null);
   };
 
-  const seen = getSeenAnnouncements();
+  const seen = useMemo(() => seenKeys, [seenKeys]);
 
   // Combine all announcements and sort by timestamp
   const getAllAnnouncements = () => {
@@ -210,6 +366,16 @@ const GlobalAnnouncements = () => {
           data: event
         });
       }
+    });
+
+    // Add SDG impact announcements
+    extraAnnouncements.forEach(info => {
+      allItems.push({
+        type: 'info',
+        id: info.id,
+        timestamp: info.createdAt || new Date(0),
+        data: info
+      });
     });
 
     // Sort by timestamp, newest first
@@ -259,7 +425,7 @@ const GlobalAnnouncements = () => {
         sortedAnnouncements.map(item => {
           if (item.type === 'milestone') {
             const milestone = item.data;
-            const isUnseen = !seen.milestones.includes(item.id);
+            const isUnseen = !seen.has(toKey('milestone', item.id));
             return (
               <div
                 key={item.id}
@@ -282,7 +448,7 @@ const GlobalAnnouncements = () => {
             );
           } else if (item.type === 'closing') {
             const event = item.data;
-            const isClosingUnseen = !seen.closingSoon.includes(event.id);
+            const isClosingUnseen = !seen.has(toKey('closing', event.id));
             return (
               <div
                 key={item.id}
@@ -323,11 +489,34 @@ const GlobalAnnouncements = () => {
                 </div>
               </div>
             );
+          } else if (item.type === 'info') {
+            const info = item.data;
+            const isInfoUnseen = !seen.has(toKey('info', item.id));
+            return (
+              <div
+                key={item.id}
+                className={`global-feed-item info ${isInfoUnseen ? 'unseen' : 'seen'}`}
+                onClick={() => {
+                  markAsSeen(item.id, 'info');
+                  openModal(info, 'info');
+                }}
+              >
+                <span className="feed-icon">🌍</span>
+                <div className="feed-content">
+                  {isInfoUnseen && <span className="unread-dot"></span>}
+                  <p className="feed-title">{info.title || 'SDG Impact'}</p>
+                  <p className="feed-desc">{info.message}</p>
+                  <span className="feed-time">
+                    {info.createdAt ? info.createdAt.toLocaleString() : ''}
+                  </span>
+                </div>
+              </div>
+            );
           } else {
             // Regular event announcement
             const event = item.data;
             const { icon, className } = getIconAndClass(event);
-            const isEventUnseen = !seen.events.includes(event.id);
+            const isEventUnseen = !seen.has(toKey('event', event.id));
             return (
               <div
                 key={item.id}
@@ -395,6 +584,23 @@ const GlobalAnnouncements = () => {
                   <a href={`/event/${selectedEvent.id}`} className="modal-cta-btn">
                     View Event Details
                   </a>
+                </div>
+              </>
+            ) : modalType === 'info' ? (
+              <>
+                <div className="modal-icon">🌍</div>
+                <h2 className="modal-title">
+                  {selectedEvent.title || 'SDG Impact'}
+                </h2>
+                {selectedEvent.message && (
+                  <p className="modal-section-content">{selectedEvent.message}</p>
+                )}
+                <div className="modal-footer">
+                  {selectedEvent.link && (
+                    <a href={selectedEvent.link} className="modal-cta-btn">
+                      View Event Details
+                    </a>
+                  )}
                 </div>
               </>
             ) : modalType === 'closing' ? (

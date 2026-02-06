@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import './Header.css';
 import chatIcon from '../assets/headassets/Chat Icon.svg';
-import notificationIcon from '../assets/headassets/Notification Icon.svg';
+import NotificationBell from './NotificationBell';
 import menuIcon from '../assets/headassets/Menu Icon.svg';
 import serveIcon from '../assets/serve_plus_logo.svg';
 import StudentMenu from './menu/StudentMenu';
@@ -177,11 +177,7 @@ export default function Header() {
               onClick={() => setShowChatModal(true)}>
               <img src={chatIcon} alt="Chat" width="24" height="24" />
             </button>
-            <button 
-              className="icon-button"
-              aria-label="Notification">
-              <img src={notificationIcon} alt="Notifications" width="24" height="24" />
-            </button>
+            <NotificationBell />
             <div className="menu-container" ref={menuRef}>
               <button 
                 className="icon-button menu-button"

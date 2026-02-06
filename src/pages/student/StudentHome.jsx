@@ -23,7 +23,6 @@ const StudentHome = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [menuOverlayOpen, setMenuOverlayOpen] = useState(false);
   const [chatOverlayOpen, setChatOverlayOpen] = useState(false);
-  const [notificationOverlayOpen, setNotificationOverlayOpen] = useState(false);
   const [open, setOpen] = useState(false); // Global feed panel state
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [activeTab, setActiveTab] = useState("all"); // All Missions are selected initially
@@ -206,7 +205,6 @@ const StudentHome = () => {
 
   const handleMenuOverlayToggle = () => setMenuOverlayOpen((open) => !open);
   const handleChatOverlayToggle = () => setChatOverlayOpen((open) => !open);
-  const handleNotificationOverlayToggle = () => setNotificationOverlayOpen((open) => !open);
 
 
   //leaderboard with actual data from Firestore
@@ -562,23 +560,23 @@ const StudentHome = () => {
       </button>
 
       {/* SLIDE-IN PANEL */}
-      {open && (
-        <aside className="global-feed open"
-          style={{
-            position: 'fixed',
-            top: 80,
-            right: 0,
-            height: 'calc(100vh - 80px)',
-            width: 380,
-            background: '#fff',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            borderLeft: '2px solid #30bdb7',
-            zIndex: 999,
-            transition: 'transform 0.3s'
-          }}>
-          <GlobalAnnouncements />
-        </aside>
-      )}
+      <aside className={`global-feed ${open ? 'open' : ''}`}
+        style={{
+          position: 'fixed',
+          top: 80,
+          right: 0,
+          height: 'calc(100vh - 80px)',
+          width: 380,
+          background: '#fff',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          borderLeft: '2px solid #30bdb7',
+          zIndex: 999,
+          transition: 'transform 0.3s',
+          transform: open ? 'translateX(0)' : 'translateX(100%)',
+          pointerEvents: open ? 'auto' : 'none'
+        }}>
+        <GlobalAnnouncements />
+      </aside>
     </div>
   );
 }
