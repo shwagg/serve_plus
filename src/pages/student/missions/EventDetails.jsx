@@ -3,76 +3,37 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
+
 import Header from '../../../components/Header';
 import GlobalAnnouncements from '../../../components/GlobalAnnouncements';
 import '../../../styles/student.css';
+import PreActivitySurvey from '../../../../public/forms/PreActivitySurvey';
 
-function SurveyModal({ open, onClose, onSubmit, screenshot, setScreenshot }) {
-  const [previewUrl, setPreviewUrl] = useState(null);
 
-  useEffect(() => {
-    if (screenshot) {
-      const url = URL.createObjectURL(screenshot);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    } else {
-      setPreviewUrl(null);
-    }
-  }, [screenshot]);
-
+function PreActivitySurveyModal({ open, onClose, onSubmit }) {
   if (!open) return null;
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <h2 style={{ textAlign: 'center' }}>Pre-Activity Survey Required</h2>
-        <p style={{ textAlign: 'center', maxWidth: 350 }}>
-          Please answer the pre-activity survey and upload a screenshot as proof before joining the event.
-        </p>
-        <a href="https://forms.office.com/r/DnaS8u9U9m" target="_blank" rel="noopener noreferrer" style={{ color: '#30bdb7', marginBottom: 16 }}>Go to Survey</a>
-        <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <input type="file" accept="image/*" onChange={e => setScreenshot(e.target.files[0])} style={{ margin: '0 auto' }} />
-        </div>
-        {previewUrl && (
-          <div style={{ position: 'relative', marginBottom: 16, display: 'inline-block' }}>
-            <img src={previewUrl} alt="Proof Preview" style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
-            <button
-              onClick={() => setScreenshot(null)}
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                background: 'rgba(0,0,0,0.7)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '50%',
-                width: 28,
-                height: 28,
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: 18,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 2
-              }}
-              aria-label="Remove image"
-            >
-              ×
-            </button>
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
-          <button onClick={onSubmit} style={{ padding: '10px 24px', borderRadius: 20, background: '#222', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>Submit Proof</button>
-          <button onClick={onClose} style={{ padding: '10px 24px', borderRadius: 20, background: '#222', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>Cancel</button>
-        </div>
+      <div className="modal-content modal-scrollable">
+        <PreActivitySurvey onSubmit={onSubmit} />
+        <button onClick={onClose} style={{ marginTop: 16, padding: '10px 24px', borderRadius: 8, background: '#888', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>Cancel</button>
       </div>
       <style>{`
         .modal-overlay {
           position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
           background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 2000;
         }
-        .modal-content {
-          background: #fff; padding: 32px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.18); min-width: 320px;
+        .modal-content.modal-scrollable {
+          background: #fff;
+          padding: 32px;
+          border-radius: 12px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+          min-width: 320px;
+          max-height: 90vh;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
       `}</style>
     </div>
@@ -84,7 +45,7 @@ export default function EventDetails() {
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyCompleted, setSurveyCompleted] = useState(false);
-  const [screenshot, setScreenshot] = useState(null);
+  const [surveyForm, setSurveyForm] = useState(null);
   const { id } = useParams();
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
@@ -131,11 +92,16 @@ export default function EventDetails() {
     fetchMission();
   }, [id, navigate]);
 
-  const handleJoinEvent = async () => {
-    if (!surveyCompleted) {
-      setShowSurveyModal(true);
-      return;
-    }
+  const handleJoinEvent = () => {
+    setShowSurveyModal(true);
+  };
+
+  // Called when PreActivitySurvey is submitted
+  const handleSurveySubmit = async (form) => {
+    setSurveyForm(form);
+    setSurveyCompleted(true);
+    setShowSurveyModal(false);
+    // Now register the user as a volunteer
     const user = auth.currentUser;
     if (!user) {
       alert('Please log in to join this event.');
@@ -153,7 +119,8 @@ export default function EventDetails() {
         pointsEarned: 0,
         verified: false,
         name: userName,
-        email: userEmail
+        email: userEmail,
+        preActivitySurvey: form
       });
 
       await createNotification(user.uid, {
@@ -198,61 +165,16 @@ export default function EventDetails() {
           </ul>
           <button
             className="event-details-join-btn"
-            onClick={() => {
-              setShowSurveyModal(true);
-            }}
+            onClick={handleJoinEvent}
           >
             JOIN EVENT
           </button>
         </div>
       </div>
-      <SurveyModal
+      <PreActivitySurveyModal
         open={showSurveyModal}
         onClose={() => setShowSurveyModal(false)}
-        screenshot={screenshot}
-        setScreenshot={setScreenshot}
-        onSubmit={async () => {
-          if (!screenshot) {
-            alert('Please upload a screenshot as proof.');
-            return;
-          }
-          const user = auth.currentUser;
-          if (!user) {
-            alert('Please log in to join this event.');
-            return;
-          }
-          try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            const userData = userDoc.exists() ? userDoc.data() : {};
-            const userName = userData.name || user.displayName || '';
-            const userEmail = user.email || '';
-            const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
-            await setDoc(volunteerRef, {
-              joinedAt: new Date().toISOString(),
-              attendanceStatus: 'pending',
-              pointsEarned: 0,
-              verified: false,
-              name: userName,
-              email: userEmail
-            });
-            await createNotification(user.uid, {
-              type: 'event_registration',
-              title: 'Registration Submitted',
-              message: `Your registration for "${mission?.title || 'Event'}" is submitted.`,
-              link: `/event/${id}/activity`,
-              metadata: {
-                status: 'submitted',
-                eventId: id,
-              },
-            });
-            setSurveyCompleted(true);
-            setShowSurveyModal(false);
-            navigate(`/event/${id}/activity`);
-          } catch (error) {
-            console.error('Error joining event:', error);
-            alert('Failed to join event. Please try again.');
-          }
-        }}
+        onSubmit={handleSurveySubmit}
       />
       {/* Community Updates Toggle Button and Slide-in Panel */}
       <button
