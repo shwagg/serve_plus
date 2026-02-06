@@ -318,6 +318,20 @@ const GlobalAnnouncements = () => {
     return { icon: '🆕', className: 'new' };
   };
 
+  const formatTimeAgo = (date) => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay > 0) return diffDay === 1 ? '1 day ago' : `${diffDay} days ago`;
+    if (diffHour > 0) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+    if (diffMin > 0) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+    return 'just now';
+  };
+
   const openModal = (event, type = 'event') => {
     setSelectedEvent(event);
     setModalType(type);
@@ -441,7 +455,7 @@ const GlobalAnnouncements = () => {
                   <p className="feed-title">Milestone Reached!</p>
                   <p className="feed-desc">3+ volunteers have joined <b>{milestone.title}</b>!</p>
                   <span className="feed-time">
-                    {milestone.milestoneTime ? milestone.milestoneTime.toLocaleString() : ''}
+                    {formatTimeAgo(milestone.milestoneTime)}
                   </span>
                 </div>
               </div>
@@ -507,7 +521,7 @@ const GlobalAnnouncements = () => {
                   <p className="feed-title">{info.title || 'SDG Impact'}</p>
                   <p className="feed-desc">{info.message}</p>
                   <span className="feed-time">
-                    {info.createdAt ? info.createdAt.toLocaleString() : ''}
+                    {formatTimeAgo(info.createdAt)}
                   </span>
                 </div>
               </div>
