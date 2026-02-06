@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm }) {
   const softSkills = [
@@ -22,6 +23,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
   const [username, setUsername] = useState(profile.username || "");
   const [skills, setSkills] = useState(profile.skills || []);
   const [interests, setInterests] = useState(profile.interests || []);
+  const [uploading, setUploading] = useState(false);
 
   // Reset state when modal opens or profile changes
   useEffect(() => {
@@ -35,7 +37,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
     }
   }, [open, profile]);
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -43,49 +45,71 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
         return;
       }
       
-      // Compress image before uploading
-      const img = new Image();
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      setUploading(true);
       
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        img.src = event.target.result;
-        img.onload = () => {
-          // Resize to max 400x400 while maintaining aspect ratio
-          const maxSize = 400;
-          let width = img.width;
-          let height = img.height;
-          
-          if (width > height) {
-            if (width > maxSize) {
-              height *= maxSize / width;
-              width = maxSize;
+      try {
+        // Compress image before uploading
+        const img = new Image();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          img.src = event.target.result;
+          img.onload = async () => {
+            // Resize to max 400x400 while maintaining aspect ratio
+            const maxSize = 400;
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > height) {
+              if (width > maxSize) {
+                height *= maxSize / width;
+                width = maxSize;
+              }
+            } else {
+              if (height > maxSize) {
+                width *= maxSize / height;
+                height = maxSize;
+              }
             }
-          } else {
-            if (height > maxSize) {
-              width *= maxSize / height;
-              height = maxSize;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          // Convert to base64 with compression (0.7 quality)
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          
-          // Check if still too large (Firestore limit ~1MB)
-          if (compressedDataUrl.length > 1000000) {
-            alert("Image is still too large after compression. Please choose a smaller image.");
-            return;
-          }
-          
-          setAvatar(compressedDataUrl);
+            
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Convert to blob
+            canvas.toBlob(async (blob) => {
+              try {
+                // Upload to Firebase Storage
+                const storage = getStorage();
+                const user = auth.currentUser;
+                if (!user) {
+                  alert("You must be logged in to upload an image");
+                  setUploading(false);
+                  return;
+                }
+                
+                const storageRef = ref(storage, `profile-pictures/${user.uid}/profile.jpg`);
+                await uploadBytes(storageRef, blob);
+                const downloadURL = await getDownloadURL(storageRef);
+                
+                setAvatar(downloadURL);
+                setUploading(false);
+              } catch (err) {
+                console.error("Upload error:", err);
+                alert("Failed to upload image: " + err.message);
+                setUploading(false);
+              }
+            }, 'image/jpeg', 0.7);
+          };
         };
-      };
-      reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error("Error processing image:", err);
+        alert("Failed to process image");
+        setUploading(false);
+      }
     }
   };
 
@@ -104,9 +128,10 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
                 onChange={handleImageUpload}
                 style={{ display: 'none' }}
                 id="avatar-upload"
+                disabled={uploading}
               />
-              <label htmlFor="avatar-upload" className="profile-modal-upload-btn">
-                📷 Change Picture
+              <label htmlFor="avatar-upload" className="profile-modal-upload-btn" style={{ opacity: uploading ? 0.6 : 1, cursor: uploading ? 'not-allowed' : 'pointer' }}>
+                {uploading ? '⏳ Uploading...' : '📷 Change Picture'}
               </label>
             </div>
           </div>

@@ -11,6 +11,14 @@ service firebase.storage {
       allow read: if request.auth != null;
     }
 
+    // Profile pictures: allow users to upload their own profile pictures (max 5MB)
+    match /profile-pictures/{userId}/{fileName} {
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024;
+      allow read: if request.auth != null;
+    }
+
     // Default: deny all other access
     match /{allPaths=**} {
       allow read, write: if false;
