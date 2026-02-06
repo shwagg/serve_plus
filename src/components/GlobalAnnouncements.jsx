@@ -42,7 +42,7 @@ const GlobalAnnouncements = () => {
   const markAllAsRead = () => {
     const allEventIds = announcements.map(a => a.id);
     const allMilestoneIds = milestones.map(m => m.eventId + '-milestone');
-    const allClosingIds = announcements.filter(a => isClosingSoon(a.date)).map(a => a.id);
+    const allClosingIds = announcements.filter(a => isClosingSoon(a.targetDates)).map(a => a.id);
     
     const seen = {
       events: allEventIds,
@@ -68,7 +68,7 @@ const GlobalAnnouncements = () => {
         count++;
       }
       // Count unseen closing soon announcements
-      if (isClosingSoon(event.date) && !seen.closingSoon.includes(event.id)) {
+      if (isClosingSoon(event.targetDates) && !seen.closingSoon.includes(event.id)) {
         count++;
       }
     });
@@ -202,7 +202,7 @@ const GlobalAnnouncements = () => {
       });
 
       // Add closing soon if applicable
-      if (isClosingSoon(event.date)) {
+      if (isClosingSoon(event.targetDates)) {
         allItems.push({
           type: 'closing',
           id: event.id + '-closing',
@@ -298,7 +298,7 @@ const GlobalAnnouncements = () => {
                   <p className="feed-title">Mission Closing Soon</p>
                   <p className="feed-desc">
                     {(() => {
-                      const closingDate = getClosingDate(event.date);
+                      const closingDate = getClosingDate(event.targetDates);
                       if (!closingDate || isNaN(closingDate.getTime())) return '';
                       const now = new Date();
                       const diffMs = closingDate - now;
@@ -314,9 +314,9 @@ const GlobalAnnouncements = () => {
                   </p>
                   <span className="feed-event-title">
                     {event.title || 'Untitled Event'}
-                    {event.date && (
+                    {event.targetDates && (
                       <span className="event-date-badge">
-                        Registration Closes: {getClosingDate(event.date)?.toLocaleDateString()} at {getClosingDate(event.date)?.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                        Registration Closes: {getClosingDate(event.targetDates)?.toLocaleDateString()} at {getClosingDate(event.targetDates)?.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
                       </span>
                     )}
                   </span>
@@ -406,9 +406,9 @@ const GlobalAnnouncements = () => {
                 <h3 className="modal-subtitle">
                   {selectedEvent.title || 'Untitled Event'}
                 </h3>
-                {selectedEvent.date && (
+                {selectedEvent.targetDates && (
                   <p className="modal-date">
-                    Event Date: {new Date(selectedEvent.date).toLocaleDateString()} at {new Date(selectedEvent.date).toLocaleTimeString()}
+                    Event Date: {new Date(selectedEvent.targetDates).toLocaleDateString()} at {new Date(selectedEvent.targetDates).toLocaleTimeString()}
                   </p>
                 )}
                 {selectedEvent.description && (
@@ -452,11 +452,11 @@ const GlobalAnnouncements = () => {
                     })()}
                   </p>
                 )}
-                {selectedEvent.date && (
+                {selectedEvent.targetDates && (
                   <div className="modal-date-badge">
                     <strong>Event Date:</strong>{' '}
                     <span>
-                      {new Date(selectedEvent.date).toLocaleDateString()} at {new Date(selectedEvent.date).toLocaleTimeString()}
+                      {new Date(selectedEvent.targetDates).toLocaleDateString()} at {new Date(selectedEvent.targetDates).toLocaleTimeString()}
                     </span>
                   </div>
                 )}
