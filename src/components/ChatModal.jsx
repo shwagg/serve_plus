@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs, doc, getDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import './styles/ChatModal.css';
+import { Link } from 'react-router-dom';
 
 export default function ChatModal({ isOpen, onClose, onSelectMission }) {
   const [missions, setMissions] = useState([]);
@@ -147,7 +148,7 @@ export default function ChatModal({ isOpen, onClose, onSelectMission }) {
         {/* Header */}
         <div className="chat-modal-header">
           <h2>Chats</h2>
-          <a href="#" className="chat-view-all">View all Chats</a>
+          <Link to="/chat" className="chat-view-all">View all Chats</Link>
         </div>
 
         {/* Search Bar */}

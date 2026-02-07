@@ -12,10 +12,27 @@ export default function RosterAccountManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingRoleUserId, setEditingRoleUserId] = useState(null);
   const [selectedRole, setSelectedRole] = useState("");
+  const [selectedPosition, setSelectedPosition] = useState("");
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState("overall");
-  const [roleFilter, setRoleFilter] = useState("overall"); 
+  const [roleFilter, setRoleFilter] = useState("overall");
+
+  // Position options based on role
+  const positionsByRole = {
+    faculty: [
+      "program chair",
+      "cluster head",
+      "college engagement head",
+      "student organization adviser",
+      "college dean",
+      "shs principal"
+    ],
+    admin: [
+      "director",
+      "regular"
+    ]
+  }; 
 
   useEffect(() => {
     fetchUsers();
@@ -81,27 +98,40 @@ export default function RosterAccountManagement() {
     setRoleFilter(filter);
   };
 
-  const handleChangeRoleClick = (userId, currentRole) => {
+  const handleChangeRoleClick = (userId, currentRole, currentPosition) => {
     setEditingRoleUserId(userId);
     setSelectedRole(currentRole || "");
+    setSelectedPosition(currentPosition || "");
   };
 
   const handleRoleChange = async (userId) => {
     if (!selectedRole) return;
 
+    // Check if position is required but not selected
+    if ((selectedRole === "faculty" || selectedRole === "admin") && !selectedPosition) {
+      alert("Please select a position for this role.");
+      return;
+    }
+
     try {
       const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, {
-        role: selectedRole
-      });
+      const updateData = { role: selectedRole };
+      
+      // Include position if role requires it
+      if (selectedRole === "faculty" || selectedRole === "admin") {
+        updateData.position = selectedPosition;
+      }
+      
+      await updateDoc(userRef, updateData);
 
       // Update local state
       setUsers(users.map(user => 
-        user.id === userId ? { ...user, role: selectedRole } : user
+        user.id === userId ? { ...user, role: selectedRole, position: updateData.position || null } : user
       ));
 
       setEditingRoleUserId(null);
       setSelectedRole("");
+      setSelectedPosition("");
     } catch (err) {
       console.error("Error updating role:", err);
       alert("Failed to update role. Please try again.");
@@ -111,6 +141,7 @@ export default function RosterAccountManagement() {
   const handleCancelRoleChange = () => {
     setEditingRoleUserId(null);
     setSelectedRole("");
+    setSelectedPosition("");
   };
 
   return (
@@ -285,7 +316,10 @@ export default function RosterAccountManagement() {
                           <div className="role-edit-container">
                             <select 
                               value={selectedRole} 
-                              onChange={(e) => setSelectedRole(e.target.value)}
+                              onChange={(e) => {
+                                setSelectedRole(e.target.value);
+                                setSelectedPosition(""); // Reset position when role changes
+                              }}
                               className="role-select"
                             >
                               <option value="student">Student</option>
@@ -293,6 +327,22 @@ export default function RosterAccountManagement() {
                               <option value="partner">Partner</option>
                               <option value="admin">Admin</option>
                             </select>
+                            
+                            {(selectedRole === "faculty" || selectedRole === "admin") && (
+                              <select 
+                                value={selectedPosition} 
+                                onChange={(e) => setSelectedPosition(e.target.value)}
+                                className="role-select"
+                              >
+                                <option value="">Select Position</option>
+                                {positionsByRole[selectedRole]?.map((position) => (
+                                  <option key={position} value={position}>
+                                    {position}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            
                             <div className="role-edit-actions">
                               <button 
                                 onClick={() => handleRoleChange(user.id)}
@@ -312,7 +362,7 @@ export default function RosterAccountManagement() {
                           <div className="role-display">
                             <span>{user.role || "N/A"}</span>
                             <button
-                              onClick={() => handleChangeRoleClick(user.id, user.role)}
+                              onClick={() => handleChangeRoleClick(user.id, user.role, user.position)}
                               className="change-role-btn"
                             >
                               <img src={ChangeIcon} alt="Change Role" />

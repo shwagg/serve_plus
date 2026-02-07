@@ -20,6 +20,11 @@ export const adminLinks = [
         icon: ListAltIcon,
     },
     {
+        label: "Roster",
+        to: "/admin/roster",
+        icon: ListAltIcon,
+    },
+    {
         label: "Customize",
         to: "/admin/projects/proposal",
         icon: DesignServicesOutlinedIcon,
