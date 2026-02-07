@@ -5,6 +5,7 @@ import createIcon from '../../assets/menuassets/Create.svg';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
+import viewIcon from '../../assets/menuassets/View.svg';
 export default function FacultyMenu({ userName, userEmail, userUsername, userAvatar, onLogout, onClose, onCreateProposal }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -44,6 +45,10 @@ export default function FacultyMenu({ userName, userEmail, userUsername, userAva
         <button className="menu-item" onClick={handleCreateProposal}>
           <img src={createIcon} alt="Create" className="menu-icon" />
           Create Proposal
+        </button>
+        <button className="menu-item" onClick={() => handleMenuClick('/global/review-proposals')}>
+          <img src={viewIcon} alt="Review Proposals" className="menu-icon" />
+          Review Proposals
         </button>
         <button className="menu-item" onClick={() => handleMenuClick('/global/menu/settings')}>
           <img src={settingsIcon} alt="Settings" className="menu-icon" />

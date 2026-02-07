@@ -12,6 +12,7 @@ import StudentHome from "../pages/student/StudentHome";
 import EventActivity from "../pages/student/missions/EventActivity";
 import EventDetails from "../pages/student/missions/EventDetails";
 import Profile from "../pages/global/Profile";
+import ViewProposals from "../pages/global/ViewProposals";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 export default function AppRouter() {
@@ -26,6 +27,7 @@ export default function AppRouter() {
 
         {/* Global routes */}
         <Route path="/global/project-proposal" element={<ProjectProposal />} />
+        <Route path="/global/review-proposals" element={<ViewProposals />} />
 
         {/* Admin routes with sidebar layout */}
         <Route path="/admin" element={<AdminLayout />}>

@@ -3,6 +3,7 @@ import '../styles/Menu.css';
 import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
+import viewIcon from '../../assets/menuassets/View.svg';
 export default function PartnerMenu({ userName, userEmail, userUsername, userAvatar, onLogout, onClose, onCreateProposal }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -30,6 +31,10 @@ export default function PartnerMenu({ userName, userEmail, userUsername, userAva
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">
+        <button className="menu-item" onClick={() => handleMenuClick('/global/review-proposals')}>
+          <img src={viewIcon} alt="Review Proposals" className="menu-icon" />
+          Review Proposals
+        </button>
         <button className="menu-item" onClick={() => handleMenuClick('/global/menu/settings')}>
           <img src={settingsIcon} alt="Settings" className="menu-icon" />
           Settings
