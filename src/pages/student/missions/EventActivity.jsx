@@ -13,6 +13,7 @@ import Header from "../../../components/Header";
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { db } from "../../../firebaseConfig";
+import PostActivitySurvey from '../../../../public/forms/PostActivitySurvey';
 
 export default function EventActivity() {
   // State for pre-activity survey modal (existing)
@@ -1309,133 +1310,43 @@ export default function EventActivity() {
       {/* Post-Activity Survey Modal */}
       {showPostSurveyModal && (
         <div className="qr-modal-overlay" onClick={e => e.stopPropagation()}>
-          <div className="qr-modal-content" style={{ minHeight: 220, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+          <div className="qr-modal-content modal-scrollable" style={{ maxHeight: '90vh', overflowY: 'auto', minWidth: 340 }} onClick={e => e.stopPropagation()}>
             <button className="qr-modal-close" onClick={() => setShowPostSurveyModal(false)}>X</button>
             <h3 className="qr-modal-title">Post-Activity Survey</h3>
-            <button
-              style={{
-                background: '#3386e6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 10,
-                padding: '12px 32px',
-                fontWeight: 700,
-                fontSize: 16,
-                cursor: 'pointer',
-                marginTop: 24,
-                boxShadow: '0 2px 8px #0001',
-                transition: 'background 0.2s',
+            <PostActivitySurvey
+              onSubmit={async (form) => {
+                // Mark user as present in Firestore and save survey
+                const user = auth.currentUser;
+                if (!user) {
+                  alert('You must be logged in.');
+                  return;
+                }
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                let name = '';
+                let email = '';
+                if (userDoc.exists()) {
+                  const data = userDoc.data();
+                  name = data.name || data.username || '';
+                  email = data.email || '';
+                } else {
+                  name = user.displayName || '';
+                  email = user.email || '';
+                }
+                await setDoc(
+                  doc(db, 'missions', id, 'volunteer', user.uid),
+                  {
+                    name,
+                    email,
+                    attendanceStatus: 'present',
+                    postActivitySurvey: form
+                  },
+                  { merge: true }
+                );
+                setShowPostSurveyModal(false);
+                setQRStatus('Attendance recorded!');
+                alert('Survey submitted and attendance recorded!');
               }}
-              onClick={() => window.open('https://forms.office.com/r/feU14WB6SF', '_blank')}
-            >
-              Post-Activity Survey Form
-            </button>
-            <div style={{ marginTop: 32, width: '100%', textAlign: 'center' }}>
-              <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Upload Image as Proof</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={e => {
-                  const file = e.target.files[0];
-                  setPostSurveyProofImage(file);
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => setPostSurveyProofPreview(reader.result);
-                    reader.readAsDataURL(file);
-                  } else {
-                    setPostSurveyProofPreview(null);
-                  }
-                }}
-                style={{ marginBottom: 16 }}
-              />
-              {postSurveyProofPreview && (
-                <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto 12px auto' }}>
-                  <img src={postSurveyProofPreview} alt="Proof Preview" style={{ width: 180, height: 180, objectFit: 'cover', borderRadius: 12, boxShadow: '0 2px 8px #0001', border: '2px solid #eee', background: '#f7f7f7', display: 'block' }} />
-                  <button
-                    style={{
-                      position: 'absolute',
-                      top: 6,
-                      right: 6,
-                      background: '#d32f2f',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: 28,
-                      height: 28,
-                      fontWeight: 700,
-                      fontSize: 16,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px #0002',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 2,
-                    }}
-                    title="Delete image"
-                    onClick={() => {
-                      setPostSurveyProofImage(null);
-                      setPostSurveyProofPreview(null);
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-              <button
-                style={{
-                  background: '#32CD32',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 10,
-                  padding: '10px 28px',
-                  fontWeight: 700,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                  marginTop: 8,
-                  boxShadow: '0 2px 8px #0001',
-                  transition: 'background 0.2s',
-                }}
-                onClick={async () => {
-                  if (!postSurveyProofImage) {
-                    alert('Please upload an image as proof.');
-                    return;
-                  }
-                  // Mark user as present in Firestore
-                  const user = auth.currentUser;
-                  if (!user) {
-                    alert('You must be logged in.');
-                    return;
-                  }
-                  const userDoc = await getDoc(doc(db, 'users', user.uid));
-                  let name = '';
-                  let email = '';
-                  if (userDoc.exists()) {
-                    const data = userDoc.data();
-                    name = data.name || data.username || '';
-                    email = data.email || '';
-                  } else {
-                    name = user.displayName || '';
-                    email = user.email || '';
-                  }
-                  await setDoc(
-                    doc(db, 'missions', id, 'volunteer', user.uid),
-                    {
-                      name,
-                      email,
-                      attendanceStatus: 'present'
-                    },
-                    { merge: true }
-                  );
-                  setShowPostSurveyModal(false);
-                  setPostSurveyProofImage(null);
-                  setPostSurveyProofPreview(null);
-                  setQRStatus('Attendance recorded!');
-                  alert('Proof submitted and attendance recorded!');
-                }}
-              >
-                Submit Proof
-              </button>
-            </div>
+            />
           </div>
         </div>
       )}
