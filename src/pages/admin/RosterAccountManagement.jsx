@@ -276,7 +276,7 @@ export default function RosterAccountManagement() {
             <table className="roster-table">
               <thead>
                 <tr>
-                  <th className="text-left">#</th>
+                  <th className="text-left"> </th>
                   <th className="text-left">Name</th>
                   <th className="text-center">View Account</th>
                   <th className="text-center">Points</th>
