@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
 
 import { exportProposalPDF } from './exportProposalPDF';
 
@@ -10,11 +12,98 @@ function SummaryPanel({
   projectType,
   loading,
   onBack,
-  onSubmit,
+  onClose,
   sdgOptions,
   setLoading
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
+
+  /**
+   * Handles form submission: creates a mission document in the unified missions collection.
+   */
+  const handleSubmit = async () => {
+    setLoading(true);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        alert('You must be logged in to submit a proposal');
+        setLoading(false);
+        return;
+      }
+
+      const now = serverTimestamp();
+
+      // Create mission document with unified schema
+      const missionData = {
+        // Timestamps
+        createdAt: now,
+        publishedAt: null,
+        updatedAt: now,
+        
+        // Basic Info
+        projectType: projectType === 'service-learning' ? 'sl' : 'ce',
+        status: 'for_approval',
+        title: formData.title,
+        alt: formData.alt || '',
+        
+        // Project Details
+        dateProposed: formData.targetDate,
+        sdgs: formData.sdgs || [],
+        targetDate: formData.targetDate,
+        stakeholders: formData.stakeholders,
+        location: formData.location,
+        volunteerHours: Number(formData.volunteerHours) || 0,
+        description: formData.description,
+        objectives: formData.objectives,
+        specificActivities: formData.specificActivities.split('\n').filter(a => a.trim()),
+        successIndicators: formData.successIndicators.split('\n').filter(a => a.trim()),
+        budget: formData.budget,
+        studentOutcomes: formData.studentOutcomes || '',
+        
+        // People involved
+        proponents: [formData.preparedBy],
+        preparedBy: formData.preparedBy,
+        reviewedBy: '',
+        recommendedBy: '',
+        endorsedBy: '',
+        approvedBy: '',
+        
+        // Affiliation
+        affiliation: formData.affiliation || '',
+        
+        // Activities
+        activities: [],
+      };
+
+      // Add type-specific fields
+      if (projectType === 'service-learning') {
+        missionData.slFields = {
+          section: slFields.section,
+          course: slFields.course,
+          courseCode: slFields.courseCode,
+          assignedFaculty: slFields.assignedFaculty,
+        };
+      } else {
+        missionData.ceFields = {
+          nature: ceFields.nature,
+          learningOutcomes: ceFields.learningOutcomes,
+          customLearningOutcome: ceFields.customLearningOutcome || '',
+        };
+      }
+
+      // Save to missions collection
+      await addDoc(collection(db, 'missions'), missionData);
+
+      alert('Proposal submitted successfully!');
+      onClose();
+    } catch (error) {
+      console.error('Error submitting proposal:', error);
+      alert('Failed to submit proposal. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const generatePdfPreview = async () => {
@@ -27,9 +116,9 @@ function SummaryPanel({
         const form = pdfDoc.getForm();
         try {
           form.getTextField('ProjectTitle').setText(formData.title || '');
-          form.getTextField('Faculty').setText(formData.faculty || '');
+          form.getTextField('Faculty').setText(formData.preparedBy || '');
           form.getTextField('TargetDate').setText(formData.targetDate || '');
-          form.getTextField('SDG').setText((formData.sdg || []).join(', '));
+          form.getTextField('SDG').setText((formData.sdgs || []).join(', '));
           form.getTextField('VolunteerHours').setText(formData.volunteerHours || '');
           form.getTextField('Location').setText(formData.location || '');
           form.getTextField('Stakeholders').setText(formData.stakeholders || '');
@@ -72,7 +161,7 @@ function SummaryPanel({
       <div style={{ display: 'flex', flexDirection: 'row', width: '100%', maxWidth: 1200, margin: '0 auto', marginBottom: 24, gap: 40, alignItems: 'flex-start', justifyContent: 'center' }}>
         {/* PDF Preview on the left */}
         <div style={{ flex: 1, minWidth: 350, maxWidth: 600, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {pdfPreviewUrl && (
+          {pdfPreviewUrl ? (
             <iframe
               src={pdfPreviewUrl}
               width="100%"
@@ -80,7 +169,7 @@ function SummaryPanel({
               style={{ border: '1px solid #ccc', borderRadius: 8, background: '#fff', boxShadow: '0 2px 8px #eee' }}
               title="PDF Preview"
             />
-          )}
+          ) : null}
         </div>
         {/* Summary details on the right */}
         <div style={{ flex: 1.2, minWidth: 400, maxWidth: 700, background: '#fff', padding: '40px 48px', borderRadius: 20, boxShadow: '0 2px 12px #e0e0e0', color: '#222', display: 'flex', flexDirection: 'column', gap: 16, border: '1.5px solid #e0e0e0' }}>
@@ -88,7 +177,7 @@ function SummaryPanel({
           <div style={{ display: 'flex', gap: 24, marginBottom: 8 }}>
             <div>
               <div style={{ fontWeight: 600 }}>Published by:</div>
-              <div>{formData.faculty}</div>
+              <div>{formData.preparedBy}</div>
             </div>
             <div>
               <div style={{ fontWeight: 600 }}>Date Published:</div>
@@ -100,7 +189,7 @@ function SummaryPanel({
             </div>
           </div>
           <div style={{ fontWeight: 600, marginTop: 8 }}>Details</div>
-          <div><b>SDGs:</b> {(formData.sdg || []).join(', ')}</div>
+          <div><b>SDGs:</b> {(formData.sdgs || []).join(', ')}</div>
           <div><b>Target Date:</b> {formData.targetDate}</div>
           <div><b>Location:</b> {formData.location}</div>
           <div><b>Volunteer Hours:</b> {formData.volunteerHours}</div>
@@ -120,6 +209,7 @@ function SummaryPanel({
           {/* Community Engagement fields */}
           {projectType === 'community-engagement' && (
             <>
+              <div><b>Affiliation:</b> {formData.affiliation}</div>
               <div><b>Nature:</b> {ceFields.nature}</div>
               <div><b>Learning Outcomes:</b> {(() => {
                 const ceLOKeyMap = {
@@ -174,12 +264,12 @@ function SummaryPanel({
                   proposalTitle: formData.title,
                   dateProposed: new Date().toLocaleString(),
                   participatingSections: slFields.section || '',
-                  proponent: formData.faculty,
+                  proponent: formData.preparedBy,
                   courseTitle: slFields.course || '',
                   courseCode: slFields.courseCode || '',
                   targetDates: formData.targetDate,
                   targetLocation: formData.location,
-                  sdgs: (formData.sdg || []).map(num => sdgNumberToLabel[num] || num),
+                  sdgs: (formData.sdgs || []).map(num => sdgNumberToLabel[num] || num),
                   proposalDescription: formData.description,
                   proposalObjectives: formData.objectives,
                   specificActivities: formData.specificActivities,
@@ -238,9 +328,10 @@ function SummaryPanel({
                 exportFormData = {
                   communityEngagementTitle: formData.title,
                   dateProposed: new Date().toLocaleString(),
-                  proponent: formData.faculty,
+                  proponent: formData.preparedBy,
+                  affiliation: formData.affiliation,
                   studentOutcomes: formData.studentOutcomes || '',
-                  sdgs: (formData.sdg || []).map(num => ceSdgNumberToLabel[num] || num),
+                  sdgs: (formData.sdgs || []).map(num => ceSdgNumberToLabel[num] || num),
                   natureOfEngagement: natureArr,
                   learningOutcomes: loArr,
                   targetDate: formData.targetDate,
@@ -252,7 +343,7 @@ function SummaryPanel({
                   specificActivities: formData.specificActivities,
                   successIndicators: formData.successIndicators,
                   budget: formData.budget,
-                  preparedBy: formData.faculty
+                  preparedBy: formData.preparedBy
                 };
               }
               await exportProposalPDF({
@@ -277,7 +368,7 @@ function SummaryPanel({
           type="button"
           className="btn-submit"
           disabled={loading}
-          onClick={onSubmit}
+          onClick={handleSubmit}
           style={{ background: '#1a237e', color: '#fff', fontWeight: 600, borderRadius: 8, padding: '10px 32px', fontSize: 16 }}
         >
           SUBMIT

@@ -1,7 +1,6 @@
 
 // React and library imports
 import { useState, useEffect } from 'react';
-import { exportProposalPDF, exportCommunityEngagementProposalPDF } from '../exportProposalPDF';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -19,9 +18,11 @@ function ProjectProposal({ projectType, onClose }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [hasProponentName, setHasProponentName] = useState(false);
+  const [userRole, setUserRole] = useState('');
   const [formData, setFormData] = useState({
     title: '',
-    sdg: [],
+    sdgs: [],
     targetDate: '',
     stakeholders: '',
     location: '',
@@ -31,16 +32,18 @@ function ProjectProposal({ projectType, onClose }) {
     specificActivities: '',
     successIndicators: '',
     budget: '',
-    faculty: '', // Faculty in Charge/Proponent
-    college: '', // College/Program/Department/Student Org
+    preparedBy: '', // Faculty in Charge/Proponent
+    affiliation: '', // College/Program/Department/Student Org
     studentOutcomes: '',
+    alt: '', // Alt text for image
   });
-  // Get user info and update formData.faculty on mount or when user changes
-  // Effect: Fetch user info and update faculty field on mount or when user changes
+  // Get user info and update formData.preparedBy on mount or when user changes
+  // Effect: Fetch user info and update preparedBy field on mount or when user changes
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user?.displayName) {
-        setFormData(prev => ({ ...prev, faculty: user.displayName }));
+        setFormData(prev => ({ ...prev, preparedBy: user.displayName }));
+        setHasProponentName(true);
       } else if (user?.uid) {
         // Try to fetch name from Firestore user profile
         try {
@@ -49,11 +52,27 @@ function ProjectProposal({ projectType, onClose }) {
           if (userDoc.exists()) {
             const data = userDoc.data();
             if (data.name) {
-              setFormData(prev => ({ ...prev, faculty: data.name }));
+              setFormData(prev => ({ ...prev, preparedBy: data.name }));
+              setHasProponentName(true);
+              
+              // Set user role
+              if (data.role) {
+                setUserRole(data.role);
+                
+                // If user is faculty, auto-populate assignedFaculty
+                if (data.role === 'faculty') {
+                  setSlFields(prev => ({ ...prev, assignedFaculty: data.name }));
+                }
+              }
+            } else {
+              setHasProponentName(false);
             }
+          } else {
+            setHasProponentName(false);
           }
         } catch (err) {
           // Ignore errors
+          setHasProponentName(false);
         }
       }
     });
@@ -65,6 +84,7 @@ function ProjectProposal({ projectType, onClose }) {
     section: '',
     course: '',
     courseCode: '',
+    assignedFaculty: ''
   });
 
   // Community Engagement specific fields
@@ -141,118 +161,54 @@ function ProjectProposal({ projectType, onClose }) {
   };
 
   /**
-   * Toggles selection of an SDG number in the formData.sdg array.
+   * Toggles selection of an SDG number in the formData.sdgs array.
    * @param {number} sdgNumber
    */
   const handleSdgToggle = (sdgNumber) => {
     setFormData(prev => {
-      const currentSdgs = prev.sdg || [];
+      const currentSdgs = prev.sdgs || [];
       if (currentSdgs.includes(sdgNumber)) {
         return {
           ...prev,
-          sdg: currentSdgs.filter(num => num !== sdgNumber)
+          sdgs: currentSdgs.filter(num => num !== sdgNumber)
         };
       } else {
         return {
           ...prev,
-          sdg: [...currentSdgs, sdgNumber].sort((a, b) => a - b)
+          sdgs: [...currentSdgs, sdgNumber].sort((a, b) => a - b)
         };
       }
     });
   };
 
   /**
-   * Removes an SDG number from the formData.sdg array.
+   * Removes an SDG number from the formData.sdgs array.
    * @param {number} sdgNumber
    */
   const handleRemoveSdg = (sdgNumber) => {
     setFormData(prev => ({
       ...prev,
-      sdg: prev.sdg.filter(num => num !== sdgNumber)
+      sdgs: prev.sdgs.filter(num => num !== sdgNumber)
     }));
   };
 
-  /**
-   * Handles form submission: creates a proposal document and its details in Firestore.
-   * @param {Event} e - Form submit event
-   */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        alert('You must be logged in to submit a proposal');
-        return;
-      }
-
-      // Create main proposal document
-      const proposalData = {
-        proponent: user.uid,
-        dateCreated: serverTimestamp(),
-        status: 'pending',
-        proposalType: projectType === 'service-learning' ? 'sl' : 'ce',
-      };
-
-      // Add proposal to main collection
-      const proposalRef = await addDoc(collection(db, 'proposal'), proposalData);
-
-      // Prepare details data
-      const detailsData = {
-        title: formData.title,
-        dateProposed: serverTimestamp(),
-        sdg: formData.sdg,
-        targetDate: formData.targetDate,
-        stakeholders: formData.stakeholders,
-        location: formData.location,
-        volunteerHours: formData.volunteerHours,
-        description: formData.description,
-        objectives: formData.objectives,
-        specificActivities: formData.specificActivities,
-        successIndicators: formData.successIndicators,
-        budget: formData.budget,
-        preparedBy: user.uid,
-        reviewedBy: '',
-        recommendedBy: '',
-        endorsedBy: '',
-        approvedBy: '',
-      };
-
-      // Add type-specific fields
-      if (projectType === 'service-learning') {
-        detailsData.slFields = slFields;
-      } else {
-        detailsData.ceFields = ceFields;
-      }
-
-      // Add details to subcollection
-      await addDoc(collection(db, 'proposal', proposalRef.id, 'details'), detailsData);
-
-      alert('Proposal submitted successfully!');
-      onClose();
-    } catch (error) {
-      console.error('Error submitting proposal:', error);
-      alert('Failed to submit proposal. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  // PDF generation and export logic is now handled in SummaryPanel
+  // Submission logic is now handled in SummaryPanel
 
   return (
     <div className="project-proposal-container">
       <div className="proposal-content-wrapper">
         {!showSummary ? (
-          <form className="proposal-form" onSubmit={handleSubmit}>
+          <form className="proposal-form" onSubmit={(e) => e.preventDefault()}>
           {/* Basic Information */}
           <div className="form-section">
             <h2>Basic Information</h2>
             
             <div className="form-group">
-              <label htmlFor="title">Project Title *</label>
+              <label htmlFor="title">
+                {projectType === 'service-learning'
+                  ? 'Title of Service-Learning Initiative'
+                  : 'Title of Community Engagement Initiative'}
+              </label>
               <input
                 type="text"
                 id="title"
@@ -262,27 +218,71 @@ function ProjectProposal({ projectType, onClose }) {
                 required
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="faculty">
-                {projectType === 'service-learning'
-                  ? 'Faculty-in-Charge / Proponent(s) *'
-                  : 'Name of Proponent(s) and College / Program / Department / Student Organization *'}
-              </label>
-              <input
-                type="text"
-                id="faculty"
-                name="faculty"
-                value={formData.faculty}
-                readOnly
-                required
-                placeholder={projectType === 'service-learning'
-                  ? 'e.g., Dr. Juan Dela Cruz'
-                  : 'e.g., Juan Dela Cruz, College of Science'}
-              />
-            </div>
+
+            {projectType === 'service-learning' && (
+              <div className="form-group">
+                <label htmlFor="preparedBy">Faculty-in-Charge / Proponent(s) *</label>
+                <input
+                  type="text"
+                  id="preparedBy"
+                  name="preparedBy"
+                  value={formData.preparedBy}
+                  onChange={handleInputChange}
+                  readOnly={hasProponentName}
+                  required
+                  placeholder="e.g., Juan Dela Cruz"
+                />
+              </div>
+            )}
+
+            {projectType === 'service-learning' && (
+              <div className="form-group">
+                <label htmlFor="assignedFaculty">Assigned Faculty *</label>
+                <input
+                  type="text"
+                  id="assignedFaculty"
+                  name="assignedFaculty"
+                  value={slFields.assignedFaculty}
+                  onChange={handleSlFieldChange}
+                  readOnly={userRole === 'faculty'}
+                  required
+                  placeholder="e.g., Juan Dela Cruz"
+                />
+              </div>
+            )}
+
+            {projectType === 'community-engagement' && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="ceProponent">Name of Proponent(s)</label>
+                  <input
+                    type="text"
+                    id="ceProponent"
+                    name="preparedBy"
+                    value={formData.preparedBy}
+                    onChange={handleInputChange}
+                    readOnly={hasProponentName}
+                    required
+                    placeholder="e.g., Juan Dela Cruz"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="affiliation">Affiliation</label>
+                  <input
+                    type="text"
+                    id="affiliation"
+                    name="affiliation"
+                    value={formData.affiliation}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="e.g., College of Science"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="form-group">
-              <label htmlFor="targetDate">Target Date *</label>
+              <label htmlFor="targetDate">Target Date</label>
               <input
                 type="date"
                 id="targetDate"
@@ -295,12 +295,12 @@ function ProjectProposal({ projectType, onClose }) {
 
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="sdg">Sustainable Development Goal (SDG)</label>
+                <label htmlFor="sdgs">Sustainable Development Goal (SDG)</label>
                 <div className="sdg-selector">
                   {/* Selected SDGs Display */}
-                  {formData.sdg && formData.sdg.length > 0 && (
+                  {formData.sdgs && formData.sdgs.length > 0 && (
                     <div className="sdg-selected-tags">
-                      {formData.sdg.map(sdgNum => (
+                      {formData.sdgs.map(sdgNum => (
                         <span key={sdgNum} className="sdg-tag">
                           {sdgNum}
                           <button
@@ -323,9 +323,9 @@ function ProjectProposal({ projectType, onClose }) {
                       className="sdg-dropdown-toggle"
                       onClick={() => setShowSdgDropdown(!showSdgDropdown)}
                     >
-                      {formData.sdg.length === 0 
+                      {formData.sdgs.length === 0 
                         ? 'Select SDG(s)' 
-                        : `${formData.sdg.length} SDG${formData.sdg.length > 1 ? 's' : ''} selected`}
+                        : `${formData.sdgs.length} SDG${formData.sdgs.length > 1 ? 's' : ''} selected`}
                       <span className="dropdown-arrow">{showSdgDropdown ? '▲' : '▼'}</span>
                     </button>
                     
@@ -335,7 +335,7 @@ function ProjectProposal({ projectType, onClose }) {
                           <label key={sdg.number} className="sdg-option">
                             <input
                               type="checkbox"
-                              checked={formData.sdg.includes(sdg.number)}
+                              checked={formData.sdgs.includes(sdg.number)}
                               onChange={() => handleSdgToggle(sdg.number)}
                             />
                             <span className="sdg-option-text">
@@ -350,7 +350,7 @@ function ProjectProposal({ projectType, onClose }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="volunteerHours">Volunteer Hours *</label>
+                <label htmlFor="volunteerHours">Volunteer Hours</label>
                 <input
                   type="number"
                   id="volunteerHours"
@@ -364,7 +364,7 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="location">Location *</label>
+              <label htmlFor="location">Location</label>
               <input
                 type="text"
                 id="location"
@@ -377,7 +377,7 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="stakeholders">Stakeholders *</label>
+              <label htmlFor="stakeholders">Stakeholders</label>
               <textarea
                 id="stakeholders"
                 name="stakeholders"
@@ -390,8 +390,7 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
           </div>
 
-          {/* Type-specific fields */}
-          {/* --- Service Learning (SL) Specific Fields --- */}
+          {/* Service Learning Specific Fields */}
           {projectType === 'service-learning' && (
             <div className="form-section">
               <h2>Academic Information</h2>
@@ -422,18 +421,6 @@ function ProjectProposal({ projectType, onClose }) {
                 </div>
               </div>
               <div className="form-group">
-                <label htmlFor="faculty">Faculty in Charge *</label>
-                <input
-                  type="text"
-                  id="faculty"
-                  name="faculty"
-                  value={formData.faculty}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="e.g., Dr. Juan Dela Cruz"
-                />
-              </div>
-              <div className="form-group">
                 <label htmlFor="section">Section *</label>
                 <input
                   type="text"
@@ -447,18 +434,17 @@ function ProjectProposal({ projectType, onClose }) {
               </div>
             </div>
           )}
-          {/* --- End of Service Learning (SL) Specific Fields --- */}
 
 
 
 
-          {/* --- Community Engagement (CE) Specific Fields --- */}
+          {/* Community Engagement Specific Fields */}
           {projectType === 'community-engagement' && (
             <div className="form-section">
               <h2>Engagement Details</h2>
               
               <div className="form-group">
-                <label htmlFor="nature">Nature of Engagement *</label>
+                <label htmlFor="nature">Nature of Engagement</label>
                 <select
                   id="nature"
                   name="nature"
@@ -487,7 +473,7 @@ function ProjectProposal({ projectType, onClose }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="learningOutcomes">Learning Outcomes Level *</label>
+                <label htmlFor="learningOutcomes">Learning Outcomes Level</label>
                 <select
                   id="learningOutcomes"
                   name="learningOutcomes"
@@ -521,18 +507,14 @@ function ProjectProposal({ projectType, onClose }) {
               )}
             </div>
           )}
-          {/* --- End of Community Engagement (CE) Specific Fields --- */}
-
-
-
-
+  
 
           {/* Project Details */}
           <div className="form-section">
             <h2>Project Details</h2>
             
             <div className="form-group">
-              <label htmlFor="description">Project Description *</label>
+              <label htmlFor="description">Project Description</label>
               <textarea
                 id="description"
                 name="description"
@@ -545,7 +527,7 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="objectives">Objectives *</label>
+              <label htmlFor="objectives">Objectives</label>
               <textarea
                 id="objectives"
                 name="objectives"
@@ -558,7 +540,7 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="specificActivities">Specific Activities *</label>
+              <label htmlFor="specificActivities">Specific Activities</label>
               <textarea
                 id="specificActivities"
                 name="specificActivities"
@@ -571,7 +553,7 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="successIndicators">Success Indicators *</label>
+              <label htmlFor="successIndicators">Success Indicators</label>
               <textarea
                 id="successIndicators"
                 name="successIndicators"
@@ -584,7 +566,7 @@ function ProjectProposal({ projectType, onClose }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="budget">Budget *</label>
+              <label htmlFor="budget">Budget</label>
               <textarea
                 id="budget"
                 name="budget"
@@ -624,7 +606,7 @@ function ProjectProposal({ projectType, onClose }) {
             projectType={projectType}
             loading={loading}
             onBack={() => setShowSummary(false)}
-            onSubmit={handleSubmit}
+            onClose={onClose}
             sdgOptions={sdgOptions}
             setLoading={setLoading}
           />

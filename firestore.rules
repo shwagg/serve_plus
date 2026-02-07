@@ -31,8 +31,11 @@ service cloud.firestore {
     match /missions/{missionId}{
       allow read: if request.auth != null;
 
-      // ADMIN (based on users collection)
-      allow create, update, delete: if
+      // Allow authenticated users to create proposals
+      allow create: if request.auth != null;
+
+      // ADMIN (based on users collection) - can update and delete
+      allow update, delete: if
       request.auth != null &&
       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
 
