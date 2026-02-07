@@ -5,7 +5,8 @@ import {
     AddBoxOutlinedIcon,
     DesignServicesOutlinedIcon,
     SettingsOutlinedIcon,
-} from "../components/icons";
+    ImportContactsOutlinedIcon,
+} from "../components/icons/index";
 
 //admin sidebar
 export const adminLinks = [
@@ -33,6 +34,11 @@ export const adminLinks = [
         label: "Settings",
         to: "/admin/settings",
         icon: SettingsOutlinedIcon,
+    },
+    {
+        label: "Document Library",
+        to: "/admin/documents",
+        icon: ImportContactsOutlinedIcon,
     },
 ];
 
