@@ -16,6 +16,10 @@ import { db } from "../../../firebaseConfig";
 import PostActivitySurvey from '../../../../public/forms/PostActivitySurvey';
 
 export default function EventActivity() {
+    // State for uploaded consent file (PDF)
+    const [uploadedConsentFile, setUploadedConsentFile] = useState(null);
+  // Consent Form Modal State
+  const [showConsentModal, setShowConsentModal] = useState(false);
   // State for pre-activity survey modal (existing)
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyProofImage, setSurveyProofImage] = useState(null);
@@ -1125,6 +1129,70 @@ export default function EventActivity() {
                 >
                   Scan Attendance QR Code
                 </button>
+                
+
+                {/* Activity Consent Form Button */}
+                <button
+                  className="event-consent-button"
+                  style={{
+                    flex: 1,
+                    maxWidth: 320,
+                    height: 48,
+                    background: '#30bdb7',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontWeight: 700,
+                    fontSize: 16,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px #0001',
+                    transition: 'background 0.2s',
+                  }}
+                  onClick={() => setShowConsentModal(true)}
+                >
+                  Activity Consent Form
+                </button>
+
+
+
+                {/* Activity Consent Form Modal (ABSOLUTE ROOT LEVEL) */}
+                {showConsentModal && (
+                  <div
+                    className="qr-modal-overlay"
+                    onClick={e => {
+                      if (e.target === e.currentTarget) setShowConsentModal(false);
+                    }}
+                  >
+                    <div
+                      className="qr-modal-content"
+                      style={{ minHeight: 180, minWidth: 340, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
+                    >
+                      <button className="qr-modal-close" onClick={() => setShowConsentModal(false)} style={{ alignSelf: 'flex-end' }}>X</button>
+                      <h3 className="qr-modal-title">Activity Consent Form</h3>
+                      <p style={{ margin: '16px 0', textAlign: 'center' }}>Please download and fill out the consent form below.</p>
+                      <a
+                        href="/assets/Activity%20Consent%20Form%20Fillable.pdf"
+                        download
+                        style={{
+                          background: '#3386e6',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 10,
+                          padding: '12px 32px',
+                          fontWeight: 700,
+                          fontSize: 16,
+                          cursor: 'pointer',
+                          marginTop: 8,
+                          boxShadow: '0 2px 8px #0001',
+                          textDecoration: 'none',
+                          display: 'inline-block',
+                        }}
+                      >
+                        Download Consent Form (PDF)
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
               {event.waiver && (
                 <div
@@ -1351,112 +1419,7 @@ export default function EventActivity() {
         </div>
       )}
 
-      {/* Pre-Activity Survey Modal */}
-      {showSurveyModal && (
-        <div className="qr-modal-overlay" onClick={(e) => e.stopPropagation()}>
-          <div className="qr-modal-content" style={{ minHeight: 220, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
-            <button className="qr-modal-close" onClick={() => setShowSurveyModal(false)}>X</button>
-            <h3 className="qr-modal-title">Pre-Activity Survey</h3>
-            <button
-              style={{
-                background: '#3386e6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 10,
-                padding: '12px 32px',
-                fontWeight: 700,
-                fontSize: 16,
-                cursor: 'pointer',
-                marginTop: 24,
-                boxShadow: '0 2px 8px #0001',
-                transition: 'background 0.2s',
-              }}
-              onClick={() => window.open('https://forms.office.com/r/DnaS8u9U9m', '_blank')}
-            >
-              Pre-Activity Survey Form
-            </button>
-            <div style={{ marginTop: 32, width: '100%', textAlign: 'center' }}>
-              <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Upload Image as Proof</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={e => {
-                  const file = e.target.files[0];
-                  setSurveyProofImage(file);
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => setSurveyProofPreview(reader.result);
-                    reader.readAsDataURL(file);
-                  } else {
-                    setSurveyProofPreview(null);
-                  }
-                }}
-                style={{ marginBottom: 16 }}
-              />
-              {surveyProofPreview && (
-                <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto 12px auto' }}>
-                  <img src={surveyProofPreview} alt="Proof Preview" style={{ width: 180, height: 180, objectFit: 'cover', borderRadius: 12, boxShadow: '0 2px 8px #0001', border: '2px solid #eee', background: '#f7f7f7', display: 'block' }} />
-                  <button
-                    style={{
-                      position: 'absolute',
-                      top: 6,
-                      right: 6,
-                      background: '#d32f2f',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: 28,
-                      height: 28,
-                      fontWeight: 700,
-                      fontSize: 16,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px #0002',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 2,
-                    }}
-                    title="Delete image"
-                    onClick={() => {
-                      setSurveyProofImage(null);
-                      setSurveyProofPreview(null);
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-              <button
-                style={{
-                  background: '#32CD32',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 10,
-                  padding: '10px 28px',
-                  fontWeight: 700,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                  marginTop: 8,
-                  boxShadow: '0 2px 8px #0001',
-                  transition: 'background 0.2s',
-                }}
-                onClick={() => {
-                  if (!surveyProofImage) {
-                    alert('Please upload an image as proof.');
-                    return;
-                  }
-                  alert('Proof image submitted! (Demo only, not saved)');
-                  setShowSurveyModal(false);
-                  setSurveyProofImage(null);
-                  setSurveyProofPreview(null);
-                }}
-              >
-                Submit Proof
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  
       
       {/* Global Announcements Toggle Button */}
       <button
@@ -1500,6 +1463,128 @@ export default function EventActivity() {
           transform: open ? 'translateX(0)' : 'translateX(100%)'
         }}>
         <GlobalAnnouncements />
-      </aside>    </div>
+      </aside>
+      
+    {/* Consent Modal at absolute root, after all containers */}
+    {showConsentModal && (
+      <div
+        className="qr-modal-overlay"
+        onClick={e => {
+          if (e.target === e.currentTarget) setShowConsentModal(false);
+        }}
+      >
+        <div
+          className="qr-modal-content"
+          style={{ minHeight: 180, minWidth: 340, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
+        >
+          <button className="qr-modal-close" onClick={() => setShowConsentModal(false)} style={{ alignSelf: 'flex-end' }}>X</button>
+          <h3 className="qr-modal-title">Activity Consent Form</h3>
+          <div style={{
+            margin: '16px 0',
+            textAlign: 'left',
+            background: '#f7f7f7',
+            borderRadius: 8,
+            padding: '16px 18px',
+            color: '#234e7b',
+            fontSize: 15,
+            maxWidth: 400
+          }}>
+            <strong>Note:</strong><br />
+            If there is no submitted consent form, students will not be allowed to join the event.<br /><br />
+            Please download the PDF file and fill up the necessary fields and have your parent/guardian sign it. And then upload it to the submission bin for checking.
+          </div>
+          <p style={{ margin: '16px 0', textAlign: 'center' }}>Please download and fill out the consent form below.</p>
+          <a
+            href="/assets/Activity%20Consent%20Form%20Fillable.pdf"
+            download
+            style={{
+              background: '#3386e6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              padding: '12px 32px',
+              fontWeight: 700,
+              fontSize: 16,
+              cursor: 'pointer',
+              marginTop: 8,
+              boxShadow: '0 2px 8px #0001',
+              textDecoration: 'none',
+              display: 'inline-block',
+            }}
+          >
+            Download Consent Form (PDF)
+          </a>
+
+          {/* Submission Bin for PDF Upload */}
+          <div style={{ marginTop: 28, width: '100%', textAlign: 'center' }}>
+            <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Upload Signed Consent Form (PDF)</label>
+            <input
+              type="file"
+              accept="application/pdf"
+              style={{ marginBottom: 12 }}
+              onChange={e => {
+                const file = e.target.files && e.target.files[0];
+                if (file && file.type !== 'application/pdf') {
+                  alert('Please upload a PDF file.');
+                  e.target.value = '';
+                  return;
+                }
+                // For demo: just show file name, no upload logic
+                setUploadedConsentFile(file);
+              }}
+            />
+            {uploadedConsentFile && (
+              <div style={{ marginTop: 8, color: '#234e7b', fontWeight: 500 }}>
+                Selected file: {uploadedConsentFile.name}
+                <button
+                  style={{
+                    marginLeft: 12,
+                    background: '#d32f2f',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '2px 10px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setUploadedConsentFile(null)}
+                  title="Remove file"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            <button
+              style={{
+                background: '#32CD32',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                padding: '10px 28px',
+                fontWeight: 700,
+                fontSize: 15,
+                cursor: 'pointer',
+                marginTop: 10,
+                boxShadow: '0 2px 8px #0001',
+                transition: 'background 0.2s',
+              }}
+              onClick={() => {
+                if (!uploadedConsentFile) {
+                  alert('Please select a PDF file to upload.');
+                  return;
+                }
+                alert('Consent form uploaded! (Demo only, not saved)');
+                setUploadedConsentFile(null);
+              }}
+            >
+              Submit Consent Form
+            </button>
+          </div>
+        // Add state for uploaded consent file at the top of the component
+          const [uploadedConsentFile, setUploadedConsentFile] = useState(null);
+        </div>
+      </div>
+    )}
+  </div>
   );
 }
