@@ -26,7 +26,9 @@ export default function RosterAccountManagement() {
       "college engagement head",
       "student organization adviser",
       "college dean",
-      "shs principal"
+      "shs principal",
+      "sao director",
+      "department head"
     ],
     admin: [
       "director",
