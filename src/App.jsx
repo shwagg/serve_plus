@@ -13,6 +13,7 @@ import CurrentEventMonitoring from "./pages/admin/CurrentEventMonitoring";
 import ProjectList from "./pages/global/ProjectList";
 import CreateProject from "./pages/global/CreateProject";
 import ProjectProposal from "./pages/global/proposal/ProjectProposal";
+import ReviewProposal from "./pages/global/proposal/ReviewProposal";
 import ProjectDetails from "./pages/admin/ProjectDetails";
 import ProjectTasks from "./pages/admin/ProjectTasks";
 import AuditLogs from "./pages/admin/AuditLogs";
@@ -69,6 +70,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["student", "faculty", "admin"]}>
                 <ProjectProposal />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/global/review-proposals"
+            element={
+              <ProtectedRoute allowedRoles={["faculty", "admin", "partner"]}>
+                <ReviewProposal />
               </ProtectedRoute>
             }
           />

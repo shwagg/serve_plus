@@ -280,7 +280,6 @@ export default function RosterAccountManagement() {
                 <tr>
                   <th className="text-left"> </th>
                   <th className="text-left">Name</th>
-                  <th className="text-center">View Account</th>
                   <th className="text-center">Points</th>
                   <th className="text-center">Role</th>
                   <th className="text-center">Status</th>
@@ -301,14 +300,6 @@ export default function RosterAccountManagement() {
                       </td>
                       <td className="user-name">
                         {user.name || "N/A"}
-                      </td>
-                      <td className="text-center">
-                        <button
-                          onClick={() => console.log("View account:", user.id)}
-                          className="view-account-btn"
-                        >
-                          <img src={ViewAccountIcon} alt="View Account" />
-                        </button>
                       </td>
                       <td className="text-center points-cell">
                         {user.points ? `${user.points} PTS` : "/"}
