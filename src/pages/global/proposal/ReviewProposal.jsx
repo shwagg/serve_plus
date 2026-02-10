@@ -61,6 +61,7 @@ export default function ReviewProposal() {
 
   const getStatusBadgeClass = (status = "") => {
     const s = status.toLowerCase();
+    if (s === "for_approval" || s === "for-approval") return "pending";
     if (s === "draft") return "draft";
     if (s === "pending") return "pending";
     if (s === "published") return "published";
@@ -71,6 +72,7 @@ export default function ReviewProposal() {
   const formatStatus = (status = "") => {
     if (!status) return "Draft";
     const s = status.toLowerCase();
+    if (s === "for_approval" || s === "for-approval") return "For Approval";
     if (s === "pending") return "For Approval";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
@@ -100,7 +102,7 @@ export default function ReviewProposal() {
             <h1 className="review-proposal-title">Review Proposals</h1>
 
             <div className="status-filters">
-              {["overall","pending","draft","published","completed"].map(filter => (
+              {["overall","for-approval","pending","draft","published","completed"].map(filter => (
                 <label key={filter} className="filter-label">
                   <input
                     type="radio"
@@ -109,7 +111,7 @@ export default function ReviewProposal() {
                     onChange={() => setStatusFilter(filter)}
                     className={`filter-${filter.replace('_', '-')}`}
                   />
-                  <span>{filter.charAt(0).toUpperCase() + filter.slice(1)}</span>
+                  <span>{filter === "for-approval" ? "For Approval" : filter.charAt(0).toUpperCase() + filter.slice(1)}</span>
                 </label>
               ))}
             </div>

@@ -67,6 +67,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
 
   const getStatusBadgeClass = (status = "") => {
     const s = status.toLowerCase();
+    if (s === "for_approval" || s === "for-approval") return "pending";
     if (s === "draft") return "draft";
     if (s === "pending") return "pending";
     if (s === "published") return "published";
@@ -77,6 +78,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
   const formatStatus = (status) => {
     if (!status || typeof status !== "string") return "Draft";
     const s = status.toLowerCase();
+    if (s === "for_approval" || s === "for-approval") return "For Approval";
     if (s === "pending") return "For Approval";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
@@ -225,6 +227,14 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
         lastApprovedBy: approvalLevel,
       };
 
+      // Check how many approval fields are currently filled (before this approval)
+      const currentApprovalCount = [
+        proposal.reviewedBy,
+        proposal.recommendedBy,
+        proposal.endorsedBy,
+        proposal.approvedBy
+      ].filter(field => field && typeof field === "string" && field.trim() !== "").length;
+
       // Check if all approval fields will be filled after this approval
       const currentProposal = {
         ...proposal,
@@ -237,12 +247,17 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
         currentProposal.endorsedBy && 
         currentProposal.approvedBy;
 
-      // Only change status to draft when ALL approvals are complete
+      // Determine the new status based on approval progress
       if (allApprovalsFilled) {
+        // All approvals complete → draft
         updateData.status = "draft";
         setApprovalMessage("Proposal fully approved! All signatures collected. Status updated to Draft for admin review.");
+      } else if (currentApprovalCount === 0) {
+        // First approval (transitioning from for_approval) → pending
+        updateData.status = "pending";
+        setApprovalMessage(`First approval recorded! Status updated to Pending. Waiting for remaining approvals.`);
       } else {
-        // Keep status as pending while waiting for other approvals
+        // Subsequent approvals → keep as pending
         updateData.status = "pending";
         setApprovalMessage(`Approval recorded! Waiting for remaining approvals.`);
       }
@@ -281,7 +296,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
     try {
       const proposalRef = doc(db, "missions", proposal.id);
       const updateData = {
-        status: "draft",
+        status: "for_approval",
         rejectionReason: rejectComments,
         rejectedBy: approvalLevel,
         rejectedAt: serverTimestamp(),
@@ -292,7 +307,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
         endorsedBy: "",
         approvedBy: "",
       };
-      setApprovalMessage("Proposal rejected. All approvals cleared and returned to draft.");
+      setApprovalMessage("Proposal rejected. All approvals cleared and returned to For Approval for resubmission.");
 
       await updateDoc(proposalRef, updateData);
       setActionSaved(true);

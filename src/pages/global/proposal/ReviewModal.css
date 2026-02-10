@@ -329,6 +329,11 @@
   font-weight: 500;
 }
 
+.status-badge.pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
 .status-badge.draft {
   background-color: #f1f5f9;
   color: #475569;
