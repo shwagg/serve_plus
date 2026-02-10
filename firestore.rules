@@ -39,22 +39,16 @@ service cloud.firestore {
 
       // ADMIN (based on users collection) - can update and delete
       allow update, delete: if
-      request.auth != null &&
-      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+        request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
 
-      // PARTNER APPROVAL ONLY
+      // FACULTY - can update approval chain fields (reviewedBy, recommendedBy)
       allow update: if
-      request.auth != null &&
-      resource.data.status == "for_approval" &&
-      request.resource.data.approvals.partner.decidedBy == request.auth.uid &&
-      request.resource.data.approvals.partner.decidedAt != null;
-      
-      // FACULTY APPROVAL ONLY
-      allow update: if
-      request.auth != null &&
-      resource.data.status == "approved" &&
-      request.resource.data.approvals.faculty.decidedBy == request.auth.uid &&
-      request.resource.data.approvals.faculty.decidedAt != null;
+        request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "faculty" &&
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewedBy', 'recommendedBy', 'status', 'lastApprovedAt', 'lastApprovedBy', 'rejectionReason', 'rejectedBy', 'rejectedAt', 'rejectedByUser'])
+        );
       
       // Allow authenticated users to join as volunteers
       match /volunteer/{userId} {
