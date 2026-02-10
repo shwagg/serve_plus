@@ -117,7 +117,8 @@ export default function EventActivity() {
       const ext = file.name.split(".").pop().toLowerCase();
       const fileType = ext === "pdf" ? "pdf" : "image";
 
-      const filePath = `consents/${id}/${user.uid}/consent.${ext}`;
+      const filePath = `consents/${user.uid}/consent.${ext}`;
+      console.log("[Consent Upload] User UID:", user.uid, "File Path:", filePath, "Is Authenticated:", !!user);
       const fileRef = ref(storage, filePath);
 
       await uploadBytes(fileRef, file);
@@ -1060,6 +1061,9 @@ export default function EventActivity() {
   const [loading, setLoading] = useState(true);
   const [totalPointsEarned, setTotalPointsEarned] = useState(0);
 
+  // Helper to determine survey status (progress or subcollection)
+  const [surveyStatus, setSurveyStatus] = useState({ pre: null, post: null });
+
   useEffect(() => {
     async function fetchEvent() {
       try {
@@ -1080,14 +1084,35 @@ export default function EventActivity() {
           // Check enrollment status for each task and get volunteer points
           const user = auth.currentUser;
           if (user) {
-            // Fetch volunteer's total points for this event
+            // Fetch volunteer's progress for this event
             const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
-            if (volunteerSnap.exists()) {
-              setVolunteerProgress(volunteerSnap.data().progress);
-              //this will be about the volunteer progress on his requirements.
-            }
+            let progress = (volunteerSnap.exists() && volunteerSnap.data().progress) ? { ...volunteerSnap.data().progress } : {};
 
+            // --- Sync progress with actual survey subcollections ---
+            // Pre-Activity Survey
+            const preSurveyDoc = await getDoc(doc(db, "missions", id, "volunteer", user.uid, "preSurvey", "response"));
+            // Post-Activity Survey
+            const postSurveyDoc = await getDoc(doc(db, "missions", id, "volunteer", user.uid, "postSurvey", "response"));
+
+            // Set surveyStatus for UI
+            setSurveyStatus({
+              pre: progress.preSurvey === "submitted" || preSurveyDoc.exists() ? "submitted" : progress.preSurvey || null,
+              post: progress.postSurvey === "submitted" || postSurveyDoc.exists() ? "submitted" : progress.postSurvey || null
+            });
+
+            // Update progress fields if needed
+            if (preSurveyDoc.exists() && progress.preSurvey !== "submitted") {
+              progress.preSurvey = "submitted";
+              await updateDoc(volunteerRef, { "progress.preSurvey": "submitted" });
+            }
+            if (postSurveyDoc.exists() && progress.postSurvey !== "submitted") {
+              progress.postSurvey = "submitted";
+              await updateDoc(volunteerRef, { "progress.postSurvey": "submitted" });
+            }
+            setVolunteerProgress(progress);
+
+            // Enrollment status for each task
             const enrollmentStatus = {};
             for (const task of tasksData) {
               const participantRef = doc(
@@ -1375,7 +1400,7 @@ export default function EventActivity() {
             <div className="activity-card">
               <RequirementItem
                 label="Pre-Activity Survey"
-                status={volunteerProgress?.preSurvey}
+                status={surveyStatus.pre}
                 onOpen={() => { console.log("Pre-activity clicked"); setShowPreSurveyModal(true) }}
               />
             </div>
@@ -1399,9 +1424,9 @@ export default function EventActivity() {
 
             <RequirementItem
               label="Post-Activity Survey"
-              status={volunteerProgress?.postSurvey}
+              status={surveyStatus.post}
               locked={
-                volunteerProgress?.preSurvey !== "submitted" ||
+                surveyStatus.pre !== "submitted" ||
                 volunteerProgress?.consent !== "verified" ||
                 volunteerProgress?.attendance !== "present"
               }
