@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { db } from "../../../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import Header from "../../../components/Header";
+import ReviewModal from "./ReviewModal";
 import "../../../styles/ReviewProposal.css";
 
 export default function ReviewProposal() {
@@ -11,27 +12,30 @@ export default function ReviewProposal() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("overall");
+  
+  const [selectedProposal, setSelectedProposal] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+
+  const fetchProposals = async () => {
+    try {
+      setLoading(true);
+      const snapshot = await getDocs(collection(db, "missions"));
+
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setProposals(data);
+    } catch (err) {
+      console.error("Firestore error:", err);
+      setError("Failed to load proposals");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProposals = async () => {
-      try {
-        setLoading(true);
-        const snapshot = await getDocs(collection(db, "proposals"));
-
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
-        setProposals(data);
-      } catch (err) {
-        console.error("Firestore error:", err);
-        setError("Failed to load proposals");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProposals();
   }, []);
 
@@ -55,21 +59,34 @@ export default function ReviewProposal() {
     return data;
   }, [proposals, searchTerm, statusFilter]);
 
-  const formatDate = (value) => {
-    if (!value) return "N/A";
-    try {
-      if (value?.toDate) return value.toDate().toLocaleDateString();
-      return new Date(value).toLocaleDateString();
-    } catch {
-      return "N/A";
-    }
-  };
-
   const getStatusBadgeClass = (status = "") => {
     const s = status.toLowerCase();
-    if (s === "approved") return "approved";
-    if (s === "rejected") return "rejected";
-    return "pending";
+    if (s === "draft") return "draft";
+    if (s === "pending") return "pending";
+    if (s === "published") return "published";
+    if (s === "completed") return "completed";
+    return "draft";
+  };
+
+  const formatStatus = (status = "") => {
+    if (!status) return "Draft";
+    const s = status.toLowerCase();
+    if (s === "pending") return "For Approval";
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const handleOpenModal = (proposal) => {
+    setSelectedProposal(proposal);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setSelectedProposal(null);
+  };
+
+  const handleApprovalChange = () => {
+    fetchProposals();
   };
 
   return (
@@ -83,13 +100,14 @@ export default function ReviewProposal() {
             <h1 className="review-proposal-title">Review Proposals</h1>
 
             <div className="status-filters">
-              {["overall","pending","approved","rejected"].map(filter => (
+              {["overall","pending","draft","published","completed"].map(filter => (
                 <label key={filter} className="filter-label">
                   <input
                     type="radio"
                     name="status"
                     checked={statusFilter === filter}
                     onChange={() => setStatusFilter(filter)}
+                    className={`filter-${filter.replace('_', '-')}`}
                   />
                   <span>{filter.charAt(0).toUpperCase() + filter.slice(1)}</span>
                 </label>
@@ -121,7 +139,7 @@ export default function ReviewProposal() {
                   <tr>
                     <th></th>
                     <th>Title</th>
-                    <th className="text-center">Target Date</th>
+                    <th className="text-left description-header">Description</th>
                     <th className="text-center">Status</th>
                   </tr>
                 </thead>
@@ -136,13 +154,24 @@ export default function ReviewProposal() {
                     filteredProposals.map((proposal, index) => (
                       <tr key={proposal.id}>
                         <td className="row-number">{index + 1}</td>
-                        <td className="proposal-title">{proposal.title || "N/A"}</td>
-                        <td className="text-center">
-                          {formatDate(proposal.targetDate)}
+                        <td className="proposal-title">
+                          <button 
+                            className="title-link"
+                            onClick={() => handleOpenModal(proposal)}
+                          >
+                            {proposal.title || "N/A"}
+                          </button>
+                        </td>
+                        <td className="proposal-description">
+                          {proposal.description 
+                            ? (proposal.description.length > 150 
+                                ? proposal.description.substring(0, 150) + "..." 
+                                : proposal.description)
+                            : "No description"}
                         </td>
                         <td className="text-center">
                           <span className={`status-badge ${getStatusBadgeClass(proposal.status)}`}>
-                            {proposal.status || "Pending"}
+                            {formatStatus(proposal.status) || "Draft"}
                           </span>
                         </td>
                       </tr>
@@ -155,6 +184,9 @@ export default function ReviewProposal() {
 
         </div>
       </div>
+
+      {/* Proposal Summary Modal */}
+      {showModal && <ReviewModal proposal={selectedProposal} onClose={handleCloseModal} onApprovalChange={handleApprovalChange} />}
     </>
   );
 }
