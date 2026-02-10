@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { ListAltOutlinedIcon } from "../../components/icons/index";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+
 
 export default function DocumentLibrary() {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState([]);
+  const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
+  const [currentMissionId, setCurrentMissionId] = useState(null);
+  const [volunteers, setVolunteers] = useState([]);
+  const [showAnswerModal, setShowAnswerModal] = useState(false);
+  const [answerModalTitle, setAnswerModalTitle] = useState("");
+  const [answerModalData, setAnswerModalData] = useState(null);
+
   const fetchApprovedProposals = async () => {
     const snap = await getDocs(collection(db, "missions"));
     return snap.docs
@@ -68,65 +76,359 @@ export default function DocumentLibrary() {
     boxShadow: isHovered ? '0 4px 16px #1a376433' : '0 2px 8px #0001',
     padding: '24px',
     marginBottom: 18,
-    color: '#1a3764',
+    color: '#000',
     border: '2px solid #1a3764',
     transition: 'box-shadow 0.2s, transform 0.2s',
     transform: isHovered ? 'translateY(-4px) scale(1.03)' : 'none',
     cursor: 'pointer',
   });
 
+  // Override font color for all text in document-library
+  const documentLibraryStyle = {
+    color: '#000',
+  };
+
+  const handleViewSubmissions = async (missionId) => {
+    setCurrentMissionId(missionId);
+    setShowSubmissionsModal(true);
+    // Fetch volunteers for the selected mission
+    const snap = await getDocs(collection(db, "missions", missionId, "volunteer"));
+    const volunteersRaw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log('[DEBUG] Volunteers fetched:', volunteersRaw);
+
+    // Fetch survey answers for each volunteer
+    const volunteers = await Promise.all(volunteersRaw.map(async (v) => {
+      // Pre-Activity Survey
+      let preSurveyAnswers = null;
+      try {
+        const preDoc = await getDoc(doc(db, "missions", missionId, "volunteer", v.id, "preSurvey", "response"));
+        if (preDoc.exists()) {
+          preSurveyAnswers = preDoc.data();
+        }
+      } catch (e) { console.log('[DEBUG] Error fetching preSurvey for', v.id, e); }
+
+      // Post-Activity Survey
+      let postSurveyAnswers = null;
+      try {
+        const postDoc = await getDoc(doc(db, "missions", missionId, "volunteer", v.id, "postSurvey", "response"));
+        if (postDoc.exists()) {
+          postSurveyAnswers = postDoc.data();
+        }
+      } catch (e) { console.log('[DEBUG] Error fetching postSurvey for', v.id, e); }
+
+      const result = {
+        ...v,
+        preSurveyAnswers,
+        postSurveyAnswers,
+      };
+      console.log('[DEBUG] Volunteer with answers:', result);
+      return result;
+    }));
+    setVolunteers(volunteers);
+    console.log('[DEBUG] Final volunteers with answers:', volunteers);
+  };
+
+  // Helper to open answer modal
+  const handleViewAnswers = (volunteer, type) => {
+    let title = type === 'pre' ? 'Pre-Activity Survey Answers' : 'Post-Activity Survey Answers';
+    let data = type === 'pre' ? volunteer.preSurveyAnswers : volunteer.postSurveyAnswers;
+    // fallback for old data structure
+    if (!data && volunteer.answers) {
+      data = volunteer.answers;
+    }
+    setAnswerModalTitle(title + (volunteer.name ? ` - ${volunteer.name}` : ''));
+    setAnswerModalData(data);
+    setShowAnswerModal(true);
+  };
+
   return (
-    <div className="document-library">
-      <h2>Document Library</h2>
+    <>
+      <div className="document-library" style={documentLibraryStyle}>
+        <h2>Document Library</h2>
 
-      {loading ? (
-        <p className="loading-state">Loading submissions…</p>
-      ) : proposals.length === 0 ? (
-        <p className="empty-state">No approved events found.</p>
-      ) : (
-        <div className="library-grid">
-          {proposals.map((mission) => {
-            const s = stats[mission.id];
-            const completion = s?.completionRate ?? 0;
+        {loading ? (
+          <p className="loading-state">Loading submissions…</p>
+        ) : proposals.length === 0 ? (
+          <p className="empty-state">No approved events found.</p>
+        ) : (
+          <div className="library-grid">
+            {proposals.map((mission) => {
+              // Find volunteers for this mission if modal is open for this mission
+              const missionVolunteers = currentMissionId === mission.id ? volunteers : [];
+              // Fallback to stats if not viewing submissions
+              const s = stats[mission.id];
+              const completion = s?.completionRate ?? 0;
 
-            return (
-              <div key={mission.id} className="library-card">
-                <div>
-                  <h3>{mission.title || mission.name}</h3>
+              // Use live data if available, otherwise fallback to stats
+              const total = missionVolunteers.length || s?.total || 0;
+              const preSurvey = missionVolunteers.length ? missionVolunteers.filter(v => v.preSurveyAnswers).length : s?.preSurvey || 0;
+              const postSurvey = missionVolunteers.length ? missionVolunteers.filter(v => v.postSurveyAnswers).length : s?.postSurvey || 0;
+              const consent = missionVolunteers.length ? missionVolunteers.filter(v => v.progress?.consent === 'submitted').length : s?.consent || 0;
+              const attendance = missionVolunteers.length ? missionVolunteers.filter(v => v.progress?.attendance === 'present').length : s?.attendance || 0;
 
-                  <p className="library-meta">
-                    Volunteers Joined: {s?.total ?? 0}
-                  </p>
-
-                  <ul className="library-meta">
-                    <li>Pre-Activity Survey: {s?.preSurvey ?? 0}</li>
-                    <li>Consent Submitted: {s?.consent ?? 0}</li>
-                    <li>Attendance Marked: {s?.attendance ?? 0}</li>
-                    <li>Post-Activity Survey: {s?.postSurvey ?? 0}</li>
-                  </ul>
-                </div>
-
-                <div className="library-footer">
-                  <a
-                    href={`/admin/forms/documents/${mission.id}`}
-                    className="library-link"
+              return (
+                <div className="library-card" style={{
+                  background: '#fff',
+                  borderRadius: '20px',
+                  boxShadow: '0 2px 8px #0001',
+                  padding: '32px 24px',
+                  marginBottom: '24px',
+                  color: '#23335b',
+                  border: '2px solid #23335b',
+                  maxWidth: '380px',
+                  minWidth: '260px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}>
+                  <div style={{ width: '100%' }}>
+                    <h3 style={{ marginBottom: 18, fontWeight: 700, fontSize: '1.25rem', textAlign: 'center' }}>{mission.title || mission.name}</h3>
+                    <hr style={{ width: '100%', border: 'none', borderTop: '1px solid #e0e4ea', margin: '0 0 18px 0' }} />
+                    <p className="library-meta" style={{ marginBottom: 8, fontWeight: 600, fontSize: '1.1rem', textAlign: 'center' }}>
+                      Volunteers Joined: {total}
+                    </p>
+                    <ul className="library-meta" style={{ marginBottom: 24, paddingLeft: 18, color: '#23335b', fontSize: '1rem', textAlign: 'left' }}>
+                      <li>Pre-Activity Survey: {preSurvey}</li>
+                      <li>Consent Submitted: {consent}</li>
+                      <li>Attendance Marked: {attendance}</li>
+                      <li>Post-Activity Survey: {postSurvey}</li>
+                    </ul>
+                  </div>
+                  <button
+                    className="library-link library-btn"
+                    onClick={() => handleViewSubmissions(mission.id)}
+                    style={{
+                      background: '#30bdb7',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '16px 0',
+                      fontWeight: 600,
+                      fontSize: '1.08rem',
+                      cursor: 'pointer',
+                      width: '180px',
+                      marginBottom: '8px',
+                      marginTop: '8px',
+                      transition: 'background 0.18s',
+                      boxShadow: '0 2px 8px #0001',
+                    }}
                   >
                     View Submissions
-                  </a>
-
-                  <span
-                    className={`library-progress ${completion >= 75 ? "good" : "warn"
-                      }`}
-                  >
-                    {completion}% Complete
-                  </span>
+                  </button>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Submissions Modal - must be outside the map! */}
+      {showSubmissionsModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(44,62,80,0.18)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowSubmissionsModal(false)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              padding: 32,
+              minWidth: 600,
+              maxWidth: '90vw',
+              boxShadow: '0 2px 16px #0002',
+              position: 'relative',
+              color: '#000', // Set font color to black for all modal content
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                background: 'none',
+                border: 'none',
+                fontSize: 22,
+                cursor: 'pointer',
+                color: '#23335b',
+              }}
+              onClick={() => setShowSubmissionsModal(false)}
+            >
+              ×
+            </button>
+            <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Submissions</h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 16, color: '#000' }}>
+              <thead>
+                <tr style={{ background: '#f3f4f8', color: '#000' }}>
+                  <th style={{ padding: '10px 12px', borderBottom: '2px solid #e0e4ea', color: '#000', fontWeight: 700 }}>Student Name / Participant</th>
+                  <th style={{ padding: '10px 12px', borderBottom: '2px solid #e0e4ea', color: '#000', fontWeight: 700 }}>Pre-Activity Survey</th>
+                  <th style={{ padding: '10px 12px', borderBottom: '2px solid #e0e4ea', color: '#000', fontWeight: 700 }}>Activity Consent Form</th>
+                  <th style={{ padding: '10px 12px', borderBottom: '2px solid #e0e4ea', color: '#000', fontWeight: 700 }}>Post-Activity Form</th>
+                </tr>
+              </thead>
+              <tbody>
+                {volunteers.length === 0 ? (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#888' }}>No submissions found.</td></tr>
+                ) : volunteers.map(v => (
+                  <tr key={v.id} style={{ background: '#fff', color: '#000' }}>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', color: '#000' }}>{v.name || v.respondent?.name || v.id}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', textAlign: 'center', color: '#000' }}>
+                      {v.preSurveyAnswers ? (
+                        <button style={{padding:'4px 10px',borderRadius:6,border:'1px solid #30bdb7',background:'#f3f4f8',color:'#23335b',cursor:'pointer'}} onClick={() => handleViewAnswers(v, 'pre')}>View Answers</button>
+                      ) : ''}
+                    </td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', textAlign: 'center', color: '#000' }}>{v.progress?.consent === 'submitted' ? '✔️' : ''}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', textAlign: 'center', color: '#000' }}>
+                      {v.postSurveyAnswers ? (
+                        <button style={{padding:'4px 10px',borderRadius:6,border:'1px solid #30bdb7',background:'#f3f4f8',color:'#23335b',cursor:'pointer'}} onClick={() => handleViewAnswers(v, 'post')}>View Answers</button>
+                      ) : ''}
+                    </td>
+                  </tr>
+                ))}
+                    {/* Answer Preview Modal */}
+                    {showAnswerModal && (
+                      <div
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          width: '100vw',
+                          height: '100vh',
+                          background: 'rgba(44,62,80,0.18)',
+                          zIndex: 10000,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onClick={() => setShowAnswerModal(false)}
+                      >
+                        <div
+                          style={{
+                            background: '#fff',
+                            borderRadius: 16,
+                            padding: 32,
+                            minWidth: 400,
+                            maxWidth: '90vw',
+                            boxShadow: '0 2px 16px #0002',
+                            position: 'relative',
+                            color: '#000',
+                            maxHeight: '80vh',
+                            overflowY: 'auto',
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <button
+                            style={{
+                              position: 'absolute',
+                              top: 16,
+                              right: 16,
+                              background: 'none',
+                              border: 'none',
+                              fontSize: 22,
+                              cursor: 'pointer',
+                              color: '#23335b',
+                            }}
+                            onClick={() => setShowAnswerModal(false)}
+                          >
+                            ×
+                          </button>
+                          <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>{answerModalTitle}</h2>
+                          {answerModalData ? (
+                            <div style={{maxWidth:600,margin:'0 auto'}}>
+
+                              {/* Pre-Activity Survey Preview */}
+                              {answerModalTitle.startsWith('Pre-Activity') && (
+                                <div>
+                                  <h3 style={{fontWeight:700, color:'#23235b', fontSize:'1.08rem', marginBottom:18}}>Pre-Activity Survey</h3>
+                                  <div style={{marginBottom:12}}><b>Name:</b> {answerModalData.respondent?.name || ''}</div>
+                                  <div style={{marginBottom:12}}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Program:</b> {answerModalData.respondent?.program || ''}</div>
+                                  {answerModalData.respondent?.college === 'Non-Academic Organization' && (
+                                    <div style={{marginBottom:12}}><b>Organization Name:</b> {answerModalData.respondent?.nonAcademicOrg || ''}</div>
+                                  )}
+                                  <div style={{marginBottom:12}}><b>Type of Engagement:</b> {answerModalData.engagement?.type || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Title of Initiative:</b> {answerModalData.engagement?.initiativeTitle || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Type/Level of Participation:</b> {(answerModalData.engagement?.participation || []).join(', ')} {answerModalData.engagement?.participationOther ? `, Other: ${answerModalData.engagement?.participationOther}` : ''}</div>
+                                  <div style={{marginBottom:12}}><b>Previous Community Service Experience:</b> {answerModalData.background?.previousService || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Frequency of Community Service:</b> {answerModalData.background?.frequency || ''}</div>
+                                  <div style={{marginTop:24,marginBottom:8,fontWeight:600}}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
+                                  <ol style={{paddingLeft:18}}>
+                                    {[
+                                      'There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.',
+                                      'Volunteer work along with teamwork would somehow help solve social problems.',
+                                      'People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.',
+                                      'I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.',
+                                      'Contributing and improving skills I’ve learned from my degree program or affiliation would somehow solve social problems.',
+                                      'I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.',
+                                      'I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.',
+                                      'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.'
+                                    ].map((q, idx) => (
+                                      <li key={idx} style={{marginBottom:6}}>
+                                        <span>{q}</span><br/>
+                                        <span style={{color:'#30bdb7',fontWeight:600}}>Answer: {answerModalData.likert && answerModalData.likert[`q${idx+1}`]}</span>
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              )}
+                              
+                              {/* Post-Activity Survey Preview */}
+                              {answerModalTitle.startsWith('Post-Activity') && (
+                                <div>
+                                  <h3 style={{fontWeight:700, color:'#23235b', fontSize:'1.08rem', marginBottom:18}}>Post-Activity Survey</h3>
+                                  <div style={{marginBottom:12}}><b>Name:</b> {answerModalData.respondent?.name || ''}</div>
+                                  <div style={{marginBottom:12}}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Program:</b> {answerModalData.respondent?.program || ''}</div>
+                                  {answerModalData.respondent?.college === 'Non-Academic Organization' && (
+                                    <div style={{marginBottom:12}}><b>Organization Name:</b> {answerModalData.respondent?.nonAcademicOrg || ''}</div>
+                                  )}
+                                  <div style={{marginBottom:12}}><b>Type of Engagement:</b> {answerModalData.engagement?.type || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Title of Initiative:</b> {answerModalData.engagement?.initiativeTitle || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Date of Implementation:</b> {answerModalData.engagement?.dateOfImplementation || ''}</div>
+                                  <div style={{marginBottom:12}}><b>Location/Venue:</b> {answerModalData.engagement?.location || ''}</div>
+                                  <div style={{marginTop:24,marginBottom:8,fontWeight:600}}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
+                                  <ol style={{paddingLeft:18}}>
+                                    {[
+                                      'The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.',
+                                      'The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.',
+                                      'Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.',
+                                      'Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.',
+                                      'The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.',
+                                      'I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.',
+                                      'I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.',
+                                      'I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.'
+                                    ].map((q, idx) => (
+                                      <li key={idx} style={{marginBottom:6}}>
+                                        <span>{q}</span><br/>
+                                        <span style={{color:'#30bdb7',fontWeight:600}}>Answer: {answerModalData.likert && answerModalData.likert[`q${idx+1}`]}</span>
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{textAlign:'center',color:'#888'}}>No answers found.</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
-
 }

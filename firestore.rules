@@ -106,6 +106,18 @@ service cloud.firestore {
           (request.auth.token.role == "admin" ||
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
       }
+
+      // Pre-Activity Survey subcollection - users can submit their own survey
+      match /volunteer/{userId}/preSurvey/{docId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Post-Activity Survey subcollection - users can submit their own survey
+      match /volunteer/{userId}/postSurvey/{docId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // Allow authenticated users to write to activityJournals

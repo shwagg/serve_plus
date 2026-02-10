@@ -19,6 +19,17 @@ service firebase.storage {
       allow read: if request.auth != null;
     }
 
+    // Consent form: allow anyone to download the consent form PDF
+    match /assets/Activity Consent Form Fillable.pdf {
+      allow read: if true;
+    }
+
+    // Consent uploads: allow authenticated users and admins to upload and read consent files
+    match /consents/{userId}/{fileName} {
+      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.role == "admin");
+      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.role == "admin");
+    }
+
     // Default: deny all other access
     match /{allPaths=**} {
       allow read, write: if false;
