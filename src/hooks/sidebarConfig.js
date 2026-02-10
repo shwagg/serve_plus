@@ -21,7 +21,7 @@ export const adminLinks = [
         label: "Events",
         children: [
             { label: "Current Event", to: "/admin/events/current" },
-            { label: "Roster", to: "/admin/events/roster" },
+            { label: "Roster", to: "/admin/roster" },
             { label: "Partner Hub", to: "/admin/events/partners" },
         ],
     },
