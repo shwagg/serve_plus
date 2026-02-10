@@ -21,7 +21,7 @@ export const adminLinks = [
         label: "Events",
         children: [
             { label: "Current Event", to: "/admin/events/current" },
-            { label: "Roster", to: "/admin/events/roster" },
+            { label: "Roster", to: "/admin/roster" },
             { label: "Partner Hub", to: "/admin/events/partners" },
         ],
     },
@@ -44,7 +44,7 @@ export const adminLinks = [
         key: "system",
         label: "System",
         children: [
-            { label: "System Activity Log", to: "/admin/system/logs" },
+            { label: "System Activity Log", to: "/admin/audit-logs" },
             { label: "Students Banner", to: "/admin/system/banner" },
             { label: "Announcement", to: "/admin/system/announcement" },
         ],
@@ -57,7 +57,7 @@ export const partnerLinks = [
         key: "project",
         label: "Project",
         children: [
-            { label: "Project List", to: "/admin/projects" },
+            { label: "Project List", to: "/partner/projects" },
         ],
     },
 ];
@@ -69,7 +69,7 @@ export const facultyLinks = [
         label: "Events",
         children: [
             { label: "Current Event", to: "/admin/events/current" },
-            { label: "Roster", to: "/admin/events/roster" },
+            { label: "Roster", to: "/admin/roster" },
             { label: "Partner Hub", to: "/admin/events/partners" },
         ],
     },
@@ -84,7 +84,7 @@ export const facultyLinks = [
         key: "forms",
         label: "Forms",
         children: [
-            { label: "Document Library", to: "/admin/forms/documents" },
+            { label: "Document Library", to: "/admindocuments" },
         ],
     },
 ];
