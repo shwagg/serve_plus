@@ -53,7 +53,7 @@ const GlobalAnnouncements = () => {
   const [extraAnnouncements, setExtraAnnouncements] = useState([]); // SDG impact announcements
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [modalType, setModalType] = useState('event'); // 'event', 'closing', 'milestone', or 'info'
+  const [modalType, setModalType] = useState('event'); // 'event', 'closing', 'milestone', 'info', or 'full'
 
   const toKey = (type, id) => `${type}:${id}`;
 
@@ -94,6 +94,12 @@ const GlobalAnnouncements = () => {
 
     milestones.forEach((milestone) => {
       keys.push(toKey('milestone', milestone.eventId + '-milestone'));
+    });
+
+    announcements.forEach((event) => {
+      if (isFullyBooked(event)) {
+        keys.push(toKey('full', event.id));
+      }
     });
 
     extraAnnouncements.forEach((info) => {
@@ -158,6 +164,10 @@ const GlobalAnnouncements = () => {
       if (isClosingSoon(event.targetDates) && !currentSeen.has(toKey('closing', event.id))) {
         count++;
       }
+      // Count unseen fully booked announcements
+      if (isFullyBooked(event) && !currentSeen.has(toKey('full', event.id))) {
+        count++;
+      }
     });
 
     // Count unseen milestones
@@ -198,6 +208,7 @@ const GlobalAnnouncements = () => {
             const volunteerCol = collection(db, `missions/${event.id}/volunteer`);
             const volunteerSnap = await getDocs(volunteerCol);
             const count = volunteerSnap.size;
+            event.volunteerCount = count;
             let milestoneTime = null;
             if (count >= 3) { // Change to desired milestone number
               const joinDates = [];
@@ -212,6 +223,7 @@ const GlobalAnnouncements = () => {
               milestoneTime = joinDates[2] || null; // change index based on milestone number
               milestoneArr.push({ eventId: event.id, title: event.title || 'Untitled Event', count, milestoneTime });
             }
+            event.fullBookedTime = milestoneTime;
             // Track SDG usage across missions
             if (Array.isArray(event.sdgs)) {
               event.sdgs.forEach((sdg) => {
@@ -314,6 +326,12 @@ const GlobalAnnouncements = () => {
     return diffDays > 0 && diffDays <= 2;
   };
 
+  // Helper: is event fully booked (default threshold 3 volunteers)
+  const isFullyBooked = (event) => {
+    const count = Number(event?.volunteerCount || 0);
+    return count >= 3;
+  };
+
   const getIconAndClass = (event) => {
     return { icon: '🆕', className: 'new' };
   };
@@ -359,7 +377,7 @@ const GlobalAnnouncements = () => {
       });
     });
 
-    // Add regular announcements and closing soon
+    // Add regular announcements, closing soon, and fully booked
     announcements.forEach(event => {
       const eventTimestamp = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : new Date(0));
       
@@ -376,7 +394,17 @@ const GlobalAnnouncements = () => {
         allItems.push({
           type: 'closing',
           id: event.id + '-closing',
-          timestamp: eventTimestamp, // Use same timestamp as event
+          timestamp: eventTimestamp,
+          data: event
+        });
+      }
+
+      // Add fully booked if applicable
+      if (isFullyBooked(event)) {
+        allItems.push({
+          type: 'full',
+          id: event.id + '-full',
+          timestamp: event.fullBookedTime || eventTimestamp,
           data: event
         });
       }
@@ -526,6 +554,31 @@ const GlobalAnnouncements = () => {
                 </div>
               </div>
             );
+          } else if (item.type === 'full') {
+            const event = item.data;
+            const isFullUnseen = !seen.has(toKey('full', event.id));
+            return (
+              <div
+                key={item.id}
+                className={`global-feed-item full ${isFullUnseen ? 'unseen' : 'seen'}`}
+                onClick={() => {
+                  markAsSeen(event.id, 'full');
+                  openModal(event, 'full');
+                }}
+              >
+                <span className="feed-icon">🚫</span>
+                <div className="feed-content">
+                  {isFullUnseen && <span className="unread-dot"></span>}
+                  <p className="feed-title">Mission Fully Booked</p>
+                  <p className="feed-desc">
+                    {event.title || 'Untitled Event'} is now fully booked.
+                  </p>
+                  <span className="feed-time">
+                    {formatTimeAgo(event.fullBookedTime || (event.createdAt?.toDate ? event.createdAt.toDate() : event.createdAt))}
+                  </span>
+                </div>
+              </div>
+            );
           } else {
             // Regular event announcement
             const event = item.data;
@@ -646,6 +699,33 @@ const GlobalAnnouncements = () => {
                 <div className="modal-footer">
                   <a href={`/event/${selectedEvent.id}`} className="modal-cta-btn">
                     Join This Mission
+                  </a>
+                </div>
+              </>
+            ) : modalType === 'full' ? (
+              <>
+                <div className="modal-icon">🚫</div>
+                <h2 className="modal-title">
+                  Mission Fully Booked
+                </h2>
+                <h3 className="modal-subtitle">
+                  {selectedEvent.title || 'Untitled Event'}
+                </h3>
+                {selectedEvent.description && (
+                  <div className="modal-section">
+                    <h4 className="modal-section-title">Description</h4>
+                    <p className="modal-section-content">{selectedEvent.description}</p>
+                  </div>
+                )}
+                {selectedEvent.location && (
+                  <div className="modal-section">
+                    <h4 className="modal-section-title">Location</h4>
+                    <p className="modal-section-content">{selectedEvent.location}</p>
+                  </div>
+                )}
+                <div className="modal-footer">
+                  <a href={`/event/${selectedEvent.id}`} className="modal-cta-btn">
+                    View Event Details
                   </a>
                 </div>
               </>
