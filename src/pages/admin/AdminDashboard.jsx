@@ -149,7 +149,7 @@ export default function AdminDashboard() {
         }));
 
         setSdgAnalytics(analytics);
-        setTotalProjects(total);
+        setTotalProjects(published.length);
 
         const today = startOfToday();
         const todayEvents = [];
