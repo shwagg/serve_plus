@@ -569,7 +569,7 @@ const GlobalAnnouncements = () => {
                 <span className="feed-icon">🚫</span>
                 <div className="feed-content">
                   {isFullUnseen && <span className="unread-dot"></span>}
-                  <p className="feed-title">Mission Fully Booked</p>
+                  <p className="feed-title">Event Fully Booked</p>
                   <p className="feed-desc">
                     {event.title || 'Untitled Event'} is now fully booked.
                   </p>
@@ -706,7 +706,7 @@ const GlobalAnnouncements = () => {
               <>
                 <div className="modal-icon">🚫</div>
                 <h2 className="modal-title">
-                  Mission Fully Booked
+                  Event Fully Booked
                 </h2>
                 <h3 className="modal-subtitle">
                   {selectedEvent.title || 'Untitled Event'}

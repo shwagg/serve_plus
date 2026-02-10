@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
+import { createNotification } from "../../utils/notificationUtils";
 
 import "../../styles/admin.css";
 
@@ -243,6 +244,31 @@ export default function ProjectDetails() {
 
     setSaving(true);
     try {
+      // Send event_cancelled notifications to volunteers (non-blocking)
+      try {
+        const volunteersRef = collection(db, "missions", projectId, "volunteer");
+        const volunteersSnap = await getDocs(volunteersRef);
+        
+        const notificationPromises = volunteersSnap.docs.map(async (volunteerDoc) => {
+          try {
+            await createNotification(volunteerDoc.id, {
+              type: "event_cancelled",
+              title: "Event Cancelled",
+              message: `${project?.title || "An event"} has been cancelled.`,
+              link: "/student"
+            });
+          } catch (notifError) {
+            console.error(`Failed to notify volunteer ${volunteerDoc.id}:`, notifError);
+          }
+        });
+        
+        await Promise.all(notificationPromises);
+      } catch (notifError) {
+        console.error("Error sending notifications:", notifError);
+        // Continue with archiving even if notifications fail
+      }
+      
+      // Archive the event
       await updateDoc(ref, {
         status: "archived",
         archivedAt: serverTimestamp(),
@@ -285,6 +311,7 @@ export default function ProjectDetails() {
 
     setSaving(true);
     try {
+      const ref = doc(db, "missions", projectId);
       await deleteDoc(ref);
       navigate("/admin/projects");
     } catch (e) {

@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { SessionProvider } from "./context/SessionContext";
 import { ProtectedRoute } from "./router/ProtectedRoute";
+import { useUpcomingEventNotifications } from "./hooks/useUpcomingEventNotifications";
+import { useOverdueReflectionNotifications } from "./hooks/useOverdueReflectionNotifications";
 
 import Auth from "./pages/Auth"; //changed login to authorization page
 import OAuthCallback from "./pages/OAuthCallback";
@@ -29,6 +31,12 @@ import Chat from "./pages/global/Chat";
 import "./App.css";
 
 function App() {
+  // Check for upcoming events and create notifications
+  useUpcomingEventNotifications();
+  
+  // Check for overdue reflections and create notifications
+  useOverdueReflectionNotifications();
+  
   return (
     <SessionProvider>
       <Router>

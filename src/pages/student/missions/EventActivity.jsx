@@ -13,6 +13,7 @@ import Header from "../../../components/Header";
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { db } from "../../../firebaseConfig";
+import { createNotification } from "../../../utils/notificationUtils";
 import PostActivitySurvey from '../../../../public/forms/PostActivitySurvey';
 
 export default function EventActivity() {
@@ -214,6 +215,33 @@ export default function EventActivity() {
         });
         // Update the displayed total
         setTotalPointsEarned(newTotal);
+        
+        // Check for level up (calculate across all missions)
+        const missionsRef = collection(db, "missions");
+        const missionsSnap = await getDocs(missionsRef);
+        let totalPointsAllMissions = 0;
+
+        for (const missionDoc of missionsSnap.docs) {
+          const volRef = doc(db, "missions", missionDoc.id, "volunteer", user.uid);
+          const volSnap = await getDoc(volRef);
+          if (volSnap.exists()) {
+            totalPointsAllMissions += volSnap.data().pointsEarned || 0;
+          }
+        }
+
+        // Calculate old and new level (every 100 points = 1 level)
+        const oldLevel = Math.floor((totalPointsAllMissions - pointsToAward) / 100) + 1;
+        const newLevel = Math.floor(totalPointsAllMissions / 100) + 1;
+
+        // Send level up notification if level increased
+        if (newLevel > oldLevel) {
+          await createNotification(user.uid, {
+            type: "level_up",
+            title: "Level Up!",
+            message: `Congratulations! You've reached Level ${newLevel}! 🎉`,
+            link: "/student"
+          });
+        }
       }
 
       setSubmitStatus((prev) => ({
@@ -221,6 +249,14 @@ export default function EventActivity() {
         [activityIdx]: `Reflection submitted! +${pointsToAward} points earned!`,
       }));
       setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
+
+      // Send notification to student
+      await createNotification(user.uid, {
+        type: "reflection_submitted",
+        title: "Reflection Submitted",
+        message: `Your reflection for "${activity.title}" has been submitted successfully! +${pointsToAward} points earned.`,
+        link: `/event/${id}/activity`
+      });
 
       // Refresh journals to show the updated reflection
       await fetchUserJournals();

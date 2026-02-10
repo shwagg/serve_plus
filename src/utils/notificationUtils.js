@@ -6,6 +6,7 @@ import {
   where,
   orderBy,
   getDocs,
+  getDoc,
   updateDoc,
   doc,
   serverTimestamp,
@@ -45,4 +46,170 @@ export function subscribeToNotifications(userId, callback) {
     }));
     callback(notifications);
   });
+}
+
+// Check for upcoming events and create notifications
+export async function checkUpcomingEvents(userId) {
+  try {
+    console.log('[checkUpcomingEvents] Starting check for user:', userId);
+    
+    // Get user's registered events
+    const missionsRef = collection(db, "missions");
+    const missionsSnapshot = await getDocs(missionsRef);
+    
+    console.log('[checkUpcomingEvents] Found missions:', missionsSnapshot.size);
+    
+    const now = new Date();
+    const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    console.log('[checkUpcomingEvents] Date range:', {
+      now: now.toISOString(),
+      oneWeekFromNow: oneWeekFromNow.toISOString()
+    });
+    
+    for (const missionDoc of missionsSnapshot.docs) {
+      const missionData = missionDoc.data();
+      const missionId = missionDoc.id;
+      
+      console.log(`[checkUpcomingEvents] Checking mission ${missionId}:`, missionData.title);
+      
+      // Check if user is registered for this event
+      const volunteerDocRef = doc(db, "missions", missionId, "volunteer", userId);
+      const volunteerDoc = await getDoc(volunteerDocRef);
+      
+      console.log(`[checkUpcomingEvents] User registered for ${missionId}:`, volunteerDoc.exists());
+      
+      if (!volunteerDoc.exists()) continue;
+      
+      // Check if event is within 1 week
+      const eventDate = missionData.targetDates?.toDate?.() || new Date(missionData.targetDates);
+      console.log(`[checkUpcomingEvents] Event date for ${missionId}:`, eventDate, 'Type:', typeof missionData.targetDates);
+      
+      if (eventDate <= oneWeekFromNow && eventDate > now) {
+        // Calculate days until event
+        const daysUntil = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
+        
+        console.log(`[checkUpcomingEvents] Event ${missionId} is upcoming (${daysUntil} days)`);
+        
+        // Check if notification already exists for this event
+        const notificationsRef = collection(db, "users", userId, "notifications");
+        const existingQuery = query(
+          notificationsRef,
+          where("type", "==", "event_upcoming"),
+          where("eventId", "==", missionId)
+        );
+        const existingNotifications = await getDocs(existingQuery);
+        
+        console.log(`[checkUpcomingEvents] Existing notifications for ${missionId}:`, existingNotifications.size);
+        
+        // Only create if no notification exists yet
+        if (existingNotifications.empty) {
+          console.log(`[checkUpcomingEvents] Creating notification for ${missionId}`);
+          await createNotification(userId, {
+            type: "event_upcoming",
+            title: "Event Coming Up Soon!",
+            message: `${missionData.title || "Your event"} is ${daysUntil} day${daysUntil !== 1 ? 's' : ''} away`,
+            link: `/event/${missionId}`,
+            eventId: missionId,
+          });
+          console.log(`[checkUpcomingEvents] Notification created successfully`);
+        }
+      } else {
+        console.log(`[checkUpcomingEvents] Event ${missionId} not in range:`, {
+          eventDate,
+          isBeforeOneWeek: eventDate <= oneWeekFromNow,
+          isAfterNow: eventDate > now
+        });
+      }
+    }
+    console.log('[checkUpcomingEvents] Check complete');
+  } catch (error) {
+    console.error("Error checking upcoming events:", error);
+  }
+}
+
+// Check for overdue reflections and create notifications
+export async function checkOverdueReflections(userId) {
+  try {
+    console.log('[checkOverdueReflections] Starting check for user:', userId);
+    
+    // Get all missions
+    const missionsRef = collection(db, "missions");
+    const missionsSnapshot = await getDocs(missionsRef);
+    
+    const now = new Date();
+    
+    for (const missionDoc of missionsSnapshot.docs) {
+      const missionId = missionDoc.id;
+      
+      // Check if user is registered for this event
+      const volunteerDocRef = doc(db, "missions", missionId, "volunteer", userId);
+      const volunteerDoc = await getDoc(volunteerDocRef);
+      
+      if (!volunteerDoc.exists()) continue;
+      
+      // Get all tasks for this mission
+      const tasksRef = collection(db, "missions", missionId, "task");
+      const tasksSnapshot = await getDocs(tasksRef);
+      
+      for (const taskDoc of tasksSnapshot.docs) {
+        const taskData = taskDoc.data();
+        const taskId = taskDoc.id;
+        
+        // Skip if no due date
+        if (!taskData.dueDate) continue;
+        
+        const dueDate = new Date(taskData.dueDate);
+        
+        // Check if deadline has passed
+        if (dueDate < now) {
+          // Check if user has submitted reflection
+          const participantRef = doc(
+            db,
+            "missions",
+            missionId,
+            "task",
+            taskId,
+            "participants",
+            userId
+          );
+          const participantSnap = await getDoc(participantRef);
+          
+          // If no participant doc or no reflection, it's overdue
+          const hasReflection = participantSnap.exists() && 
+                               participantSnap.data().reflection && 
+                               participantSnap.data().reflection.trim();
+          
+          if (!hasReflection) {
+            // Check if notification already exists
+            const notificationsRef = collection(db, "users", userId, "notifications");
+            const existingQuery = query(
+              notificationsRef,
+              where("type", "==", "reflection_overdue"),
+              where("taskId", "==", taskId),
+              where("missionId", "==", missionId)
+            );
+            const existingNotifications = await getDocs(existingQuery);
+            
+            // Only create if no notification exists yet
+            if (existingNotifications.empty) {
+              console.log(`[checkOverdueReflections] Task ${taskId} overdue for mission ${missionId}`);
+              await createNotification(userId, {
+                type: "reflection_overdue",
+                title: "Reflection Overdue",
+                message: `Your reflection for "${taskData.title}" has passed its deadline.`,
+                link: `/event/${missionId}/activity`,
+                taskId: taskId,
+                missionId: missionId,
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    console.log('[checkOverdueReflections] Check complete');
+  } catch (error) {
+    console.error("Error checking overdue reflections:", error);
+  }
 }

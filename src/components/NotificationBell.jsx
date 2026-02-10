@@ -58,7 +58,7 @@ export default function NotificationBell() {
     switch (type) {
       case "event_registration":
         return "✅";
-      case "event_reminder":
+      case "event_upcoming":
         return "⏰";
       case "event_cancelled":
         return "❌";
@@ -68,6 +68,10 @@ export default function NotificationBell() {
         return "🏆";
       case "points_earned":
         return "⭐";
+      case "reflection_submitted":
+        return "✍️";
+      case "reflection_overdue":
+        return "⏰";
       case "reflection_approved":
         return "✔️";
       case "deadline_approaching":
