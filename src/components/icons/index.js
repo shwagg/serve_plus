@@ -4,6 +4,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import WestIcon from '@mui/icons-material/West';
 import EastIcon from '@mui/icons-material/East';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
+import MenuOpenOutlinedIcon from '@mui/icons-material/MenuOpenOutlined';
 import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
 import CloseIcon from '@mui/icons-material/Close';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
@@ -15,7 +16,9 @@ import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined';
 import DesignServicesOutlinedIcon from '@mui/icons-material/DesignServicesOutlined';
 import LocalPoliceOutlinedIcon from '@mui/icons-material/LocalPoliceOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 //under project proposal icons
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import ImportContactsOutlinedIcon from '@mui/icons-material/ImportContactsOutlined';
@@ -32,7 +35,8 @@ export {
     WestIcon,
     EastIcon,
     MenuOpenIcon,
-    ViewSidebarIcon,
+    MenuOpenOutlinedIcon,
+    ViewSidebarOutlinedIcon,
     CloseIcon,
     DashboardOutlinedIcon,
     ListAltIcon,
@@ -50,4 +54,5 @@ export {
     ViewKanbanOutlinedIcon,
     ListAltOutlinedIcon,
     GridViewOutlinedIcon,
+    HomeRoundedIcon,
 };

@@ -13,7 +13,6 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import DocumentLibrary from "./pages/admin/DocumentLibrary";
 import CurrentEventMonitoring from "./pages/admin/CurrentEventMonitoring";
 import ProjectList from "./pages/global/ProjectList";
-import CreateProject from "./pages/global/CreateProject";
 import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
 import ProjectDetails from "./pages/admin/ProjectDetails";
@@ -57,7 +56,6 @@ function App() {
             <Route path="documents" element={<DocumentLibrary />} />
             <Route path="events/:eventId" element={<CurrentEventMonitoring />} />
             <Route path="projects" element={<ProjectList />} />
-            <Route path="projects/new" element={<CreateProject />} />
             <Route path="projects/proposal" element={<ProposeProject />} />
             <Route path="projects/:projectId" element={<ProjectDetails mode="admin" />} />
             <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />

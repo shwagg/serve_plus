@@ -3,26 +3,60 @@ import { ListAltOutlinedIcon } from "../../components/icons/index";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 
-const fetchApprovedProposals = async () => {
-  const snap = await getDocs(collection(db, "missions"));
-  return snap.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }))
-    .filter((doc) => (doc.status || '').toLowerCase() === "approved");
-};
-
 export default function DocumentLibrary() {
-  const [proposals, setProposals] = useState([]);
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [proposals, setProposals] = useState([]);
+  const fetchApprovedProposals = async () => {
+    const snap = await getDocs(collection(db, "missions"));
+    return snap.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((doc) => doc.status === "published");
+  };
+  const fetchVolunteerStats = async (missionId) => {
+    const snap = await getDocs(
+      collection(db, "missions", missionId, "volunteer")
+    );
+    const volunteers = snap.docs.map(d => d.data());
+    const total = volunteers.length;
+    const count = (key, value) =>
+      volunteers.filter(v => v.progress?.[key] === value).length;
+    const completed =
+      count("preSurvey", "submitted") +
+      count("consent", "submitted") +
+      count("attendance", "present") +
+      count("postSurvey", "submitted");
 
+    const maxPossible = total * 4;
+
+    return {
+      total,
+      preSurvey: count("preSurvey", "submitted"),
+      consent: count("consent", "submitted"),
+      attendance: count("attendance", "present"),
+      postSurvey: count("postSurvey", "submitted"),
+      completionRate:
+        maxPossible === 0
+          ? 0
+          : Math.round((completed / maxPossible) * 100),
+    };
+  };
   useEffect(() => {
-    fetchApprovedProposals().then((data) => {
-      setProposals(data);
-      setLoading(false);
-    });
-  }, []);
+    const loadData = async () => {
+      const missions = await fetchApprovedProposals();
 
-  // Hover state for cards
-  const [hovered, setHovered] = useState(null);
+      const statsMap = {};
+      for (const mission of missions) {
+        statsMap[mission.id] = await fetchVolunteerStats(mission.id);
+      }
+
+      setProposals(missions);
+      setStats(statsMap);
+      setLoading(false);
+    };
+
+    loadData();
+  }, []);
 
   // Card style with hover effect
   const cardStyle = (isHovered) => ({
@@ -42,49 +76,57 @@ export default function DocumentLibrary() {
   });
 
   return (
-    <div style={{ padding: 32 }}>
-      <h2 style={{ display: "flex", alignItems: "center", gap: 12, color: '#1a3764', fontWeight: 700 }}>
-        <ListAltOutlinedIcon /> Document Library
-      </h2>
-      <div style={{ marginTop: 32, background: '#1a3764', borderRadius: 16, color: '#fff', padding: '16px 0', fontWeight: 700, fontSize: 22, boxShadow: '0 2px 8px #0001' }}>
-        <div style={{ paddingLeft: 32 }}>Events</div>
-      </div>
-      <div style={{ marginTop: 24 }}>
-        
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-          {/* Temporary UI: Example event cards, replace with dynamic proposals if needed */}
-          <div
-            style={cardStyle(hovered === 0)}
-            onMouseEnter={() => setHovered(0)}
-            onMouseLeave={() => setHovered(null)}
-          >
-            <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 8 }}>Laguna Lake Watershed Reforestation & River Cleanup Drive</div>
-            <div style={{ fontWeight: 600, color: '#1a3764', marginBottom: 8 }}>Published by:</div>
-            <ul style={{ margin: 0, paddingLeft: 18, color: '#1a3764', fontWeight: 500 }}>
-              <li>Rhea A. Nayang</li>
-            </ul>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-              <a href="#" style={{ color: '#30bdb7', fontWeight: 600, textDecoration: 'none', fontSize: 16 }}>Details</a>
-              <span style={{ color: '#8bc34a', fontWeight: 700, fontSize: 16 }}>Complete</span>
-            </div>
-          </div>
-          <div
-            style={cardStyle(hovered === 1)}
-            onMouseEnter={() => setHovered(1)}
-            onMouseLeave={() => setHovered(null)}
-          >
-            <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 8 }}>Project L.E.A.D.: Literacy and Educational Advancement Drive</div>
-            <div style={{ fontWeight: 600, color: '#1a3764', marginBottom: 8 }}>Published by:</div>
-            <ul style={{ margin: 0, paddingLeft: 18, color: '#1a3764', fontWeight: 500 }}>
-              <li>Maria T. Alonzo</li>
-            </ul>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-              <a href="#" style={{ color: '#30bdb7', fontWeight: 600, textDecoration: 'none', fontSize: 16 }}>Details</a>
-              <span style={{ color: '#ff9800', fontWeight: 700, fontSize: 16 }}>Pending</span>
-            </div>
-          </div>
+    <div className="document-library">
+      <h2>Document Library</h2>
+
+      {loading ? (
+        <p className="loading-state">Loading submissions…</p>
+      ) : proposals.length === 0 ? (
+        <p className="empty-state">No approved events found.</p>
+      ) : (
+        <div className="library-grid">
+          {proposals.map((mission) => {
+            const s = stats[mission.id];
+            const completion = s?.completionRate ?? 0;
+
+            return (
+              <div key={mission.id} className="library-card">
+                <div>
+                  <h3>{mission.title || mission.name}</h3>
+
+                  <p className="library-meta">
+                    Volunteers Joined: {s?.total ?? 0}
+                  </p>
+
+                  <ul className="library-meta">
+                    <li>Pre-Activity Survey: {s?.preSurvey ?? 0}</li>
+                    <li>Consent Submitted: {s?.consent ?? 0}</li>
+                    <li>Attendance Marked: {s?.attendance ?? 0}</li>
+                    <li>Post-Activity Survey: {s?.postSurvey ?? 0}</li>
+                  </ul>
+                </div>
+
+                <div className="library-footer">
+                  <a
+                    href={`/admin/forms/documents/${mission.id}`}
+                    className="library-link"
+                  >
+                    View Submissions
+                  </a>
+
+                  <span
+                    className={`library-progress ${completion >= 75 ? "good" : "warn"
+                      }`}
+                  >
+                    {completion}% Complete
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
     </div>
   );
+
 }
