@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
 
 import Header from '../../../components/Header';
@@ -93,6 +93,31 @@ export default function EventDetails() {
       finalStatus: "in_progress",
       pointsEarned: 0
     });
+
+    // Create a registration notification (once per event)
+    try {
+      const notificationsRef = collection(db, "users", user.uid, "notifications");
+      const existingQuery = query(
+        notificationsRef,
+        where("type", "==", "event_registration"),
+        where("eventId", "==", id)
+      );
+      const existing = await getDocs(existingQuery);
+
+      if (existing.empty) {
+        await createNotification(user.uid, {
+          type: "event_registration",
+          title: "Registration Submitted",
+          message: `Your registration for "${mission?.title || "this event"}" is submitted.`,
+          link: `/event/${id}`,
+          eventId: id,
+        });
+      }
+    } catch (e) {
+      // Non-blocking: joining the event should still succeed even if notification fails.
+      console.error("Failed to create registration notification:", e);
+    }
+
     //go to event when it is active or ongoing for the day
     navigate(`/event/${id}/activity?mode=active`);
   };
