@@ -1,37 +1,54 @@
 import { getAuth } from "firebase/auth";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../../../firebaseConfig";
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { db } from "../../../firebaseConfig";
+import '../../../styles/student.css';
+import '../../../styles/EventActivity.css';
+import PreActivitySurvey from '../../../../public/forms/PreActivitySurvey';
 import PostActivitySurvey from '../../../../public/forms/PostActivitySurvey';
 
 export default function EventActivity() {
-    // State for uploaded consent file (PDF)
-    const [uploadedConsentFile, setUploadedConsentFile] = useState(null);
-  // Consent Form Modal State
+  //Requirement panel containing all forms
+  const RequirementItem = ({ label, status, mode, onOpen }) => {
+    const isLocked =
+      status === "locked" ||
+      (label === "Attendance (QR)" && mode !== "active");
+
+    return (
+      <div className={`requirement-item ${status}`}>
+        <span className="req-label">{label}</span>
+
+        {isLocked && <span className="req-status muted">Locked</span>}
+        {status === "pending" && <span className="req-status pending">Pending</span>}
+        {status === "submitted" && <span className="req-status done">Submitted</span>}
+        {onOpen && status !== "submitted" && (
+          <button className="req-action" onClick={onOpen}>
+            Open
+          </button>
+        )}
+
+      </div>
+    );
+  };
+
+  const [uploadedConsentFile, setUploadedConsentFile] = useState(null);
+  const [selectedConsentFile, setSelectedConsentFile] = useState(null);
   const [showConsentModal, setShowConsentModal] = useState(false);
   // State for pre-activity survey modal (existing)
-  const [showSurveyModal, setShowSurveyModal] = useState(false);
-  const [surveyProofImage, setSurveyProofImage] = useState(null);
-  const [surveyProofPreview, setSurveyProofPreview] = useState(null);
+  const [showPreSurveyModal, setShowPreSurveyModal] = useState(false);
   // State for post-activity survey modal
   const [showPostSurveyModal, setShowPostSurveyModal] = useState(false);
-  const [postSurveyProofImage, setPostSurveyProofImage] = useState(null);
-  const [postSurveyProofPreview, setPostSurveyProofPreview] = useState(null);
   const { id } = useParams();
   const navigate = useNavigate();
   const auth = getAuth();
-  
+  const location = useLocation();
+  const mode = new URLSearchParams(location.search).get("mode") || "preview";
   const [open, setOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -45,12 +62,12 @@ export default function EventActivity() {
         setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
       }
     };
-    
+
     checkCount();
     const interval = setInterval(checkCount, 500);
     return () => clearInterval(interval);
   }, []);
-  
+
   const handleQRScan = async (decodedText) => {
     setQRStatus("");
     const projectId = id;
@@ -87,7 +104,52 @@ export default function EventActivity() {
       setQRStatus("Failed to process QR code.");
     }
   };
-  
+  //For saving consent file to be reviewed
+  const handleConsentSubmit = async (file) => {
+    const user = auth.currentUser;
+    if (!user || !file) {
+      alert("Missing user or file.");
+      return;
+    }
+
+    try {
+      const ext = file.name.split(".").pop().toLowerCase();
+      const fileType = ext === "pdf" ? "pdf" : "image";
+
+      const filePath = `consents/${id}/${user.uid}/consent.${ext}`;
+      const fileRef = ref(storage, filePath);
+
+      await uploadBytes(fileRef, file);
+      const fileUrl = await getDownloadURL(fileRef);
+
+      await updateDoc(
+        doc(db, "missions", id, "volunteer", user.uid),
+        {
+          "progress.consent": "submitted",
+          consentSubmission: {
+            fileUrl: fileUrl,
+            filePath: filePath,
+            fileType: fileType,
+            submittedAt: serverTimestamp(),
+            verifiedAt: null,
+            verifiedBy: ""
+          }
+        }
+      );
+
+      setVolunteerProgress((prev) => ({
+        ...prev,
+        consent: "submitted"
+      }));
+
+      alert("Consent form submitted successfully.");
+    } catch (error) {
+      console.error("Consent upload failed FULL ERROR:", error);
+      alert(error?.message || JSON.stringify(error));
+    }
+  };
+
+
   // All hooks at top level
   // Placeholder form hooks
   const coreSkills = [
@@ -134,17 +196,17 @@ export default function EventActivity() {
   const [easySkills, setEasySkills] = React.useState("");
   const [moderateSkills, setModerateSkills] = React.useState("");
   const [hardSkills, setHardSkills] = React.useState("");
-  // Event hooks
-  // const [event, setEvent] = useState(null); // REMOVE duplicate declaration
-  // const [loading, setLoading] = useState(true); // REMOVE duplicate declaration
-  // Journal hooks
+
   const [journalReflections, setJournalReflections] = useState({});
   const [submitStatus, setSubmitStatus] = useState({});
   const [userJournals, setUserJournals] = useState([]);
   const [editingJournalId, setEditingJournalId] = useState(null);
   const [editingJournalText, setEditingJournalText] = useState("");
   const [enrolledTasks, setEnrolledTasks] = useState({});
-
+  const [volunteerProgress, setVolunteerProgress] = useState(null);
+  const canJoinActivities =
+    volunteerProgress?.preSurvey === "submitted" &&
+    volunteerProgress?.consent === "verified";
   // Handler for adding a skill to a level (for placeholder)
   const handleAddSkill = (skill, level) => {
     if (level === "easy")
@@ -428,6 +490,7 @@ export default function EventActivity() {
         state: { newActivity, activities: prevActivities },
       });
     };
+
     return (
       <div
         style={{
@@ -985,7 +1048,8 @@ export default function EventActivity() {
             const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
             if (volunteerSnap.exists()) {
-              setTotalPointsEarned(volunteerSnap.data().pointsEarned || 0);
+              setVolunteerProgress(volunteerSnap.data().progress);
+              //this will be about the volunteer progress on his requirements.
             }
 
             const enrollmentStatus = {};
@@ -1050,15 +1114,15 @@ export default function EventActivity() {
   // ...existing code...
 
   return (
-    <div className="event-activity-page">
+    <div className="full-page">
       <Header />
+      <div className="header-spacer"></div>
       <div className="event-activity-container">
-        {/* Left: Event Summary styled as per screenshot */}
+        {/* Left Side: Event Summary */}
         <div className="event-summary-card">
-          {/* Top image */}
           <div className="event-summary-image">
             <img
-              src={event.img || "/assets/mission1.jpg"}
+              src={event.img && event.img.trim() !== "" ? event.img : "/assets/mission1.jpg"}
               alt={event.alt || "Event"}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
@@ -1098,271 +1162,221 @@ export default function EventActivity() {
                 <img
                   src={event.badge || "/assets/badge.png"}
                   alt="Event Badge"
-                  style={{
-                    width: 90,
-                    marginTop: 8,
-                    borderRadius: 8,
-                    border: "2px solid #eee",
-                  }}
+                  className="image-badge"
                 />
               </div>
-              
+
               {/* QR button only */}
               <div style={{ marginTop: 16, display: "flex", flexDirection: "row", justifyContent: "center", gap: 18 }}>
                 <button
                   className="event-qr-button"
-                  style={{
-                    flex: 1,
-                    maxWidth: 320,
-                    height: 48,
-                    background: '#1ea7fd',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 12,
-                    fontWeight: 700,
-                    fontSize: 16,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px #0001',
-                    transition: 'background 0.2s',
-                  }}
                   onClick={() => setShowQRModal(true)}
+                  disabled={mode !== "active"}
                 >
-                  Scan Attendance QR Code
+                  {mode === "active"
+                    ? "Scan Attendance QR Code"
+                    : "Attendance Locked"}
                 </button>
-                
-
-                {/* Activity Consent Form Button */}
-                <button
-                  className="event-consent-button"
-                  style={{
-                    flex: 1,
-                    maxWidth: 320,
-                    height: 48,
-                    background: '#30bdb7',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 12,
-                    fontWeight: 700,
-                    fontSize: 16,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px #0001',
-                    transition: 'background 0.2s',
-                  }}
-                  onClick={() => setShowConsentModal(true)}
-                >
-                  Activity Consent Form
-                </button>
-
-
-
-                {/* Activity Consent Form Modal (ABSOLUTE ROOT LEVEL) */}
-                {showConsentModal && (
-                  <div
-                    className="qr-modal-overlay"
-                    onClick={e => {
-                      if (e.target === e.currentTarget) setShowConsentModal(false);
-                    }}
-                  >
-                    <div
-                      className="qr-modal-content"
-                      style={{ minHeight: 180, minWidth: 340, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
-                    >
-                      <button className="qr-modal-close" onClick={() => setShowConsentModal(false)} style={{ alignSelf: 'flex-end' }}>X</button>
-                      <h3 className="qr-modal-title">Activity Consent Form</h3>
-                      <p style={{ margin: '16px 0', textAlign: 'center' }}>Please download and fill out the consent form below.</p>
-                      <a
-                        href="/assets/Activity%20Consent%20Form%20Fillable.pdf"
-                        download
-                        style={{
-                          background: '#3386e6',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 10,
-                          padding: '12px 32px',
-                          fontWeight: 700,
-                          fontSize: 16,
-                          cursor: 'pointer',
-                          marginTop: 8,
-                          boxShadow: '0 2px 8px #0001',
-                          textDecoration: 'none',
-                          display: 'inline-block',
-                        }}
-                      >
-                        Download Consent Form (PDF)
-                      </a>
-                    </div>
-                  </div>
-                )}
               </div>
-              {event.waiver && (
-                <div
-                  style={{
-                    marginTop: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <a
-                    href={event.waiver}
-                    style={{
-                      color: "#30bdb7",
-                      textDecoration: "underline",
-                      fontWeight: 500,
-                      fontSize: 15,
-                    }}
-                  >
-                    Waiver Form
-                  </a>
-                </div>
-              )}
+
             </div>
-            <button className="event-incomplete-button" disabled>
-              INCOMPLETE
-            </button>
+            <div className="event-status-label incomplete">
+              Status: Incomplete
+            </div>
+
           </div>
         </div>
-        {/* Activities Section with journals below each activity title */}
-        {/* Right: Activity Section */}
-        <div className="event-activities-panel">
-          <h2 className="event-activities-title">
-            Activity
-          </h2>
-          {tasks &&
-            tasks.map((activity, idx) => {
-              // Find journals for this activity
-              const journalsForActivity = userJournals.filter(
-                (j) => j.activityId === activity.title
-              );
-              return (
-                <div key={idx} className="activity-card">
-                  <div className="activity-header">
-                    <h3 className="activity-title">
-                      {activity.title}
-                      {activity.points !== undefined && (
-                        <span style={{ 
-                          marginLeft: 12, 
-                          color: "#388e3c", 
-                          fontSize: 16,
-                          fontWeight: 600 
-                        }}>
-                          ({activity.points} pts)
-                        </span>
+
+        {/* Right Side: Activity Section & Requirement */}
+        <div className="event-right-panel">
+          <div className="event-activities-panel">
+            <h2 className="event-activities-title">
+              Activity
+            </h2>
+            {/*TASKS AVAILABLE FOR THIS SPECIFIC EVENT*/}
+            {tasks &&
+              tasks.map((activity, idx) => {
+                // Find journals for this activity
+                const journalsForActivity = userJournals.filter(
+                  (j) => j.activityId === activity.title
+                );
+                return (
+                  <div key={idx} className="activity-card">
+                    <div className="requirement-item activity-item">
+                      <span className="req-label">
+                        {activity.title} ({activity.points} pts)
+                      </span>
+
+                      {/* JOIN LOGIC */}
+                      {enrolledTasks[activity.id] ? (
+                        <span className="req-status done">Enrolled</span>
+                      ) : canJoinActivities ? (
+                        <button
+                          className="req-action"
+                          onClick={() => handleJoinActivity(activity.id)}
+                        >
+                          Join
+                        </button>
+                      ) : (
+                        <span className="req-status locked">Closed</span>
                       )}
-                    </h3>
-                    <button
-                      onClick={() => handleJoinActivity(activity.id)}
-                      disabled={enrolledTasks[activity.id]}
-                      className="activity-join-button"
-                    >
-                      {enrolledTasks[activity.id]
-                        ? "ENROLLED"
-                        : "JOIN THE ACTIVITY!"}
-                    </button>
-                  </div>
-                  {/* User's journals for this activity */}
-                  {journalsForActivity.length > 0 &&
-                    journalsForActivity.map((journal) => (
-                      <div key={journal.id} className="journal-card">
-                        {editingJournalId === journal.taskId ? (
-                          <>
-                            <textarea
-                              value={editingJournalText}
-                              onChange={(e) =>
-                                setEditingJournalText(e.target.value)
-                              }
-                              className="journal-edit-textarea"
-                            />
-                            <button
-                              onClick={() => handleSaveEditJournal(journal)}
-                              className="journal-button journal-button-save"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingJournalId(null)}
-                              className="journal-button journal-button-cancel"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <div className="journal-text">
-                              {journal.reflection}
-                            </div>
-                            <button
-                              onClick={() => handleEditJournal(journal)}
-                              className="journal-button journal-button-edit"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDeleteJournal(journal.taskId)
-                              }
-                              className="journal-button journal-button-delete"
-                            >
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  <ul className="activity-details-list">
-                    {activity.details &&
-                      activity.details.map((detail, i) => (
-                        <li key={i}>{detail}</li>
-                      ))}
-                  </ul>
-                  {activity.required && (
-                    <div className="activity-required">
-                      <strong>Required:</strong> {activity.required}
                     </div>
-                  )}
-                  <textarea
-                    placeholder="Journal Reflection"
-                    className="journal-textarea"
-                    value={journalReflections[idx] || ""}
-                    onChange={(e) => handleJournalChange(idx, e.target.value)}
-                  />
-                  <div className="task-progress-row">
-                    <span>Task Progress</span>
-                    <progress
-                      value={
-                        submitStatus[idx] === "Reflection submitted!" ? 100 : 0
+
+                    {/* User's journals for this activity */}
+                    {journalsForActivity.length > 0 &&
+                      journalsForActivity.map((journal) => (
+                        <div key={journal.id} className="journal-card">
+                          {editingJournalId === journal.taskId ? (
+                            <>
+                              <textarea
+                                value={editingJournalText}
+                                onChange={(e) =>
+                                  setEditingJournalText(e.target.value)
+                                }
+                                className="journal-edit-textarea"
+                              />
+                              <button
+                                onClick={() => handleSaveEditJournal(journal)}
+                                className="journal-button journal-button-save"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingJournalId(null)}
+                                className="journal-button journal-button-cancel"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="journal-text">
+                                {journal.reflection}
+                              </div>
+                              <button
+                                onClick={() => handleEditJournal(journal)}
+                                className="journal-button journal-button-edit"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleDeleteJournal(journal.taskId)
+                                }
+                                className="journal-button journal-button-delete"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    <ul className="activity-details-list">
+                      {activity.details &&
+                        activity.details.map((detail, i) => (
+                          <li key={i}>{detail}</li>
+                        ))}
+                    </ul>
+                    {activity.required && (
+                      <div className="activity-required">
+                        <strong>Required:</strong> {activity.required}
+                      </div>
+                    )}
+                    <textarea
+                      placeholder={
+                        mode === "preview"
+                          ? "Journal will be available during the event"
+                          : "Journal Reflection"
                       }
-                      max="100"
-                      className="task-progress-bar"
+                      className="journal-textarea"
+                      value={journalReflections[idx] || ""}
+                      onChange={(e) => handleJournalChange(idx, e.target.value)}
+                      disabled={mode === "preview"}
                     />
-                  </div>
-                  <button
-                    className="activity-submit-button"
-                    disabled={
-                      !journalReflections[idx] ||
-                      !journalReflections[idx].trim()
-                    }
-                    onClick={() => handleJournalSubmit(idx, activity)}
-                  >
-                    SUBMIT
-                  </button>
-                  {submitStatus[idx] && (
-                    <div
-                      className={`submit-status ${
-                        submitStatus[idx] === "Reflection submitted!"
+                    <div className="task-progress-row">
+                      <span>Task Progress</span>
+                      <progress
+                        value={
+                          submitStatus[idx] === "Reflection submitted!" ? 100 : 0
+                        }
+                        max="100"
+                        className="task-progress-bar"
+                      />
+                    </div>
+                    <button
+                      className="activity-submit-button"
+                      disabled={
+                        mode === "preview" ||
+                        !journalReflections[idx] ||
+                        !journalReflections[idx].trim()
+                      }
+                      onClick={() => handleJournalSubmit(idx, activity)}
+                    >
+                      {mode === "preview" ? "LOCKED" : "SUBMIT"}
+                    </button>
+
+                    {submitStatus[idx] && (
+                      <div
+                        className={`submit-status ${submitStatus[idx] === "Reflection submitted!"
                           ? "submit-status-success"
                           : "submit-status-error"
-                      }`}
-                    >
-                      {submitStatus[idx]}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                          }`}
+                      >
+                        {submitStatus[idx]}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+          {/*REQUIREMENTS SECTION (UNDER ALL TASKS)*/}
+          <div className="event-activities-panel">
+            <h3 className="event-activities-title">Requirements</h3>
+            <div className="requirements-status">
+              Status: <span className="status-text incomplete">Incomplete</span>
+            </div>
+            <h4 className="requirements-subtitle">Before Event</h4>
+            <div className="activity-card">
+              <RequirementItem
+                label="Pre-Activity Survey"
+                status={volunteerProgress?.preSurvey}
+                onOpen={() => { console.log("Pre-activity clicked"); setShowPreSurveyModal(true) }}
+              />
+            </div>
+            <div className="activity-card">
+              <RequirementItem
+                label="Parent Consent (In Person)"
+                status={volunteerProgress?.consent}
+                onOpen={() => setShowConsentModal(true)}
+              />
+            </div>
+            <div className="activity-card">
+              <RequirementItem
+                label="Attendance (QR)"
+                status={volunteerProgress?.attendance}
+                onOpen={() => setShowQRModal(true)}
+              />
+            </div>
+
+
+            <h4 className="requirements-subtitle">After Event</h4>
+
+            <RequirementItem
+              label="Post-Activity Survey"
+              status={volunteerProgress?.postSurvey}
+              locked={
+                volunteerProgress?.preSurvey !== "submitted" ||
+                volunteerProgress?.consent !== "verified" ||
+                volunteerProgress?.attendance !== "present"
+              }
+              onOpen={() => setShowPostSurveyModal(true)}
+            />
+
+          </div>
         </div>
+
       </div>
-      
+
       {/* QR Modal - at root level to prevent flickering */}
       {showQRModal && (
         <div className="qr-modal-overlay" onClick={(e) => e.stopPropagation()}>
@@ -1375,12 +1389,104 @@ export default function EventActivity() {
         </div>
       )}
 
+
+      {/* Pre-Activity Survey Modal */}
+      {showPreSurveyModal && (
+        <div
+          className="qr-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPreSurveyModal(false);
+          }}
+        >
+          <div
+            className="qr-modal-content modal-scrollable"
+            style={{ maxHeight: "90vh", overflowY: "auto", minWidth: 340 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="qr-modal-close"
+              onClick={() => setShowPreSurveyModal(false)}
+            >
+              X
+            </button>
+
+            <h3 className="qr-modal-title">Pre-Activity Survey</h3>
+
+            <PreActivitySurvey
+              onSubmit={async (form) => {
+                const user = auth.currentUser;
+                if (!user) {
+                  alert("You must be logged in.");
+                  return;
+                }
+                await setDoc(
+                  doc(
+                    db,
+                    "missions", id,
+                    "volunteer", user.uid,
+                    "preSurvey", "response"
+                  ),
+                  {
+                    meta: {
+                      submittedAt: serverTimestamp(),
+                      version: "v1"
+                    },
+                    respondent: {
+                      name: form.name,
+                      college: form.college,
+                      program: form.program,
+                      nonAcademicOrg: form.nonAcademicOrg
+                    },
+                    engagement: {
+                      type: form.engagementType,
+                      initiativeTitle: form.initiativeTitle,
+                      participation: form.participation,
+                      participationOther: form.participationOther
+                    },
+                    background: {
+                      previousService: form.prevService,
+                      frequency: form.frequency
+                    },
+                    likert: {
+                      q1: Number(form.likert_0),
+                      q2: Number(form.likert_1),
+                      q3: Number(form.likert_2),
+                      q4: Number(form.likert_3),
+                      q5: Number(form.likert_4),
+                      q6: Number(form.likert_5),
+                      q7: Number(form.likert_6),
+                      q8: Number(form.likert_7)
+                    }
+                  }
+                );
+                await updateDoc(
+                  doc(db, "missions", id, "volunteer", user.uid),
+                  {
+                    "progress.preSurvey": "submitted"
+                  }
+                );
+
+                setVolunteerProgress((prev) => ({
+                  ...prev,
+                  preSurvey: "submitted",
+                  consent: "open"
+                }));
+                setShowPreSurveyModal(false);
+                alert("Pre-Activity Survey submitted!");
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+
       {/* Post-Activity Survey Modal */}
       {showPostSurveyModal && (
         <div className="qr-modal-overlay" onClick={e => e.stopPropagation()}>
           <div className="qr-modal-content modal-scrollable" style={{ maxHeight: '90vh', overflowY: 'auto', minWidth: 340 }} onClick={e => e.stopPropagation()}>
             <button className="qr-modal-close" onClick={() => setShowPostSurveyModal(false)}>X</button>
             <h3 className="qr-modal-title">Post-Activity Survey</h3>
+
             <PostActivitySurvey
               onSubmit={async (form) => {
                 // Mark user as present in Firestore and save survey
@@ -1389,57 +1495,67 @@ export default function EventActivity() {
                   alert('You must be logged in.');
                   return;
                 }
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                let name = '';
-                let email = '';
-                if (userDoc.exists()) {
-                  const data = userDoc.data();
-                  name = data.name || data.username || '';
-                  email = data.email || '';
-                } else {
-                  name = user.displayName || '';
-                  email = user.email || '';
-                }
+
                 await setDoc(
-                  doc(db, 'missions', id, 'volunteer', user.uid),
+                  doc(
+                    db,
+                    "missions", id,
+                    "volunteer", user.uid,
+                    "postSurvey", "response"
+                  ),
                   {
-                    name,
-                    email,
-                    attendanceStatus: 'present',
-                    postActivitySurvey: form
-                  },
-                  { merge: true }
+                    meta: {
+                      submittedAt: serverTimestamp(),
+                      version: "v1"
+                    },
+                    respondent: {
+                      name: form.name,
+                      college: form.college,
+                      program: form.program,
+                      nonAcademicOrg: form.nonAcademicOrg
+                    },
+                    engagement: {
+                      type: form.engagementType,
+                      initiativeTitle: form.initiativeTitle,
+                      dateOfImplementation: form.dateOfImplementation,
+                      location: form.location
+                    },
+                    likert: {
+                      q1: Number(form.likert_0),
+                      q2: Number(form.likert_1),
+                      q3: Number(form.likert_2),
+                      q4: Number(form.likert_3),
+                      q5: Number(form.likert_4),
+                      q6: Number(form.likert_5),
+                      q7: Number(form.likert_6),
+                      q8: Number(form.likert_7)
+                    }
+                  }
                 );
+                await updateDoc(
+                  doc(db, "missions", id, "volunteer", user.uid),
+                  {
+                    "progress.postSurvey": "submitted"
+                  }
+                );
+                setVolunteerProgress(prev => ({
+                  ...prev,
+                  postSurvey: "submitted",
+                  finalStatus: "completed"
+                }));
+
                 setShowPostSurveyModal(false);
-                setQRStatus('Attendance recorded!');
-                alert('Survey submitted and attendance recorded!');
+                alert("Post-Activity Survey submitted!");
               }}
             />
           </div>
         </div>
       )}
 
-  
-      
       {/* Global Announcements Toggle Button */}
       <button
         className="global-feed-toggle"
         onClick={() => setOpen(!open)}
-        style={{
-          position: 'fixed',
-          top: 90,
-          right: 20,
-          background: '#30bdb7',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          padding: '10px 16px',
-          cursor: 'pointer',
-          fontWeight: 600,
-          fontSize: 14,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-          zIndex: 1000
-        }}
       >
         📢 Update
         {announcementUnreadCount > 0 && (
@@ -1464,127 +1580,94 @@ export default function EventActivity() {
         }}>
         <GlobalAnnouncements />
       </aside>
-      
-    {/* Consent Modal at absolute root, after all containers */}
-    {showConsentModal && (
-      <div
-        className="qr-modal-overlay"
-        onClick={e => {
-          if (e.target === e.currentTarget) setShowConsentModal(false);
-        }}
-      >
-        <div
-          className="qr-modal-content"
-          style={{ minHeight: 180, minWidth: 340, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
-        >
-          <button className="qr-modal-close" onClick={() => setShowConsentModal(false)} style={{ alignSelf: 'flex-end' }}>X</button>
-          <h3 className="qr-modal-title">Activity Consent Form</h3>
-          <div style={{
-            margin: '16px 0',
-            textAlign: 'left',
-            background: '#f7f7f7',
-            borderRadius: 8,
-            padding: '16px 18px',
-            color: '#234e7b',
-            fontSize: 15,
-            maxWidth: 400
-          }}>
-            <strong>Note:</strong><br />
-            If there is no submitted consent form, students will not be allowed to join the event.<br /><br />
-            Please download the PDF file and fill up the necessary fields and have your parent/guardian sign it. And then upload it to the submission bin for checking.
-          </div>
-          <p style={{ margin: '16px 0', textAlign: 'center' }}>Please download and fill out the consent form below.</p>
-          <a
-            href="/assets/Activity%20Consent%20Form%20Fillable.pdf"
-            download
-            style={{
-              background: '#3386e6',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 10,
-              padding: '12px 32px',
-              fontWeight: 700,
-              fontSize: 16,
-              cursor: 'pointer',
-              marginTop: 8,
-              boxShadow: '0 2px 8px #0001',
-              textDecoration: 'none',
-              display: 'inline-block',
-            }}
-          >
-            Download Consent Form (PDF)
-          </a>
 
-          {/* Submission Bin for PDF Upload */}
-          <div style={{ marginTop: 28, width: '100%', textAlign: 'center' }}>
-            <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Upload Signed Consent Form (PDF)</label>
-            <input
-              type="file"
-              accept="application/pdf"
-              style={{ marginBottom: 12 }}
-              onChange={e => {
-                const file = e.target.files && e.target.files[0];
-                if (file && file.type !== 'application/pdf') {
-                  alert('Please upload a PDF file.');
-                  e.target.value = '';
-                  return;
-                }
-                // For demo: just show file name, no upload logic
-                setUploadedConsentFile(file);
-              }}
-            />
-            {uploadedConsentFile && (
-              <div style={{ marginTop: 8, color: '#234e7b', fontWeight: 500 }}>
-                Selected file: {uploadedConsentFile.name}
-                <button
-                  style={{
-                    marginLeft: 12,
-                    background: '#d32f2f',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '2px 10px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setUploadedConsentFile(null)}
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-            <button
-              style={{
-                background: '#32CD32',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 10,
-                padding: '10px 28px',
-                fontWeight: 700,
-                fontSize: 15,
-                cursor: 'pointer',
-                marginTop: 10,
-                boxShadow: '0 2px 8px #0001',
-                transition: 'background 0.2s',
-              }}
-              onClick={() => {
-                if (!uploadedConsentFile) {
-                  alert('Please select a PDF file to upload.');
-                  return;
-                }
-                alert('Consent form uploaded! (Demo only, not saved)');
-                setUploadedConsentFile(null);
-              }}
+      {/* Consent Modal*/}
+      {showConsentModal && (
+        <div
+          className="qr-modal-overlay"
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowConsentModal(false);
+          }}
+        >
+          <div
+            className="qr-modal-content"
+            style={{ minHeight: 180, minWidth: 340, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
+          >
+            <button className="qr-modal-close" onClick={() => setShowConsentModal(false)} style={{ alignSelf: 'flex-end' }}>X</button>
+            <h3 className="qr-modal-title">Activity Consent Form</h3>
+            <div className="qr-modal-note">
+              <strong>Note:</strong><br />
+              If there is no submitted consent form, students will not be allowed to join the event.<br /><br />
+              Please download the PDF file and fill up the necessary fields and have your parent/guardian sign it. And then upload it to the submission bin for checking.
+            </div>
+            <p style={{ margin: '16px 0', textAlign: 'center' }}>Please download and fill out the consent form below.</p>
+            <a
+              href="/assets/Activity%20Consent%20Form%20Fillable.pdf"
+              download
+              className="consent-btn"
             >
-              Submit Consent Form
-            </button>
+              Download Consent Form (PDF)
+            </a>
+
+            {/* Submission Bin for PDF or Image Upload */}
+            <div className="consent-details">
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                style={{ marginBottom: 8 }}
+                onChange={e => {
+                  const file = e.target.files && e.target.files[0];
+                  if (!file) return;
+
+                  const fileName = file.name.toLowerCase();
+                  const isPdf = fileName.endsWith(".pdf");
+                  const isImage =
+                    fileName.endsWith(".jpg") ||
+                    fileName.endsWith(".jpeg") ||
+                    fileName.endsWith(".png");
+
+                  if (!isPdf && !isImage) {
+                    alert("Please upload a PDF or image file.");
+                    e.target.value = "";
+                    return;
+                  }
+
+                  setSelectedConsentFile(file);
+                }}
+              />
+              <button
+                disabled={!selectedConsentFile}
+                onClick={() => handleConsentSubmit(selectedConsentFile)}
+              >
+                Submit
+              </button>
+
+              {uploadedConsentFile && (
+                <div style={{ marginTop: 8, color: '#234e7b', fontWeight: 500 }}>
+                  Selected file: {uploadedConsentFile.name}
+                  <button
+                    style={{
+                      marginLeft: 12,
+                      background: '#d32f2f',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '2px 10px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setUploadedConsentFile(null)}
+                    title="Remove file"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
+            </div>
           </div>
-        // Add state for uploaded consent file at the top of the component
-          const [uploadedConsentFile, setUploadedConsentFile] = useState(null);
         </div>
-      </div>
-    )}
-  </div>
+      )}
+    </div>
   );
 }

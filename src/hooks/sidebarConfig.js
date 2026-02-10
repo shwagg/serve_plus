@@ -1,71 +1,90 @@
 //icons
 import {
-    DashboardOutlinedIcon,
+    HomeRoundedIcon,
     ListAltIcon,
-    AddBoxOutlinedIcon,
     DesignServicesOutlinedIcon,
     SettingsOutlinedIcon,
-    ImportContactsOutlinedIcon,
 } from "../components/icons/index";
 
-//admin sidebar
+//admin side
 export const adminLinks = [
     {
+        key: "dashboard",
         label: "Dashboard",
-        to: "/admin/dashboard",
-        icon: DashboardOutlinedIcon,
+        children: [
+            { label: "Program Impact Metrics", to: "/admin/dashboard/metrics" },
+            { label: "SDG", to: "/admin/dashboard/sdg" },
+        ],
     },
     {
+        key: "events",
+        label: "Events",
+        children: [
+            { label: "Current Event", to: "/admin/events/current" },
+            { label: "Roster", to: "/admin/events/roster" },
+            { label: "Partner Hub", to: "/admin/events/partners" },
+        ],
+    },
+    {
+        key: "project",
         label: "Project",
-        to: "/admin/projects",
-        icon: ListAltIcon,
+        children: [
+            { label: "Project List", to: "/admin/projects" },
+            { label: "Badge & Points", to: "/admin/projects/badges" },
+        ],
     },
     {
-        label: "Roster",
-        to: "/admin/roster",
-        icon: ListAltIcon,
+        key: "forms",
+        label: "Forms",
+        children: [
+            { label: "Document Library", to: "/admin/documents" },
+        ],
     },
     {
-        label: "Customize",
-        to: "/admin/projects/proposal",
-        icon: DesignServicesOutlinedIcon,
-    },
-    {
-        label: "Settings",
-        to: "/admin/settings",
-        icon: SettingsOutlinedIcon,
-    },
-    {
-        label: "Document Library",
-        to: "/admin/documents",
-        icon: ImportContactsOutlinedIcon,
+        key: "system",
+        label: "System",
+        children: [
+            { label: "System Activity Log", to: "/admin/system/logs" },
+            { label: "Students Banner", to: "/admin/system/banner" },
+            { label: "Announcement", to: "/admin/system/announcement" },
+        ],
     },
 ];
 
-//partner sidebar
+//partner side
 export const partnerLinks = [
     {
-        label: "Projects",
-        to: "/partner/projects",
-        icon: ListAltIcon,
-    },
-    {
-        label: "Settings",
-        to: "/partner/settings",
-        icon: SettingsOutlinedIcon,
+        key: "project",
+        label: "Project",
+        children: [
+            { label: "Project List", to: "/admin/projects" },
+        ],
     },
 ];
 
-//faculty sidebar
+//faculty side
 export const facultyLinks = [
     {
-        label: "Projects",
-        to: "/faculty/projects",
-        icon: ListAltIcon,
+        key: "events",
+        label: "Events",
+        children: [
+            { label: "Current Event", to: "/admin/events/current" },
+            { label: "Roster", to: "/admin/events/roster" },
+            { label: "Partner Hub", to: "/admin/events/partners" },
+        ],
     },
     {
-        label: "Settings",
-        to: "/faculty/settings",
-        icon: SettingsOutlinedIcon,
+        key: "project",
+        label: "Project",
+        children: [
+            { label: "Project List", to: "/faculty/projects" },
+        ],
+    },
+    {
+        key: "forms",
+        label: "Forms",
+        children: [
+            { label: "Document Library", to: "/admin/forms/documents" },
+        ],
     },
 ];

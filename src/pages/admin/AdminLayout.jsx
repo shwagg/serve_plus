@@ -38,11 +38,14 @@ export default function AdminLayout() {
         fetchUserProfile();
     }, []);
 
-
     return (
         <div className="admin-page">
             <Header />
-            <Sidebar links={adminLinks} />
+            <Sidebar
+                links={adminLinks}
+                collapsed={collapsed}
+                setCollapsed={setCollapsed}
+            />
             {/* ONLY THIS PART CHANGES */}
             <main className="admin-main">
                 <Outlet />

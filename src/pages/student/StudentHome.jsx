@@ -54,6 +54,7 @@ const StudentHome = () => {
   const currentUserRef = useRef(null);
   const leaderboardListRef = useRef(null);
   const [missionCards, setMissionCards] = useState([]);
+  const [enrolledMissions, setEnrolledMissions] = useState({});
 
   // Landing promos which can be created by admins for
   //students to see
@@ -103,13 +104,40 @@ const StudentHome = () => {
   useEffect(() => {
     const fetchMissions = async () => {
       try {
+        const user = auth.currentUser;
+
         const querySnapshot = await getDocs(collection(db, "missions"));
-        const missions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const missions = querySnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(m => m.status === "published");
+
         setMissionCards(missions);
+
+        // Check if user is enrolled
+        const enrollmentMap = {};
+
+        if (user) {
+          for (const mission of missions) {
+            const volunteerRef = doc(
+              db,
+              "missions",
+              mission.id,
+              "volunteer",
+              user.uid
+            );
+
+            const volunteerSnap = await getDoc(volunteerRef);
+            enrollmentMap[mission.id] = volunteerSnap.exists();
+          }
+        }
+
+        setEnrolledMissions(enrollmentMap);
+
       } catch (error) {
         console.error("Error fetching missions:", error);
       }
     };
+
     fetchMissions();
   }, []);
 
@@ -448,7 +476,13 @@ const StudentHome = () => {
                 <div
                   key={mission.id}
                   className="mission-card"
-                  onClick={() => window.location.href = `/event/${mission.id}`}
+                  onClick={() => {
+                    if (enrolledMissions[mission.id]) {
+                      navigate(`/event/${mission.id}/activity?mode=preview`);
+                    } else {
+                      navigate(`/event/${mission.id}`);
+                    }
+                  }}
                 >
                   <div className="mission-card-image">
                     <img src={mission.img || mission1} alt={mission.alt || mission.title} />

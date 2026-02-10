@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
 
-import "../../styles/admin.css";
+import "../../styles/ProjectDetails.css";
 
 //for demo purposes only
 import html2canvas from "html2canvas";
@@ -49,7 +49,7 @@ export default function ProjectDetails() {
       try {
         const volunteerRef = collection(db, "missions", projectId, "volunteer");
         const snap = await getDocs(volunteerRef);
-        
+
         // All volunteers with their status
         const allVols = snap.docs.map(doc => ({
           name: doc.data().name || doc.data().email || "Unknown",
@@ -57,7 +57,7 @@ export default function ProjectDetails() {
           email: doc.data().email || ""
         }));
         setAllVolunteers(allVols);
-        
+
         // Only present attendees for quick view
         setAttendees(
           snap.docs
@@ -172,7 +172,7 @@ export default function ProjectDetails() {
         }
       };
       initializeQRTimestamp();
-      
+
       QRCode.toDataURL(JSON.stringify({ eventId: projectId, timestamp: qrTimestamp }), (err, url) => {
         if (!err) setQrUrl(url);
       });
@@ -465,12 +465,12 @@ export default function ProjectDetails() {
             >
               ×
             </button>
-            
+
             <h2 style={{ margin: '0 0 8px 0', color: '#234e7b', fontSize: 24 }}>Attendance Report</h2>
             <p style={{ margin: '0 0 24px 0', color: '#666', fontSize: 14 }}>
               {project.title || project.alt || 'Untitled Event'}
             </p>
-            
+
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, color: '#234e7b', marginBottom: 8 }}>
                 Total Registered: {allVolunteers.length}
@@ -546,7 +546,7 @@ export default function ProjectDetails() {
                 }}
                 onClick={() => {
                   // Export as CSV
-                  const csvContent = "data:text/csv;charset=utf-8," 
+                  const csvContent = "data:text/csv;charset=utf-8,"
                     + "No,Name,Email,Status\n"
                     + allVolunteers.map((v, idx) => `${idx + 1},${v.name},${v.email},${v.status}`).join("\n");
                   const encodedUri = encodeURI(csvContent);

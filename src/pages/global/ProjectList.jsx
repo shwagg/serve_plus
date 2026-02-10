@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
-import "../../styles/admin.css";
+import "../../styles/ProjectList.css";
 import { ViewKanbanOutlinedIcon, ListAltOutlinedIcon } from "../../components/icons/index";
 
 //kanban board
 const KANBAN_COLUMNS = [
     { key: "draft", label: "Draft" },
     { key: "for_approval", label: "For Approval" },
-    { key: "to_publish", label: "To Publish" },
+    { key: "published", label: "Published" },
 ];
 
 // demo fallback image
@@ -85,7 +85,6 @@ export default function ProjectList({ mode = "admin" }) {
         console.log("APPROVE CLICKED:", projectId);
         const ref = doc(db, "missions", projectId);
         await updateDoc(ref, {
-            status: "approved",
             "approvals.partner.approved": true,
             "approvals.partner.decidedAt": serverTimestamp(),
             "approvals.partner.decidedBy": user.uid,
@@ -106,7 +105,6 @@ export default function ProjectList({ mode = "admin" }) {
         const ref = doc(db, "missions", projectId);
 
         await updateDoc(ref, {
-            status: "to_publish",
             "approvals.faculty.approved": true,
             "approvals.faculty.decidedAt": serverTimestamp(),
             "approvals.faculty.decidedBy": user.uid,
@@ -395,7 +393,7 @@ function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject }) {
         mode === "admin" &&
         partnerApproved === true &&
         facultyApproved === true &&
-        p.status === "to_publish";
+        p.status === "for_approval";
     //was going to set where admin would add points and badge before publishing to students view
     return (
         <div

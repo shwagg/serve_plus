@@ -1,55 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
 
 import Header from '../../../components/Header';
 import GlobalAnnouncements from '../../../components/GlobalAnnouncements';
 import '../../../styles/student.css';
-import PreActivitySurvey from '../../../../public/forms/PreActivitySurvey';
-
-
-function PreActivitySurveyModal({ open, onClose, onSubmit }) {
-  if (!open) return null;
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content modal-scrollable">
-        <PreActivitySurvey onSubmit={onSubmit} />
-        <button onClick={onClose} style={{ marginTop: 16, padding: '10px 24px', borderRadius: 8, background: '#888', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>Cancel</button>
-      </div>
-      <style>{`
-        .modal-overlay {
-          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-          background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 2000;
-        }
-        .modal-content.modal-scrollable {
-          background: #fff;
-          padding: 32px;
-          border-radius: 12px;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-          min-width: 320px;
-          max-height: 90vh;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-      `}</style>
-    </div>
-  );
-}
 
 export default function EventDetails() {
   const [open, setOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
-  const [showSurveyModal, setShowSurveyModal] = useState(false);
-  const [surveyCompleted, setSurveyCompleted] = useState(false);
-  const [surveyForm, setSurveyForm] = useState(null);
   const { id } = useParams();
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [volunteer, setVolunteer] = useState(null); //ADD THIS FOR TESTING
+
 
   useEffect(() => {
     const checkCount = () => {
@@ -72,12 +40,25 @@ export default function EventDetails() {
           setMission(missionSnap.data());
           // Check if user is already a volunteer
           const user = auth.currentUser;
+          const tasksRef = collection(db, "missions", id, "task");
+          const tasksSnap = await getDocs(tasksRef);
+
+          setTasks(
+            tasksSnap.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+          );
+
           if (user) {
             const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
+            //if (volunteerSnap.exists()) {
+            // navigate(`/event/${id}/activity`, { replace: true });
+            //return;
+            //} DELETING THIS FOR TESTING, REPLACED WITH THIS:
             if (volunteerSnap.exists()) {
-              navigate(`/event/${id}/activity`, { replace: true });
-              return;
+              setVolunteer(volunteerSnap.data());
             }
           }
         } else {
@@ -92,90 +73,129 @@ export default function EventDetails() {
     fetchMission();
   }, [id, navigate]);
 
-  const handleJoinEvent = () => {
-    setShowSurveyModal(true);
-  };
-
-  // Called when PreActivitySurvey is submitted
-  const handleSurveySubmit = async (form) => {
-    setSurveyForm(form);
-    setSurveyCompleted(true);
-    setShowSurveyModal(false);
-    // Now register the user as a volunteer
+  const handleJoinEvent = async () => {
     const user = auth.currentUser;
     if (!user) {
-      alert('Please log in to join this event.');
+      alert("Please log in to join this event.");
       return;
     }
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.exists() ? userDoc.data() : {};
-      const userName = userData.name || user.displayName || '';
-      const userEmail = user.email || '';
-      const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
-      await setDoc(volunteerRef, {
-        joinedAt: new Date().toISOString(),
-        attendanceStatus: 'pending',
-        pointsEarned: 0,
-        verified: false,
-        name: userName,
-        email: userEmail,
-        preActivitySurvey: form
-      });
 
-      await createNotification(user.uid, {
-        type: 'event_registration',
-        title: 'Registration Submitted',
-        message: `Your registration for "${mission?.title || 'Event'}" is submitted.`,
-        link: `/event/${id}/activity`,
-        metadata: {
-          status: 'submitted',
-          eventId: id,
-        },
-      });
-      navigate(`/event/${id}/activity`);
-    } catch (error) {
-      console.error('Error joining event:', error);
-      alert('Failed to join event. Please try again.');
-    }
+    const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+
+    await setDoc(volunteerRef, {
+      joinedAt: new Date().toISOString(),
+      progress: {
+        preSurvey: "not_started",
+        consent: "pending",
+        attendance: "not_checked_in",
+        postSurvey: "locked"
+      },
+      finalStatus: "in_progress",
+      pointsEarned: 0
+    });
+    //go to event when it is active or ongoing for the day
+    navigate(`/event/${id}/activity?mode=active`);
   };
 
   if (loading) {
-    return <div className="full-page"><Header /><div className="content-page" style={{padding: 32}}>Loading...</div></div>;
+    return <div className="full-page"><Header /><div className="content-page" style={{ padding: 32 }}>Loading...</div></div>;
   }
   if (!mission) {
-    return <div className="full-page"><Header /><div className="content-page" style={{padding: 32}}>Event not found.</div></div>;
+    return <div className="full-page"><Header /><div className="content-page" style={{ padding: 32 }}>Event not found.</div></div>;
   }
 
   return (
-    <div className="full-page event-details-bg">
+    <div className="full-page">
       <Header />
-      <div className="event-details-center">
-        <div className="event-details-image">
-          <img src={mission.img} alt={mission.alt} />
-        </div>
-        <div className="event-details-card">
-          <div className="event-details-title">{mission.title}</div>
-          <div className="event-details-desc">{mission.description}</div>
-          <span className="event-details-activity-label">Activity Details:</span>
-          <ul className="event-details-activity-list">
-            {(mission.details || (mission.activities && mission.activities[0]?.details) || []).map((item, idx) => (
-              <li key={idx}>{item}</li>
-            ))}
-          </ul>
-          <button
-            className="event-details-join-btn"
-            onClick={handleJoinEvent}
-          >
-            JOIN EVENT
-          </button>
+      <div className="header-spacer"></div>
+      <div className="content-page">
+        <div className="event-details-center">
+          <div className="event-details-image">
+            {mission.img && mission.img.trim() !== "" && (
+              <img src={mission.img} alt={mission.alt || "Event image"} />
+            )}
+          </div>
+          <div className="event-details-card">
+            <div className="event-details-grid">
+
+              {/* LEFT COLUMN */}
+              <div className="event-details-left">
+                <h1 className="event-details-title">{mission.title}</h1>
+                <p className="event-details-desc">{mission.description}</p>
+                <div className="event-details-meta">
+                  <div className="event-meta-item">
+                    📅 <span>{mission.targetDate || "Date TBA"}</span>
+                  </div>
+
+                  <div className="event-meta-item">
+                    📍 <span>{mission.location || "Location TBA"}</span>
+                  </div>
+
+                  <div className="event-meta-item">
+                    ⏱ <span>
+                      {mission.volunteerHours
+                        ? `${mission.volunteerHours} hours`
+                        : "TBA"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="event-details-divider" />
+
+              {/* RIGHT COLUMN */}
+              <div className="event-details-right">
+                <div className="event-details-section">
+                  <ul className="event-details-activity-list">
+                    {(mission.details ||
+                      (mission.activities && mission.activities[0]?.details) ||
+                      []).map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                  </ul>
+                </div>
+
+                <div className="event-details-section">
+                  <span className="event-details-activity-label">
+                    Included Tasks
+                  </span>
+
+                  {tasks.length === 0 ? (
+                    <p className="event-details-empty">
+                      No tasks added yet.
+                    </p>
+                  ) : (
+                    <ul className="event-details-activity-list">
+                      {tasks.map(task => (
+                        <li key={task.id} className="event-task-item">
+                          <div className="event-task-item">
+                            <span className="event-task-title">
+                              {task.title}
+                            </span>
+                            <span className="task-points">
+                              ({task.points} pts)
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+              </div>
+            </div>
+            <div className='event-details-cta'>
+              <button
+                className="event-details-join-btn"
+                onClick={handleJoinEvent}
+              >
+                JOIN EVENT
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      <PreActivitySurveyModal
-        open={showSurveyModal}
-        onClose={() => setShowSurveyModal(false)}
-        onSubmit={handleSurveySubmit}
-      />
+
       {/* Community Updates Toggle Button and Slide-in Panel */}
       <button
         className="global-feed-toggle"
