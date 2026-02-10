@@ -9,6 +9,7 @@ import { checkUpcomingEvents } from '../utils/notificationUtils';
 export function useUpcomingEventNotifications() {
   useEffect(() => {
     console.log('[useUpcomingEventNotifications] Hook mounted');
+    const minHoursBetweenChecks = import.meta.env.DEV ? 0 : 24;
     
     const checkNotifications = async (userId) => {
       console.log('[useUpcomingEventNotifications] checkNotifications called with userId:', userId);
@@ -31,8 +32,8 @@ export function useUpcomingEventNotifications() {
         
         console.log('[useUpcomingEventNotifications] Hours since last check:', hoursSinceLastCheck);
         
-        // Only check once every 24 hours
-        if (hoursSinceLastCheck < 24) {
+        // Only check once every 24 hours (prod). In dev, allow immediate re-checks.
+        if (hoursSinceLastCheck < minHoursBetweenChecks) {
           console.log('[useUpcomingEventNotifications] Checked recently, skipping');
           return;
         }

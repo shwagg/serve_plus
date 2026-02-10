@@ -11,8 +11,6 @@ import { db } from "../../../firebaseConfig";
 import { createNotification } from "../../../utils/notificationUtils";
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
-import PreActivitySurvey from "../../../../public/forms/PreActivitySurvey";
-import PostActivitySurvey from "../../../../public/forms/PostActivitySurvey";
 
 export default function EventActivity() {
   //Requirement panel containing all forms

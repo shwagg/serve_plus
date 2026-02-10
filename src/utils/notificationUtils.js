@@ -48,6 +48,47 @@ export function subscribeToNotifications(userId, callback) {
   });
 }
 
+function parseMissionTargetDate(rawTargetDates, now = new Date()) {
+  const parseOne = (value) => {
+    if (!value) return null;
+    if (value?.toDate && typeof value.toDate === 'function') {
+      const date = value.toDate();
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      // Prefer local-date parsing for YYYY-MM-DD to avoid UTC shifting.
+      const match = /^\d{4}-\d{2}-\d{2}$/.exec(trimmed);
+      if (match) {
+        const [year, month, day] = trimmed.split('-').map(Number);
+        const local = new Date(year, month - 1, day);
+        return Number.isNaN(local.getTime()) ? null : local;
+      }
+      const date = new Date(trimmed);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    if (typeof value === 'number') {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    return null;
+  };
+
+  if (Array.isArray(rawTargetDates)) {
+    const parsed = rawTargetDates
+      .map(parseOne)
+      .filter(Boolean)
+      .sort((a, b) => a - b);
+    const nextUpcoming = parsed.find((d) => d > now);
+    return nextUpcoming ?? null;
+  }
+
+  return parseOne(rawTargetDates);
+}
+
 // Check for upcoming events and create notifications
 export async function checkUpcomingEvents(userId) {
   try {
@@ -82,8 +123,13 @@ export async function checkUpcomingEvents(userId) {
       if (!volunteerDoc.exists()) continue;
       
       // Check if event is within 1 week
-      const eventDate = missionData.targetDates?.toDate?.() || new Date(missionData.targetDates);
-      console.log(`[checkUpcomingEvents] Event date for ${missionId}:`, eventDate, 'Type:', typeof missionData.targetDates);
+      const eventDate = parseMissionTargetDate(missionData.targetDates, now);
+      console.log(`[checkUpcomingEvents] Event date for ${missionId}:`, eventDate, 'Raw type:', typeof missionData.targetDates);
+
+      if (!eventDate) {
+        console.log(`[checkUpcomingEvents] Mission ${missionId} has invalid targetDates:`, missionData.targetDates);
+        continue;
+      }
       
       if (eventDate <= oneWeekFromNow && eventDate > now) {
         // Calculate days until event
