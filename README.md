@@ -36,3 +36,13 @@ Hi, for material-icons, install lang ito:
 close yung run npm dev.
 "npm install @mui/material @mui/icons-material @emotion/react @emotion/styled"
 then run npm dev again.
+
+
+
+
+
+users w/ positions:
+admin@test.com = admin/regular
+admin2@test.com = admin/director
+faculty2@test.com = faculty/program chair
+faculty3@test.com = faculty/college dean

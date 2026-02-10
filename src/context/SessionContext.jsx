@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react";
-import { auth, functions } from "../firebaseConfig";
+import { auth, functions, db } from "../firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 
@@ -10,6 +11,7 @@ const SESSION_TIMEOUT = 10 * 60 * 1000; // currently 10 seconds, to make it 10 m
 export function SessionProvider({ children }) {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [userData, setUserData] = useState(null);
   const timeoutIdRef = useRef(null);
   const inactivityTimerRef = useRef(null);
 
@@ -86,9 +88,9 @@ export function SessionProvider({ children }) {
     };
   };
 
-  // Monitor auth state changes
+  // Monitor auth state changes and fetch user data
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         // On successful login clear auto-logout marker and any popstate handler
         try {
@@ -101,10 +103,29 @@ export function SessionProvider({ children }) {
         } catch (e) {
           /* ignore */
         }
+        
+        // Fetch user data from Firestore
+        try {
+          const userRef = doc(db, "users", user.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            console.log("SessionContext - Fetched user data:", data);
+            setUserData(data);
+          } else {
+            console.warn("SessionContext - User document not found in Firestore for uid:", user.uid);
+            setUserData(null);
+          }
+        } catch (error) {
+          console.error("SessionContext - Error fetching user data:", error);
+          setUserData(null);
+        }
+        
         setIsSessionActive(true);
         resetInactivityTimer();
       } else {
         setIsSessionActive(false);
+        setUserData(null);
         if (inactivityTimerRef.current) {
           clearTimeout(inactivityTimerRef.current);
         }
@@ -144,6 +165,7 @@ export function SessionProvider({ children }) {
     isSessionActive,
     logout,
     resetInactivityTimer,
+    userData,
   };
 
   return (
