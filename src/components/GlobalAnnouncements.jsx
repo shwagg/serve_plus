@@ -255,6 +255,58 @@ const GlobalAnnouncements = () => {
           });
         }
 
+        // Leaderboard announcement: Calculate top volunteers by total points
+        const userPointsMap = new Map(); // userId -> {name, totalPoints, events}
+        for (const event of events) {
+          try {
+            const volunteerCol = collection(db, `missions/${event.id}/volunteer`);
+            const volunteerSnap = await getDocs(volunteerCol);
+            
+            volunteerSnap.forEach(volunteerDoc => {
+              const data = volunteerDoc.data();
+              const points = data.pointsEarned || 0;
+              const userId = volunteerDoc.id;
+              
+              if (points > 0) {
+                if (userPointsMap.has(userId)) {
+                  const existing = userPointsMap.get(userId);
+                  existing.totalPoints += points;
+                  existing.events++;
+                } else {
+                  userPointsMap.set(userId, {
+                    name: data.name || 'Anonymous',
+                    totalPoints: points,
+                    events: 1
+                  });
+                }
+              }
+            });
+          } catch (err) {
+            console.warn(`Error calculating leaderboard for event ${event.id}:`, err);
+          }
+        }
+
+        // Get top 3 volunteers
+        if (userPointsMap.size > 0) {
+          const topVolunteers = Array.from(userPointsMap.entries())
+            .sort((a, b) => b[1].totalPoints - a[1].totalPoints)
+            .slice(0, 3);
+          
+          const leaderboardText = topVolunteers.map((entry, idx) => {
+            const emoji = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+            return `${emoji} ${entry[1].name} - ${entry[1].totalPoints} pts`;
+          }).join(' • ');
+
+          extraArr.push({
+            id: 'leaderboard-top',
+            type: 'info',
+            title: '🏆 Top Volunteers',
+            message: `Leading our community impact: ${leaderboardText}`,
+            link: '/student/home',
+            createdAt: new Date(),
+          });
+        }
+
         setMilestones(milestoneArr);
         setExtraAnnouncements(extraArr);
       } catch (error) {

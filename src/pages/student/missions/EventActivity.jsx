@@ -313,11 +313,21 @@ export default function EventActivity() {
       }));
       setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
 
+      // Send points earned notification
+      if (pointsToAward > 0) {
+        await createNotification(user.uid, {
+          type: "points_earned",
+          title: "Points Earned!",
+          message: `You earned ${pointsToAward} points for completing "${activity.title}"`,
+          link: `/event/${id}/activity`
+        });
+      }
+
       // Send notification to student
       await createNotification(user.uid, {
         type: "reflection_submitted",
         title: "Reflection Submitted",
-        message: `Your reflection for "${activity.title}" has been submitted successfully! +${pointsToAward} points earned.`,
+        message: `Your reflection for "${activity.title}" has been submitted successfully!`,
         link: `/event/${id}/activity`
       });
 
