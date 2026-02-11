@@ -206,9 +206,7 @@ export default function EventActivity() {
   const [editingJournalText, setEditingJournalText] = useState("");
   const [enrolledTasks, setEnrolledTasks] = useState({});
   const [volunteerProgress, setVolunteerProgress] = useState(null);
-  const canJoinActivities =
-    volunteerProgress?.preSurvey === "submitted" &&
-    volunteerProgress?.consent === "verified";
+  const canJoinActivities = mode === "active";
   // Handler for adding a skill to a level (for placeholder)
   const handleAddSkill = (skill, level) => {
     if (level === "easy")
