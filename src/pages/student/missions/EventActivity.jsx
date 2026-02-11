@@ -2,7 +2,7 @@ import { getAuth } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../../firebaseConfig";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
@@ -1070,6 +1070,9 @@ export default function EventActivity() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalPointsEarned, setTotalPointsEarned] = useState(0);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const leaderboardListRef = useRef(null);
+  const currentUserRef = useRef(null);
 
   // Helper to determine survey status (progress or subcollection)
   const [surveyStatus, setSurveyStatus] = useState({ pre: null, post: null });
@@ -1152,6 +1155,76 @@ export default function EventActivity() {
     fetchEvent();
   }, [id]);
 
+  useEffect(() => {
+    async function fetchEventLeaderboard() {
+      try {
+        const usersSnap = await getDocs(collection(db, "users"));
+        const volunteersSnap = await getDocs(
+          collection(db, "missions", id, "volunteer")
+        );
+
+        const usersMap = new Map();
+        usersSnap.docs.forEach((userDoc) => {
+          usersMap.set(userDoc.id, userDoc.data());
+        });
+
+        const leaderboardData = volunteersSnap.docs.map((volunteerDoc) => {
+          const userId = volunteerDoc.id;
+          const userData = usersMap.get(userId) || {};
+          const name =
+            userData.username ||
+            userData.name ||
+            userData.email?.split("@")[0] ||
+            "Volunteer";
+
+          return {
+            uid: userId,
+            name,
+            points: volunteerDoc.data().pointsEarned || 0,
+            avatar:
+              userData.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                name
+              )}&background=30bdb7&color=fff&size=120`,
+          };
+        });
+
+        leaderboardData.sort((a, b) => b.points - a.points);
+        setLeaderboard(leaderboardData);
+      } catch (error) {
+        console.error("Error fetching event leaderboard:", error);
+      }
+    }
+
+    if (id) {
+      fetchEventLeaderboard();
+    }
+  }, [id, totalPointsEarned]);
+
+  useEffect(() => {
+    const container = leaderboardListRef.current;
+    const item = currentUserRef.current;
+
+    if (!container || !item) return;
+
+    requestAnimationFrame(() => {
+      const containerHeight = container.getBoundingClientRect().height;
+      const itemRect = item.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      const itemCenter =
+        itemRect.top - containerRect.top + itemRect.height / 2;
+
+      const scrollTop =
+        itemCenter - containerHeight / 2 + container.scrollTop;
+
+      container.scrollTo({
+        top: scrollTop,
+        behavior: "auto",
+      });
+    });
+  }, [leaderboard]);
+
   if (loading) {
     return (
       <div style={{ padding: 32, color: "#234e7b", fontWeight: 600 }}>
@@ -1182,7 +1255,31 @@ export default function EventActivity() {
     );
   }
 
-  // ...existing code...
+  const sortedLeaderboard = [...leaderboard].sort(
+    (a, b) => b.points - a.points
+  );
+  const top1 = sortedLeaderboard[0];
+  const top2 = sortedLeaderboard[1];
+  const top3 = sortedLeaderboard[2];
+  const podium = [top2, top1, top3].filter(Boolean);
+  const currentUserId = auth.currentUser?.uid;
+  const currentUserIndex = sortedLeaderboard.findIndex(
+    (user) => user.uid === currentUserId
+  );
+  const currentUserRank =
+    currentUserIndex !== -1 ? currentUserIndex + 1 : null;
+
+  const getOrdinal = (rank) => {
+    if (!rank) return "";
+
+    const j = rank % 10;
+    const k = rank % 100;
+
+    if (j === 1 && k !== 11) return `${rank}st`;
+    if (j === 2 && k !== 12) return `${rank}nd`;
+    if (j === 3 && k !== 13) return `${rank}rd`;
+    return `${rank}th`;
+  };
 
   return (
     <div className="full-page">
@@ -1190,71 +1287,136 @@ export default function EventActivity() {
       <div className="header-spacer"></div>
       <div className="event-activity-container">
         {/* Left Side: Event Summary */}
-        <div className="event-summary-card">
-          <div className="event-summary-image">
-            <img
-              src={event.img && event.img.trim() !== "" ? event.img : "/assets/mission1.jpg"}
-              alt={event.alt || "Event"}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+        <div className="event-left-panel">
+          <div className="event-summary-card">
+            <div className="event-summary-image">
+              <img
+                src={event.img && event.img.trim() !== "" ? event.img : "/assets/mission1.jpg"}
+                alt={event.alt || "Event"}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+            {/* Green card */}
+            <div className="event-summary-body">
+              <h2 className="event-summary-title">
+                {event.title}
+              </h2>
+              <p className="event-summary-description">
+                {event.description}
+              </p>
+              {/* White info box */}
+              <div className="event-info-box">
+                <div style={{ marginBottom: 10 }}>
+                  <strong>Location:</strong>{" "}
+                  <span style={{ color: "#234e7b" }}>{event.location}</span>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <strong>Date & Time:</strong>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    <li>{event.date}</li>
+                    <li>{event.time}</li>
+                  </ul>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <strong>Points:</strong>{" "}
+                  <span style={{ color: "#388e3c" }}>{event.points} PTS</span>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <strong>Your Points Earned:</strong>{" "}
+                  <span style={{ color: "#1976d2", fontWeight: 600, fontSize: 16 }}>{totalPointsEarned} PTS</span>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <strong>Event Badge:</strong>
+                  <br />
+                  <img
+                    src={event.badge || "/assets/badge.png"}
+                    alt="Event Badge"
+                    className="image-badge"
+                  />
+                </div>
+
+                {/* QR button only */}
+                <div style={{ marginTop: 16, display: "flex", flexDirection: "row", justifyContent: "center", gap: 18 }}>
+                  <button
+                    className="event-qr-button"
+                    onClick={() => setShowQRModal(true)}
+                    disabled={mode !== "active"}
+                  >
+                    {mode === "active"
+                      ? "Scan Attendance QR Code"
+                      : "Attendance Locked"}
+                  </button>
+                </div>
+
+              </div>
+              <div className="event-status-label incomplete">
+                Status: Incomplete
+              </div>
+
+            </div>
           </div>
-          {/* Green card */}
-          <div className="event-summary-body">
-            <h2 className="event-summary-title">
-              {event.title}
-            </h2>
-            <p className="event-summary-description">
-              {event.description}
-            </p>
-            {/* White info box */}
-            <div className="event-info-box">
-              <div style={{ marginBottom: 10 }}>
-                <strong>Location:</strong>{" "}
-                <span style={{ color: "#234e7b" }}>{event.location}</span>
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Date & Time:</strong>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  <li>{event.date}</li>
-                  <li>{event.time}</li>
-                </ul>
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Points:</strong>{" "}
-                <span style={{ color: "#388e3c" }}>{event.points} PTS</span>
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Your Points Earned:</strong>{" "}
-                <span style={{ color: "#1976d2", fontWeight: 600, fontSize: 16 }}>{totalPointsEarned} PTS</span>
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Event Badge:</strong>
-                <br />
-                <img
-                  src={event.badge || "/assets/badge.png"}
-                  alt="Event Badge"
-                  className="image-badge"
-                />
-              </div>
 
-              {/* QR button only */}
-              <div style={{ marginTop: 16, display: "flex", flexDirection: "row", justifyContent: "center", gap: 18 }}>
-                <button
-                  className="event-qr-button"
-                  onClick={() => setShowQRModal(true)}
-                  disabled={mode !== "active"}
-                >
-                  {mode === "active"
-                    ? "Scan Attendance QR Code"
-                    : "Attendance Locked"}
-                </button>
+          {/* LEADERBOARD */}
+          <div className="event-leaderboard-card">
+            <section className="leaderboard-section">
+              <div className="mission-section-header">
+                <h2 style={{ color: "#000" }}>Activity Leaderboard</h2>
               </div>
+              <div className="leaderboard-body">
+                <div className="leaderboard-podium">
+                  {podium.map((user) => {
+                    const rank =
+                      user.uid === top1?.uid ? 1 : user.uid === top2?.uid ? 2 : 3;
 
-            </div>
-            <div className="event-status-label incomplete">
-              Status: Incomplete
-            </div>
+                    return (
+                      <div key={user.uid} className={`podium-item rank-${rank}`}>
+                        <div className="podium-top">
+                          <div className="podium-avatar-wrap">
+                            <img src={user.avatar} alt={user.name} />
+                            <span className="podium-rank">{rank}</span>
+                          </div>
 
+                          <div className="podium-info">
+                            <div className="podium-name">{user.name}</div>
+                            <div className="podium-points">{user.points} pts</div>
+                          </div>
+                        </div>
+                        <div className={`podium-base rank-${rank}`}></div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="leaderboard-list" ref={leaderboardListRef}>
+                  {sortedLeaderboard.length === 0 ? (
+                    <div style={{ padding: "12px 14px", color: "#6b7280" }}>
+                      No participants yet.
+                    </div>
+                  ) : (
+                    sortedLeaderboard.map((user, index) => {
+                      const rank = index + 1;
+                      return (
+                        <div
+                          key={user.uid}
+                          ref={user.uid === currentUserId ? currentUserRef : null}
+                          className={`leaderboard-row ${
+                            user.uid === currentUserId ? "is-current-user" : ""
+                          }`}
+                        >
+                          <span className="rank-num">{rank}</span>
+                          <img
+                            src={user.avatar}
+                            alt={`${user.name}'s avatar`}
+                            className="leaderboard-avatar"
+                          ></img>
+                          <span className="rank-name">{user.name}</span>
+                          <span className="rank-points">{user.points} pts</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </section>
           </div>
         </div>
 

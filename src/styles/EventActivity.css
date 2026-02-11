@@ -123,6 +123,15 @@ h1, h2, h3 {
   min-width: 0;
 }
 
+.event-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex: 0 0 40%;
+  max-width: 40%;
+  min-width: 340px;
+}
+
 .event-activity-page {
   min-height: 100vh;
   width: 100vw;
@@ -359,9 +368,9 @@ h1, h2, h3 {
     font-weight: 600;
 }
 .event-summary-card {
-  flex: 0 0 40%;
-  max-width: 40%;
-  min-width: 340px;
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-width: 0;
   background: #ffffff;
   border-radius: 16px;
   padding: 0;
@@ -375,6 +384,77 @@ h1, h2, h3 {
 .event-summary-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+.event-leaderboard-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px 16px 18px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+}
+
+.event-leaderboard-card .leaderboard-section {
+  background: transparent;
+  height: auto;
+  padding: 8px 0 0;
+  box-shadow: none;
+}
+
+.event-leaderboard-card .leaderboard-body {
+  margin-top: 10px;
+  min-height: 0;
+  padding: 0;
+  gap: 12px;
+}
+
+.event-leaderboard-card .leaderboard-podium {
+  flex: 0 0 100%;
+  max-width: 100%;
+  justify-content: center;
+  gap: 10px;
+}
+
+.event-leaderboard-card .leaderboard-list {
+  width: 100%;
+  max-width: none;
+  max-height: 150px;
+}
+
+.event-leaderboard-card .podium-item {
+  width: 96px;
+}
+
+.event-leaderboard-card .podium-avatar-wrap img {
+  width: 68px;
+  height: 68px;
+}
+
+.event-leaderboard-card .podium-item.rank-1 .podium-top img {
+  width: 80px;
+  height: 80px;
+}
+
+.event-leaderboard-card .podium-item.rank-1 {
+  transform: translateY(-12px);
+}
+
+.event-leaderboard-card .podium-item.rank-1 .podium-top::before {
+  top: -26px;
+  font-size: 26px;
+}
+
+.event-leaderboard-card .podium-item.rank-2,
+.event-leaderboard-card .podium-item.rank-3 {
+  margin-bottom: 12px;
+}
+
+.event-leaderboard-card .podium-base.rank-1 {
+  height: 28px;
+}
+
+.event-leaderboard-card .podium-base.rank-2,
+.event-leaderboard-card .podium-base.rank-3 {
+  height: 18px;
 }
 
 .event-summary-image {
