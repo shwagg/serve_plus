@@ -7,10 +7,11 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
-import { db } from "../../../firebaseConfig";
 import { createNotification } from "../../../utils/notificationUtils";
+//styles
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
+//forms
 import PreActivitySurvey from "../../../../public/forms/PreActivitySurvey.jsx";
 import PostActivitySurvey from "../../../../public/forms/PostActivitySurvey.jsx";
 
@@ -106,48 +107,56 @@ export default function EventActivity() {
     }
   };
   //For saving consent file to be reviewed
-  const handleConsentSubmit = async (file) => {
-    const user = auth.currentUser;
-    if (!user || !file) {
-      alert("Missing user or file.");
-      return;
-    }
-
+  const handleConsentSubmit = async () => {
     try {
-      const ext = file.name.split(".").pop().toLowerCase();
-      const fileType = ext === "pdf" ? "pdf" : "image";
-
-      const filePath = `consents/${user.uid}/consent.${ext}`;
-      console.log("[Consent Upload] User UID:", user.uid, "File Path:", filePath, "Is Authenticated:", !!user);
-      const fileRef = ref(storage, filePath);
-
-      await uploadBytes(fileRef, file);
-      const fileUrl = await getDownloadURL(fileRef);
-
-      await updateDoc(
+      const user = auth.currentUser;
+      if (!user) {
+        alert("You must be logged in.");
+        return;
+      }
+      if (!selectedConsentFile) {
+        alert("Please select a PDF file.");
+        return;
+      }
+      // ✅ PDF validation
+      if (selectedConsentFile.type !== "application/pdf") {
+        alert("Only PDF files are allowed.");
+        return;
+      }
+      // ✅ File size limit (10MB)
+      if (selectedConsentFile.size > 10 * 1024 * 1024) {
+        alert("File must be less than 10MB.");
+        return;
+      }
+      const fileRef = ref(
+        storage,
+        `consents/${id}/${user.uid}/${selectedConsentFile.name}`
+      );
+      // Upload to Storage
+      await uploadBytes(fileRef, selectedConsentFile);
+      const downloadURL = await getDownloadURL(fileRef);
+      // Save metadata to Firestore
+      await setDoc(
         doc(db, "missions", id, "volunteer", user.uid),
         {
-          "progress.consent": "submitted",
           consentSubmission: {
-            fileUrl: fileUrl,
-            filePath: filePath,
-            fileType: fileType,
-            submittedAt: serverTimestamp(),
-            verifiedAt: null,
-            verifiedBy: ""
+            fileUrl: downloadURL,
+            filePath: fileRef.fullPath,
+            fileType: selectedConsentFile.type,
+            submittedAt: serverTimestamp()
+          },
+          progress: {
+            consent: "submitted"
           }
-        }
+        },
+        { merge: true }
       );
-
-      setVolunteerProgress((prev) => ({
-        ...prev,
-        consent: "submitted"
-      }));
-
-      alert("Consent form submitted successfully.");
+      setUploadedConsentFile(selectedConsentFile);
+      setSelectedConsentFile(null);
+      alert("Consent uploaded successfully!");
     } catch (error) {
-      console.error("Consent upload failed FULL ERROR:", error);
-      alert(error?.message || JSON.stringify(error));
+      console.error("Upload error:", error);
+      alert("Upload failed.");
     }
   };
 
@@ -276,7 +285,7 @@ export default function EventActivity() {
         });
         // Update the displayed total
         setTotalPointsEarned(newTotal);
-        
+
         // Check for level up (calculate across all missions)
         const missionsRef = collection(db, "missions");
         const missionsSnap = await getDocs(missionsRef);
@@ -1095,10 +1104,20 @@ export default function EventActivity() {
           // Check enrollment status for each task and get volunteer points
           const user = auth.currentUser;
           if (user) {
-            // Fetch volunteer's progress for this event
             const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
-            const volunteerSnap = await getDoc(volunteerRef);
-            let progress = (volunteerSnap.exists() && volunteerSnap.data().progress) ? { ...volunteerSnap.data().progress } : {};
+            let volunteerSnap = await getDoc(volunteerRef);
+            //fetch from what EventDetails created 'volunteer'
+            if (!volunteerSnap.exists()) {
+              navigate(`/event/${id}`);
+              return;
+            }
+
+            if (volunteerSnap.data().status !== "approved") {
+              navigate(`/event/${id}`);
+              return;
+            }
+
+            let progress = volunteerSnap.data().progress || {};
 
             // --- Sync progress with actual survey subcollections ---
             // Pre-Activity Survey
@@ -1396,9 +1415,8 @@ export default function EventActivity() {
                         <div
                           key={user.uid}
                           ref={user.uid === currentUserId ? currentUserRef : null}
-                          className={`leaderboard-row ${
-                            user.uid === currentUserId ? "is-current-user" : ""
-                          }`}
+                          className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""
+                            }`}
                         >
                           <span className="rank-num">{rank}</span>
                           <img
@@ -1844,31 +1862,13 @@ export default function EventActivity() {
             <div className="consent-details">
               <input
                 type="file"
-                accept=".pdf,image/*"
+                accept="application/pdf"
                 style={{ marginBottom: 8 }}
-                onChange={e => {
-                  const file = e.target.files && e.target.files[0];
-                  if (!file) return;
-
-                  const fileName = file.name.toLowerCase();
-                  const isPdf = fileName.endsWith(".pdf");
-                  const isImage =
-                    fileName.endsWith(".jpg") ||
-                    fileName.endsWith(".jpeg") ||
-                    fileName.endsWith(".png");
-
-                  if (!isPdf && !isImage) {
-                    alert("Please upload a PDF or image file.");
-                    e.target.value = "";
-                    return;
-                  }
-
-                  setSelectedConsentFile(file);
-                }}
+                onChange={(e) => setSelectedConsentFile(e.target.files[0])}
               />
               <button
                 disabled={!selectedConsentFile}
-                onClick={() => handleConsentSubmit(selectedConsentFile)}
+                onClick={handleConsentSubmit}
               >
                 Submit
               </button>

@@ -89,3 +89,102 @@
   font-size: 16px;
   color: #000;
 }
+/*SUBMISSION MODAL*/
+.submission-modal-container{
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(44,62,80,0.18);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center,
+}
+.submission-modal-x{
+  background: '#fff';
+  border-radius: 16px;
+  padding: 32px;
+  min-width: 600px;
+  max-width: 90vw;
+  box-shadow: 0 2px 16px #0002;
+  position: relative;
+  color: #000;
+}
+/*real close button*/
+/* ===== Submission Modal Enhancements ===== */
+
+.submission-summary {
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  background: #f3f4f8;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.submission-summary-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #23335b;
+}
+
+.submission-summary-count {
+  font-size: 18px;
+  font-weight: 700;
+  color: #30bdb7;
+}
+
+/* Table Improvements */
+.submission-table th,
+.submission-table td {
+  text-align: center;
+  padding: 12px 8px;
+}
+
+.submission-table th {
+  background-color: #f8f9fc;
+  font-weight: 600;
+  font-size: 14px;
+  color: #23335b;
+}
+
+.submission-table tr:hover {
+  background-color: #f3f4f8;
+}
+
+/* Mini Action Button */
+.mini-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #30bdb7;
+  background: #f3f4f8;
+  color: #23335b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: 0.2s ease;
+}
+
+.mini-btn:hover {
+  background: #30bdb7;
+  color: white;
+}
+
+/* Status Styling */
+.status-completed {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.status-progress {
+  color: #30bdb7;
+  font-weight: 600;
+}
+
+.status-incomplete {
+  color: #ff9800;
+  font-weight: 600;
+}

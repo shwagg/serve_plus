@@ -59,7 +59,8 @@ export function SessionProvider({ children }) {
       }
       // Push a history entry so Back presses stay on the same page, and redirect to login
       window.history.pushState(null, null, window.location.href);
-      window.location.href = "/";
+      //WILL UNCOMMENT AFTER DESIGNING
+      //window.location.href = "/";
     } catch (error) {
       console.error("Error during logout:", error);
     } finally {
@@ -103,7 +104,7 @@ export function SessionProvider({ children }) {
         } catch (e) {
           /* ignore */
         }
-        
+
         // Fetch user data from Firestore
         try {
           const userRef = doc(db, "users", user.uid);
@@ -120,7 +121,7 @@ export function SessionProvider({ children }) {
           console.error("SessionContext - Error fetching user data:", error);
           setUserData(null);
         }
-        
+
         setIsSessionActive(true);
         resetInactivityTimer();
       } else {

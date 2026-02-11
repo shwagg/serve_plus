@@ -84,14 +84,18 @@ export default function EventDetails() {
 
     await setDoc(volunteerRef, {
       joinedAt: new Date().toISOString(),
+      status: "pending",
       progress: {
-        preSurvey: "not_started",
-        consent: "pending",
+        preSurvey: "locked",
+        consent: "locked",
         attendance: "not_checked_in",
         postSurvey: "locked"
       },
-      finalStatus: "in_progress",
+      finalStatus: "pending_approval",
       pointsEarned: 0
+    });
+    setVolunteer({
+      status: "pending"
     });
 
     // Create a registration notification (once per event)
@@ -117,9 +121,6 @@ export default function EventDetails() {
       // Non-blocking: joining the event should still succeed even if notification fails.
       console.error("Failed to create registration notification:", e);
     }
-
-    //go to event when it is active or ongoing for the day
-    navigate(`/event/${id}/activity?mode=active`);
   };
 
   if (loading) {
@@ -209,12 +210,35 @@ export default function EventDetails() {
 
               </div>
             </div>
-            <div className='event-details-cta'>
+            <div className="event-details-cta">
+
               <button
-                className="event-details-join-btn"
-                onClick={handleJoinEvent}
+                className={`event-details-join-btn ${volunteer?.status === "pending"
+                  ? "pending"
+                  : volunteer?.status === "rejected"
+                    ? "rejected"
+                    : ""
+                  }`}
+                disabled={volunteer?.status === "pending"}
+                onClick={() => {
+                  if (!volunteer) {
+                    handleJoinEvent();
+                  } else if (volunteer.status === "approved") {
+                    navigate(`/event/${id}/activity?mode=active`);
+                  } else if (volunteer.status === "rejected") {
+                    handleJoinEvent(); // allow re-request
+                  }
+                }}
               >
-                JOIN EVENT
+                {!volunteer
+                  ? "JOIN EVENT"
+                  : volunteer.status === "pending"
+                    ? "PENDING REQUEST"
+                    : volunteer.status === "approved"
+                      ? "VIEW EVENT"
+                      : volunteer.status === "rejected"
+                        ? "REQUEST REJECTED"
+                        : "JOIN EVENT"}
               </button>
             </div>
           </div>

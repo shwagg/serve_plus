@@ -1,0 +1,231 @@
+.current-events-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+.mission-card {
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  border: 1px solid #e6f2f5;
+  cursor: pointer;
+  transition: 0.2s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; 
+  min-height: 170px;
+}
+
+.mission-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+
+.mission-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mission-header h3 {
+  font-size: 18px;
+  color: #234e7b;
+  font-weight: 700;
+}
+
+.pending-badge {
+   position: absolute;
+  top: 12px;
+  right: 14px;
+  background: #e53935;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 22px;
+  text-align: center;
+}
+
+.mission-info {
+  font-size: 14px;
+  color: #555;
+}
+.current-events-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  padding: 10px;
+}
+
+.mission-card {
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  cursor: pointer;
+  transition: 0.2s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.mission-card:hover {
+  transform: translateY(-3px);
+}
+.mission-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mission-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #234e7b;
+  margin: 0;
+}
+.mission-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.pending-badge {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: #e53935;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: white;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.approve-btn {
+  background: #30bdb7;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  margin-right: 6px;
+}
+
+.reject-btn {
+  background: #e53935;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+}
+
+.back-button {
+  margin-bottom: 15px;
+  background: none;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  color: #000;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: white;
+  table-layout: fixed; /* 🔥 Important */
+  color: #234e7b;
+}
+
+.admin-table thead {
+  background: #f5f7fa;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #eaeaea;
+  text-align: left;
+  vertical-align: middle;
+}
+
+/* Column Width Control */
+.admin-table th:nth-child(1),
+.admin-table td:nth-child(1) {
+  width: 35%;
+}
+
+.admin-table th:nth-child(2),
+.admin-table td:nth-child(2) {
+  width: 15%;
+}
+
+.admin-table th:nth-child(3),
+.admin-table td:nth-child(3) {
+  width: 25%;
+}
+
+.admin-table th:nth-child(4),
+.admin-table td:nth-child(4) {
+  width: 25%;
+}
+
+/* Row Hover */
+.admin-table tbody tr:hover {
+  background: #f9fbfd;
+}
+
+/* Action Buttons Wrapper */
+.admin-table td:last-child {
+  display: flex;
+  gap: 10px;
+}
+.section-header {
+  margin-top: 30px;
+  margin-bottom: 10px;
+}
+
+.section-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #234e7b;
+}
+
+.empty-label {
+  padding: 20px;
+  text-align: center;
+  background: #f9fbfd;
+  border-radius: 12px;
+  color: #888;
+  font-size: 14px;
+}
+
+/* Pending = highlighted (like unread email) */
+.pending-row {
+  background: #fffdf5;
+}
+
+/* Approved = subtle */
+.approved-row {
+  background: #fafafa;
+}
+
+.approved-table thead {
+  background: #f3f3f3;
+}
+

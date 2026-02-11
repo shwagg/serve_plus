@@ -20,7 +20,7 @@ export const adminLinks = [
         key: "events",
         label: "Events",
         children: [
-            { label: "Current Event", to: "/admin/events/current" },
+            { label: "Current Event", to: "/admin/current-event" },
             { label: "Roster", to: "/admin/roster" },
             { label: "Partner Hub", to: "/admin/events/partners" },
         ],

@@ -17,6 +17,7 @@ import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
 import ProjectDetails from "./pages/admin/ProjectDetails";
 import ProjectTasks from "./pages/admin/ProjectTasks";
+import CurrentEvent from "./pages/admin/CurrentEvent";
 import AuditLogs from "./pages/admin/AuditLogs";
 import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import StudentHome from "./pages/student/StudentHome";
@@ -32,10 +33,10 @@ import "./App.css";
 function App() {
   // Check for upcoming events and create notifications
   useUpcomingEventNotifications();
-  
+
   // Check for overdue reflections and create notifications
   useOverdueReflectionNotifications();
-  
+
   return (
     <SessionProvider>
       <Router>
@@ -61,6 +62,7 @@ function App() {
             <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
+            <Route path="current-event/:missionId?" element={<CurrentEvent />} />
           </Route>
 
           <Route

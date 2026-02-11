@@ -1,17 +1,13 @@
-
 :root{
   --navy:#1f3b73;
   --teal:#30bdb7;
   --teal-dark:#0f766e;
-  --bg:#f6f7fb;
   --card:#ffffff;
   --muted:#64748b;
   --border:#e5e7eb;
   --color: #000000;
   --shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-  --header-height: 10%; /* fixed header height */
 }
-
 
 .page-title{
   margin: 0 0 16px 0;

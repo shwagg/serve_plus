@@ -12,6 +12,7 @@ import { adminLinks } from "../../hooks/sidebarConfig";
 export default function AdminLayout() {
     const [collapsed, setCollapsed] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
+
     //for profile
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -26,9 +27,11 @@ export default function AdminLayout() {
 
                 const data = userSnap.data();
 
+                //specify what data of user you want to retrieve
                 setUserProfile({
                     name: data.name,
                     role: data.role,
+                    avatar: data.avatar
                 });
             } catch (error) {
                 console.error("Error fetching user profile:", error);
@@ -45,6 +48,7 @@ export default function AdminLayout() {
                 links={adminLinks}
                 collapsed={collapsed}
                 setCollapsed={setCollapsed}
+                userProfile={userProfile}
             />
             {/* ONLY THIS PART CHANGES */}
             <main className="admin-main">
