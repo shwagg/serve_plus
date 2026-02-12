@@ -225,180 +225,234 @@ export default function DocumentLibrary() {
       {/* Submissions Modal - must be outside the map! */}
       {showSubmissionsModal && (
         <div
-          className="submission-modal-container"
+          className="submission-modal-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(44,62,80,0.08)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
           onClick={() => setShowSubmissionsModal(false)}
         >
           <div
-            className="submission-modal-x"
+            className="submission-modal-content"
+            style={{
+              background: '#f8f9fb',
+              borderRadius: 18,
+              padding: 32,
+              minWidth: 800,
+              maxWidth: '90vw',
+              boxShadow: '0 2px 16px #0002',
+              position: 'relative',
+              color: '#000',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
             onClick={e => e.stopPropagation()}
           >
             <button
               className="submission-modal-close"
+              style={{
+                position: 'absolute',
+                top: 16,
+                left: 16,
+                background: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 22,
+                cursor: 'pointer',
+                color: '#23335b',
+                boxShadow: '0 1px 4px #0001',
+              }}
               onClick={() => setShowSubmissionsModal(false)}
             >
               ×
             </button>
             <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Submissions</h2>
-            <table className="submission-table">
+            <table className="submission-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 8px #0001' }}>
               <thead>
-                <tr style={{ background: '#f3f4f8', color: '#000' }}>
-                  <th>Student Name / Participant</th>
-                  <th>Attendance</th>
-                  <th>Pre-Activity Survey</th>
-                  <th>Activity Consent Form</th>
-                  <th>Post-Activity Form</th>
-                  <th>Status</th>
+                <tr style={{ background: '#f3f4f8', color: '#23335b', borderBottom: '2px solid #e0e4ea' }}>
+                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'left', fontSize: '1.05rem' }}>Student Name / Participant</th>
+                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Attendance</th>
+                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Pre-Activity Survey</th>
+                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Activity Consent Form</th>
+                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Post-Activity Form</th>
+                  <th style={{ padding: '14px 10px', fontWeight: 700, textAlign: 'center', fontSize: '1.05rem' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {volunteers.length === 0 ? (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#888' }}>No submissions found.</td></tr>
-                ) : volunteers.map(v => (
-                  <tr key={v.id} style={{ background: '#fff', color: '#000' }}>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', color: '#000' }}>{v.name || v.respondent?.name || v.id}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', textAlign: 'center', color: '#000' }}>
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888', background: '#fff' }}>No submissions found.</td>
+                  </tr>
+                ) : volunteers.map((v, idx) => (
+                  <tr key={v.id} style={{ background: idx % 2 === 0 ? '#f8f9fb' : '#fff', color: '#23335b' }}>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'left', fontWeight: 500 }}>{v.name || v.respondent?.name || v.id}</td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
+                      {v.progress?.attendance === 'present' ? 'Present' : ''}
+                    </td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
                       {v.preSurveyAnswers ? (
-                        <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer' }} onClick={() => handleViewAnswers(v, 'pre')}>View Answers</button>
+                        <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleViewAnswers(v, 'pre')}>View Answers</button>
                       ) : ''}
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', textAlign: 'center', color: '#000' }}>{v.progress?.consent === 'submitted' ? '✔️' : ''}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e4ea', textAlign: 'center', color: '#000' }}>
-                      {v.postSurveyAnswers ? (
-                        <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer' }} onClick={() => handleViewAnswers(v, 'post')}>View Answers</button>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
+                      {v.progress?.consent === 'submitted' && v.consentSubmission?.fileUrl ? (
+                        <button
+                          style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }}
+                          onClick={() => window.open(v.consentSubmission.fileUrl, '_blank')}
+                        >
+                          View PDF
+                        </button>
                       ) : ''}
+                    </td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
+                      {v.postSurveyAnswers ? (
+                        <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleViewAnswers(v, 'post')}>View Answers</button>
+                      ) : ''}
+                    </td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', textAlign: 'center' }}>
+                      {/* You can add a status here if needed */}
                     </td>
                   </tr>
                 ))}
-                {/* Answer Preview Modal */}
-                {showAnswerModal && (
-                  <div
+              </tbody>
+            </table>
+            {/* Answer Preview Modal */}
+            {showAnswerModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  background: 'rgba(44,62,80,0.18)',
+                  zIndex: 11000,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onClick={() => setShowAnswerModal(false)}
+              >
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: 16,
+                    padding: 32,
+                    minWidth: 400,
+                    maxWidth: '90vw',
+                    boxShadow: '0 2px 16px #0002',
+                    position: 'relative',
+                    color: '#000',
+                    maxHeight: '80vh',
+                    overflowY: 'auto',
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <button
                     style={{
-                      position: 'fixed',
-                      top: 0,
-                      left: 0,
-                      width: '100vw',
-                      height: '100vh',
-                      background: 'rgba(44,62,80,0.18)',
-                      zIndex: 10000,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      position: 'absolute',
+                      top: 16,
+                      right: 16,
+                      background: 'none',
+                      border: 'none',
+                      fontSize: 22,
+                      cursor: 'pointer',
+                      color: '#23335b',
                     }}
                     onClick={() => setShowAnswerModal(false)}
                   >
-                    <div
-                      style={{
-                        background: '#fff',
-                        borderRadius: 16,
-                        padding: 32,
-                        minWidth: 400,
-                        maxWidth: '90vw',
-                        boxShadow: '0 2px 16px #0002',
-                        position: 'relative',
-                        color: '#000',
-                        maxHeight: '80vh',
-                        overflowY: 'auto',
-                      }}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <button
-                        style={{
-                          position: 'absolute',
-                          top: 16,
-                          right: 16,
-                          background: 'none',
-                          border: 'none',
-                          fontSize: 22,
-                          cursor: 'pointer',
-                          color: '#23335b',
-                        }}
-                        onClick={() => setShowAnswerModal(false)}
-                      >
-                        ×
-                      </button>
-                      <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>{answerModalTitle}</h2>
-                      {answerModalData ? (
-                        <div style={{ maxWidth: 600, margin: '0 auto' }}>
-
-                          {/* Pre-Activity Survey Preview */}
-                          {answerModalTitle.startsWith('Pre-Activity') && (
-                            <div>
-                              <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.08rem', marginBottom: 18 }}>Pre-Activity Survey</h3>
-                              <div style={{ marginBottom: 12 }}><b>Name:</b> {answerModalData.respondent?.name || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Program:</b> {answerModalData.respondent?.program || ''}</div>
-                              {answerModalData.respondent?.college === 'Non-Academic Organization' && (
-                                <div style={{ marginBottom: 12 }}><b>Organization Name:</b> {answerModalData.respondent?.nonAcademicOrg || ''}</div>
-                              )}
-                              <div style={{ marginBottom: 12 }}><b>Type of Engagement:</b> {answerModalData.engagement?.type || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Title of Initiative:</b> {answerModalData.engagement?.initiativeTitle || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Type/Level of Participation:</b> {(answerModalData.engagement?.participation || []).join(', ')} {answerModalData.engagement?.participationOther ? `, Other: ${answerModalData.engagement?.participationOther}` : ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Previous Community Service Experience:</b> {answerModalData.background?.previousService || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Frequency of Community Service:</b> {answerModalData.background?.frequency || ''}</div>
-                              <div style={{ marginTop: 24, marginBottom: 8, fontWeight: 600 }}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
-                              <ol style={{ paddingLeft: 18 }}>
-                                {[
-                                  'There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.',
-                                  'Volunteer work along with teamwork would somehow help solve social problems.',
-                                  'People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.',
-                                  'I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.',
-                                  'Contributing and improving skills I’ve learned from my degree program or affiliation would somehow solve social problems.',
-                                  'I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.',
-                                  'I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.',
-                                  'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.'
-                                ].map((q, idx) => (
-                                  <li key={idx} style={{ marginBottom: 6 }}>
-                                    <span>{q}</span><br />
-                                    <span style={{ color: '#30bdb7', fontWeight: 600 }}>Answer: {answerModalData.likert && answerModalData.likert[`q${idx + 1}`]}</span>
-                                  </li>
-                                ))}
-                              </ol>
-                            </div>
+                    ×
+                  </button>
+                 
+                  <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>{answerModalTitle}</h2>
+                  {answerModalData ? (
+                    <div style={{ maxWidth: 600, margin: '0 auto' }}>
+                      {/* Pre-Activity Survey Preview */}
+                      {answerModalTitle.startsWith('Pre-Activity') && (
+                        <div>
+                          <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.08rem', marginBottom: 18 }}>Pre-Activity Survey</h3>
+                          <div style={{ marginBottom: 12 }}><b>Name:</b> {answerModalData.respondent?.name || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Program:</b> {answerModalData.respondent?.program || ''}</div>
+                          {answerModalData.respondent?.college === 'Non-Academic Organization' && (
+                            <div style={{ marginBottom: 12 }}><b>Organization Name:</b> {answerModalData.respondent?.nonAcademicOrg || ''}</div>
                           )}
-
-                          {/* Post-Activity Survey Preview */}
-                          {answerModalTitle.startsWith('Post-Activity') && (
-                            <div>
-                              <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.08rem', marginBottom: 18 }}>Post-Activity Survey</h3>
-                              <div style={{ marginBottom: 12 }}><b>Name:</b> {answerModalData.respondent?.name || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Program:</b> {answerModalData.respondent?.program || ''}</div>
-                              {answerModalData.respondent?.college === 'Non-Academic Organization' && (
-                                <div style={{ marginBottom: 12 }}><b>Organization Name:</b> {answerModalData.respondent?.nonAcademicOrg || ''}</div>
-                              )}
-                              <div style={{ marginBottom: 12 }}><b>Type of Engagement:</b> {answerModalData.engagement?.type || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Title of Initiative:</b> {answerModalData.engagement?.initiativeTitle || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Date of Implementation:</b> {answerModalData.engagement?.dateOfImplementation || ''}</div>
-                              <div style={{ marginBottom: 12 }}><b>Location/Venue:</b> {answerModalData.engagement?.location || ''}</div>
-                              <div style={{ marginTop: 24, marginBottom: 8, fontWeight: 600 }}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
-                              <ol style={{ paddingLeft: 18 }}>
-                                {[
-                                  'The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.',
-                                  'The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.',
-                                  'Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.',
-                                  'Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.',
-                                  'The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.',
-                                  'I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.',
-                                  'I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.',
-                                  'I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.'
-                                ].map((q, idx) => (
-                                  <li key={idx} style={{ marginBottom: 6 }}>
-                                    <span>{q}</span><br />
-                                    <span style={{ color: '#30bdb7', fontWeight: 600 }}>Answer: {answerModalData.likert && answerModalData.likert[`q${idx + 1}`]}</span>
-                                  </li>
-                                ))}
-                              </ol>
-                            </div>
-                          )}
+                          <div style={{ marginBottom: 12 }}><b>Type of Engagement:</b> {answerModalData.engagement?.type || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Title of Initiative:</b> {answerModalData.engagement?.initiativeTitle || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Type/Level of Participation:</b> {(answerModalData.engagement?.participation || []).join(', ')} {answerModalData.engagement?.participationOther ? `, Other: ${answerModalData.engagement?.participationOther}` : ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Previous Community Service Experience:</b> {answerModalData.background?.previousService || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Frequency of Community Service:</b> {answerModalData.background?.frequency || ''}</div>
+                          <div style={{ marginTop: 24, marginBottom: 8, fontWeight: 600 }}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
+                          <ol style={{ paddingLeft: 18 }}>
+                            {[
+                              'There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.',
+                              'Volunteer work along with teamwork would somehow help solve social problems.',
+                              'People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.',
+                              'I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.',
+                              'Contributing and improving skills I’ve learned from my degree program or affiliation would somehow solve social problems.',
+                              'I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.',
+                              'I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.',
+                              'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.'
+                            ].map((q, idx) => (
+                              <li key={idx} style={{ marginBottom: 6 }}>
+                                <span>{q}</span><br />
+                                <span style={{ color: '#30bdb7', fontWeight: 600 }}>Answer: {answerModalData.likert && answerModalData.likert[`q${idx + 1}`]}</span>
+                              </li>
+                            ))}
+                          </ol>
                         </div>
-                      ) : (
-                        <div style={{ textAlign: 'center', color: '#888' }}>No answers found.</div>
+                      )}
+                      {/* Post-Activity Survey Preview */}
+                      {answerModalTitle.startsWith('Post-Activity') && (
+                        <div>
+                          <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.08rem', marginBottom: 18 }}>Post-Activity Survey</h3>
+                          <div style={{ marginBottom: 12 }}><b>Name:</b> {answerModalData.respondent?.name || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Program:</b> {answerModalData.respondent?.program || ''}</div>
+                          {answerModalData.respondent?.college === 'Non-Academic Organization' && (
+                            <div style={{ marginBottom: 12 }}><b>Organization Name:</b> {answerModalData.respondent?.nonAcademicOrg || ''}</div>
+                          )}
+                          <div style={{ marginBottom: 12 }}><b>Type of Engagement:</b> {answerModalData.engagement?.type || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Title of Initiative:</b> {answerModalData.engagement?.initiativeTitle || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Date of Implementation:</b> {answerModalData.engagement?.dateOfImplementation || ''}</div>
+                          <div style={{ marginBottom: 12 }}><b>Location/Venue:</b> {answerModalData.engagement?.location || ''}</div>
+                          <div style={{ marginTop: 24, marginBottom: 8, fontWeight: 600 }}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
+                          <ol style={{ paddingLeft: 18 }}>
+                            {[
+                              'The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.',
+                              'The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.',
+                              'Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.',
+                              'Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.',
+                              'The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.',
+                              'I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.',
+                              'I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.',
+                              'I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.'
+                            ].map((q, idx) => (
+                              <li key={idx} style={{ marginBottom: 6 }}>
+                                <span>{q}</span><br />
+                                <span style={{ color: '#30bdb7', fontWeight: 600 }}>Answer: {answerModalData.likert && answerModalData.likert[`q${idx + 1}`]}</span>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#888' }}>No answers found.</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

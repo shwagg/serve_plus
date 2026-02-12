@@ -99,9 +99,15 @@ export default function EventActivity() {
           return;
         }
       }
-      // Instead of marking present, require post-activity survey proof
+      // Mark attendance as present in Firestore
+      const volunteerRef = doc(db, "missions", projectId, "volunteer", user.uid);
+      await updateDoc(volunteerRef, {
+        "progress.attendance": "present"
+      });
+      // Update local state to reflect attendance as present
+      setVolunteerProgress((prev) => ({ ...prev, attendance: "present" }));
+      setQRStatus("Attendance recorded!");
       setShowQRModal(false);
-      setShowPostSurveyModal(true);
     } catch (err) {
       setQRStatus("Failed to process QR code.");
     }
@@ -1714,7 +1720,7 @@ export default function EventActivity() {
             <div className="activity-card">
               <RequirementItem
                 label="Attendance (QR)"
-                status={volunteerProgress?.attendance}
+                status={volunteerProgress?.attendance === "present" ? "submitted" : volunteerProgress?.attendance}
                 onOpen={() => setShowQRModal(true)}
               />
             </div>
