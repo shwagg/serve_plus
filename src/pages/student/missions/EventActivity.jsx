@@ -1,7 +1,7 @@
 import { getAuth } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../../../firebaseConfig";
+import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
@@ -461,11 +461,29 @@ export default function EventActivity() {
         "participants",
         user.uid
       );
+      const participantSnap = await getDoc(participantRef);
+      const pointsToRemove = participantSnap.exists()
+        ? participantSnap.data().pointsEarned || 0
+        : 0;
+
       await updateDoc(participantRef, {
         reflection: "",
         status: "todo",
+        pointsEarned: 0,
         lastUpdated: new Date().toISOString(),
       });
+
+      if (pointsToRemove > 0) {
+        const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+        const volunteerSnap = await getDoc(volunteerRef);
+        if (volunteerSnap.exists()) {
+          const currentTotal = volunteerSnap.data().pointsEarned || 0;
+          const newTotal = Math.max(0, currentTotal - pointsToRemove);
+          await updateDoc(volunteerRef, { pointsEarned: newTotal });
+          setTotalPointsEarned(newTotal);
+        }
+      }
+
       setUserJournals(userJournals.filter((j) => j.taskId !== taskId));
     } catch (err) {
       alert("Failed to delete journal.");
