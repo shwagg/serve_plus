@@ -1,5 +1,5 @@
 import { getAuth } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, serverTimestamp, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef } from "react";
@@ -1098,6 +1098,8 @@ export default function EventActivity() {
   const [leaderboard, setLeaderboard] = useState([]);
   const leaderboardListRef = useRef(null);
   const currentUserRef = useRef(null);
+  const previousRankRef = useRef(null);
+  const hasLeaderboardLoadedRef = useRef(false);
 
   // Helper to determine survey status (progress or subcollection)
   const [surveyStatus, setSurveyStatus] = useState({ pre: null, post: null });
@@ -1225,6 +1227,98 @@ export default function EventActivity() {
         });
 
         leaderboardData.sort((a, b) => b.points - a.points);
+
+        const notifyRankChange = async () => {
+          const user = auth.currentUser;
+          if (!user) return;
+
+          const missionsSnap = await getDocs(collection(db, "missions"));
+          const pointsByUser = new Map();
+
+          for (const missionDoc of missionsSnap.docs) {
+            const volunteersSnap = await getDocs(
+              collection(db, "missions", missionDoc.id, "volunteer")
+            );
+            volunteersSnap.docs.forEach((volunteerDoc) => {
+              const currentPoints = pointsByUser.get(volunteerDoc.id) || 0;
+              const pointsToAdd = volunteerDoc.data().pointsEarned || 0;
+              pointsByUser.set(volunteerDoc.id, currentPoints + pointsToAdd);
+            });
+          }
+
+          if (!pointsByUser.has(user.uid)) return;
+
+          const globalLeaderboard = Array.from(pointsByUser.entries()).map(
+            ([uid, points]) => ({ uid, points })
+          );
+          globalLeaderboard.sort(
+            (a, b) => b.points - a.points || a.uid.localeCompare(b.uid)
+          );
+
+          const newIndex = globalLeaderboard.findIndex(
+            (entry) => entry.uid === user.uid
+          );
+          if (newIndex === -1) return;
+
+          const newRank = newIndex + 1;
+          const previousRank = previousRankRef.current;
+          previousRankRef.current = newRank;
+
+          if (!hasLeaderboardLoadedRef.current) {
+            hasLeaderboardLoadedRef.current = true;
+            return;
+          }
+
+          if (!previousRank || previousRank === newRank) return;
+
+          const cutoff = Timestamp.fromDate(
+            new Date(Date.now() - 24 * 60 * 60 * 1000)
+          );
+          const notificationsRef = collection(
+            db,
+            "users",
+            user.uid,
+            "notifications"
+          );
+          const recentQuery = query(
+            notificationsRef,
+            where("type", "==", "leaderboard_rank_global"),
+            where("createdAt", ">=", cutoff)
+          );
+          const recentSnap = await getDocs(recentQuery);
+          if (!recentSnap.empty) return;
+
+          const ordinal = (rank) => {
+            const j = rank % 10;
+            const k = rank % 100;
+            if (j === 1 && k !== 11) return `${rank}st`;
+            if (j === 2 && k !== 12) return `${rank}nd`;
+            if (j === 3 && k !== 13) return `${rank}rd`;
+            return `${rank}th`;
+          };
+
+          const direction = newRank < previousRank ? "up" : "down";
+          const title =
+            direction === "up" ? "Leaderboard Rank Up" : "Leaderboard Rank Down";
+          const message =
+            direction === "up"
+              ? `You moved up to ${ordinal(newRank)} place on the overall leaderboard.`
+              : `You moved down to ${ordinal(newRank)} place on the overall leaderboard.`;
+
+          await createNotification(user.uid, {
+            type: "leaderboard_rank_global",
+            title,
+            message,
+            link: "/student",
+            rank: {
+              from: previousRank,
+              to: newRank,
+              direction,
+            },
+          });
+        };
+
+        await notifyRankChange();
         setLeaderboard(leaderboardData);
       } catch (error) {
         console.error("Error fetching event leaderboard:", error);
