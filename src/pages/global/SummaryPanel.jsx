@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
+import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
 
 import { exportProposalPDF } from './exportProposalPDF';
 
@@ -64,6 +65,7 @@ function SummaryPanel({
         // People involved
         proponents: [formData.preparedBy],
         preparedBy: formData.preparedBy,
+        createdBy: user.uid,
         reviewedBy: '',
         recommendedBy: '',
         endorsedBy: '',
@@ -93,7 +95,27 @@ function SummaryPanel({
       }
 
       // Save to missions collection
-      await addDoc(collection(db, 'missions'), missionData);
+      const docRef = await addDoc(collection(db, 'missions'), missionData);
+
+      try {
+        await createNotification(user.uid, {
+          type: 'proposal_submitted',
+          title: 'Proposal Submitted',
+          message: `Your proposal "${formData.title}" was submitted for approval.`,
+          link: '/global/review-proposals',
+          proposalId: docRef.id,
+        });
+
+        await notifyUsersByRoles(['admin', 'faculty'], {
+          type: 'proposal_submitted',
+          title: 'New Proposal Submitted',
+          message: `"${formData.title}" was submitted for approval.`,
+          link: '/global/review-proposals',
+          proposalId: docRef.id,
+        });
+      } catch (notificationError) {
+        console.error('Error creating proposal notifications:', notificationError);
+      }
 
       alert('Proposal submitted successfully!');
       onClose();

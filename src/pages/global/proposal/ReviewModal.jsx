@@ -1,6 +1,7 @@
 import React, { useState, useContext, useMemo, useEffect } from "react";
 import { db, auth } from "../../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { createNotification, notifyUsersByRoles } from "../../../utils/notificationUtils";
 import { SessionContext } from "../../../context/SessionContext";
 import "./ReviewModal.css";
 
@@ -263,6 +264,29 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
       }
 
       await updateDoc(proposalRef, updateData);
+
+      const nextStatus = updateData.status || proposal.status || "pending";
+      const statusLabel = formatStatus(nextStatus);
+      try {
+        if (proposal.createdBy) {
+          await createNotification(proposal.createdBy, {
+            type: "proposal_status",
+            title: "Proposal Status Updated",
+            message: `Your proposal "${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+            link: "/global/review-proposals",
+            proposalId: proposal.id,
+          });
+        }
+        await notifyUsersByRoles(["admin", "faculty"], {
+          type: "proposal_status",
+          title: "Proposal Status Updated",
+          message: `"${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+          link: "/global/review-proposals",
+          proposalId: proposal.id,
+        });
+      } catch (notificationError) {
+        console.error("Error creating proposal status notifications:", notificationError);
+      }
       setActionSaved(true);
       
       if (onApprovalChange) {
@@ -310,6 +334,28 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
       setApprovalMessage("Proposal rejected. All approvals cleared and returned to For Approval for resubmission.");
 
       await updateDoc(proposalRef, updateData);
+
+      const statusLabel = formatStatus(updateData.status);
+      try {
+        if (proposal.createdBy) {
+          await createNotification(proposal.createdBy, {
+            type: "proposal_status",
+            title: "Proposal Status Updated",
+            message: `Your proposal "${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+            link: "/global/review-proposals",
+            proposalId: proposal.id,
+          });
+        }
+        await notifyUsersByRoles(["admin", "faculty"], {
+          type: "proposal_status",
+          title: "Proposal Status Updated",
+          message: `"${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+          link: "/global/review-proposals",
+          proposalId: proposal.id,
+        });
+      } catch (notificationError) {
+        console.error("Error creating proposal status notifications:", notificationError);
+      }
       setActionSaved(true);
       
       if (onApprovalChange) {

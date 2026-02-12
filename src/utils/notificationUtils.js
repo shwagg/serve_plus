@@ -22,6 +22,18 @@ export async function createNotification(userId, notificationData) {
   });
 }
 
+export async function notifyUsersByRoles(roles, notificationData) {
+  if (!roles || roles.length === 0) return;
+
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("role", "in", roles));
+  const snapshot = await getDocs(q);
+
+  for (const docSnap of snapshot.docs) {
+    await createNotification(docSnap.id, notificationData);
+  }
+}
+
 export async function markNotificationAsRead(userId, notificationId) {
   const notificationRef = doc(db, "users", userId, "notifications", notificationId);
   await updateDoc(notificationRef, { read: true });

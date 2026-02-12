@@ -1,7 +1,8 @@
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
+import { createNotification } from "../../utils/notificationUtils";
 import "../../styles/CurrentEventMonitoring.css";
 
 export default function CurrentEventMonitoring() {
@@ -12,6 +13,7 @@ export default function CurrentEventMonitoring() {
   const [tasks, setTasks] = useState([]);
   const [allMissions, setAllMissions] = useState([]);
   const [taskParticipants, setTaskParticipants] = useState([]);
+  const [usersById, setUsersById] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,6 +29,13 @@ export default function CurrentEventMonitoring() {
           ...doc.data(),
         }));
         setAllMissions(missionsData);
+
+        const usersSnap = await getDocs(collection(db, "users"));
+        const userMap = {};
+        usersSnap.docs.forEach((userDoc) => {
+          userMap[userDoc.id] = userDoc.data();
+        });
+        setUsersById(userMap);
 
         // Fetch mission data
         const missionRef = doc(db, "missions", eventId);
@@ -136,6 +145,54 @@ export default function CurrentEventMonitoring() {
       today.getFullYear() === eventDate.getFullYear() &&
       today.getMonth() === eventDate.getMonth() &&
       today.getDate() === eventDate.getDate()
+    );
+  };
+
+  const reflectionItems = taskParticipants.filter(
+    (participant) => participant.reflection && participant.reflection.trim()
+  );
+
+  const taskTitleById = tasks.reduce((acc, task) => {
+    acc[task.id] = task.title || "Task";
+    return acc;
+  }, {});
+
+  const handleReflectionReview = async (participant, action) => {
+    const participantRef = doc(
+      db,
+      "missions",
+      eventId,
+      "task",
+      participant.taskId,
+      "participants",
+      participant.id
+    );
+
+    const newStatus = action === "approve" ? "approved" : "needs_revision";
+
+    await updateDoc(participantRef, {
+      reflectionStatus: newStatus,
+      reflectionReviewedAt: serverTimestamp(),
+    });
+
+    await createNotification(participant.id, {
+      type: newStatus === "approved" ? "reflection_approved" : "reflection_needs_revision",
+      title: newStatus === "approved" ? "Reflection Approved" : "Reflection Needs Revision",
+      message:
+        newStatus === "approved"
+          ? `Your reflection for "${taskTitleById[participant.taskId]}" was approved.`
+          : `Your reflection for "${taskTitleById[participant.taskId]}" needs revision.`,
+      link: `/event/${eventId}/activity?mode=active`,
+      eventId,
+      taskId: participant.taskId,
+    });
+
+    setTaskParticipants((prev) =>
+      prev.map((item) =>
+        item.id === participant.id && item.taskId === participant.taskId
+          ? { ...item, reflectionStatus: newStatus }
+          : item
+      )
     );
   };
 
@@ -294,6 +351,58 @@ export default function CurrentEventMonitoring() {
             <button className="cem-btn-action">
               Review Submitted Activity Files
             </button>
+          </div>
+
+          <div className="cem-panel cem-analytics">
+            <h2 className="cem-panel-title">Reflection Reviews</h2>
+            {reflectionItems.length === 0 ? (
+              <div className="cem-analytics-content">No reflections submitted.</div>
+            ) : (
+              <div className="cem-analytics-content" style={{ overflowX: "auto" }}>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Task</th>
+                      <th>Reflection</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reflectionItems.map((participant) => {
+                      const userData = usersById[participant.id] || {};
+                      const studentName =
+                        userData.name || userData.username || userData.email || participant.id;
+                      return (
+                        <tr key={`${participant.id}-${participant.taskId}`}>
+                          <td>{studentName}</td>
+                          <td>{taskTitleById[participant.taskId]}</td>
+                          <td style={{ maxWidth: 360 }}>
+                            {participant.reflection}
+                          </td>
+                          <td>{participant.reflectionStatus || "submitted"}</td>
+                          <td>
+                            <button
+                              className="approve-btn"
+                              onClick={() => handleReflectionReview(participant, "approve")}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              className="reject-btn"
+                              onClick={() => handleReflectionReview(participant, "needs_revision")}
+                            >
+                              Needs Revision
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>

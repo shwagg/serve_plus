@@ -76,6 +76,12 @@ export default function NotificationBell() {
         return "⏰";
       case "reflection_approved":
         return "✔️";
+      case "reflection_needs_revision":
+        return "📝";
+      case "proposal_submitted":
+        return "📨";
+      case "proposal_status":
+        return "📌";
       case "deadline_approaching":
         return "⚠️";
       case "certificate_ready":
