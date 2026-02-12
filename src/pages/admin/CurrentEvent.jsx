@@ -3,6 +3,7 @@ import { db } from "../../firebaseConfig";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "../../styles/CurrentEvent.css";
+import { createNotification } from "../../utils/notificationUtils";
 
 export default function CurrentEvent() {
     const { missionId } = useParams();
@@ -108,18 +109,40 @@ export default function CurrentEvent() {
 
     const handleApprove = async (userId) => {
         await updateDoc(
-            doc(db, "missions", selectedMission.id, "volunteer", userId),
+            doc(db, "missions", missionId, "volunteer", userId),
             { status: "approved" }
         );
 
         setPendingVolunteers(prev =>
             prev.filter(v => v.id !== userId)
         );
+
+        try {
+            const notificationsRef = collection(db, "users", userId, "notifications");
+            const existingQuery = query(
+                notificationsRef,
+                where("type", "==", "event_approved"),
+                where("eventId", "==", missionId)
+            );
+            const existing = await getDocs(existingQuery);
+
+            if (existing.empty) {
+                await createNotification(userId, {
+                    type: "event_approved",
+                    title: "Registration Approved",
+                    message: `Your registration for "${location.state?.missionTitle || "this event"}" has been approved.`,
+                    link: `/event/${missionId}/activity?mode=active`,
+                    eventId: missionId,
+                });
+            }
+        } catch (e) {
+            console.error("Failed to create approval notification:", e);
+        }
     };
 
     const handleReject = async (userId) => {
         await updateDoc(
-            doc(db, "missions", selectedMission.id, "volunteer", userId),
+            doc(db, "missions", missionId, "volunteer", userId),
             { status: "rejected" }
         );
 

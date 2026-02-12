@@ -58,6 +58,8 @@ export default function NotificationBell() {
     switch (type) {
       case "event_registration":
         return "✅";
+      case "event_approved":
+        return "✅";
       case "event_upcoming":
         return "⏰";
       case "event_cancelled":
