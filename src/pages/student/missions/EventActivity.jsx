@@ -56,7 +56,8 @@ export default function EventActivity() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrStatus, setQRStatus] = useState("");
   const [scannedLocation, setScannedLocation] = useState(null);
-  const scanTimeoutRef = useRef(null);
+  const [scannerKey, setScannerKey] = useState(0);
+  const [scanSuccess, setScanSuccess] = useState(false);
 
   // Update unread count from GlobalAnnouncements
   useEffect(() => {
@@ -122,24 +123,15 @@ export default function EventActivity() {
 
       // Update local state to reflect attendance as present
       setVolunteerProgress((prev) => ({ ...prev, attendance: "present" }));
+      setScanSuccess(true);
 
-      // Show a status message including coordinates if available
+      // Show a status message including coordinates if available (user will choose to Continue)
       setScannedLocation(locData);
       if (locData) {
         setQRStatus(`Attendance recorded — scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`);
       } else {
         setQRStatus("Attendance recorded! Location not available.");
       }
-
-      // Auto-close QR modal after a short delay and open post survey
-      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
-      scanTimeoutRef.current = setTimeout(() => {
-        setShowQRModal(false);
-        setShowPostSurveyModal(true);
-        setQRStatus("");
-        setScannedLocation(null);
-        scanTimeoutRef.current = null;
-      }, 2500);
     } catch (err) {
       setQRStatus("Failed to process QR code.");
     }
@@ -1782,8 +1774,39 @@ export default function EventActivity() {
           <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="qr-modal-close" onClick={() => setShowQRModal(false)}>X</button>
             <h3 className="qr-modal-title">Scan or Upload QR Code</h3>
-            <QRScanner onScan={handleQRScan} />
-            {qrStatus && <div className={`qr-status ${qrStatus === "Attendance recorded!" ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>}
+            <QRScanner key={scannerKey} onScan={handleQRScan} />
+            {qrStatus && (
+              <div>
+                <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>
+                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                  <button
+                    style={{ padding: '8px 12px', background: '#eef', border: '1px solid #ccd', borderRadius: 6 }}
+                    onClick={() => {
+                      // Retry: reset scanner and statuses
+                      setQRStatus("");
+                      setScannedLocation(null);
+                      setScanSuccess(false);
+                      setScannerKey(k => k + 1);
+                    }}
+                  >
+                    Retry
+                  </button>
+                  <button
+                    style={{ padding: '8px 12px', background: '#30bdb7', color: '#fff', border: 'none', borderRadius: 6 }}
+                    onClick={() => {
+                      // Continue to post survey
+                      setShowQRModal(false);
+                      setShowPostSurveyModal(true);
+                      setQRStatus("");
+                      setScannedLocation(null);
+                      setScanSuccess(false);
+                    }}
+                  >
+                    Continue
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
