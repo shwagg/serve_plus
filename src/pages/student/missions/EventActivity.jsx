@@ -55,6 +55,8 @@ export default function EventActivity() {
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrStatus, setQRStatus] = useState("");
+  const [scannedLocation, setScannedLocation] = useState(null);
+  const scanTimeoutRef = useRef(null);
 
   // Update unread count from GlobalAnnouncements
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function EventActivity() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleQRScan = async (decodedText) => {
+  const handleQRScan = async (decodedText, position) => {
     setQRStatus("");
     const projectId = id;
     const user = auth.currentUser;
@@ -99,15 +101,73 @@ export default function EventActivity() {
           return;
         }
       }
-      // Mark attendance as present in Firestore
-      const volunteerRef = doc(db, "missions", projectId, "volunteer", user.uid);
-      await updateDoc(volunteerRef, {
-        "progress.attendance": "present"
-      });
+<<<<<<< Updated upstream
+      // Save scan location to volunteer doc (best-effort) and mark attendance present
+      let locData = null;
+      try {
+        const volunteerRef = doc(db, "missions", projectId, "volunteer", user.uid);
+        locData = position && position.coords ? {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        } : null;
+        await updateDoc(volunteerRef, {
+          "scanAttendance.location": locData,
+          "scanAttendance.scannedAt": serverTimestamp(),
+          "progress.attendance": "present"
+        });
+      } catch (e) {
+        console.warn("Failed to save scan location or mark attendance:", e);
+      }
+
       // Update local state to reflect attendance as present
       setVolunteerProgress((prev) => ({ ...prev, attendance: "present" }));
-      setQRStatus("Attendance recorded!");
+
+      // Show a status message including coordinates if available
+      if (locData) {
+        setQRStatus(`Attendance recorded — scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`);
+      } else {
+        setQRStatus("Attendance recorded! Location not available.");
+      }
       setShowQRModal(false);
+=======
+      // Save scan location to volunteer doc (best-effort) and show feedback in modal
+      let locData = null;
+      try {
+        const volunteerRef = doc(db, "missions", projectId, "volunteer", user.uid);
+        locData = position && position.coords ? {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        } : null;
+        await updateDoc(volunteerRef, {
+          "scanAttendance.location": locData,
+          "scanAttendance.scannedAt": serverTimestamp()
+        });
+      } catch (e) {
+        console.warn("Failed to save scan location:", e);
+      }
+
+      // Set a user-visible status message showing where it was scanned
+      setScannedLocation(locData);
+      if (locData) {
+        setQRStatus(
+          `Scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`
+        );
+      } else {
+        setQRStatus("Scanned — location not available or permission denied.");
+      }
+
+      // Auto-close QR modal after a short delay and open post survey
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+      scanTimeoutRef.current = setTimeout(() => {
+        setShowQRModal(false);
+        setShowPostSurveyModal(true);
+        setQRStatus("");
+        setScannedLocation(null);
+        scanTimeoutRef.current = null;
+      }, 2500);
+>>>>>>> Stashed changes
     } catch (err) {
       setQRStatus("Failed to process QR code.");
     }

@@ -32,11 +32,36 @@ export default function QRScanner({ onScan }) {
             aspectRatio: 0.75, // Portrait ratio (3:4)
           },
           (decodedText, decodedResult) => {
-            if (onScan) onScan(decodedText);
-            if (runningRef.current && html5QrCodeRef.current) {
-              html5QrCodeRef.current.stop();
-              runningRef.current = false;
-            }
+            (async () => {
+              // Try to obtain geolocation (best-effort)
+              let position = null;
+              try {
+                position = await new Promise((resolve, reject) => {
+                  if (!navigator.geolocation) return resolve(null);
+                  const timedOut = setTimeout(() => resolve(null), 5000);
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                      clearTimeout(timedOut);
+                      resolve(pos);
+                    },
+                    (err) => {
+                      clearTimeout(timedOut);
+                      resolve(null);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                  );
+                });
+              } catch (e) {
+                position = null;
+              }
+
+              if (onScan) onScan(decodedText, position);
+
+              if (runningRef.current && html5QrCodeRef.current) {
+                html5QrCodeRef.current.stop();
+                runningRef.current = false;
+              }
+            })();
           },
           (errorMessage) => {
             // Optionally handle scan errors
@@ -87,7 +112,7 @@ export default function QRScanner({ onScan }) {
     const reader = new FileReader();
     reader.onload = function (event) {
       const img = new window.Image();
-      img.onload = function () {
+      img.onload = async function () {
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
@@ -96,7 +121,29 @@ export default function QRScanner({ onScan }) {
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
         const code = jsQR(imageData.data, img.width, img.height);
         if (code && code.data) {
-          if (onScan) onScan(code.data);
+          // Try to get geolocation when scanning from an image (best-effort)
+          let position = null;
+          try {
+            position = await new Promise((resolve) => {
+              if (!navigator.geolocation) return resolve(null);
+              const timedOut = setTimeout(() => resolve(null), 5000);
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  clearTimeout(timedOut);
+                  resolve(pos);
+                },
+                () => {
+                  clearTimeout(timedOut);
+                  resolve(null);
+                },
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+              );
+            });
+          } catch (e) {
+            position = null;
+          }
+
+          if (onScan) onScan(code.data, position);
         } else {
           alert("No QR code found in image.");
         }
