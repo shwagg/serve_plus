@@ -101,7 +101,7 @@ export default function EventActivity() {
           return;
         }
       }
-<<<<<<< Updated upstream
+
       // Save scan location to volunteer doc (best-effort) and mark attendance present
       let locData = null;
       try {
@@ -124,38 +124,11 @@ export default function EventActivity() {
       setVolunteerProgress((prev) => ({ ...prev, attendance: "present" }));
 
       // Show a status message including coordinates if available
+      setScannedLocation(locData);
       if (locData) {
         setQRStatus(`Attendance recorded — scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`);
       } else {
         setQRStatus("Attendance recorded! Location not available.");
-      }
-      setShowQRModal(false);
-=======
-      // Save scan location to volunteer doc (best-effort) and show feedback in modal
-      let locData = null;
-      try {
-        const volunteerRef = doc(db, "missions", projectId, "volunteer", user.uid);
-        locData = position && position.coords ? {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy
-        } : null;
-        await updateDoc(volunteerRef, {
-          "scanAttendance.location": locData,
-          "scanAttendance.scannedAt": serverTimestamp()
-        });
-      } catch (e) {
-        console.warn("Failed to save scan location:", e);
-      }
-
-      // Set a user-visible status message showing where it was scanned
-      setScannedLocation(locData);
-      if (locData) {
-        setQRStatus(
-          `Scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`
-        );
-      } else {
-        setQRStatus("Scanned — location not available or permission denied.");
       }
 
       // Auto-close QR modal after a short delay and open post survey
@@ -167,7 +140,6 @@ export default function EventActivity() {
         setScannedLocation(null);
         scanTimeoutRef.current = null;
       }, 2500);
->>>>>>> Stashed changes
     } catch (err) {
       setQRStatus("Failed to process QR code.");
     }
