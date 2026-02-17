@@ -117,6 +117,25 @@ export default function EventActivity() {
           "scanAttendance.scannedAt": serverTimestamp(),
           "progress.attendance": "present"
         });
+
+        // If we have coordinates, attempt reverse geocoding (best-effort) to get a human-friendly place name
+        if (locData) {
+          try {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(locData.lat)}&lon=${encodeURIComponent(locData.lng)}`;
+            const resp = await fetch(url, { method: 'GET' });
+            if (resp.ok) {
+              const json = await resp.json();
+              const locationName = json.display_name || json.name || null;
+              if (locationName) {
+                // save the resolved name to Firestore
+                await updateDoc(volunteerRef, { "scanAttendance.locationName": locationName });
+                locData.name = locationName;
+              }
+            }
+          } catch (e) {
+            console.warn('Reverse geocoding failed:', e);
+          }
+        }
       } catch (e) {
         console.warn("Failed to save scan location or mark attendance:", e);
       }
