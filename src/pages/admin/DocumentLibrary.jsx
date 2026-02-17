@@ -320,7 +320,14 @@ export default function DocumentLibrary() {
                       ) : ''}
                     </td>
                     <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', textAlign: 'center' }}>
-                      {/* You can add a status here if needed */}
+                      {v.progress?.preSurvey === 'submitted' &&
+                      v.progress?.consent === 'submitted' &&
+                      v.progress?.attendance === 'present' &&
+                      v.progress?.postSurvey === 'submitted' ? (
+                        <span className="status-completed" style={{ color: '#30bdb7', fontWeight: 700 }}>Completed</span>
+                      ) : (
+                        <span className="status-incomplete" style={{ color: '#d32f2f', fontWeight: 700 }}>Incomplete</span>
+                      )}
                     </td>
                   </tr>
                 ))}

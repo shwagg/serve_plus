@@ -8,6 +8,7 @@ import Header from "../../../components/Header";
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
+import { useSession } from '../../../context/SessionContext';
 //styles
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
@@ -16,6 +17,7 @@ import PreActivitySurvey from "../../../../public/forms/PreActivitySurvey.jsx";
 import PostActivitySurvey from "../../../../public/forms/PostActivitySurvey.jsx";
 
 export default function EventActivity() {
+  const { userData } = useSession();
   //Requirement panel containing all forms
   const RequirementItem = ({ label, status, mode, onOpen }) => {
     const isLocked =
@@ -1743,7 +1745,21 @@ export default function EventActivity() {
           <div className="event-activities-panel">
             <h3 className="event-activities-title">Requirements</h3>
             <div className="requirements-status">
-              Status: <span className="status-text incomplete">Incomplete</span>
+              Status: <span className={`status-text ${
+                surveyStatus.pre === 'submitted' &&
+                volunteerProgress?.consent === 'submitted' &&
+                volunteerProgress?.attendance === 'present' &&
+                surveyStatus.post === 'submitted'
+                  ? 'complete'
+                  : 'incomplete'
+              }`}>
+                {surveyStatus.pre === 'submitted' &&
+                volunteerProgress?.consent === 'submitted' &&
+                volunteerProgress?.attendance === 'present' &&
+                surveyStatus.post === 'submitted'
+                  ? 'Complete'
+                  : 'Incomplete'}
+              </span>
             </div>
             <h4 className="requirements-subtitle">Before Event</h4>
             <div className="activity-card">
@@ -1842,6 +1858,7 @@ export default function EventActivity() {
             <h3 className="qr-modal-title">Pre-Activity Survey</h3>
 
             <PreActivitySurvey
+              initialName={userData?.name || ''}
               onSubmit={async (form) => {
                 const user = auth.currentUser;
                 if (!user) {
@@ -1917,6 +1934,7 @@ export default function EventActivity() {
             <h3 className="qr-modal-title">Post-Activity Survey</h3>
 
             <PostActivitySurvey
+              initialName={userData?.name || ''}
               onSubmit={async (form) => {
                 // Mark user as present in Firestore and save survey
                 const user = auth.currentUser;

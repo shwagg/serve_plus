@@ -43,9 +43,9 @@ const colleges = [
   },
 ];
 
-const PreActivitySurvey = ({ onSubmit }) => {
+const PreActivitySurvey = ({ onSubmit, initialName = '' }) => {
   const [form, setForm] = useState({
-    name: '',
+    name: initialName,
     college: '',
     program: '',
     nonAcademicOrg: '',
