@@ -102,8 +102,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const parseMissionDate = (dateStr) => {
-      // Works for strings like: "November 09, 2025"
-      // Similar format to what we have in Firestore
+      // Accepts (yyyy-mm-dd) or other string formats
+      if (!dateStr) return null;
       const d = new Date(dateStr);
       return isNaN(d.getTime()) ? null : d;
     };
@@ -156,25 +156,23 @@ export default function AdminDashboard() {
         const upcoming = [];
 
         for (const m of published) {
-          const md = m.dateAt?.toDate
-            ? m.dateAt.toDate()
-            : parseMissionDate(m.date);
-
+          // Use targetDate as the event date
+          const md = parseMissionDate(m.targetDate);
           if (!md) continue;
-
           const missionDay = new Date(
             md.getFullYear(),
             md.getMonth(),
             md.getDate(),
           );
-
           if (isSameDay(missionDay, today)) todayEvents.push(m);
           else if (missionDay > today) upcoming.push(m);
         }
-
-        // (optional) sort upcoming by soonest date
-        upcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
-
+        // Sort upcoming by soonest targetDate
+        upcoming.sort((a, b) => {
+          const da = parseMissionDate(a.targetDate);
+          const db = parseMissionDate(b.targetDate);
+          return (da || 0) - (db || 0);
+        });
         setEventsToday(todayEvents);
         setUpcomingEvents(upcoming);
       } catch (err) {
@@ -367,7 +365,9 @@ export default function AdminDashboard() {
                         {e.title || e.alt || "Untitled Event"}
                       </div>
                       <div className="event-footer">
-                        <span className="event-date">{e.date}</span>
+                        <span className="event-date">
+                          {e.targetDate ? new Date(e.targetDate).toLocaleDateString() : "No date"}
+                        </span>
                         <button
                           className="event-details"
                           type="button"
@@ -413,7 +413,9 @@ export default function AdminDashboard() {
                         {e.title || e.alt || e.name || "Untitled Event"}
                       </div>
                       <div className="event-footer">
-                        <span className="event-date">{e.date}</span>
+                        <span className="event-date">
+                          {e.targetDate ? new Date(e.targetDate).toLocaleDateString() : "No date"}
+                        </span>
                         <button
                           className="event-details"
                           type="button"

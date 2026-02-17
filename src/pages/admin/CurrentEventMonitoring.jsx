@@ -76,7 +76,7 @@ export default function CurrentEventMonitoring() {
               eventId,
               "task",
               task.id,
-              "participants"
+              "participants",
             );
             const participantsSnap = await getDocs(participantsRef);
             participantsSnap.docs.forEach((doc) => {
@@ -107,12 +107,17 @@ export default function CurrentEventMonitoring() {
     return <div className="error">Event not found</div>;
   }
 
+  // Only allow published missions
+  if (mission.status !== "published") {
+    return <div className="error">Event is not published or not available for monitoring.</div>;
+  }
+
   // calculate completion stats
   const activeMissions = allMissions.filter(
-    (m) => m.status === "published"
+    (m) => m.status === "published",
   ).length;
   const completedMissions = allMissions.filter(
-    (m) => m.status === "completed"
+    (m) => m.status === "completed",
   ).length;
 
   // Calculate metrics
@@ -129,7 +134,7 @@ export default function CurrentEventMonitoring() {
   const totalTasks = tasks.length;
   const totalTaskParticipants = taskParticipants.length;
   const completedTaskParticipants = taskParticipants.filter(
-    (p) => p.status === "completed"
+    (p) => p.status === "completed",
   ).length;
   const taskCompletionRate =
     totalTaskParticipants > 0
@@ -138,9 +143,14 @@ export default function CurrentEventMonitoring() {
 
   const isHappeningToday = () => {
     const today = new Date();
-    const eventDate = mission.dateAt?.toDate
-      ? mission.dateAt.toDate()
-      : new Date(mission.date);
+    let eventDate;
+    if (mission.targetDate?.toDate) {
+      eventDate = mission.targetDate.toDate();
+    } else if (mission.targetDate) {
+      eventDate = new Date(mission.targetDate);
+    } else {
+      return false;
+    }
     return (
       today.getFullYear() === eventDate.getFullYear() &&
       today.getMonth() === eventDate.getMonth() &&
@@ -210,7 +220,9 @@ export default function CurrentEventMonitoring() {
           <h1 className="cem-title">Current Event Monitoring</h1>
         </div>
         <div className="cem-header-right">
-          <span className="cem-stats">Active: {activeMissions} | Complete: {completedMissions}</span>
+          <span className="cem-stats">
+            Active: {activeMissions} | Complete: {completedMissions}
+          </span>
           {isHappeningToday() && (
             <span className="cem-badge happening">Happening Today</span>
           )}
@@ -231,17 +243,13 @@ export default function CurrentEventMonitoring() {
             </p>
             <p className="cem-partner">
               Partnering Organization:{""}
-              <strong>
-                {"wala pa sa firestore"}
-              </strong>
+              <strong>{"wala pa sa firestore"}</strong>
             </p>
             <p></p>
             <strong>Details</strong>
 
             <div className="cem-description">
-              <p>
-                {mission.description}
-              </p>
+              <p>{mission.description}</p>
             </div>
 
             <div className="cem-info-section">
@@ -258,7 +266,12 @@ export default function CurrentEventMonitoring() {
               <h4 className="cem-info-title">Date & Time:</h4>
               <ul className="cem-info-list">
                 <li>
-                  {mission.date || "November 9, 2025"} | 7:00 AM to 12:00 PM
+                  {mission.targetDate?.toDate
+                    ? mission.targetDate.toDate().toLocaleDateString()
+                    : mission.targetDate
+                      ? new Date(mission.targetDate).toLocaleDateString()
+                      : "Date not set"}{" "}
+                  | 7:00 AM to 12:00 PM
                 </li>
               </ul>
             </div>
@@ -341,7 +354,9 @@ export default function CurrentEventMonitoring() {
                 <span className="cem-metric-label">
                   Community Feedback Score
                 </span>
-                <span className="cem-metric-badge feedback">wala pa sa firestore</span>
+                <span className="cem-metric-badge feedback">
+                  wala pa sa firestore
+                </span>
               </div>
             </div>
           </div>
@@ -356,9 +371,14 @@ export default function CurrentEventMonitoring() {
           <div className="cem-panel cem-analytics">
             <h2 className="cem-panel-title">Reflection Reviews</h2>
             {reflectionItems.length === 0 ? (
-              <div className="cem-analytics-content">No reflections submitted.</div>
+              <div className="cem-analytics-content">
+                No reflections submitted.
+              </div>
             ) : (
-              <div className="cem-analytics-content" style={{ overflowX: "auto" }}>
+              <div
+                className="cem-analytics-content"
+                style={{ overflowX: "auto" }}
+              >
                 <table className="admin-table">
                   <thead>
                     <tr>
@@ -373,7 +393,10 @@ export default function CurrentEventMonitoring() {
                     {reflectionItems.map((participant) => {
                       const userData = usersById[participant.id] || {};
                       const studentName =
-                        userData.name || userData.username || userData.email || participant.id;
+                        userData.name ||
+                        userData.username ||
+                        userData.email ||
+                        participant.id;
                       return (
                         <tr key={`${participant.id}-${participant.taskId}`}>
                           <td>{studentName}</td>
@@ -385,13 +408,20 @@ export default function CurrentEventMonitoring() {
                           <td>
                             <button
                               className="approve-btn"
-                              onClick={() => handleReflectionReview(participant, "approve")}
+                              onClick={() =>
+                                handleReflectionReview(participant, "approve")
+                              }
                             >
                               Approve
                             </button>
                             <button
                               className="reject-btn"
-                              onClick={() => handleReflectionReview(participant, "needs_revision")}
+                              onClick={() =>
+                                handleReflectionReview(
+                                  participant,
+                                  "needs_revision",
+                                )
+                              }
                             >
                               Needs Revision
                             </button>
