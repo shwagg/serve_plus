@@ -1,10 +1,12 @@
-const functions = require("firebase-functions");
+const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { exchangeCodeForToken, fetchBlackboardUserProfile, createOrUpdateUser } = require("./blackboardOauth");
+const {
+  exchangeCodeForToken,
+  fetchBlackboardUserProfile,
+  createOrUpdateUser,
+} = require("./blackboardOauth");
 
-
-exports.blackboardCallback = functions.https.onRequest(async (req, res) => {
-
+exports.blackboardCallback = onRequest(async (req, res) => {
   res.set("Access-Control-Allow-Origin", process.env.FRONTEND_URL);
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
@@ -14,12 +16,14 @@ exports.blackboardCallback = functions.https.onRequest(async (req, res) => {
   }
 
   try {
-    const { code, state, error, error_description } = req.query;
+    const { code, error, error_description } = req.query;
 
     // Handle authorization denial
     if (error) {
       console.warn("Blackboard authorization denied:", error_description);
-      return res.redirect(`${process.env.FRONTEND_URL}/auth?error=${encodeURIComponent(error_description || "Authorization denied")}`);
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/auth?error=${encodeURIComponent(error_description || "Authorization denied")}`,
+      );
     }
 
     if (!code) {
@@ -48,14 +52,14 @@ exports.blackboardCallback = functions.https.onRequest(async (req, res) => {
     // Redirect to OAuth callback page with token
     const callbackUrl = `${process.env.FRONTEND_URL}/oauth-callback?token=${encodeURIComponent(customToken)}&provider=blackboard`;
     return res.redirect(callbackUrl);
-
   } catch (error) {
     console.error("Blackboard callback error:", error.message);
-    const errorMsg = encodeURIComponent(error.message || "Authentication failed");
+    const errorMsg = encodeURIComponent(
+      error.message || "Authentication failed",
+    );
     return res.redirect(`${process.env.FRONTEND_URL}/auth?error=${errorMsg}`);
   }
 });
-
 
 function validateOAuthState(sessionState, queryState) {
   if (!sessionState || !queryState || sessionState !== queryState) {

@@ -1,8 +1,7 @@
 process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 
-const functions = require("firebase-functions");
+const { onCall } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-
 
 admin.initializeApp();
 
@@ -12,17 +11,24 @@ const { logLogout } = require("./src/auth/logLogout");
 const { recordLoginFailure } = require("./src/auth/recordLoginFailure");
 const { resetLoginAttempts } = require("./src/auth/resetLoginAttempts");
 const { checkLoginAttempts } = require("./src/auth/checkLoginAttempts");
-
-
-
-// Export as callable Cloud Functions
-exports.logLogin = functions.https.onCall(logLogin);
-exports.logLogout = functions.https.onCall(logLogout);
-exports.recordLoginFailure = functions.https.onCall(recordLoginFailure);
-exports.resetLoginAttempts = functions.https.onCall(resetLoginAttempts);
-exports.checkLoginAttempts = functions.https.onCall(checkLoginAttempts);
-
 const { sendMfaCode, verifyMfaCode } = require("./src/auth/mfa");
 
+// Export as callable Cloud Functions with region
+exports.logLogin = onCall({ region: "asia-southeast1" }, logLogin);
+exports.logLogout = onCall({ region: "asia-southeast1" }, logLogout);
+exports.recordLoginFailure = onCall(
+  { region: "asia-southeast1" },
+  recordLoginFailure,
+);
+exports.resetLoginAttempts = onCall(
+  { region: "asia-southeast1" },
+  resetLoginAttempts,
+);
+exports.checkLoginAttempts = onCall(
+  { region: "asia-southeast1" },
+  checkLoginAttempts,
+);
+
+// mfa functions are defined in their module
 exports.sendMfaCode = sendMfaCode;
 exports.verifyMfaCode = verifyMfaCode;

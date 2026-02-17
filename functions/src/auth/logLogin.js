@@ -1,8 +1,8 @@
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
-async function logLogin(data, context) {
-  const uid = context?.auth?.uid || data?.uid || data?.data?.uid;
+async function logLogin(request) {
+  const uid = request?.auth?.uid || request?.data?.uid;
 
   if (!uid) {
     throw new Error("User ID is required");
@@ -21,13 +21,16 @@ async function logLogin(data, context) {
   }
 
   // Store audit log
-  await admin.firestore().collection("auditLogs").add({
-    uid,
-    email: email || null,
-    action: "LOGIN",
-    role,
-    timestamp: FieldValue.serverTimestamp(),
-  });
+  await admin
+    .firestore()
+    .collection("auditLogs")
+    .add({
+      uid,
+      email: email || null,
+      action: "LOGIN",
+      role,
+      timestamp: FieldValue.serverTimestamp(),
+    });
 
   console.log("Login logged for:", email);
 

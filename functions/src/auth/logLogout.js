@@ -1,17 +1,16 @@
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
-async function logLogout(data, context) {
+async function logLogout(request) {
   try {
+    const data = request?.data;
     console.log("logLogout called with data:", data);
-      let uid = undefined;
-      if (typeof data === 'object' && data !== null) {
-        if (typeof data.uid === 'string' && data.uid) {
-          uid = data.uid;
-        } else if (data.data && typeof data.data.uid === 'string' && data.data.uid) {
-          uid = data.data.uid;
-        }
+    let uid = undefined;
+    if (typeof data === "object" && data !== null) {
+      if (typeof data.uid === "string" && data.uid) {
+        uid = data.uid;
       }
+    }
     if (!uid) {
       console.error("No UID provided");
       throw new Error("User ID is required");
@@ -30,13 +29,16 @@ async function logLogout(data, context) {
     }
     // Store audit log
     console.log("Writing audit log for logout...");
-    await admin.firestore().collection("auditLogs").add({
-      uid,
-      email: email || null,
-      action: "LOGOUT",
-      role,
-      timestamp: FieldValue.serverTimestamp(),
-    });
+    await admin
+      .firestore()
+      .collection("auditLogs")
+      .add({
+        uid,
+        email: email || null,
+        action: "LOGOUT",
+        role,
+        timestamp: FieldValue.serverTimestamp(),
+      });
     console.log("Logout logged for:", email);
     return { role };
   } catch (error) {

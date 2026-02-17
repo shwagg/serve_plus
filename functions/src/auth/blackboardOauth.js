@@ -1,6 +1,5 @@
 //token exchange and user profile fetching for Blackboard OAuth
 
-const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const axios = require("axios");
 
@@ -9,8 +8,6 @@ const BLACKBOARD_USER_URL = process.env.BLACKBOARD_USER_URL;
 const BLACKBOARD_CLIENT_ID = process.env.BLACKBOARD_CLIENT_ID;
 const BLACKBOARD_CLIENT_SECRET = process.env.BLACKBOARD_CLIENT_SECRET;
 const BLACKBOARD_REDIRECT_URI = process.env.BLACKBOARD_REDIRECT_URI;
-
-
 
 async function exchangeCodeForToken(code) {
   try {
@@ -26,11 +23,13 @@ async function exchangeCodeForToken(code) {
 
     return response.data;
   } catch (error) {
-    console.error("Token exchange failed:", error.response?.data || error.message);
+    console.error(
+      "Token exchange failed:",
+      error.response?.data || error.message,
+    );
     throw new Error("Failed to exchange authorization code");
   }
 }
-
 
 async function fetchBlackboardUserProfile(accessToken) {
   try {
@@ -42,16 +41,18 @@ async function fetchBlackboardUserProfile(accessToken) {
 
     return response.data;
   } catch (error) {
-    console.error("Failed to fetch user profile:", error.response?.data || error.message);
+    console.error(
+      "Failed to fetch user profile:",
+      error.response?.data || error.message,
+    );
     throw new Error("Failed to fetch user profile from Blackboard");
   }
 }
 
-
 //update/create user in firestore
 async function createOrUpdateUser(blackboardProfile, uid) {
   const userRef = admin.firestore().collection("users").doc(uid);
-  
+
   const userData = {
     email: blackboardProfile.email,
     displayName: blackboardProfile.name || blackboardProfile.userName,

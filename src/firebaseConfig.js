@@ -20,16 +20,26 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence); // Ensure persistence
 const db = getFirestore(app);
-const functions = getFunctions(app, "us-central1");
+const functions = getFunctions(app, import.meta.env.VITE_FUNCTIONS_REGION || "us-central1");
 const storage = getStorage(app);
 
-// Connect to emulators (LOCAL ONLY)
-let emulatorsConnected = false;
-if (import.meta.env.DEV) {
-  emulatorsConnected = true;
+// Connect to emulators based on env flags.
+const useEmulators = import.meta.env.VITE_USE_EMULATORS === "true";
+const emulateAuth = import.meta.env.VITE_EMULATE_AUTH === "true" || useEmulators;
+const emulateFirestore = import.meta.env.VITE_EMULATE_FIRESTORE === "true" || useEmulators;
+const emulateFunctions = import.meta.env.VITE_EMULATE_FUNCTIONS === "true" || useEmulators;
+const emulateStorage = import.meta.env.VITE_EMULATE_STORAGE === "true" || useEmulators;
+
+if (emulateAuth) {
   connectAuthEmulator(auth, "http://localhost:9099");
+}
+if (emulateFirestore) {
   connectFirestoreEmulator(db, "localhost", 8080);
+}
+if (emulateFunctions) {
   connectFunctionsEmulator(functions, "localhost", 5001);
+}
+if (emulateStorage) {
   connectStorageEmulator(storage, "localhost", 9199);
 }
 
