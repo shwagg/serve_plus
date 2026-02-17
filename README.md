@@ -46,3 +46,10 @@ admin@test.com = admin/regular
 admin2@test.com = admin/director
 faculty2@test.com = faculty/program chair
 faculty3@test.com = faculty/college dean
+
+proposal approval sequence:
+student -> create/submit a proposal first
+faculty2@test.com -> faculty/program chair (dito next magrereflect for approval) (REVIEWED BY)
+faculty3@test.com -> faculty/college dean  (RECOMMENDED BY)
+admin@test.com -> admin/regular  (ENDORSED BY)
+admin2@test.com -> admin/director (final approval) (APPROVED BY)

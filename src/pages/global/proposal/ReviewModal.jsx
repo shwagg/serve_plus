@@ -84,123 +84,51 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  // Determine approval level based on user role, position, and project type
-  const getApprovalLevel = () => {
-    console.log("ReviewModal - Full userData object:", userData);
-    
-    if (!userData) {
-      console.warn("userData is null or undefined");
-      return null;
+  // Sequential approval enforcement
+  // Normalize role and position
+  const role = userData?.role || userData?.userRole || userData?.Role || "";
+  const positionField = userData?.position || userData?.positions || userData?.Position || userData?.Positions || "";
+  const userPositions = Array.isArray(positionField) ? positionField : positionField ? [positionField] : [];
+  const normalizedPositions = userPositions.map(p => String(p).toLowerCase().trim().replace(/\s+/g, " ")).filter(p => p.length > 0);
+
+  function getApprovalLevel() {
+    if (role.toLowerCase() === "faculty") {
+      if (normalizedPositions.includes("program chair")) return "reviewedBy";
+      // Allow both 'college dean' and 'cluster head' for recommendedBy
+      if (normalizedPositions.includes("college dean") || normalizedPositions.includes("cluster head")) return "recommendedBy";
     }
-
-    // Try different possible role field names
-    const role = userData?.role || userData?.userRole || userData?.Role;
-    if (!role) {
-      console.warn("No user role found in userData. Available keys:", Object.keys(userData || {}));
-      return null;
+    if (role.toLowerCase() === "admin") {
+      if (normalizedPositions.includes("regular")) return "endorsedBy";
+      if (normalizedPositions.includes("director")) return "approvedBy";
     }
-
-    console.log("✓ User role found:", role);
-
-    // Normalize user positions - try multiple possible field names
-    const positionField = userData?.position || userData?.positions || userData?.Position || userData?.Positions;
-    const userPositions = Array.isArray(positionField)
-      ? positionField
-      : positionField
-      ? [positionField]
-      : [];
-    
-    // Better position normalization: lowercase, trim, remove extra spaces
-    const normalizedPositions = userPositions
-      .map(p => String(p).toLowerCase().trim().replace(/\s+/g, " "))
-      .filter(p => p.length > 0);
-
-    console.log("ReviewModal - User data:", { role, positions: userPositions, normalized: normalizedPositions });
-    console.log("ReviewModal - Proposal type:", proposal?.projectType?.toLowerCase());
-
-    const projectType = proposal?.projectType?.toLowerCase();
-
-    // Service Learning (SL) approval flow
-    if (projectType === "sl") {
-      const slReviewerPositions = [
-        "program chair",
-        "cluster head",
-        "college engagement head",
-      ];
-      const slRecommenderPositions = [
-        "college dean",
-        "shs principal",
-      ];
-
-      if (role.toLowerCase() === "faculty") {
-        if (normalizedPositions.some(p => slReviewerPositions.includes(p))) {
-          console.log("Matched SL reviewer position");
-          return "reviewedBy";
-        }
-        if (normalizedPositions.some(p => slRecommenderPositions.includes(p))) {
-          console.log("Matched SL recommender position");
-          return "recommendedBy";
-        }
-      }
-
-      if (role.toLowerCase() === "admin") {
-        if (normalizedPositions.some(p => p === "regular")) {
-          console.log("\u2713 Matched admin regular");
-          return "endorsedBy";
-        }
-        if (normalizedPositions.some(p => p === "director")) {
-          console.log("\u2713 Matched admin director");
-          return "approvedBy";
-        }
-      }
-    }
-
-    // Community Engagement (CE) approval flow
-    if (projectType === "ce") {
-      const ceReviewerPositions = [
-        "program chair",
-        "college engagement head",
-        "student organization adviser",
-      ];
-      const ceRecommenderPositions = [
-        "college dean",
-        "shs principal",
-        "sao director",
-        "department head",
-      ];
-
-      if (role.toLowerCase() === "faculty") {
-        if (normalizedPositions.some(p => ceReviewerPositions.includes(p))) {
-          console.log("Matched CE reviewer position");
-          return "reviewedBy";
-        }
-        if (normalizedPositions.some(p => ceRecommenderPositions.includes(p))) {
-          console.log("Matched CE recommender position");
-          return "recommendedBy";
-        }
-      }
-
-      if (role.toLowerCase() === "admin") {
-        if (normalizedPositions.some(p => p === "regular")) {
-          console.log("Matched admin regular");
-          return "endorsedBy";
-        }
-        if (normalizedPositions.some(p => p === "director")) {
-          console.log("Matched admin director");
-          return "approvedBy";
-        }
-      }
-    }
-
-    console.warn("No approval level matched. Role:", role, "Normalized positions:", normalizedPositions, "Project type:", projectType);
     return null;
-  };
+  }
+  const approvalLevel = useMemo(() => getApprovalLevel(), [userData, proposal?.projectType, proposal?.id]);
 
-  const approvalLevel = useMemo(() => {
-    return getApprovalLevel();
-  }, [userData, proposal?.projectType, proposal?.id]);
+  // Only allow approval if previous steps are completed
+  function canApproveSequential() {
+    if (!approvalLevel || !proposal) return false;
+    if (approvalLevel === "reviewedBy") {
+      return !proposal.reviewedBy && !proposal.recommendedBy && !proposal.endorsedBy && !proposal.approvedBy;
+    }
+    if (approvalLevel === "recommendedBy") {
+      return typeof proposal.reviewedBy === "string" && proposal.reviewedBy.trim() !== "" && (!proposal.recommendedBy || proposal.recommendedBy.trim() === "") && (!proposal.endorsedBy || proposal.endorsedBy.trim() === "") && (!proposal.approvedBy || proposal.approvedBy.trim() === "");
+    }
+    if (approvalLevel === "endorsedBy") {
+      return typeof proposal.reviewedBy === "string" && proposal.reviewedBy.trim() !== "" && typeof proposal.recommendedBy === "string" && proposal.recommendedBy.trim() !== "" && (!proposal.endorsedBy || proposal.endorsedBy.trim() === "") && (!proposal.approvedBy || proposal.approvedBy.trim() === "");
+    }
+    if (approvalLevel === "approvedBy") {
+      return typeof proposal.reviewedBy === "string" && proposal.reviewedBy.trim() !== "" && typeof proposal.recommendedBy === "string" && proposal.recommendedBy.trim() !== "" && typeof proposal.endorsedBy === "string" && proposal.endorsedBy.trim() !== "" && (!proposal.approvedBy || proposal.approvedBy.trim() === "");
+    }
+    return false;
+  }
 
-
+  // Debug logs for troubleshooting
+  console.log("[DEBUG][ReviewModal] userData:", userData);
+  console.log("[DEBUG][ReviewModal] normalizedPositions:", normalizedPositions);
+  console.log("[DEBUG][ReviewModal] approvalLevel:", approvalLevel);
+  console.log("[DEBUG][ReviewModal] canApproveSequential:", canApproveSequential());
+  console.log("[DEBUG][ReviewModal] proposal:", proposal);
 
   // Check if this approval field has already been filled
   const isAlreadyApproved = () => {
@@ -380,7 +308,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
           <div className="header-title-group">
             <h2>Proposal Summary</h2>
           </div>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+          <button className="modal-close" onClick={onClose}>&&#10;</button>
         </div>
         
         <div className="modal-body">
@@ -540,7 +468,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
               </div>
               <div className="field-group">
                 <label>Learning Outcomes:</label>
-                <p>{proposal.ceFields.learningOutcomes !== undefined ? proposal.ceFields.learningOutcomes : "N/A"}</p>
+                <p>{proposal.ceFields.learningOutcomes || "N/A"}</p>
               </div>
               {proposal.ceFields.customLearningOutcome && (
                 <div className="field-group">
@@ -597,7 +525,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
                 value={rejectComments}
                 onChange={(e) => setRejectComments(e.target.value)}
                 rows="3"
-                disabled={isSubmitting || !approvalLevel}
+                disabled={isSubmitting || !approvalLevel || !canApproveSequential()}
               />
             </div>
           )}
@@ -608,16 +536,16 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
                 <button
                   className="btn-approve"
                   onClick={handleApprove}
-                  disabled={isSubmitting || !approvalLevel || isAlreadyApproved()}
-                  title={`Approval Level: ${approvalLevel || 'None'} ${isAlreadyApproved() ? '(Already approved)' : ''}`}
+                  disabled={isSubmitting || !approvalLevel || isAlreadyApproved() || !canApproveSequential()}
+                  title={`Approval Level: ${approvalLevel || 'None'} ${isAlreadyApproved() ? '(Already approved)' : ''} ${!canApproveSequential() ? '(Not your turn)' : ''}`}
                 >
                   {isSubmitting ? "Approving..." : "Approve"}
                 </button>
                 <button
                   className="btn-reject"
                   onClick={handleReject}
-                  disabled={isSubmitting || !approvalLevel || isAlreadyApproved()}
-                  title={`Approval Level: ${approvalLevel || 'None'} ${isAlreadyApproved() ? '(Already approved)' : ''}`}
+                  disabled={isSubmitting || !approvalLevel || isAlreadyApproved() || !canApproveSequential()}
+                  title={`Approval Level: ${approvalLevel || 'None'} ${isAlreadyApproved() ? '(Already approved)' : ''} ${!canApproveSequential() ? '(Not your turn)' : ''}`}
                 >
                   {isSubmitting ? "Rejecting..." : "Reject"}
                 </button>
