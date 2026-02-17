@@ -192,7 +192,7 @@ const GlobalAnnouncements = () => {
     const fetchAnnouncements = async () => {
       try {
         // Fetch the latest event proposals from Firestore (from 'Missions' collection)
-        const q = query(collection(db, "missions"));
+        const q = query(collection(db, "missions"), where("status", "==", "published"));
         const querySnapshot = await getDocs(q);
         const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('Fetched event IDs:', events.map(e => e.id));

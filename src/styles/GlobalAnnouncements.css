@@ -236,17 +236,26 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
   border: none;
-  font-size: 24px;
+  border-radius: 20px;
+  font-size: 20px;
   cursor: pointer;
   color: #666;
-  padding: 8px;
+  padding: 0;
   line-height: 1;
+  z-index: 3;
+  margin: 0; /* prevent centering from global button rules */
 }
 
 .modal-close-btn:hover {
   color: #333;
+  background: rgba(0,0,0,0.04);
 }
 
 .modal-icon {
