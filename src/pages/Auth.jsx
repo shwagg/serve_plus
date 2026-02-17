@@ -62,8 +62,30 @@ function Auth() {
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        setError("User profile not found in database.");
-        return;
+        // User document missing, create minimal profile
+        try {
+          await import("firebase/firestore").then(({ setDoc }) =>
+            setDoc(userRef, {
+              uid,
+              email,
+              name: userCred.user.displayName || email,
+              role: "student",
+              status: "active",
+              createdAt: new Date(),
+            })
+          );
+          // Optional, fetch again to update userSnap
+          const newSnap = await getDoc(userRef);
+          if (newSnap.exists()) {
+            // Continue as normal
+          } else {
+            setError("Failed to create user profile.");
+            return;
+          }
+        } catch (createErr) {
+          setError("User profile not found and could not be created.");
+          return;
+        }
       }
 
       const { role, status } = userSnap.data();
