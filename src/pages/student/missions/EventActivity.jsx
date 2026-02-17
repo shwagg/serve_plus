@@ -1791,19 +1791,7 @@ export default function EventActivity() {
                   >
                     Retry
                   </button>
-                  <button
-                    style={{ padding: '8px 12px', background: '#30bdb7', color: '#fff', border: 'none', borderRadius: 6 }}
-                    onClick={() => {
-                      // Continue to post survey
-                      setShowQRModal(false);
-                      setShowPostSurveyModal(true);
-                      setQRStatus("");
-                      setScannedLocation(null);
-                      setScanSuccess(false);
-                    }}
-                  >
-                    Continue
-                  </button>
+                  {/* Removed: Continue to post survey button. Post-Activity Survey should only be opened from requirements section. */}
                 </div>
               </div>
             )}
