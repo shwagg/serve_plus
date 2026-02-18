@@ -130,6 +130,10 @@ export default function ProjectList({ mode = "admin" }) {
             status: "published",
             publishedAt: serverTimestamp(),
             publishedBy: user.uid,
+            //for community feedback form to be filled up
+            //since this is a published project
+            "feedback.isActive": true,
+            "feedback.openedAt": serverTimestamp()
         });
     };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
@@ -41,13 +41,13 @@ function SummaryPanel({
         createdAt: now,
         publishedAt: null,
         updatedAt: now,
-        
+
         // Basic Info
         projectType: projectType === 'service-learning' ? 'sl' : 'ce',
         status: 'for_approval',
         title: formData.title,
         alt: formData.alt || '',
-        
+
         // Project Details
         dateProposed: formData.targetDate,
         sdgs: formData.sdgs || [],
@@ -61,7 +61,7 @@ function SummaryPanel({
         successIndicators: formData.successIndicators.split('\n').filter(a => a.trim()),
         budget: formData.budget,
         studentOutcomes: formData.studentOutcomes || '',
-        
+
         // People involved
         proponents: [formData.preparedBy],
         preparedBy: formData.preparedBy,
@@ -70,12 +70,19 @@ function SummaryPanel({
         recommendedBy: '',
         endorsedBy: '',
         approvedBy: '',
-        
+
         // Affiliation
         affiliation: formData.affiliation || '',
-        
+
         // Activities
         activities: [],
+
+        //Feeback from Community
+        feedback: {
+          isActive: false,
+          openedAt: null,
+          closedAt: null
+        }
       };
 
       // Add type-specific fields
@@ -152,7 +159,7 @@ function SummaryPanel({
           form.getTextField('SpecificActivities').setText(formData.specificActivities || '');
           form.getTextField('SuccessIndicators').setText(formData.successIndicators || '');
           form.getTextField('Budget').setText(formData.budget || '');
-        } catch (e) {}
+        } catch (e) { }
         form.flatten();
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });

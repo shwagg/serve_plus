@@ -4,6 +4,9 @@ import settingsIcon from '../../assets/menuassets/Settings.svg';
 import supportIcon from '../../assets/menuassets/Support.svg';
 import infoIcon from '../../assets/menuassets/Info.svg';
 import viewIcon from '../../assets/menuassets/View.svg';
+import dashboardIcon from '../../assets/menuassets/Dashboard.svg';
+import projectListIcon from '../../assets/menuassets/List.svg';
+import feedbackFormIcon from '../../assets/menuassets/FeedbackForm.svg';
 export default function PartnerMenu({ userName, userEmail, userUsername, userAvatar, onLogout, onClose, onCreateProposal }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -30,10 +33,23 @@ export default function PartnerMenu({ userName, userEmail, userUsername, userAva
         </div>
       </button>
       <div className="menu-divider"></div>
+
       <div className="menu-items">
+        <button className="menu-item" onClick={() => handleMenuClick('/partner/dashboard')}>
+          <img src={dashboardIcon} alt="Dashboard" className="menu-icon" />
+          Dashboard
+        </button>
+        <button className="menu-item" onClick={() => handleMenuClick('/partner/projects')}>
+          <img src={projectListIcon} alt="Project List" className="menu-icon" />
+          Project List
+        </button>
         <button className="menu-item" onClick={() => handleMenuClick('/global/review-proposals')}>
           <img src={viewIcon} alt="Review Proposals" className="menu-icon" />
           Review Proposals
+        </button>
+        <button className="menu-item" onClick={() => handleMenuClick(`/global/feedback/${missionId}`)}>
+          <img src={feedbackFormIcon} alt="Feedback Form" className="menu-icon" />
+          Feedback Form
         </button>
         <button className="menu-item" onClick={() => handleMenuClick('/global/menu/settings')}>
           <img src={settingsIcon} alt="Settings" className="menu-icon" />

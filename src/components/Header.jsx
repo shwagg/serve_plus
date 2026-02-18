@@ -30,17 +30,17 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <h2>Create Project Proposal</h2>
         <p>Select the type of project you want to propose:</p>
-        
+
         <div className="proposal-type-buttons">
-          <button 
+          <button
             className="proposal-type-btn service-learning"
             onClick={() => handleSelection('service-learning')}
           >
             <h3>Service Learning</h3>
             <p>Academic-based community service projects</p>
           </button>
-          
-          <button 
+
+          <button
             className="proposal-type-btn community-engagement"
             onClick={() => handleSelection('community-engagement')}
           >
@@ -48,7 +48,7 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
             <p>Direct community partnership initiatives</p>
           </button>
         </div>
-        
+
         <button className="modal-close-btn" onClick={onClose}>Cancel</button>
       </div>
     </div>
@@ -171,7 +171,7 @@ export default function Header() {
           </button>
           {/* Right Side Icons */}
           <div className="header-actions">
-            <button 
+            <button
               className="icon-button"
               aria-label="Chat"
               onClick={() => setShowChatModal(true)}>
@@ -179,7 +179,7 @@ export default function Header() {
             </button>
             <NotificationBell />
             <div className="menu-container" ref={menuRef}>
-              <button 
+              <button
                 className="icon-button menu-button"
                 aria-label="Menu"
                 onClick={() => setShowMenu(!showMenu)}>
@@ -190,7 +190,7 @@ export default function Header() {
           </div>
         </div>
       </header>
-      <ChatModal 
+      <ChatModal
         isOpen={showChatModal}
         onClose={() => setShowChatModal(false)}
         onSelectMission={(missionId) => {
@@ -199,14 +199,14 @@ export default function Header() {
         }}
       />
 
-      <CreateProposalModal 
-        isOpen={showProposalModal} 
+      <CreateProposalModal
+        isOpen={showProposalModal}
         onClose={() => setShowProposalModal(false)}
         onSelectType={handleSelectProjectType}
       />
 
       {showProposalForm && (
-        <ProjectProposal 
+        <ProjectProposal
           projectType={selectedProjectType}
           onClose={handleCloseProposalForm}
         />

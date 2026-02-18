@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { ListAltOutlinedIcon } from "../../components/icons/index";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-
+import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
+import { releaseMissionPoints } from "../global/rewardSaveSystem";
+import "../../styles/DocumentLibrary.css";
 
 export default function DocumentLibrary() {
   const [stats, setStats] = useState({});
@@ -11,6 +12,19 @@ export default function DocumentLibrary() {
   const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
   const [currentMissionId, setCurrentMissionId] = useState(null);
   const [volunteers, setVolunteers] = useState([]);
+  const allComplete =
+    volunteers.length > 0 &&
+    volunteers.every(v => {
+      const completedItems = [
+        v.preSurveyAnswers,
+        v.postSurveyAnswers,
+        v.progress?.consent === "submitted",
+        v.progress?.attendance === "present",
+        v.participationStatus
+      ].filter(Boolean).length;
+
+      return completedItems === 5;
+    });
   const [showAnswerModal, setShowAnswerModal] = useState(false);
   const [answerModalTitle, setAnswerModalTitle] = useState("");
   const [answerModalData, setAnswerModalData] = useState(null);
@@ -49,6 +63,28 @@ export default function DocumentLibrary() {
           : Math.round((completed / maxPossible) * 100),
     };
   };
+
+  // set participation factor for computation
+  const handleParticipationChange = async (missionId, volunteerId, value) => {
+    try {
+      await updateDoc(
+        doc(db, "missions", missionId, "volunteer", volunteerId),
+        {
+          participationStatus: value,
+        }
+      );
+      setVolunteers(prev =>
+        prev.map(v =>
+          v.id === volunteerId ? { ...v, participationStatus: value } : v
+        )
+      );
+
+    } catch (err) {
+      console.error("Error updating participation:", err);
+      alert("Failed to update participation status.");
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       const missions = await fetchApprovedProposals();
@@ -157,7 +193,6 @@ export default function DocumentLibrary() {
               const missionVolunteers = currentMissionId === mission.id ? volunteers : [];
               // Fallback to stats if not viewing submissions
               const s = stats[mission.id];
-              const completion = s?.completionRate ?? 0;
 
               // Use live data if available, otherwise fallback to stats
               const total = missionVolunteers.length || s?.total || 0;
@@ -276,63 +311,136 @@ export default function DocumentLibrary() {
             >
               ×
             </button>
+            {/*Headings of the summary table modal */}
             <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Submissions</h2>
-            <table className="submission-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 8px #0001' }}>
-              <thead>
-                <tr style={{ background: '#f3f4f8', color: '#23335b', borderBottom: '2px solid #e0e4ea' }}>
-                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'left', fontSize: '1.05rem' }}>Student Name / Participant</th>
-                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Attendance</th>
-                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Pre-Activity Survey</th>
-                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Activity Consent Form</th>
-                  <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Post-Activity Form</th>
-                  <th style={{ padding: '14px 10px', fontWeight: 700, textAlign: 'center', fontSize: '1.05rem' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {volunteers.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888', background: '#fff' }}>No submissions found.</td>
+            <div className="table-scroll-wrapper">
+              <table className="submission-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 8px #0001' }}>
+                <thead>
+                  <tr style={{ background: '#f3f4f8', color: '#23335b', borderBottom: '2px solid #e0e4ea' }}>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'left', fontSize: '1.05rem' }}>Student Name / Participant</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Attendance</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Pre-Activity Survey</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Activity Consent Form</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Post-Activity Form</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Participation Factor</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Completion %</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Points</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}> </th>
                   </tr>
-                ) : volunteers.map((v, idx) => (
-                  <tr key={v.id} style={{ background: idx % 2 === 0 ? '#f8f9fb' : '#fff', color: '#23335b' }}>
-                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'left', fontWeight: 500 }}>{v.name || v.respondent?.name || v.id}</td>
-                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
-                      {v.progress?.attendance === 'present' ? 'Present' : ''}
-                    </td>
-                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
-                      {v.preSurveyAnswers ? (
-                        <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleViewAnswers(v, 'pre')}>View Answers</button>
-                      ) : ''}
-                    </td>
-                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
-                      {v.progress?.consent === 'submitted' && v.consentSubmission?.fileUrl ? (
-                        <button
-                          style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }}
-                          onClick={() => window.open(v.consentSubmission.fileUrl, '_blank')}
-                        >
-                          View PDF
-                        </button>
-                      ) : ''}
-                    </td>
-                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
-                      {v.postSurveyAnswers ? (
-                        <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleViewAnswers(v, 'post')}>View Answers</button>
-                      ) : ''}
-                    </td>
-                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', textAlign: 'center' }}>
-                      {v.progress?.preSurvey === 'submitted' &&
-                      v.progress?.consent === 'submitted' &&
-                      v.progress?.attendance === 'present' &&
-                      v.progress?.postSurvey === 'submitted' ? (
-                        <span className="status-completed" style={{ color: '#30bdb7', fontWeight: 700 }}>Completed</span>
-                      ) : (
-                        <span className="status-incomplete" style={{ color: '#d32f2f', fontWeight: 700 }}>Incomplete</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {volunteers.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: 24, color: '#888', background: '#fff' }}>No submissions found.</td>
+
+                    </tr>
+                  ) : volunteers.map((v, idx) => {
+                    const completedItems = [
+                      v.preSurveyAnswers,
+                      v.postSurveyAnswers,
+                      v.progress?.consent === "submitted",
+                      v.progress?.attendance === "present",
+                      v.participationStatus
+                    ].filter(Boolean).length;
+
+                    const individualCompletion = Math.round((completedItems / 5) * 100);
+                    // Live compute preview (without saving)
+                    let previewPoints = null;
+
+                    if (v.participationStatus && avgRating) {
+
+                      const rawRole = v.role || v.preSurveyRole || null;
+
+                      if (rawRole) {
+                        const role = rawRole.trim().toLowerCase();
+
+                        previewPoints = computeFinalPoints(
+                          role,
+                          avgRating,
+                          v.participationStatus
+                        );
+                      }
+                    }
+
+                    return (
+                      <tr key={v.id} style={{ background: idx % 2 === 0 ? '#f8f9fb' : '#fff', color: '#23335b' }}>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'left', fontWeight: 500 }}>{v.name || v.respondent?.name || v.id}</td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
+                          {v.progress?.attendance === 'present' ? 'Present' : ''}
+                        </td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
+                          {v.preSurveyAnswers ? (
+                            <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleViewAnswers(v, 'pre')}>View Answers</button>
+                          ) : ''}
+                        </td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
+                          {v.progress?.consent === 'submitted' && v.consentSubmission?.fileUrl ? (
+                            <button
+                              style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }}
+                              onClick={() => window.open(v.consentSubmission.fileUrl, '_blank')}
+                            >
+                              View PDF
+                            </button>
+                          ) : ''}
+                        </td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
+                          {v.postSurveyAnswers ? (
+                            <button style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #30bdb7', background: '#f3f4f8', color: '#23335b', cursor: 'pointer', fontWeight: 600 }} onClick={() => handleViewAnswers(v, 'post')}>View Answers</button>
+                          ) : ''}
+                        </td>
+                        <td className="submission-table-cell">
+                          <select
+                            className="participation-select"
+                            value={v.participationStatus || ""}
+                            onChange={(e) =>
+                              handleParticipationChange(currentMissionId, v.id, e.target.value)
+                            }
+                          >
+                            <option value="">Select</option>
+                            <option value="verified">Verified</option>
+                            <option value="partial">Partial</option>
+                            <option value="minimal">Minimal</option>
+                            <option value="no_show">No-show</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center', fontWeight: 600 }}>
+                          {individualCompletion}%
+                        </td>
+
+                        <td className="submission-table-cell">
+                          {v.pointsEarned ? previewPoints : "-"}
+                        </td>
+                        <td className="submission-table-cell">
+                          {idx === 0 && allComplete && (
+                            <button
+                              className="release-btn"
+                              onClick={async () => {
+                                try {
+                                  await releaseMissionPoints(currentMissionId);
+
+                                  const snap = await getDocs(
+                                    collection(db, "missions", currentMissionId, "volunteer")
+                                  );
+                                  const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                                  setVolunteers(refreshed);
+
+                                  alert("Points released successfully!");
+                                } catch (err) {
+                                  alert(err.message);
+                                }
+                              }}
+                            >
+                              Release Points
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
             {/* Answer Preview Modal */}
             {showAnswerModal && (
               <div
@@ -380,7 +488,7 @@ export default function DocumentLibrary() {
                   >
                     ×
                   </button>
-                 
+
                   <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>{answerModalTitle}</h2>
                   {answerModalData ? (
                     <div style={{ maxWidth: 600, margin: '0 auto' }}>

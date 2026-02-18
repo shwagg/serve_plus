@@ -10,7 +10,7 @@ import "../../styles/ProjectDetails.css";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import ceBg from "../../assets/ce-proposal-page1.png";
-import QRCode from "qrcode";
+import { QRCodeCanvas } from "qrcode.react";
 
 
 export default function ProjectDetails() {
@@ -23,25 +23,8 @@ export default function ProjectDetails() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [qrUrl, setQrUrl] = useState("");
+  const [showFeedbackQR, setShowFeedbackQR] = useState(false);
   const [showAttendanceReport, setShowAttendanceReport] = useState(false);
-  const [qrTimestamp, setQrTimestamp] = useState(Date.now());
-
-  // Function to regenerate QR and update Firestore
-  const handleRegenerateQR = async () => {
-    const newTimestamp = Date.now();
-    try {
-      const ref = doc(db, "missions", projectId);
-      await updateDoc(ref, {
-        validQRTimestamp: newTimestamp,
-        updatedAt: serverTimestamp()
-      });
-      setQrTimestamp(newTimestamp);
-    } catch (error) {
-      console.error("Error updating QR timestamp:", error);
-      alert("Failed to regenerate QR code");
-    }
-  };
 
   // Fetch attendees from Firestore subcollection
   useEffect(() => {
@@ -54,7 +37,7 @@ export default function ProjectDetails() {
         // All volunteers with their status
         const allVols = snap.docs.map(doc => ({
           name: doc.data().name || doc.data().email || "Unknown",
-          status: doc.data().attendanceStatus || "pending",
+          status: doc.data().attendanceStatus || "not_checked",
           email: doc.data().email || ""
         }));
         setAllVolunteers(allVols);
@@ -72,7 +55,26 @@ export default function ProjectDetails() {
     };
     fetchAttendees();
   }, [projectId, showQR]);
-  // Removed duplicate declarations
+
+  //attendance re-generate timestamp for qr code
+  const generateNewQR = async () => {
+    const newTimestamp = Date.now();
+
+    await updateDoc(doc(db, "missions", projectId), {
+      validQRTimestamp: newTimestamp,
+      updatedAt: serverTimestamp()
+    });
+
+    await load(); // reload project
+  };
+  const generateQRValue = () => {
+    const expiresAt = Date.now() + (30 * 60 * 1000); // After 30 minutes
+
+    return JSON.stringify({
+      eventId: projectId,
+      expiresAt
+    });
+  };
 
   //export to PDF (demo purposes only)
   const pdfRef = useRef(null);
@@ -102,10 +104,7 @@ export default function ProjectDetails() {
     pdf.save(filename);
   };
 
-  // Removed duplicate state declarations for project, loading, saving, showQR, qrUrl
-
   const ref = doc(db, "missions", projectId);
-
   const load = async () => {
     setLoading(true);
     try {
@@ -148,38 +147,6 @@ export default function ProjectDetails() {
     }
   };
 
-  useEffect(() => {
-    if (projectId && showQR) {
-      // Initialize validQRTimestamp in Firestore if it doesn't exist
-      const initializeQRTimestamp = async () => {
-        try {
-          const ref = doc(db, "missions", projectId);
-          const snap = await getDoc(ref);
-          if (snap.exists()) {
-            const data = snap.data();
-            if (!data.validQRTimestamp) {
-              // First time showing QR, set the initial timestamp
-              await updateDoc(ref, {
-                validQRTimestamp: qrTimestamp,
-                updatedAt: serverTimestamp()
-              });
-            } else {
-              // Use the existing valid timestamp
-              setQrTimestamp(data.validQRTimestamp);
-            }
-          }
-        } catch (error) {
-          console.error("Error initializing QR timestamp:", error);
-        }
-      };
-      initializeQRTimestamp();
-
-      QRCode.toDataURL(JSON.stringify({ eventId: projectId, timestamp: qrTimestamp }), (err, url) => {
-        if (!err) setQrUrl(url);
-      });
-    }
-  }, [projectId, showQR, qrTimestamp]);
-
   const setStatus = async (nextStatus) => {
     setSaving(true);
     try {
@@ -198,6 +165,7 @@ export default function ProjectDetails() {
 
       if (nextStatus === "published") {
         payload.publishedAt = serverTimestamp();
+
       }
 
       await updateDoc(ref, payload);
@@ -248,7 +216,7 @@ export default function ProjectDetails() {
       try {
         const volunteersRef = collection(db, "missions", projectId, "volunteer");
         const volunteersSnap = await getDocs(volunteersRef);
-        
+
         const notificationPromises = volunteersSnap.docs.map(async (volunteerDoc) => {
           try {
             await createNotification(volunteerDoc.id, {
@@ -261,13 +229,13 @@ export default function ProjectDetails() {
             console.error(`Failed to notify volunteer ${volunteerDoc.id}:`, notifError);
           }
         });
-        
+
         await Promise.all(notificationPromises);
       } catch (notifError) {
         console.error("Error sending notifications:", notifError);
         // Continue with archiving even if notifications fail
       }
-      
+
       // Archive the event
       await updateDoc(ref, {
         status: "archived",
@@ -387,6 +355,7 @@ export default function ProjectDetails() {
           Publish
         </button>
 
+        {/* Attendance QR Code */}
         <button
           style={{ background: '#222', color: '#fff', borderRadius: 20, padding: '12px 24px', fontWeight: 600 }}
           onClick={() => setShowQR((prev) => !prev)}
@@ -395,57 +364,74 @@ export default function ProjectDetails() {
         >
           {showQR ? "Hide QR Code" : "Show Attendance QR Code"}
         </button>
+
+        {/* Feedback QR Code */}
+        <button
+          style={{
+            background: '#30bdb7',
+            color: '#fff',
+            borderRadius: 20,
+            padding: '12px 24px',
+            fontWeight: 600
+          }}
+          onClick={() => setShowFeedbackQR(prev => !prev)}
+          type="button"
+        >
+          {showFeedbackQR ? "Hide Feedback QR" : "Show Feedback QR"}
+        </button>
       </div>
 
-      {showQR && qrUrl && (
+      {/* ATTENDANCE QR CODE */}
+      {showQR && (
+        <div style={{ marginTop: 20, textAlign: "center" }}>
+          <QRCodeCanvas
+            value={generateQRValue()}
+            size={220}
+          />
+          <div style={{ marginTop: 8, fontSize: 12, color: "#555" }}>
+            Scan this code to record attendance.
+          </div>
+          <button
+            onClick={async () => {
+              await generateNewQR();
+              setShowQR(true);
+            }}
+          >
+            Generate Attendance QR
+          </button>
+        </div>
+      )}
+
+      {showFeedbackQR && (
         <div style={{ marginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} style={{ display: 'block' }} />
-              <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-                Scan this code to mark attendance for this event.
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <QRCodeCanvas
+              value={`${window.location.origin}/global/feedback/${projectId}`}
+              size={220}
+            />
+            <div style={{ marginTop: 8, fontSize: 12, color: '#555', textAlign: 'center' }}>
+              Scan this code to submit community feedback.
             </div>
+
             <button
               style={{
-                background: '#6c757d',
+                marginTop: 12,
+                background: '#234e7b',
                 color: '#fff',
-                padding: '8px',
+                padding: '8px 16px',
                 border: 'none',
                 borderRadius: 6,
                 cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: 24,
-                width: 40,
-                height: 40,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                fontSize: 13
               }}
-              onClick={handleRegenerateQR}
+              onClick={() =>
+                navigate(`/global/feedback/${projectId}`)
+              }
               type="button"
-              title="Regenerate QR Code"
             >
-              🔄
+              Open Feedback Form
             </button>
           </div>
-          <button
-            style={{
-              marginTop: 16,
-              background: '#30bdb7',
-              color: '#fff',
-              padding: '10px 20px',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 14
-            }}
-            onClick={() => setShowAttendanceReport(true)}
-            type="button"
-          >
-            Attendance Report
-          </button>
         </div>
       )}
 

@@ -1,0 +1,332 @@
+/* PAGE BACKGROUND */
+.feedback-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #e6f9f8, #d4f3f2);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  border-radius: 18px;
+  padding: 20px 15px;
+  margin: 20px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* CARD CONTAINER */
+.feedback-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 1100px;   /* 750px */
+  border-radius: 18px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.feedback-card:hover {
+  transform: translateY(-3px);
+}
+.feedback-content{
+  padding: clamp(25px, 4vw, 50px);
+  padding-top: 2px;
+  border-radius: 18px;
+  background: transparent;
+}
+/* TOP BAR CONTAINING NAME OF THE FORM*/
+.feedback-topbar {
+  background: #30bdb7;
+  padding: 10px 5px;
+  border-radius: 18px 18px 0 0;
+  text-align: center;
+}
+
+.feedback-topbar h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+/* HEADER SECTION */
+.feedback-header {
+  text-align: left;
+  margin-bottom: 30px;
+}
+.feedback-logo {
+  width: clamp(60px, 25vw, 100px);
+}
+.feedback-meta {
+  margin-bottom: 20px;
+}
+.feedback-date {
+  font-size: 14px;
+  color: #666;
+  letter-spacing: 0.5px;
+}
+
+/* INSTRUCTION */
+.feedback-instruction {
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.feedback-instruction p {
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 12px;
+}
+
+.rating-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  font-size: 13px;
+  color: #555;
+  background: #f4fbfb;
+  padding: 12px 15px;
+  border-radius: 10px;
+  border: 1px solid #d9f2f1;
+}
+
+/* HEADINGS */
+.feedback-card h2 {
+  margin-bottom: 8px;
+  margin-top: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: #30bdb7;
+}
+/* FEEDBACK FORM*/
+.feedback-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.rating-label-en {
+  display: block;
+  font-weight: 600;
+  color: #333;
+}
+
+.rating-label-tl {
+  display: block;
+  font-size: 12px;
+  color: #888;    
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+/* RATING */
+.rating-section {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 10px 0;
+}
+.rating-group {
+    width: 100%;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.rating-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 14px;
+}
+
+/* Rating options row */
+.rating-options {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;     
+  align-items: center;
+  text-align: center;
+}
+
+/* Each rating label */
+.rating-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.rating-options input[type="radio"] {
+  accent-color: #30bdb7;
+  width: clamp(16px, 1.2vw, 22px);
+  height: clamp(16px, 1.2vw, 22px);
+  cursor: pointer;
+}
+.rating-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Slightly lighter style for N/A */
+.rating-na {
+  font-size: 12px;
+  color: #888;
+}
+.rating-label-desc {
+  display: block;
+  font-size: 11px;
+  color: #9a9a9a;    
+  margin-top: 3px;
+  font-weight: 400;
+}
+
+
+/* COMMENT SECTION */
+.feedback-group {
+  width: 100%;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.feedback-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.feedback-textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5e0;
+  font-size: 14px;
+  resize: vertical;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* INPUT */
+.feedback-input {
+  width: 100%;
+  padding: 11px;
+  border-radius: 10px;
+  border: 1px solid #d1d5e0;
+  font-size: 14px;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+.feedback-textarea:focus,
+.feedback-input:focus {
+  border-color: #30bdb7;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(48, 189, 183, 0.15);
+}
+
+/* ERROR */
+.rating-error {
+  border: 2px solid #ff4d4f;
+  padding: 10px;
+  border-radius: 12px;
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+  100% { transform: translateX(0); }
+}
+
+/* SUBMIT BUTTON */
+.feedback-button {
+  margin-top: 35px;
+  padding: clamp(12px, 1.5vw, 16px) clamp(20px, 3vw, 32px);
+  background: linear-gradient(135deg, #30bdb7, #28a6a0);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: clamp(14px, 1vw, 16px);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.feedback-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(48, 189, 183, 0.3);
+}
+
+.feedback-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+/* SUCCESS OR CLOSED STATES */
+.feedback-card p {
+  font-size: 14px;
+  color: #555;
+  margin-top: 10px;
+}
+
+/* THANK YOU CARD*/
+.success-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.success-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 30px;
+  border-radius: 18px;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.success-card h2 {
+    margin-top: 0;
+  margin-bottom: 10px;
+  color: #30bdb7;
+  font-size: 24px;
+}
+
+.success-card p {
+  font-size: 14px;
+  color: #555;
+}
+
+/* Close Button */
+.success-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #888;
+  transition: 0.2s ease;
+}
+
+.success-close:hover {
+  color: #30bdb7;
+}

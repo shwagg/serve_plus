@@ -10,8 +10,6 @@ export default function PartnerHome() {
   return (
     <div className="admin-page">
       <Header />
-      <Sidebar links={partnerLinks} />
-
       <main className="admin-main">
         <Outlet />
       </main>

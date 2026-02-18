@@ -138,6 +138,15 @@
 }
 
 /* Table Improvements */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.submission-table {
+  min-width: 1100px;
+}
+
 .submission-table th,
 .submission-table td {
   text-align: center;
@@ -153,6 +162,13 @@
 
 .submission-table tr:hover {
   background-color: #f3f4f8;
+}
+
+.submission-table-cell {
+   padding: 12px 10px;
+   border-bottom: 1px solid #e0e4ea;
+   border-right: 1px solid #e0e4ea;
+   text-align: center;
 }
 
 /* Mini Action Button */
@@ -187,4 +203,56 @@
 .status-incomplete {
   color: #ff9800;
   font-weight: 600;
+}
+/* Participation Dropdown */
+/* ===== Participation Dropdown (Seamless Style) ===== */
+
+.participation-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  width: 120px;
+  padding: 6px 28px 6px 12px;
+
+  border-radius: 8px;
+  border: 1px solid #e0e4ea;
+  background-color: #f3f4f8;
+
+  font-size: 13px;
+  font-weight: 600;
+  color: #23335b;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Remove dark default style */
+.participation-select:focus {
+  outline: none;
+  border-color: #30bdb7;
+  box-shadow: 0 0 0 2px rgba(48, 189, 183, 0.15);
+}
+
+/* Custom dropdown arrow */
+.participation-select {
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%2323335b' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+}
+/*Release points*/
+.release-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: #30bdb7;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.release-btn:hover {
+  background: #28a9a4;
 }

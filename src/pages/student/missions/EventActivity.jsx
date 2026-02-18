@@ -95,14 +95,9 @@ export default function EventActivity() {
         setQRStatus("This QR code is not valid for this event.");
         return;
       }
-      // Validate QR timestamp against stored valid timestamp
-      const missionDoc = await getDoc(doc(db, "missions", projectId));
-      if (missionDoc.exists()) {
-        const validTimestamp = missionDoc.data()?.validQRTimestamp;
-        if (validTimestamp && parsed.timestamp !== validTimestamp) {
-          setQRStatus("This QR code has been invalidated. Please use the current code.");
-          return;
-        }
+      if (Date.now() > parsed.expiresAt) {
+        setQRStatus("QR code has expired.");
+        return;
       }
 
       // Save scan location to volunteer doc (best-effort) and mark attendance present

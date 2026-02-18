@@ -24,6 +24,7 @@ import StudentHome from "./pages/student/StudentHome";
 import ProposeProject from "./pages/global/ProposeProject";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import PartnerHome from "./pages/partner/PartnerHome";
+import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
 import EventDetails from "./pages/student/missions/EventDetails";
 import EventActivity from "./pages/student/missions/EventActivity";
 import Profile from "./pages/global/Profile";
@@ -89,6 +90,10 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="global/feedback/:missionId"
+            element={<CommunityFeedbackForm />}
+          />
           {/* <Route
             path="/student/propose-project"
             element={
@@ -108,6 +113,8 @@ function App() {
             <Route path="projects" element={<ProjectList mode="faculty" />} />
           </Route>
 
+
+          {/* Partner Routes */}
           <Route
             path="/partner"
             element={

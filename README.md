@@ -17,9 +17,6 @@ Export yung changes -> firebase emulators:export ./emulator_data
 
 if hindi gumana export, use -> firebase emulators:export ./emulator_data --force
 
-
-
-
 isang run ng import and export -> firebase emulators:start --import=./emulator_data --export-on-exit
 
 
@@ -30,14 +27,16 @@ kung pagkaexport niyo parang nareplace yung folder from "emulator_data" to whate
 close niyo lang lahat from database to vite(react) tas run this command 
 
 Rename-Item (currentname)  emulator_data
-Example: Rename-Item -Path "firebase-export-1767812823428G3B94I" -NewName "emulator_data"
+Example: 
+Rename-Item "firebase-export-1771294464230IiaRGc" -NewName "emulator_data"
 
 Hi, for material-icons, install lang ito:
 close yung run npm dev.
 "npm install @mui/material @mui/icons-material @emotion/react @emotion/styled"
 then run npm dev again.
 
-
+for QR naginstall ako na pang-react,
+install: npm install qrcode.react
 
 
 
