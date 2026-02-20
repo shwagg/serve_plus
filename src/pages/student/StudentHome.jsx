@@ -521,7 +521,27 @@ const StudentHome = () => {
                     className={`podium-item rank-${rank}`}
                   >
                     <div className="podium-top">
-                      <div className="podium-avatar-wrap">
+                      <div
+                        className="podium-avatar-wrap"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (window && typeof window.showUserProfile === "function") {
+                            window.showUserProfile(user.uid);
+                          } else {
+                            window.location.href = `/profile/${user.uid}`;
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            if (window && typeof window.showUserProfile === "function") {
+                              window.showUserProfile(user.uid);
+                            } else {
+                              window.location.href = `/profile/${user.uid}`;
+                            }
+                          }
+                        }}
+                      >
                         <img
                           src={user.avatar}
                           alt={user.name}
@@ -548,8 +568,25 @@ const StudentHome = () => {
                   <div
                     key={user.uid}
                     ref={user.uid === currentUserId ? currentUserRef : null}
-                    className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""
-                      }`}
+                    className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (window && typeof window.showUserProfile === "function") {
+                        window.showUserProfile(user.uid);
+                      } else {
+                        window.location.href = `/profile/${user.uid}`;
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        if (window && typeof window.showUserProfile === "function") {
+                          window.showUserProfile(user.uid);
+                        } else {
+                          window.location.href = `/profile/${user.uid}`;
+                        }
+                      }
+                    }}
                   >
                     <span className="rank-num">{rank}</span>
                     <img

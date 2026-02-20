@@ -4,6 +4,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   query,
   orderBy,
   limit,
@@ -14,6 +15,8 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 import "../styles/GlobalAnnouncements.css";
+import UserProfileModal from './UserProfileModal';
+import '../styles/UserProfileModal.css';
 
 const GlobalAnnouncements = () => {
   const sdgLabelMap = {
@@ -54,6 +57,7 @@ const GlobalAnnouncements = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [modalType, setModalType] = useState('event'); // 'event', 'closing', 'milestone', 'info', or 'full'
+  const [profileUser, setProfileUser] = useState(null);
 
   const toKey = (type, id) => `${type}:${id}`;
 
@@ -69,7 +73,6 @@ const GlobalAnnouncements = () => {
       calculateUnreadCount(next);
       return;
     }
-
     try {
       const readRef = doc(db, 'users', userId, 'globalAnnouncementReads', key);
       await setDoc(readRef, {
@@ -286,15 +289,16 @@ const GlobalAnnouncements = () => {
           }
         }
 
-        // Get top 3 volunteers
+        // Get top 3 volunteers and include their ids for clickable profiles
         if (userPointsMap.size > 0) {
           const topVolunteers = Array.from(userPointsMap.entries())
             .sort((a, b) => b[1].totalPoints - a[1].totalPoints)
-            .slice(0, 3);
-          
+            .slice(0, 3)
+            .map(([id, meta]) => ({ id, name: meta.name, totalPoints: meta.totalPoints, events: meta.events }));
+
           const leaderboardText = topVolunteers.map((entry, idx) => {
             const emoji = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
-            return `${emoji} ${entry[1].name} - ${entry[1].totalPoints} pts`;
+            return `${emoji} ${entry.name} - ${entry.totalPoints} pts`;
           }).join(' • ');
 
           extraArr.push({
@@ -304,6 +308,7 @@ const GlobalAnnouncements = () => {
             message: `Leading our community impact: ${leaderboardText}`,
             link: '/student/home',
             createdAt: new Date(),
+            topVolunteers
           });
         }
 
@@ -321,6 +326,26 @@ const GlobalAnnouncements = () => {
       setUserId(user?.uid || null);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Expose a global helper to open a user profile by id
+  useEffect(() => {
+    window.showUserProfile = async (userId) => {
+      if (!userId) return;
+      try {
+        const userRef = doc(db, 'users', userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap && userSnap.exists && userSnap.data()) {
+          setProfileUser({ id: userSnap.id, ...userSnap.data() });
+          return;
+        }
+        setProfileUser({ id: userId, name: 'Unknown user', uid: userId });
+      } catch (err) {
+        console.error('showUserProfile error', err);
+        setProfileUser({ id: userId, name: 'Unknown user', uid: userId });
+      }
+    };
+    return () => { window.showUserProfile = undefined; };
   }, []);
 
   useEffect(() => {
@@ -840,6 +865,10 @@ const GlobalAnnouncements = () => {
           </div>
         </div>,
         document.body
+      )}
+
+      {profileUser && (
+        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
       )}
     </div>
   );

@@ -357,6 +357,7 @@
   display: flex;
   justify-content: center;
 }
+.podium-avatar-wrap{ cursor: pointer; pointer-events: auto; z-index: 3; }
 .podium-avatar-wrap img {
   width: 110px;
   height: 110px;
@@ -512,6 +513,7 @@
   background: #f9fafb;;
   font-size: 14px;
 }
+.leaderboard-row{ cursor: pointer; pointer-events: auto; }
 
 .leaderboard-row.is-current-user {
   background: #e6fdf6;

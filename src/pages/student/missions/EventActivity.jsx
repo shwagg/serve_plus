@@ -1456,6 +1456,21 @@ export default function EventActivity() {
     return `${rank}th`;
   };
 
+  const openUserProfile = (uid) => {
+    if (!uid) return;
+    try {
+      if (window.showUserProfile && typeof window.showUserProfile === "function") {
+        window.showUserProfile(uid);
+        console.debug("openUserProfile -> window.showUserProfile", uid);
+        return;
+      }
+    } catch (err) {
+      console.warn("error calling window.showUserProfile", err);
+    }
+    // fallback to profile route
+    navigate(`/profile/${uid}`);
+  };
+
   return (
     <div className="full-page">
       <Header />
@@ -1546,7 +1561,19 @@ export default function EventActivity() {
                     return (
                       <div key={user.uid} className={`podium-item rank-${rank}`}>
                         <div className="podium-top">
-                          <div className="podium-avatar-wrap">
+                          <div
+                            className="podium-avatar-wrap"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Open profile for ${user.name}`}
+                            onClick={() => openUserProfile(user.uid)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                openUserProfile(user.uid);
+                                e.preventDefault();
+                              }
+                            }}
+                          >
                             <img src={user.avatar} alt={user.name} />
                             <span className="podium-rank">{rank}</span>
                           </div>
@@ -1573,8 +1600,17 @@ export default function EventActivity() {
                         <div
                           key={user.uid}
                           ref={user.uid === currentUserId ? currentUserRef : null}
-                          className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""
-                            }`}
+                          className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""}`}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Open profile for ${user.name}`}
+                          onClick={() => openUserProfile(user.uid)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              openUserProfile(user.uid);
+                              e.preventDefault();
+                            }
+                          }}
                         >
                           <span className="rank-num">{rank}</span>
                           <img
