@@ -21,6 +21,8 @@ export default function ProjectTasks() {
     description: "",
     dueDate: "",
     points: 0,
+    type: "individual",
+    maxParticipants: 5,
   });
 
   // Load project info
@@ -88,13 +90,21 @@ export default function ProjectTasks() {
       const nextId = snap.size.toString();
 
       const taskRef = doc(db, "missions", projectId, "task", nextId);
-      await setDoc(taskRef, {
+      const taskData = {
         title: formData.title,
         description: formData.description,
         dueDate: formData.dueDate,
         points: parseInt(formData.points) || 0,
+        type: formData.type || "individual",
         createdAt: new Date().toISOString(),
-      });
+      };
+      
+      // Add maxParticipants only for grouped tasks
+      if (formData.type === "grouped") {
+        taskData.maxParticipants = parseInt(formData.maxParticipants) || 5;
+      }
+      
+      await setDoc(taskRef, taskData);
 
       // Reset form
       setFormData({
@@ -102,6 +112,8 @@ export default function ProjectTasks() {
         description: "",
         dueDate: "",
         points: 0,
+        type: "individual",
+        maxParticipants: 5,
       });
       setShowForm(false);
       await loadTasks();
@@ -123,12 +135,20 @@ export default function ProjectTasks() {
     setSaving(true);
     try {
       const taskRef = doc(db, "missions", projectId, "task", editingTaskId);
-      await updateDoc(taskRef, {
+      const updateData = {
         title: formData.title,
         description: formData.description,
         dueDate: formData.dueDate,
         points: parseInt(formData.points) || 0,
-      });
+        type: formData.type || "individual",
+      };
+      
+      // Add maxParticipants only for grouped tasks
+      if (formData.type === "grouped") {
+        updateData.maxParticipants = parseInt(formData.maxParticipants) || 5;
+      }
+      
+      await updateDoc(taskRef, updateData);
 
       // Reset form
       setFormData({
@@ -136,6 +156,8 @@ export default function ProjectTasks() {
         description: "",
         dueDate: "",
         points: 0,
+        type: "individual",
+        maxParticipants: 5,
       });
       setEditingTaskId(null);
       setShowForm(false);
@@ -171,6 +193,8 @@ export default function ProjectTasks() {
       description: task.description || "",
       dueDate: task.dueDate || "",
       points: task.points || 0,
+      type: task.type || "individual",
+      maxParticipants: task.maxParticipants || 5,
     });
     setShowForm(true);
   };
@@ -183,6 +207,8 @@ export default function ProjectTasks() {
       description: "",
       dueDate: "",
       points: 0,
+      type: "individual",
+      maxParticipants: 5,
     });
   };
 
@@ -313,6 +339,67 @@ export default function ProjectTasks() {
                 />
               </div>
 
+              <div style={{ marginBottom: 12 }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: 4,
+                    fontWeight: 600,
+                    color: "#111",
+                  }}
+                >
+                  Task Type
+                </label>
+                <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                  <label style={{ display: "flex", alignItems: "center", cursor: "pointer", color: "#111" }}>
+                    <input
+                      type="radio"
+                      name="type"
+                      value="individual"
+                      checked={formData.type === "individual"}
+                      onChange={handleInputChange}
+                      style={{ marginRight: 6 }}
+                    />
+                    Individual
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", cursor: "pointer", color: "#111" }}>
+                    <input
+                      type="radio"
+                      name="type"
+                      value="grouped"
+                      checked={formData.type === "grouped"}
+                      onChange={handleInputChange}
+                      style={{ marginRight: 6 }}
+                    />
+                    Grouped
+                  </label>
+                </div>
+              </div>
+
+              {formData.type === "grouped" && (
+                <div style={{ marginBottom: 12 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                      color: "#111",
+                    }}
+                  >
+                    Max Members per Group
+                  </label>
+                  <input
+                    type="number"
+                    name="maxParticipants"
+                    value={formData.maxParticipants}
+                    onChange={handleInputChange}
+                    min="2"
+                    max="50"
+                    style={{ width: "100%", padding: 8, fontSize: 14 }}
+                  />
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="submit"
@@ -396,8 +483,17 @@ export default function ProjectTasks() {
                       gap: 16,
                       marginTop: 12,
                       fontSize: 13,
+                      flexWrap: "wrap",
                     }}
                   >
+                    <div style={{ color: "#111", fontWeight: 600 }}>
+                      <strong>Type:</strong> {task.type === "grouped" ? "Grouped" : "Individual"}
+                    </div>
+                    {task.type === "grouped" && task.maxParticipants && (
+                      <div style={{ color: "#1976d2", fontWeight: 600 }}>
+                        <strong>Max per Group:</strong> {task.maxParticipants}
+                      </div>
+                    )}
                     {task.points !== undefined && (
                       <div style={{ color: "#388e3c", fontWeight: 600 }}>
                         <strong>Points:</strong> {task.points}

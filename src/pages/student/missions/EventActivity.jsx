@@ -9,6 +9,7 @@ import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
 import { useSession } from '../../../context/SessionContext';
+import ChooseGroup from './ChooseGroup';
 //styles
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
@@ -48,6 +49,9 @@ export default function EventActivity() {
   const [showPreSurveyModal, setShowPreSurveyModal] = useState(false);
   // State for post-activity survey modal
   const [showPostSurveyModal, setShowPostSurveyModal] = useState(false);
+  // State for group selection modal
+  const [showChooseGroupModal, setShowChooseGroupModal] = useState(false);
+  const [selectedGroupTask, setSelectedGroupTask] = useState(null);
   const { id } = useParams();
   const navigate = useNavigate();
   const auth = getAuth();
@@ -536,12 +540,22 @@ export default function EventActivity() {
     }
   };
 
-  const handleJoinActivity = async (taskId) => {
+  const handleJoinActivity = async (taskId, task) => {
     const user = auth.currentUser;
     if (!user) {
       alert("You must be logged in to join an activity.");
       return;
     }
+
+    // Check if task is grouped
+    if (task?.type === "grouped") {
+      // Show group selection modal
+      setSelectedGroupTask({ taskId, task });
+      setShowChooseGroupModal(true);
+      return;
+    }
+
+    // Individual task - proceed with direct enrollment
     try {
       const participantRef = doc(
         db,
@@ -573,6 +587,46 @@ export default function EventActivity() {
       alert("Successfully enrolled in the activity!");
     } catch (err) {
       console.error("Error enrolling in activity:", err);
+      alert("Failed to enroll. Please try again.");
+    }
+  };
+
+  // Handle group selection for grouped tasks
+  const handleGroupSelected = async ({ groupId, isNew }) => {
+    const user = auth.currentUser;
+    if (!user || !selectedGroupTask) return;
+
+    const { taskId } = selectedGroupTask;
+
+    try {
+      const participantRef = doc(
+        db,
+        "missions",
+        id,
+        "task",
+        taskId,
+        "participants",
+        user.uid
+      );
+
+      // Create participant document with group info
+      await setDoc(participantRef, {
+        status: "enrolled",
+        groupId: groupId,
+        role: "",
+        proof: "",
+        reflection: "",
+        joinedAt: new Date().toISOString(),
+      });
+
+      // Update local state
+      setEnrolledTasks((prev) => ({ ...prev, [taskId]: true }));
+      alert(`Successfully joined ${isNew ? 'new' : ''} group!`);
+      
+      // Reload tasks to reflect enrollment
+      await fetchUserJournals();
+    } catch (err) {
+      console.error("Error enrolling in grouped activity:", err);
       alert("Failed to enroll. Please try again.");
     }
   };
@@ -1656,9 +1710,9 @@ export default function EventActivity() {
                       ) : canJoinActivities ? (
                         <button
                           className="req-action"
-                          onClick={() => handleJoinActivity(activity.id)}
+                          onClick={() => handleJoinActivity(activity.id, activity)}
                         >
-                          Join
+                          Join {activity.type === "grouped" ? "Group" : ""}
                         </button>
                       ) : (
                         <span className="req-status locked">Closed</span>
@@ -2127,6 +2181,25 @@ export default function EventActivity() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ChooseGroup Modal for Grouped Tasks */}
+      {showChooseGroupModal && selectedGroupTask && (
+        <ChooseGroup
+          open={showChooseGroupModal}
+          onClose={() => {
+            setShowChooseGroupModal(false);
+            setSelectedGroupTask(null);
+          }}
+          taskId={selectedGroupTask.taskId}
+          missionId={id}
+          user={{
+            uid: auth.currentUser?.uid,
+            displayName: userData?.name || auth.currentUser?.displayName || "",
+            name: userData?.name || "",
+          }}
+          onGroupSelected={handleGroupSelected}
+        />
       )}
     </div>
   );
