@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
-import { doc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 
 function Register() {
@@ -101,11 +101,18 @@ function Register() {
                 levelProgress: 0,
                 skills: ["React", "Firebase", "UI/UX"],
                 interests: ["Design", "Coding", "Music"],
-                achievements: ["Welcome!"],
                 eventHistory
             });
 
-            // 4. Redirect to login
+            // 4. Create rewards subcollection with welcome achievement
+            await setDoc(doc(db, "users", uid, "rewards", "welcome"), {
+                id: "welcome",
+                name: "Welcome!",
+                description: "Awarded for creating an account",
+                createdAt: serverTimestamp()
+            });
+
+            // 5. Redirect to login
             alert("Account created successfully! Please log in.");
             navigate("/", { replace: true });
         } catch (err) {

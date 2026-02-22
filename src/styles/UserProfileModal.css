@@ -29,4 +29,4 @@
 .upm-stats{display:flex;gap:12px;margin-top:12px}
 .upm-stat{background:#f4f4f6;padding:6px 10px;border-radius:6px;font-size:13px}
 .upm-actions{margin-top:14px;text-align:right}
-.upm-btn{text-decoration:none;padding:8px 12px;background:#2f6fda;color:white;border-radius:6px}
+.upm-btn{padding:8px 12px;background:#2f6fda;color:white;border-radius:6px;border:none;cursor:pointer;font-size:14px;font-weight:600;text-decoration:none;}

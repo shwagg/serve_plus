@@ -1,11 +1,17 @@
 import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import '../styles/UserProfileModal.css';
 
 const DEFAULT_LOCAL = '/assets/headassets/default-avatar.png';
 
 const UserProfileModal = ({ user, onClose }) => {
   if (!user) return null;
+  const navigate = useNavigate();
+  const handleViewProfile = () => {
+    onClose();
+    navigate(`/profile/${user.uid || user.id || ''}`);
+  };
 
   const displayName = user.displayName || user.name || user.username || (user.email ? user.email.split('@')[0] : '') || 'User';
 
@@ -54,7 +60,7 @@ const UserProfileModal = ({ user, onClose }) => {
         </div>
 
         <div className="upm-actions">
-          <a className="upm-btn" href={`/profile/${user.uid || user.id || ''}`}>View full profile</a>
+          <button className="upm-btn" onClick={handleViewProfile}>View full profile</button>
         </div>
       </div>
     </div>,

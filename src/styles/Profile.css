@@ -327,6 +327,28 @@
   font-weight: 600;
 }
 
+/* Rewards section */
+.profile-reward-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f7f7f7;
+  border-radius: 8px;
+  padding: 4px 8px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.profile-reward-icon {
+  font-size: 20px;
+}
+.profile-reward-name {
+  color: #234e7b;
+  font-weight: 600;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
 @media (max-width: 1100px) {
   .profile-main-flex {
     flex-direction: column;

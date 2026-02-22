@@ -29,6 +29,11 @@ service cloud.firestore {
       match /globalAnnouncementReads/{readId} {
         allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Rewards subcollection
+      match /rewards/{rewardId} {
+        allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // Allow open read access for development

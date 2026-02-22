@@ -12,6 +12,7 @@ import StudentHome from "../pages/student/StudentHome";
 import EventActivity from "../pages/student/missions/EventActivity";
 import EventDetails from "../pages/student/missions/EventDetails";
 import Profile from "../pages/global/Profile";
+import PublicProfile from "../pages/global/PublicProfile";
 import ViewProposals from "../pages/global/ViewProposals";
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -24,6 +25,7 @@ export default function AppRouter() {
         <Route path="/event/:id" element={<EventDetails />} />
         <Route path="/event/:id/activity" element={<EventActivity />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/:uid" element={<PublicProfile />} />
 
         {/* Global routes */}
         <Route path="/global/project-proposal" element={<ProjectProposal />} />

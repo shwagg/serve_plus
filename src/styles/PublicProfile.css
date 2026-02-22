@@ -1,0 +1,272 @@
+/* Public Profile Page */
+.pub-profile-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+/* Header Card */
+.pub-profile-header-card {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 2px 16px rgba(30, 64, 175, 0.10);
+  border: 1.5px solid #e5e7eb;
+  padding: 28px 32px;
+  margin-bottom: 28px;
+}
+
+.pub-profile-avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #30bdb7;
+  flex-shrink: 0;
+}
+
+.pub-profile-info {
+  flex: 1;
+}
+
+.pub-profile-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: #234e7b;
+  margin: 0 0 4px 0;
+}
+
+.pub-profile-email {
+  color: #6b7280;
+  font-size: 14px;
+  margin: 0 0 8px 0;
+}
+
+.pub-profile-bio {
+  color: #374151;
+  font-size: 14px;
+  margin: 0 0 14px 0;
+}
+
+.pub-profile-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.pub-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f0fdfc;
+  border-radius: 10px;
+  padding: 8px 18px;
+  min-width: 70px;
+}
+
+.pub-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #30bdb7;
+}
+
+.pub-stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* Tabs */
+.pub-profile-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 24px;
+}
+
+.pub-profile-tab-btn {
+  background: none;
+  border: none;
+  padding: 10px 22px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+  border-radius: 6px 6px 0 0;
+}
+
+.pub-profile-tab-btn:hover {
+  color: #30bdb7;
+  background: #f0fdfc;
+}
+
+.pub-profile-tab-btn.active {
+  color: #234e7b;
+  font-weight: 700;
+  border-bottom: 2px solid #30bdb7;
+  background: #f0fdfc;
+}
+
+/* Tab Content */
+.pub-profile-tab-content {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(30, 64, 175, 0.07);
+  border: 1.5px solid #e5e7eb;
+  padding: 28px;
+}
+
+.pub-profile-section {
+  margin-bottom: 24px;
+}
+
+.pub-profile-section h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #234e7b;
+  margin: 0 0 12px 0;
+}
+
+.pub-badge-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pub-empty-msg {
+  color: #6b7280;
+  font-style: italic;
+  padding: 12px 0;
+}
+
+/* Events List */
+.pub-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pub-event-card {
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  padding: 14px 18px;
+}
+
+.pub-event-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 6px;
+}
+
+.pub-event-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pub-event-role {
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.pub-event-date {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.pub-event-points {
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* Rewards Grid */
+.pub-rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.pub-reward-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: box-shadow 0.2s;
+}
+
+.pub-reward-card:hover {
+  box-shadow: 0 4px 12px rgba(48, 189, 183, 0.15);
+  border-color: #30bdb7;
+}
+
+.pub-reward-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.pub-reward-icon img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.pub-reward-default-icon {
+  font-size: 40px;
+}
+
+.pub-reward-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #234e7b;
+  margin-bottom: 4px;
+}
+
+.pub-reward-desc {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Overview */
+.pub-profile-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .pub-profile-header-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .pub-profile-stats {
+    justify-content: center;
+  }
+
+  .pub-profile-tabs {
+    overflow-x: auto;
+  }
+}

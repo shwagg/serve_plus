@@ -28,6 +28,7 @@ import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
 import EventDetails from "./pages/student/missions/EventDetails";
 import EventActivity from "./pages/student/missions/EventActivity";
 import Profile from "./pages/global/Profile";
+import PublicProfile from "./pages/global/PublicProfile";
 import Chat from "./pages/global/Chat";
 import "./App.css";
 
@@ -138,6 +139,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile/:uid"
+            element={
+              <ProtectedRoute>
+                <PublicProfile />
               </ProtectedRoute>
             }
           />

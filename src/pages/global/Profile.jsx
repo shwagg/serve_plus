@@ -241,6 +241,7 @@ const mockProfile = {
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
+  const [rewards, setRewards] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -296,6 +297,10 @@ export default function Profile() {
         profileData.levelProgress = pointsInCurrentLevel;
 
         setProfile(profileData);
+
+        // Fetch rewards from subcollection
+        const rewardsSnap = await getDocs(collection(db, "users", user.uid, "rewards"));
+        setRewards(rewardsSnap.docs.map(r => ({ id: r.id, ...r.data() })));
       } catch (err) {
         setError("Failed to load profile.");
         setProfile(mockProfile);
@@ -352,12 +357,18 @@ export default function Profile() {
             </div>
           </div>
           <div style={{ width: "100%", marginTop: 18 }}>
-            <div className="profile-achievements-label" style={{ fontWeight: 600, marginBottom: 6 }}>Achievements</div>
+            <div className="profile-achievements-label" style={{ fontWeight: 600, marginBottom: 6 }}>Rewards</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {profile.achievements && profile.achievements.map(ach => (
-                <span className="profile-badge" key={ach} title={ach}>
-                  <span style={{ color: "#234e7b", fontWeight: 700, fontSize: 18 }}>{ach[0]}</span>
-                </span>
+              {rewards.map(reward => (
+                <div
+                  key={reward.id}
+                  className="profile-reward-container"
+                >
+                  <span className="profile-reward-icon">{reward.icon || "🏅"}</span>
+                  <span className="profile-reward-name">
+                    {reward.name || reward.id}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
