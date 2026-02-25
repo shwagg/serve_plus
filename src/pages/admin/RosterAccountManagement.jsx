@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteField } from "firebase/firestore";
 import "../../styles/RosterAccountManagement.css";
 import ViewAccountIcon from "../../components/icons/ViewAccount.svg";
 import ChangeIcon from "../../components/icons/Change.svg";
@@ -21,6 +21,7 @@ export default function RosterAccountManagement() {
   // Position options based on role
   const positionsByRole = {
     faculty: [
+      "regular",
       "program chair",
       "cluster head",
       "college engagement head",
@@ -117,19 +118,84 @@ export default function RosterAccountManagement() {
 
     try {
       const userRef = doc(db, "users", userId);
-      const updateData = { role: selectedRole };
-      
-      // Include position if role requires it
-      if (selectedRole === "faculty" || selectedRole === "admin") {
-        updateData.position = selectedPosition;
+      // Find the current user object
+      const currentUser = users.find(u => u.id === userId) || {};
+      let updateData = { role: selectedRole };
+
+      // Student role: delete position, add student fields
+      if (selectedRole === "student") {
+        updateData = {
+          ...updateData,
+          position: deleteField(),
+          skills: currentUser.skills || [],
+          eventHistory: currentUser.eventHistory || [],
+          interests: currentUser.interests || [],
+          level: currentUser.level || 1,
+          levelprogress: currentUser.levelprogress || 0
+        };
+      } else if (selectedRole === "faculty" || selectedRole === "admin") {
+        // Faculty/Admin: set position, delete student fields
+        updateData = {
+          ...updateData,
+          position: selectedPosition,
+          skills: deleteField(),
+          eventHistory: deleteField(),
+          interests: deleteField(),
+          level: deleteField(),
+          levelProgress: deleteField()
+        };
+      } else {
+        // Partner or other roles: delete both position and student fields
+        updateData = {
+          ...updateData,
+          position: deleteField(),
+          skills: deleteField(),
+          eventHistory: deleteField(),
+          interests: deleteField(),
+          level: deleteField(),
+          levelProgress: deleteField()
+        };
       }
-      
+
       await updateDoc(userRef, updateData);
 
       // Update local state
-      setUsers(users.map(user => 
-        user.id === userId ? { ...user, role: selectedRole, position: updateData.position || null } : user
-      ));
+      setUsers(users.map(user => {
+        if (user.id !== userId) return user;
+        let updatedUser = { ...user, role: selectedRole };
+        if (selectedRole === "student") {
+          updatedUser = {
+            ...updatedUser,
+            position: undefined,
+            skills: user.skills || [],
+            eventHistory: user.eventHistory || [],
+            interests: user.interests || [],
+            level: user.level || 1,
+            levelprogress: user.levelprogress || 0
+          };
+        } else if (selectedRole === "faculty" || selectedRole === "admin") {
+          updatedUser = {
+            ...updatedUser,
+            position: selectedPosition
+          };
+          delete updatedUser.skills;
+          delete updatedUser.eventHistory;
+          delete updatedUser.interests;
+          delete updatedUser.level;
+          delete updatedUser.levelprogress;
+        } else {
+          updatedUser = {
+            ...updatedUser
+          };
+          delete updatedUser.position;
+          delete updatedUser.skills;
+          delete updatedUser.eventHistory;
+          delete updatedUser.interests;
+          delete updatedUser.level;
+          delete updatedUser.levelprogress;
+        }
+        return updatedUser;
+      }));
 
       setEditingRoleUserId(null);
       setSelectedRole("");
