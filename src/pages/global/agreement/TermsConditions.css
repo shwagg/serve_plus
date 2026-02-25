@@ -1,0 +1,92 @@
+.agreement-page {
+  background-color: #ffffff;
+  min-height: 100vh;
+  display: flex;
+  width: 100%;
+  position: relative;
+}
+
+.agreement-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 2.5rem;
+  padding-top: calc(60px + 2rem);
+  background: #fff;
+}
+
+.agreement-content h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #1a1a2e;
+}
+
+.agreement-content h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #1a1a2e;
+}
+
+.agreement-content p,
+.agreement-content li {
+  font-size: 1rem;
+  color: #444;
+  line-height: 1.7;
+}
+
+.agreement-content ul {
+  padding-left: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.agreement-divider {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 2rem 0;
+}
+
+.agreement-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.agreement-tab-active {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  padding: 0.4rem 1.2rem 0.4rem 0;
+  border-bottom: 3px solid #1976d2;
+  margin-bottom: -2px;
+  flex: 1;
+}
+
+.agreement-tab-link {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #1976d2;
+  text-decoration: none;
+  padding: 0.4rem 0 0.4rem 1.2rem;
+  border-left: 1px solid #e0e0e0;
+  margin-bottom: -2px;
+  transition:
+    color 0.2s,
+    background 0.2s;
+  cursor: pointer;
+  background: none;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.agreement-tab-link:hover {
+  color: #1558a8;
+  text-decoration: underline;
+}

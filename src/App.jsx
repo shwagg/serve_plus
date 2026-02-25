@@ -1,36 +1,43 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+} from "react-router-dom";
 import { SessionProvider } from "./context/SessionContext";
-import { ProtectedRoute } from "./router/ProtectedRoute";
-import { useUpcomingEventNotifications } from "./hooks/useUpcomingEventNotifications";
 import { useOverdueReflectionNotifications } from "./hooks/useOverdueReflectionNotifications";
+import { useUpcomingEventNotifications } from "./hooks/useUpcomingEventNotifications";
+import PrivacyPolicy from "./pages/global/agreement/PrivacyPolicy";
+import TermsCondition from "./pages/global/agreement/TermsCondition";
+import { ProtectedRoute } from "./router/ProtectedRoute";
 
+import "./App.css";
 import Auth from "./pages/Auth"; //changed login to authorization page
+import ForgotPass from "./pages/ForgotPass";
 import OAuthCallback from "./pages/OAuthCallback";
 import Register from "./pages/Register";
-import ForgotPass from "./pages/ForgotPass";
-import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import DocumentLibrary from "./pages/admin/DocumentLibrary";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AuditLogs from "./pages/admin/AuditLogs";
+import CurrentEvent from "./pages/admin/CurrentEvent";
 import CurrentEventMonitoring from "./pages/admin/CurrentEventMonitoring";
-import ProjectList from "./pages/global/ProjectList";
-import ProjectProposal from "./pages/global/proposal/ProjectProposal";
-import ReviewProposal from "./pages/global/proposal/ReviewProposal";
+import DocumentLibrary from "./pages/admin/DocumentLibrary";
 import ProjectDetails from "./pages/admin/ProjectDetails";
 import ProjectTasks from "./pages/admin/ProjectTasks";
-import CurrentEvent from "./pages/admin/CurrentEvent";
-import AuditLogs from "./pages/admin/AuditLogs";
 import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
-import StudentHome from "./pages/student/StudentHome";
-import ProposeProject from "./pages/global/ProposeProject";
 import FacultyHome from "./pages/faculty/FacultyHome";
-import PartnerHome from "./pages/partner/PartnerHome";
-import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
-import EventDetails from "./pages/student/missions/EventDetails";
-import EventActivity from "./pages/student/missions/EventActivity";
-import Profile from "./pages/global/Profile";
-import PublicProfile from "./pages/global/PublicProfile";
 import Chat from "./pages/global/Chat";
-import "./App.css";
+import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
+import Profile from "./pages/global/Profile";
+import ProjectList from "./pages/global/ProjectList";
+import ProposeProject from "./pages/global/ProposeProject";
+import PublicProfile from "./pages/global/PublicProfile";
+import ProjectProposal from "./pages/global/proposal/ProjectProposal";
+import ReviewProposal from "./pages/global/proposal/ReviewProposal";
+import PartnerHome from "./pages/partner/PartnerHome";
+import StudentHome from "./pages/student/StudentHome";
+import EventActivity from "./pages/student/missions/EventActivity";
+import EventDetails from "./pages/student/missions/EventDetails";
 
 function App() {
   // Check for upcoming events and create notifications
@@ -57,14 +64,26 @@ function App() {
           >
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="documents" element={<DocumentLibrary />} />
-            <Route path="events/:eventId" element={<CurrentEventMonitoring />} />
+            <Route
+              path="events/:eventId"
+              element={<CurrentEventMonitoring />}
+            />
             <Route path="projects" element={<ProjectList />} />
             <Route path="projects/proposal" element={<ProposeProject />} />
-            <Route path="projects/:projectId" element={<ProjectDetails mode="admin" />} />
-            <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
+            <Route
+              path="projects/:projectId"
+              element={<ProjectDetails mode="admin" />}
+            />
+            <Route
+              path="projects/:projectId/tasks"
+              element={<ProjectTasks />}
+            />
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
-            <Route path="current-event/:missionId?" element={<CurrentEvent />} />
+            <Route
+              path="current-event/:missionId?"
+              element={<CurrentEvent />}
+            />
           </Route>
 
           <Route
@@ -114,7 +133,6 @@ function App() {
             <Route path="projects" element={<ProjectList mode="faculty" />} />
           </Route>
 
-
           {/* Partner Routes */}
           <Route
             path="/partner"
@@ -126,14 +144,8 @@ function App() {
           >
             <Route path="projects" element={<ProjectList mode="partner" />} />
           </Route>
-          <Route
-            path="/event/:id"
-            element={<EventDetails />}
-          />
-          <Route
-            path="/event/:id/activity"
-            element={<EventActivity />}
-          />
+          <Route path="/event/:id" element={<EventDetails />} />
+          <Route path="/event/:id/activity" element={<EventActivity />} />
           <Route
             path="/profile"
             element={
@@ -166,10 +178,12 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/global/terms-condition" element={<TermsCondition />} />
+          <Route path="/global/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>
-    </SessionProvider >
+    </SessionProvider>
   );
 }
 
