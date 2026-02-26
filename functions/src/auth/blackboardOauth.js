@@ -51,11 +51,18 @@ async function fetchBlackboardUserProfile(accessToken) {
 
 //update/create user in firestore
 async function createOrUpdateUser(blackboardProfile, uid) {
+  if (!uid) {
+    throw new Error("Cannot create/update user: uid is required");
+  }
+
   const userRef = admin.firestore().collection("users").doc(uid);
 
   const userData = {
-    email: blackboardProfile.email,
-    displayName: blackboardProfile.name || blackboardProfile.userName,
+    email: blackboardProfile.email || blackboardProfile.contact?.email || "",
+    displayName:
+      blackboardProfile.name?.given && blackboardProfile.name?.family
+        ? `${blackboardProfile.name.given} ${blackboardProfile.name.family}`
+        : blackboardProfile.userName || "Blackboard User",
     blackboardId: blackboardProfile.id,
     blackboardUsername: blackboardProfile.userName,
     authProvider: "blackboard",
@@ -65,7 +72,7 @@ async function createOrUpdateUser(blackboardProfile, uid) {
 
   // Check if user exists
   const userSnap = await userRef.get();
-  if (userSnap.exists()) {
+  if (userSnap.exists) {
     // Update existing user
     await userRef.update(userData);
   } else {

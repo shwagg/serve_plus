@@ -1,4 +1,7 @@
-process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+// Only set emulator host when running locally
+if (process.env.FUNCTIONS_EMULATOR === "true") {
+  process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+}
 
 const { onCall } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
@@ -32,3 +35,9 @@ exports.checkLoginAttempts = onCall(
 // mfa functions are defined in their module
 exports.sendMfaCode = sendMfaCode;
 exports.verifyMfaCode = verifyMfaCode;
+
+// Blackboard OAuth callback (HTTP request handler, not callable)
+const {
+  blackboardCallback,
+} = require("./src/auth/blackboardCallback");
+exports.blackboardCallback = blackboardCallback;
