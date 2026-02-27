@@ -1,18 +1,20 @@
 //Changed Login to Authorization page since it covers MFA as well.
 //After logging in, MFA are placed for admin since it has sensitive role such
-//as approving, publishing, issuing certificates, and other high impact actions. 
+//as approving, publishing, issuing certificates, and other high impact actions.
 
-import { useState, useEffect } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth, db, functions } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
+import AgreementModal, {
+  CURRENT_AGREEMENT_VERSION,
+} from "../components/AgreementModal";
+import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
+import { auth, db, functions } from "../firebaseConfig";
 import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
-import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
-
 
 function Auth() {
   const [email, setEmail] = useState("");
@@ -29,6 +31,10 @@ function Auth() {
   const [mfaCode, setMfaCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+
+  // Agreement modal state
+  const [showAgreement, setShowAgreement] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null); // stores role, uid, email, userCred
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -48,7 +54,9 @@ function Auth() {
       if (lockCheck.data?.isLocked) {
         const lockUntil = new Date(lockCheck.data.lockUntil);
         const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
-        setError(`Account locked due to too many failed attempts. Try again in ${minutesLeft} minute(s).`);
+        setError(
+          `Account locked due to too many failed attempts. Try again in ${minutesLeft} minute(s).`,
+        );
         return;
       }
 
@@ -72,7 +80,7 @@ function Auth() {
               role: "student",
               status: "active",
               createdAt: new Date(),
-            })
+            }),
           );
           // Optional, fetch again to update userSnap
           const newSnap = await getDoc(userRef);
@@ -99,7 +107,7 @@ function Auth() {
       try {
         console.log("Sending to logLogin:", { uid });
         const logLogin = httpsCallable(functions, "logLogin");
-        const result = await logLogin({ uid });   // <-- THIS is what writes to auditLogs
+        const result = await logLogin({ uid }); // <-- THIS is what writes to auditLogs
         console.log("Audit log result:", result);
       } catch (auditErr) {
         console.warn("Audit log failed:", auditErr);
@@ -108,21 +116,33 @@ function Auth() {
 
       // Reset login attempts on successful login
       try {
-        const resetLoginAttempts = httpsCallable(functions, "resetLoginAttempts");
+        const resetLoginAttempts = httpsCallable(
+          functions,
+          "resetLoginAttempts",
+        );
         await resetLoginAttempts({ email });
         console.log("Login attempts reset for:", email);
       } catch (resetErr) {
         console.warn("Failed to reset login attempts:", resetErr);
       }
 
-      // ✅ 4. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
+      // ✅ 4. CHECK AGREEMENT VERSION before redirecting
+      const userAgreementVersion = userSnap.data().agreementVersion || null;
+
+      if (userAgreementVersion !== CURRENT_AGREEMENT_VERSION) {
+        // show modal when user hasn't accepted the latest agreements
+        setPendingNavigation({ role, uid, email, userCred });
+        setShowAgreement(true);
+        return;
+      }
+
+      // ✅ 5. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
       if (role === "admin") {
         try {
           const signedInEmail = userCred.user.email;
           setMfaEmail(signedInEmail);
           const sendMfaCode = httpsCallable(functions, "sendMfaCode");
           await sendMfaCode({ email: signedInEmail });
-
         } catch (mfaErr) {
           //(Only developers can see these errors)
           if (isDev) {
@@ -162,22 +182,27 @@ function Auth() {
       } else {
         navigate("/student/home", { replace: true });
       }
-
     } catch (err) {
       if (isDev) console.error("Login error:", err);
 
       //Record login failure
       try {
-        const recordLoginFailure = httpsCallable(functions, "recordLoginFailure");
+        const recordLoginFailure = httpsCallable(
+          functions,
+          "recordLoginFailure",
+        );
         const failureResult = await recordLoginFailure({ email });
 
         if (failureResult.data?.isLocked) {
           const lockUntil = new Date(failureResult.data.lockUntil);
           const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
-          setError(`Too many failed attempts. Account locked for ${minutesLeft} minute(s).`);
+          setError(
+            `Too many failed attempts. Account locked for ${minutesLeft} minute(s).`,
+          );
           return;
         } else if (failureResult.data?.attempts) {
-          const attemptsLeft = failureResult.data.maxAttempts - failureResult.data.attempts;
+          const attemptsLeft =
+            failureResult.data.maxAttempts - failureResult.data.attempts;
           console.log(`${attemptsLeft} attempts remaining before account lock`);
         }
       } catch (recordErr) {
@@ -203,7 +228,6 @@ function Auth() {
 
       setError(userMsg);
     }
-
   };
 
   //for verifying and resending MFA
@@ -244,10 +268,62 @@ function Auth() {
     }
   };
 
+  // After the user accepts the agreements, proceed auth flow
+  const handleAgreementAccepted = async () => {
+    setShowAgreement(false);
+    if (!pendingNavigation) return;
 
+    const { role, email: pendingEmail, userCred } = pendingNavigation;
+
+    if (role === "admin") {
+      try {
+        const signedInEmail = userCred.user.email;
+        setMfaEmail(signedInEmail);
+        const sendMfaCode = httpsCallable(functions, "sendMfaCode");
+        await sendMfaCode({ email: signedInEmail });
+      } catch (mfaErr) {
+        if (isDev) {
+          console.error("MFA send error full:", mfaErr);
+        }
+        const code = mfaErr?.code || "";
+        let userMsg =
+          "We couldn't send the verification code right now. Please try again.";
+        if (code === "functions/unavailable") {
+          userMsg =
+            "The verification service is temporarily unavailable.\nPlease try again in a moment.";
+        } else if (code === "functions/deadline-exceeded") {
+          userMsg =
+            "The request took too long. Please check your connection and try again.";
+        } else if (code === "functions/permission-denied") {
+          userMsg =
+            "You don't have permission to do this. Please contact your administrator.";
+        }
+        setError(userMsg);
+        setPendingNavigation(null);
+        return;
+      }
+      setStep("mfa");
+      setCooldown(30);
+    } else if (role === "faculty") {
+      navigate("/faculty/projects", { replace: true });
+    } else if (role === "partner") {
+      navigate("/partner/projects", { replace: true });
+    } else {
+      navigate("/student/home", { replace: true });
+    }
+    setPendingNavigation(null);
+  };
 
   return (
     <>
+      {/* Agreement Modal */}
+      {showAgreement && pendingNavigation && (
+        <AgreementModal
+          uid={pendingNavigation.uid}
+          onAccepted={handleAgreementAccepted}
+        />
+      )}
+
       {step === "login" && (
         <div className="ui-container">
           <div className="ui-card">
@@ -282,7 +358,9 @@ function Auth() {
                   <button
                     type="button"
                     className="ui-btn eye"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                     onClick={() => setShowPassword((prev) => !prev)}
                   >
                     {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
@@ -290,13 +368,11 @@ function Auth() {
                 )}
               </div>
 
-
               <button className="ui-btn" type="submit">
                 Sign in
               </button>
 
               {error && <p className="ui-error">{error}</p>}
-
 
               <p className="ui-smallText">
                 <Link to="/reset-password">Forgot Password?</Link>
@@ -318,9 +394,16 @@ function Auth() {
               {error && (
                 <p
                   className="ui-smallText"
-                  style={{ marginTop: 6, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}
+                  style={{
+                    marginTop: 6,
+                    textAlign: "center",
+                    color: "#64748b",
+                    fontWeight: 400,
+                    fontSize: 10,
+                  }}
                 >
-                  Need help? Contact the SERVE+ administrator or try again in a few minutes.
+                  Need help? Contact the SERVE+ administrator or try again in a
+                  few minutes.
                 </p>
               )}
             </form>
@@ -337,7 +420,11 @@ function Auth() {
 
               <p
                 className="ui-smallText"
-                style={{ textAlign: "center", color: "#475569", fontWeight: 400 }}
+                style={{
+                  textAlign: "center",
+                  color: "#475569",
+                  fontWeight: 400,
+                }}
               >
                 We sent a 6-digit code to your email. Enter it to continue.
               </p>
@@ -358,7 +445,6 @@ function Auth() {
 
               {error && <p className="ui-error">{error}</p>}
 
-
               <p
                 className="ui-smallText"
                 style={{
@@ -370,13 +456,16 @@ function Auth() {
                 }}
                 onClick={cooldown === 0 ? handleResendMfa : undefined}
                 onMouseEnter={(e) => {
-                  if (cooldown === 0) e.currentTarget.style.textDecoration = "underline";
+                  if (cooldown === 0)
+                    e.currentTarget.style.textDecoration = "underline";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.textDecoration = "none";
                 }}
               >
-                {cooldown > 0 ? `Resend available in ${cooldown}s` : "Resend code"}
+                {cooldown > 0
+                  ? `Resend available in ${cooldown}s`
+                  : "Resend code"}
               </p>
 
               <p
@@ -391,16 +480,21 @@ function Auth() {
                 Back to Login
               </p>
 
-
               {error && (
                 <p
                   className="ui-smallText"
-                  style={{ marginTop: 6, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}
+                  style={{
+                    marginTop: 6,
+                    textAlign: "center",
+                    color: "#64748b",
+                    fontWeight: 400,
+                    fontSize: 10,
+                  }}
                 >
-                  Need help? Contact the SERVE+ administrator or try again in a few minutes.
+                  Need help? Contact the SERVE+ administrator or try again in a
+                  few minutes.
                 </p>
               )}
-
             </form>
           </div>
         </div>

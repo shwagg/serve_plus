@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
+import { CURRENT_AGREEMENT_VERSION } from "../components/AgreementModal";
 
 function Register() {
     const [name, setName] = useState("");
@@ -101,7 +102,10 @@ function Register() {
                 levelProgress: 0,
                 skills: ["React", "Firebase", "UI/UX"],
                 interests: ["Design", "Coding", "Music"],
-                eventHistory
+                eventHistory,
+                termsAccepted: false,
+                privacyAccepted: false,
+                agreementVersion: null,
             });
 
             // 4. Create rewards subcollection with welcome achievement
