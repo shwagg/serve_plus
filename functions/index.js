@@ -1,6 +1,7 @@
 // Only set emulator host when running locally
 if (process.env.FUNCTIONS_EMULATOR === "true") {
   process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST = "localhost:9199";
 }
 
 const { onCall } = require("firebase-functions/v2/https");
@@ -37,7 +38,24 @@ exports.sendMfaCode = sendMfaCode;
 exports.verifyMfaCode = verifyMfaCode;
 
 // Blackboard OAuth callback (HTTP request handler, not callable)
-const {
-  blackboardCallback,
-} = require("./src/auth/blackboardCallback");
+const { blackboardCallback } = require("./src/auth/blackboardCallback");
 exports.blackboardCallback = blackboardCallback;
+
+// Backup & Restore functions
+const { createBackup } = require("./src/backup/createBackup");
+const { restoreBackup } = require("./src/backup/restoreBackup");
+const { listBackups } = require("./src/backup/listBackups");
+const { deleteBackup } = require("./src/backup/deleteBackup");
+const { scheduledBackup } = require("./src/backup/scheduledBackup");
+
+exports.createBackup = onCall(
+  { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
+  createBackup,
+);
+exports.restoreBackup = onCall(
+  { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
+  restoreBackup,
+);
+exports.listBackups = onCall({ region: "asia-southeast1" }, listBackups);
+exports.deleteBackup = onCall({ region: "asia-southeast1" }, deleteBackup);
+exports.scheduledBackup = scheduledBackup;

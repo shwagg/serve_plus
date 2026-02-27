@@ -19,6 +19,7 @@ import Register from "./pages/Register";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AuditLogs from "./pages/admin/AuditLogs";
+import BackupRestore from "./pages/admin/BackupRestore";
 import CurrentEvent from "./pages/admin/CurrentEvent";
 import CurrentEventMonitoring from "./pages/admin/CurrentEventMonitoring";
 import DocumentLibrary from "./pages/admin/DocumentLibrary";
@@ -80,6 +81,7 @@ function App() {
             />
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
+            <Route path="backup-restore" element={<BackupRestore />} />
             <Route
               path="current-event/:missionId?"
               element={<CurrentEvent />}
