@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm }) {
@@ -285,6 +285,94 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Overview");
+  const [exporting, setExporting] = useState(false);
+  const portfolioPdfRef = useRef(null);
+
+  const exportToPDF = async () => {
+    if (!portfolioPdfRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const el = portfolioPdfRef.current;
+      const displayName = profile?.username || (profile?.email ? profile.email.split("@")[0] : "Portfolio");
+
+      // ── Place element visibly in document flow for capture ──────────────
+      // html2canvas cannot capture elements off-screen or with display:none.
+      // We briefly move it to top-left of the page, behind a blocking overlay.
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99998;pointer-events:none;';
+      document.body.appendChild(overlay);
+
+      el.style.cssText = `
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 794px !important;
+        z-index: 99999 !important;
+        background: #fff !important;
+        pointer-events: none !important;
+      `;
+
+      // Two frames: layout + paint
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        windowWidth: 794,
+        x: 0,
+        y: 0,
+      });
+
+      // ── Restore hidden state immediately ────────────────────────────────
+      document.body.removeChild(overlay);
+      el.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;font-family:\'Segoe UI\',Arial,sans-serif;color:#1a1a2e;padding:0;';
+
+      // ── Build multi-page PDF ─────────────────────────────────────────────
+      const imgData = canvas.toDataURL('image/jpeg', 0.97);
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const contentW = pageW - margin * 2;
+      const contentH = (canvas.height / canvas.width) * contentW;
+
+      if (contentH <= pageH - margin * 2) {
+        // Single page
+        pdf.addImage(imgData, 'JPEG', margin, margin, contentW, contentH);
+      } else {
+        // Multi-page: slice canvas into A4 strips
+        const stripPx = Math.floor((canvas.width / contentW) * (pageH - margin * 2));
+        let yPx = 0;
+        let first = true;
+        while (yPx < canvas.height) {
+          if (!first) pdf.addPage();
+          first = false;
+          const sliceH = Math.min(stripPx, canvas.height - yPx);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = sliceH;
+          sliceCanvas.getContext('2d').drawImage(canvas, 0, yPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+          const sliceImg = sliceCanvas.toDataURL('image/jpeg', 0.97);
+          const sliceH_mm = (sliceH / canvas.width) * contentW;
+          pdf.addImage(sliceImg, 'JPEG', margin, margin, contentW, sliceH_mm);
+          yPx += sliceH;
+        }
+      }
+
+      pdf.save(`${displayName}_portfolio.pdf`);
+    } catch (err) {
+      alert("Failed to export PDF: " + (err.message || err));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     const fetchProfileAndEvents = async () => {
@@ -503,8 +591,27 @@ export default function Profile() {
           {activeTab === "Portfolio" && (() => {
             const events = profile.registeredEvents || [];
             const allSdgs = [...new Set(events.flatMap(e => e.sdgs || []))];
+            const displayName = profile.username || (profile.email ? profile.email.split('@')[0] : 'Volunteer');
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {/* Export button */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={exportToPDF}
+                    disabled={exporting}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: exporting ? '#aaa' : 'linear-gradient(135deg, #234e7b, #30bdb7)',
+                      color: '#fff', border: 'none', borderRadius: 10,
+                      padding: '10px 22px', fontWeight: 700, fontSize: 14,
+                      cursor: exporting ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 2px 8px rgba(35,78,123,0.18)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {exporting ? '⏳ Exporting...' : '⬇ Export PDF'}
+                  </button>
+                </div>
                 {/* Achievements */}
                 <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
                   <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 14 }}>
@@ -584,6 +691,154 @@ export default function Profile() {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Hidden PDF layout ── */}
+          {profile && (() => {
+            const events = profile.registeredEvents || [];
+            const allSdgs = [...new Set(events.flatMap(e => e.sdgs || []))];
+            const displayName = profile.username || (profile.email ? profile.email.split('@')[0] : 'Volunteer');
+            return (
+              <div
+                ref={portfolioPdfRef}
+                style={{
+                  position: 'fixed', left: '-9999px', top: 0,
+                  width: 794, background: '#fff',
+                  fontFamily: "'Segoe UI', Arial, sans-serif",
+                  color: '#1a1a2e', padding: 0,
+                }}
+              >
+                {/* Header banner */}
+                <div style={{ background: 'linear-gradient(135deg, #234e7b 0%, #30bdb7 100%)', padding: '36px 40px 28px', borderRadius: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                    <img
+                      src={profile.avatar}
+                      alt="avatar"
+                      crossOrigin="anonymous"
+                      style={{ width: 80, height: 80, borderRadius: '50%', border: '3px solid rgba(255,255,255,0.6)', objectFit: 'cover' }}
+                    />
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 800, fontSize: 26, letterSpacing: 0.5 }}>{displayName}</div>
+                      <div style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500, fontSize: 15, marginTop: 2 }}>{profile.name}</div>
+                      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 2 }}>{profile.email}</div>
+                      <div style={{ marginTop: 8, display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 20, padding: '3px 14px', fontSize: 12, fontWeight: 700 }}>Level {profile.level}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>{profile.totalPoints || 0} total points</span>
+                      </div>
+                    </div>
+                    <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>SerVe+ Portfolio</div>
+                      <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 4 }}>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '28px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+
+                  {/* Skills & Interests row */}
+                  <div style={{ display: 'flex', gap: 20 }}>
+                    <div style={{ flex: 1, background: '#f7fafd', borderRadius: 10, padding: '16px 18px', border: '1px solid #e0e7ef' }}>
+                      <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Skills</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {(profile.skills || []).map(s => (
+                          <span key={s} style={{ background: '#234e7b', color: '#fff', borderRadius: 20, padding: '3px 12px', fontSize: 11, fontWeight: 600 }}>{s}</span>
+                        ))}
+                        {(!profile.skills || profile.skills.length === 0) && <span style={{ color: '#aaa', fontSize: 12 }}>None listed</span>}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, background: '#f7fafd', borderRadius: 10, padding: '16px 18px', border: '1px solid #e0e7ef' }}>
+                      <div style={{ fontWeight: 700, color: '#30bdb7', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Interests</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {(profile.interests || []).map(i => (
+                          <span key={i} style={{ background: '#30bdb7', color: '#fff', borderRadius: 20, padding: '3px 12px', fontSize: 11, fontWeight: 600 }}>{i}</span>
+                        ))}
+                        {(!profile.interests || profile.interests.length === 0) && <span style={{ color: '#aaa', fontSize: 12 }}>None listed</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: 1, background: '#e0e7ef' }} />
+
+                  {/* Achievements */}
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>Achievements <span style={{ color: '#30bdb7', fontWeight: 500, fontSize: 13 }}>({rewards.length})</span></div>
+                    {rewards.length === 0 ? (
+                      <p style={{ color: '#bbb', fontSize: 12 }}>No achievements yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                        {rewards.map(r => (
+                          <div key={r.id} style={{ background: 'linear-gradient(135deg, #e8f5e9, #f0fdf4)', border: '1.5px solid #4caf50', borderRadius: 8, padding: '10px 14px', minWidth: 110, textAlign: 'center' }}>
+                            <div style={{ fontSize: 22 }}>{r.icon || '🏅'}</div>
+                            <div style={{ fontWeight: 700, fontSize: 11, color: '#234e7b', marginTop: 4 }}>{r.name || r.id}</div>
+                            {r.description && <div style={{ fontSize: 10, color: '#777', marginTop: 2 }}>{r.description}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: 1, background: '#e0e7ef' }} />
+
+                  {/* SDG Contributions */}
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>SDG Contributions</div>
+                    {allSdgs.length === 0 ? (
+                      <p style={{ color: '#bbb', fontSize: 12 }}>No SDG contributions yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {allSdgs.sort((a, b) => a - b).map(sdg => (
+                          <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ fontWeight: 800 }}>#{sdg}</span>
+                            <span>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: 1, background: '#e0e7ef' }} />
+
+                  {/* Events by Role */}
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>Events by Role</div>
+                    {events.length === 0 ? (
+                      <p style={{ color: '#bbb', fontSize: 12 }}>No events joined yet.</p>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ background: '#f0f4f8' }}>
+                            <th style={{ textAlign: 'left', padding: '8px 12px', color: '#234e7b', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Event</th>
+                            <th style={{ textAlign: 'center', padding: '8px 12px', color: '#234e7b', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Role</th>
+                            <th style={{ textAlign: 'right', padding: '8px 12px', color: '#234e7b', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Points</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {events.map((event, idx) => (
+                            <tr key={event.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f7fafd' }}>
+                              <td style={{ padding: '8px 12px', color: '#333', borderBottom: '1px solid #f0f4f8' }}>{event.title}</td>
+                              <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #f0f4f8' }}>
+                                <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 4, padding: '2px 9px', fontWeight: 600 }}>{event.role}</span>
+                              </td>
+                              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#234e7b', borderBottom: '1px solid #f0f4f8' }}>+{event.pointsEarned}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{ marginTop: 10, borderTop: '1px solid #e0e7ef', paddingTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, color: '#bbb' }}>Generated by SerVe+ · {new Date().toLocaleDateString()}</span>
+                    <span style={{ fontSize: 10, color: '#30bdb7', fontWeight: 600 }}>serve-plus.app</span>
+                  </div>
+
                 </div>
               </div>
             );
