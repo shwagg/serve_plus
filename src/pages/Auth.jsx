@@ -3,7 +3,14 @@
 //as approving, publishing, issuing certificates, and other high impact actions.
 
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -17,7 +24,7 @@ import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
 
 function Auth() {
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState(""); // email or username
   const [mfaEmail, setMfaEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -42,12 +49,23 @@ function Auth() {
     return () => clearInterval(t);
   }, [cooldown]);
 
+  // if it contains "@" treat as email, otherwise look up username
+  const resolveEmail = async (input) => {
+    if (input.includes("@")) return input;
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("username", "==", input));
+    const snap = await getDocs(q);
+    if (snap.empty) throw new Error("No account found for this username.");
+    return snap.docs[0].data().email;
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
     try {
-      // ✅ 1. Firebase Authentication
+      // ✅ 1. Resolve username to email if needed, then authenticate
+      const email = await resolveEmail(loginId.trim());
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
       console.log("Login successfully, uid:", uid);
@@ -168,7 +186,7 @@ function Auth() {
           functions,
           "recordLoginFailure",
         );
-        const failureResult = await recordLoginFailure({ email });
+        const failureResult = await recordLoginFailure({ email: loginId });
 
         if (failureResult.data?.isLocked) {
           const lockUntil = new Date(failureResult.data.lockUntil);
@@ -187,9 +205,11 @@ function Auth() {
       }
 
       const code = err?.code || "";
-      let userMsg = "Login failed. Please try again.";
+      let userMsg = err?.message || "Login failed. Please try again.";
 
-      if (code === "auth/invalid-email") {
+      if (err?.message === "No account found for this username.") {
+        // Already a friendly message from resolveEmail
+      } else if (code === "auth/invalid-email") {
         userMsg = "Please enter a valid email address.";
       } else if (code === "auth/user-not-found") {
         userMsg = "No account found for this email.";
@@ -316,10 +336,10 @@ function Auth() {
 
               <input
                 className="ui-input"
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="Email or Username"
+                value={loginId}
+                onChange={(e) => setLoginId(e.target.value)}
                 required
               />
               <div className="ui-input-pass-wrap">
