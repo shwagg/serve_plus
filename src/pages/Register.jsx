@@ -4,7 +4,6 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
-import { CURRENT_AGREEMENT_VERSION } from "../components/AgreementModal";
 
 function Register() {
     const [name, setName] = useState("");
