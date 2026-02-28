@@ -1,7 +1,8 @@
-// Only set emulator host when running locally
-if (process.env.FUNCTIONS_EMULATOR === "true") {
-  process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
-  process.env.FIREBASE_STORAGE_EMULATOR_HOST = "localhost:9199";
+if (process.env.FUNCTIONS_EMULATOR) {
+  // Only set emulator host when running locally
+  if (process.env.FUNCTIONS_EMULATOR === "true") {
+    process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+  } process.env.FIREBASE_STORAGE_EMULATOR_HOST = "localhost:9199";
 }
 
 const { onCall } = require("firebase-functions/v2/https");
@@ -18,24 +19,31 @@ const { checkLoginAttempts } = require("./src/auth/checkLoginAttempts");
 const { sendMfaCode, verifyMfaCode } = require("./src/auth/mfa");
 
 // Export as callable Cloud Functions with region
+// Export using v2
 exports.logLogin = onCall({ region: "asia-southeast1" }, logLogin);
 exports.logLogout = onCall({ region: "asia-southeast1" }, logLogout);
 exports.recordLoginFailure = onCall(
   { region: "asia-southeast1" },
-  recordLoginFailure,
+  recordLoginFailure
 );
 exports.resetLoginAttempts = onCall(
   { region: "asia-southeast1" },
-  resetLoginAttempts,
+  resetLoginAttempts
 );
 exports.checkLoginAttempts = onCall(
   { region: "asia-southeast1" },
-  checkLoginAttempts,
+  checkLoginAttempts
 );
 
 // mfa functions are defined in their module
-exports.sendMfaCode = sendMfaCode;
-exports.verifyMfaCode = verifyMfaCode;
+exports.sendMfaCode = onCall(
+  { region: "asia-southeast1" },
+  sendMfaCode
+);
+exports.verifyMfaCode = onCall(
+  { region: "asia-southeast1" },
+  verifyMfaCode
+);
 
 // Blackboard OAuth callback (HTTP request handler, not callable)
 const { blackboardCallback } = require("./src/auth/blackboardCallback");

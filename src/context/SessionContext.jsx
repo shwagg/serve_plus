@@ -43,7 +43,7 @@ export function SessionProvider({ children }) {
         try {
           console.log("Attempting to log logout for:", user?.uid);
           const logLogout = httpsCallable(functions, "logLogout");
-          await logLogout({ uid: user.uid });
+          logLogout({ uid: user.uid }).catch(() => { });
         } catch (e) {
           // Don't block logout if audit log fails
           console.error("Audit log (logout) failed:", e);

@@ -122,10 +122,10 @@ export default function Header() {
       const user = auth.currentUser;
       if (user?.uid) {
         const logLogout = httpsCallable(functions, "logLogout");
-        await logLogout({ uid: user.uid });
+        logLogout({ uid: user.uid }).catch(() => { });
       }
       await signOut(auth);
-      navigate('/');
+      navigate('/auth', { replace: true });
     } catch (error) {
       console.error('Logout error:', error);
     }

@@ -29,6 +29,9 @@ import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import Chat from "./pages/global/Chat";
 import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
+import EventDetails from "./pages/student/missions/EventDetails";
+import EventActivity from "./pages/student/missions/EventActivity";
+import BadgeManage from "./pages/admin/BadgeManage";
 import Profile from "./pages/global/Profile";
 import ProjectList from "./pages/global/ProjectList";
 import ProposeProject from "./pages/global/ProposeProject";
@@ -81,11 +84,8 @@ function App() {
             />
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
-            <Route path="backup-restore" element={<BackupRestore />} />
-            <Route
-              path="current-event/:missionId?"
-              element={<CurrentEvent />}
-            />
+            <Route path="current-event/:missionId?" element={<CurrentEvent />} />
+            <Route path="system/badges" element={<BadgeManage />} />
           </Route>
 
           <Route
@@ -116,14 +116,6 @@ function App() {
             path="global/feedback/:missionId"
             element={<CommunityFeedbackForm />}
           />
-          {/* <Route
-            path="/student/propose-project"
-            element={
-              <ProtectedRoute>
-                <ProposeProject />
-              </ProtectedRoute>
-            }
-          /> */}
           <Route
             path="/faculty"
             element={

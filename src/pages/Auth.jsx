@@ -47,23 +47,10 @@ function Auth() {
     setError("");
 
     try {
-      //Check if account is locked
-      const checkLoginAttempts = httpsCallable(functions, "checkLoginAttempts");
-      const lockCheck = await checkLoginAttempts({ email });
-
-      if (lockCheck.data?.isLocked) {
-        const lockUntil = new Date(lockCheck.data.lockUntil);
-        const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
-        setError(
-          `Account locked due to too many failed attempts. Try again in ${minutesLeft} minute(s).`,
-        );
-        return;
-      }
-
       // ✅ 1. Firebase Authentication
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
-      console.log("Login successful, uid:", uid);
+      console.log("Login successfully, uid:", uid);
 
       // ✅ 2. Fetch user profile from Firestore
       const userRef = doc(db, "users", uid);
@@ -102,29 +89,18 @@ function Auth() {
         setError("Your account is blocked.");
         return;
       }
-
+      // REMOVED 'AWAIT' TO IMPROVE FASTER LOGIN TIME. THEY STILL RUN IN THE BACKGROUND
       // ✅ 3. CALL BACKEND TO CREATE AUDIT LOG
-      try {
-        console.log("Sending to logLogin:", { uid });
-        const logLogin = httpsCallable(functions, "logLogin");
-        const result = await logLogin({ uid }); // <-- THIS is what writes to auditLogs
-        console.log("Audit log result:", result);
-      } catch (auditErr) {
-        console.warn("Audit log failed:", auditErr);
-        // Don't block login if audit log fails
-      }
+      const logLogin = httpsCallable(functions, "logLogin");
+      logLogin({ uid }).catch((err) => { // <-- THIS is what writes to auditLogs
+        console.warn("Audit log failed:", err);
+      });
 
       // Reset login attempts on successful login
-      try {
-        const resetLoginAttempts = httpsCallable(
-          functions,
-          "resetLoginAttempts",
-        );
-        await resetLoginAttempts({ email });
-        console.log("Login attempts reset for:", email);
-      } catch (resetErr) {
-        console.warn("Failed to reset login attempts:", resetErr);
-      }
+      const resetLoginAttempts = httpsCallable(functions, "resetLoginAttempts");
+      resetLoginAttempts({ email }).catch((err) => {
+        console.warn("Failed to reset login attempts:", err);
+      });
 
       // ✅ 4. CHECK AGREEMENT VERSION before redirecting
       const userAgreementVersion = userSnap.data().agreementVersion || null;
@@ -174,7 +150,7 @@ function Auth() {
         setStep("mfa");
         setCooldown(30);
         return;
-        //navigate("/admin/dashboard", { replace: true });
+
       } else if (role === "faculty") {
         navigate("/faculty/projects", { replace: true });
       } else if (role === "partner") {
