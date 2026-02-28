@@ -36,10 +36,10 @@ export const adminLinks = [
   {
     key: "forms",
     label: "Forms",
-        children: [
+            children: [
             { label: "Document Library", to: "/admin/documents" },
-        ],  
-    },
+        ],    
+      },
   {
     key: "system",
     label: "System",
@@ -48,6 +48,7 @@ export const adminLinks = [
       { label: "Backup & Restore", to: "/admin/backup-restore" },
       { label: "Students Banner", to: "/admin/system/banner" },
       { label: "Announcement", to: "/admin/system/announcement" },
+      { label: "Privacy & Terms", to: "/admin/system/agreements" },
     ],
   },
 ];
@@ -57,10 +58,10 @@ export const partnerLinks = [
   {
     key: "project",
     label: "Project",
-        children: [
+    children: [
             { label: "Project List", to: "/partner/projects" },
-        ],  
-    },
+        ],    
+      },
 ];
 
 //faculty side
@@ -79,13 +80,13 @@ export const facultyLinks = [
     label: "Project",
     children: [
             { label: "Project List", to: "/faculty/projects" },
-        ],  
-    },
+        ],    
+      },
   {
     key: "forms",
     label: "Forms",
     children: [
             { label: "Document Library", to: "/admindocuments" },
         ],  
-    },
+      },
 ];

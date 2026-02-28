@@ -1,9 +1,50 @@
+import { doc, getDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../../components/Header";
+import { db } from "../../../firebaseConfig";
 import "./PrivacyPolicy.css";
 
 export default function PrivacyPolicy() {
   const navigate = useNavigate();
+  const [intro, setIntro] = useState("");
+  const [sections, setSections] = useState([]);
+  const [version, setVersion] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPrivacy = async () => {
+      try {
+        const snap = await getDoc(doc(db, "settings", "agreements"));
+        if (snap.exists()) {
+          const data = snap.data();
+          setIntro(data.privacyIntro || "");
+          setSections(data.privacySections || []);
+          setVersion(data.version || "");
+        }
+      } catch (err) {
+        console.error("Failed to fetch privacy policy:", err);
+      }
+      setLoading(false);
+    };
+    fetchPrivacy();
+  }, []);
+
+  const renderBody = (body) => {
+    if (!body) return null;
+    const lines = body.split("\n").filter((l) => l.trim());
+    if (lines.length > 1) {
+      return (
+        <ul>
+          {lines.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      );
+    }
+    return <p>{body}</p>;
+  };
+
   return (
     <div className="agreement-page">
       <Header />
@@ -13,7 +54,7 @@ export default function PrivacyPolicy() {
             className="agreement-tab-link"
             onClick={() => navigate("/global/terms-condition")}
           >
-            ← Terms and Conditions
+            &larr; Terms and Conditions
           </button>
           <span
             className="agreement-tab-active"
@@ -26,45 +67,26 @@ export default function PrivacyPolicy() {
               flex: 1,
             }}
           >
-            Privacy Policy
+            Privacy Policy{" "}
+            {version && (
+              <small style={{ color: "#94a3b8" }}>(v{version})</small>
+            )}
           </span>
         </div>
-        <p>
-          Your privacy is important to us. This Privacy Policy explains how
-          Serve Plus collects, uses, and protects your information when you use
-          our platform.
-        </p>
-        <hr className="agreement-divider" />
-        <h2>1. Information We Collect</h2>
-        <ul>
-          <li>Personal information (name, email address, etc.)</li>
-          <li>Usage data and cookies</li>
-        </ul>
-        <h2>2. Use of Information</h2>
-        <p>
-          Information is used to provide and improve our services, communicate
-          with users, and ensure platform security.
-        </p>
-        <h2>3. Data Protection</h2>
-        <p>
-          We implement security measures to protect your data from unauthorized
-          access.
-        </p>
-        <h2>4. Third-Party Services</h2>
-        <p>
-          We may use third-party services that collect, monitor, and analyze
-          usage.
-        </p>
-        <h2>5. Changes to This Policy</h2>
-        <p>
-          We may update our Privacy Policy from time to time. Changes will be
-          posted on this page.
-        </p>
-        <h2>6. Contact Us</h2>
-        <p>
-          If you have questions about this Privacy Policy, contact us at [wala
-          pa tayong email].
-        </p>
+        {loading ? (
+          <p style={{ color: "#94a3b8" }}>Loading...</p>
+        ) : (
+          <>
+            {intro && <p>{intro}</p>}
+            <hr className="agreement-divider" />
+            {sections.map((s, i) => (
+              <div key={i}>
+                <h2>{s.heading}</h2>
+                {renderBody(s.body)}
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );

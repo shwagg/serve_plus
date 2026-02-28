@@ -1,16 +1,55 @@
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { useState } from "react";
+import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import { db } from "../firebaseConfig";
 import "./styles/AgreementModal.css";
 
-// Current agreement version — update this whenever admin changes the agreements.
-export const CURRENT_AGREEMENT_VERSION = "1.0";
+// Fallback version if Firestore doc doesn't exist yet
+const FALLBACK_VERSION = "1.0";
+
+// Helper: fetch the current agreement version from Firestore settings
+export async function fetchCurrentAgreementVersion() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "agreements"));
+    if (snap.exists()) return snap.data().version || FALLBACK_VERSION;
+  } catch (err) {
+    console.warn("Could not fetch agreement version:", err);
+  }
+  return FALLBACK_VERSION;
+}
 
 export default function AgreementModal({ uid, onAccepted }) {
   const [activeTab, setActiveTab] = useState("terms"); // "terms" or "privacy"
   const [termsChecked, setTermsChecked] = useState(false);
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  // Agreement content from Firestore
+  const [version, setVersion] = useState(FALLBACK_VERSION);
+  const [termsIntro, setTermsIntro] = useState("");
+  const [termsSections, setTermsSections] = useState([]);
+  const [privacyIntro, setPrivacyIntro] = useState("");
+  const [privacySections, setPrivacySections] = useState([]);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const snap = await getDoc(doc(db, "settings", "agreements"));
+        if (snap.exists()) {
+          const data = snap.data();
+          setVersion(data.version || FALLBACK_VERSION);
+          setTermsIntro(data.termsIntro || "");
+          setTermsSections(data.termsSections || []);
+          setPrivacyIntro(data.privacyIntro || "");
+          setPrivacySections(data.privacySections || []);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch agreement content:", err);
+      }
+      setFetching(false);
+    };
+    fetchContent();
+  }, []);
 
   const canAccept = termsChecked && privacyChecked;
 
@@ -22,7 +61,7 @@ export default function AgreementModal({ uid, onAccepted }) {
       await updateDoc(userRef, {
         termsAccepted: true,
         privacyAccepted: true,
-        agreementVersion: CURRENT_AGREEMENT_VERSION,
+        agreementVersion: version,
         agreementAcceptedAt: serverTimestamp(),
       });
       onAccepted();
@@ -34,13 +73,32 @@ export default function AgreementModal({ uid, onAccepted }) {
     }
   };
 
+  // Render a section's body — multi-line becomes a list
+  const renderBody = (body) => {
+    if (!body) return null;
+    const lines = body.split("\n").filter((l) => l.trim());
+    if (lines.length > 1) {
+      return (
+        <ul>
+          {lines.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      );
+    }
+    return <p>{body}</p>;
+  };
+
   return (
     <div className="agreement-modal-overlay">
       <div className="agreement-modal">
         <h2 className="agreement-modal-title">Agreement Required</h2>
         <p className="agreement-modal-subtitle">
           Please review and accept our Terms &amp; Conditions and Privacy Policy
-          to continue.
+          to continue.{" "}
+          <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+            (v{version})
+          </span>
         </p>
 
         {/* Tabs */}
@@ -61,98 +119,29 @@ export default function AgreementModal({ uid, onAccepted }) {
 
         {/* Scrollable content */}
         <div className="agreement-modal-body">
-          {activeTab === "terms" ? (
+          {fetching ? (
+            <p style={{ textAlign: "center", color: "#94a3b8" }}>Loading...</p>
+          ) : activeTab === "terms" ? (
             <div className="agreement-modal-text">
-              <p>
-                Welcome to Serve Plus. These Terms and Conditions outline the
-                rules and regulations for the use of our platform. By accessing
-                this website, you accept these terms in full. Please read them
-                carefully.
-              </p>
+              {termsIntro && <p>{termsIntro}</p>}
               <hr className="agreement-divider" />
-              <h3>1. Acceptance of Terms</h3>
-              <p>
-                By using Serve Plus, you agree to comply with and be bound by
-                these terms.
-              </p>
-              <h3>2. User Responsibilities</h3>
-              <p>
-                You are responsible for maintaining the confidentiality of your
-                account and password and for restricting access to your
-                computer.
-              </p>
-              <h3>3. Prohibited Activities</h3>
-              <ul>
-                <li>No unauthorized access or use of the platform.</li>
-                <li>No data mining, scraping, or similar activities.</li>
-                <li>
-                  No activity that disrupts or interferes with the platform.
-                </li>
-              </ul>
-              <h3>4. Intellectual Property</h3>
-              <p>
-                All content, trademarks, and data on this site are the property
-                of Serve Plus or its licensors.
-              </p>
-              <h3>5. Modifications</h3>
-              <p>
-                We reserve the right to revise these terms at any time.
-                Continued use of the platform means you accept any changes.
-              </p>
-              <h3>6. Termination</h3>
-              <p>
-                We may terminate or suspend access to our platform immediately,
-                without prior notice, for any breach of these terms.
-              </p>
-              <h3>7. Governing Law</h3>
-              <p>
-                These terms are governed by and construed in accordance with the
-                laws of your jurisdiction.
-              </p>
-              <h3>8. Contact Us</h3>
-              <p>
-                If you have any questions about these Terms, please contact us
-                at support@serveplus.com.
-              </p>
+              {termsSections.map((s, i) => (
+                <div key={i}>
+                  <h3>{s.heading}</h3>
+                  {renderBody(s.body)}
+                </div>
+              ))}
             </div>
           ) : (
             <div className="agreement-modal-text">
-              <p>
-                Your privacy is important to us. This Privacy Policy explains
-                how Serve Plus collects, uses, and protects your information
-                when you use our platform.
-              </p>
+              {privacyIntro && <p>{privacyIntro}</p>}
               <hr className="agreement-divider" />
-              <h3>1. Information We Collect</h3>
-              <ul>
-                <li>Personal information (name, email address, etc.)</li>
-                <li>Usage data and cookies</li>
-              </ul>
-              <h3>2. Use of Information</h3>
-              <p>
-                Information is used to provide and improve our services,
-                communicate with users, and ensure platform security.
-              </p>
-              <h3>3. Data Protection</h3>
-              <p>
-                We implement security measures to protect your data from
-                unauthorized access.
-              </p>
-              <h3>4. Third-Party Services</h3>
-              <p>
-                We may use third-party services that collect, monitor, and
-                analyze usage.
-              </p>
-              <h3>5. Changes to This Policy</h3>
-              <p>
-                We may update our Privacy Policy from time to time. Changes will
-                be posted on this page.
-              </p>
-              <h3>6. Contact Us</h3>
-              <p>
-                If you have questions about this Privacy Policy, contact us at
-                support@serveplus.com.
-              </p>
+              {privacySections.map((s, i) => (
+                <div key={i}>
+                  <h3>{s.heading}</h3>
+                  {renderBody(s.body)}
+                </div>
+              ))}
             </div>
           )}
         </div>

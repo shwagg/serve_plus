@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
 import AgreementModal, {
-  CURRENT_AGREEMENT_VERSION,
+  fetchCurrentAgreementVersion,
 } from "../components/AgreementModal";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import { auth, db, functions } from "../firebaseConfig";
@@ -92,7 +92,8 @@ function Auth() {
       // REMOVED 'AWAIT' TO IMPROVE FASTER LOGIN TIME. THEY STILL RUN IN THE BACKGROUND
       // ✅ 3. CALL BACKEND TO CREATE AUDIT LOG
       const logLogin = httpsCallable(functions, "logLogin");
-      logLogin({ uid }).catch((err) => { // <-- THIS is what writes to auditLogs
+      logLogin({ uid }).catch((err) => {
+        // <-- THIS is what writes to auditLogs
         console.warn("Audit log failed:", err);
       });
 
@@ -104,8 +105,9 @@ function Auth() {
 
       // ✅ 4. CHECK AGREEMENT VERSION before redirecting
       const userAgreementVersion = userSnap.data().agreementVersion || null;
+      const currentVersion = await fetchCurrentAgreementVersion();
 
-      if (userAgreementVersion !== CURRENT_AGREEMENT_VERSION) {
+      if (userAgreementVersion !== currentVersion) {
         // show modal when user hasn't accepted the latest agreements
         setPendingNavigation({ role, uid, email, userCred });
         setShowAgreement(true);
@@ -150,7 +152,6 @@ function Auth() {
         setStep("mfa");
         setCooldown(30);
         return;
-
       } else if (role === "faculty") {
         navigate("/faculty/projects", { replace: true });
       } else if (role === "partner") {

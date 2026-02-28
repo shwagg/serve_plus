@@ -1,6 +1,7 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminLayout from "../pages/admin/AdminLayout";
+import AgreementEditor from "../pages/admin/AgreementEditor";
 import AuditLogs from "../pages/admin/AuditLogs";
 import BackupRestore from "../pages/admin/BackupRestore";
 import ProjectDetails from "../pages/admin/ProjectDetails";
@@ -40,6 +41,7 @@ export default function AppRouter() {
           <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="backup-restore" element={<BackupRestore />} />
+          <Route path="system/agreements" element={<AgreementEditor />} />
           <Route path="roster" element={<RosterAccountManagement />} />
         </Route>
       </Routes>

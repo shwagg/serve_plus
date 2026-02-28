@@ -36,6 +36,15 @@ service cloud.firestore {
       }
     }
 
+    // Settings collection - admins can manage platform settings (agreements, etc.)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create, update: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      allow delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
     // Allow open read access for development
     match /{document=**} {
       allow read: if true;

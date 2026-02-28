@@ -18,6 +18,7 @@ import OAuthCallback from "./pages/OAuthCallback";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminLayout from "./pages/admin/AdminLayout";
+import AgreementEditor from "./pages/admin/AgreementEditor";
 import AuditLogs from "./pages/admin/AuditLogs";
 import BackupRestore from "./pages/admin/BackupRestore";
 import CurrentEvent from "./pages/admin/CurrentEvent";
@@ -29,8 +30,8 @@ import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import Chat from "./pages/global/Chat";
 import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
-import EventDetails from "./pages/student/missions/EventDetails";
 import EventActivity from "./pages/student/missions/EventActivity";
+import EventDetails from "./pages/student/missions/EventDetails";
 //import BadgeManage from "./pages/admin/BadgeManage";
 import Profile from "./pages/global/Profile";
 import ProjectList from "./pages/global/ProjectList";
@@ -40,7 +41,6 @@ import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
 import PartnerHome from "./pages/partner/PartnerHome";
 import StudentHome from "./pages/student/StudentHome";
-
 
 function App() {
   // Check for upcoming events and create notifications
@@ -84,7 +84,11 @@ function App() {
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="backup-restore" element={<BackupRestore />} />
-            <Route path="current-event/:missionId?" element={<CurrentEvent />} />
+            <Route path="system/agreements" element={<AgreementEditor />} />
+            <Route
+              path="current-event/:missionId?"
+              element={<CurrentEvent />}
+            />
             {/*<Route path="system/badges" element={<BadgeManage />} /> */}
           </Route>
 
