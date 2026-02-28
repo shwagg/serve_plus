@@ -225,6 +225,45 @@ import "../../styles/Profile.css";
 import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 
+const PROFILE_TABS = ["Overview", "Portfolio"];
+
+const SDG_LABELS = {
+  1: "No Poverty", 2: "Zero Hunger", 3: "Good Health & Well-being",
+  4: "Quality Education", 5: "Gender Equality", 6: "Clean Water & Sanitation",
+  7: "Affordable & Clean Energy", 8: "Decent Work & Economic Growth",
+  9: "Industry, Innovation & Infrastructure", 10: "Reduced Inequalities",
+  11: "Sustainable Cities & Communities", 12: "Responsible Consumption",
+  13: "Climate Action", 14: "Life Below Water", 15: "Life on Land",
+  16: "Peace, Justice & Strong Institutions", 17: "Partnerships for the Goals",
+};
+
+const SDG_COLORS = [
+  "", "#e5243b", "#dda63a", "#4c9f38", "#c5192d", "#ff3a21",
+  "#26bde2", "#fcc30b", "#a21942", "#fd6925", "#dd1367",
+  "#fd9d24", "#bf8b2e", "#3f7e44", "#0a97d9", "#56c02b",
+  "#00689d", "#19486a",
+];
+
+function computeAchievements(events, totalPoints, level) {
+  const roles = [...new Set(events.map(e => e.role).filter(Boolean))];
+  return [
+    { id: "first_step",  icon: "🌱", name: "First Step",       desc: "Joined your first event",        unlocked: events.length >= 1 },
+    { id: "active",      icon: "⭐", name: "Active Volunteer",  desc: "Joined 3+ events",               unlocked: events.length >= 3 },
+    { id: "dedicated",   icon: "🌟", name: "Dedicated",         desc: "Joined 5+ events",               unlocked: events.length >= 5 },
+    { id: "super",       icon: "🏆", name: "Super Volunteer",   desc: "Joined 10+ events",              unlocked: events.length >= 10 },
+    { id: "pts50",       icon: "💫", name: "Point Starter",     desc: "Earned 50+ points",              unlocked: totalPoints >= 50 },
+    { id: "pts100",      icon: "💎", name: "Point Collector",   desc: "Earned 100+ points",             unlocked: totalPoints >= 100 },
+    { id: "pts500",      icon: "👑", name: "Point Master",      desc: "Earned 500+ points",             unlocked: totalPoints >= 500 },
+    { id: "organizer",   icon: "📋", name: "Event Organizer",   desc: "Served as an organizer",         unlocked: events.some(e => e.role === "organizer") },
+    { id: "lead_org",    icon: "🎯", name: "Lead Organizer",    desc: "Served as lead organizer",       unlocked: events.some(e => e.role === "lead_organizer") },
+    { id: "donor",       icon: "💝", name: "Generous Donor",    desc: "Donated to a cause",             unlocked: events.some(e => e.role === "donor") },
+    { id: "all_rounder", icon: "🎨", name: "All-Rounder",       desc: "Held 3+ different roles",        unlocked: roles.length >= 3 },
+    { id: "lv5",         icon: "🚀", name: "Rising Star",       desc: "Reached Level 5",                unlocked: (level || 1) >= 5 },
+    { id: "lv10",        icon: "🦅", name: "Veteran",           desc: "Reached Level 10",               unlocked: (level || 1) >= 10 },
+    { id: "sdg3",        icon: "🌍", name: "SDG Champion",      desc: "Contributed to 3+ SDG goals",   unlocked: [...new Set(events.flatMap(e => e.sdgs || []))].length >= 3 },
+  ];
+}
+
 const mockProfile = {
   name: "Jane Doe",
   email: "jane.doe@example.com",
@@ -245,6 +284,7 @@ export default function Profile() {
   const [editOpen, setEditOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("Overview");
 
   useEffect(() => {
     const fetchProfileAndEvents = async () => {
@@ -279,9 +319,16 @@ export default function Profile() {
           const volunteerSnap = await getDoc(volunteerRef);
           
           if (volunteerSnap.exists()) {
-            registeredEvents.push({ id: eventId, title: eventTitle });
+            const vData = volunteerSnap.data();
+            registeredEvents.push({
+              id: eventId,
+              title: eventTitle,
+              role: vData.role || "participant",
+              pointsEarned: vData.pointsEarned || 0,
+              sdgs: eventData.sdgs || [],
+            });
             // Add points from this event
-            totalPoints += volunteerSnap.data().pointsEarned || 0;
+            totalPoints += vData.pointsEarned || 0;
           }
         }
         
@@ -403,29 +450,144 @@ export default function Profile() {
           />
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="profile-event-history-card">
-            <div className="profile-event-history-title">Event History</div>
-            {profile.eventHistory && profile.eventHistory.map((event, idx) => (
-              <div className="profile-event-item" key={idx}>
-                <span className="profile-event-item-label">{event.label}</span>
-                <span style={{ color: "#555", fontSize: 14 }}>{event.date}</span>
-                <span className="profile-event-item-dots">•••</span>
-              </div>
+          {/* Tab Navigation */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e0e7ef', marginBottom: 4 }}>
+            {PROFILE_TABS.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '10px 28px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activeTab === tab ? '3px solid #234e7b' : '3px solid transparent',
+                  color: activeTab === tab ? '#234e7b' : '#888',
+                  fontWeight: activeTab === tab ? 700 : 500,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {tab}
+              </button>
             ))}
           </div>
-          {/* Registered Events Section BELOW Event History */}
-          {profile.registeredEvents && profile.registeredEvents.length > 0 && (
-            <div className="profile-registered-events-card" style={{ background: '#f7f7f7', borderRadius: 12, padding: 16 }}>
-              <div className="profile-registered-events-title" style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 10 }}>
-                Events You're Registered In
-              </div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {profile.registeredEvents.map(event => (
-                  <span key={event.id} style={{ background: '#30bdb7', color: '#fff', padding: '6px 14px', borderRadius: 8, fontWeight: 600 }}>{event.title}</span>
+
+          {activeTab === "Overview" && (
+            <>
+              <div className="profile-event-history-card">
+                <div className="profile-event-history-title">Event History</div>
+                {profile.eventHistory && profile.eventHistory.map((event, idx) => (
+                  <div className="profile-event-item" key={idx}>
+                    <span className="profile-event-item-label">{event.label}</span>
+                    <span style={{ color: "#555", fontSize: 14 }}>{event.date}</span>
+                    <span className="profile-event-item-dots">•••</span>
+                  </div>
                 ))}
               </div>
-            </div>
+              {profile.registeredEvents && profile.registeredEvents.length > 0 && (
+                <div className="profile-registered-events-card" style={{ background: '#f7f7f7', borderRadius: 12, padding: 16 }}>
+                  <div className="profile-registered-events-title" style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 10 }}>
+                    Events You're Registered In
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {profile.registeredEvents.map(event => (
+                      <span key={event.id} style={{ background: '#30bdb7', color: '#fff', padding: '6px 14px', borderRadius: 8, fontWeight: 600 }}>{event.title}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
+
+          {activeTab === "Portfolio" && (() => {
+            const events = profile.registeredEvents || [];
+            const allSdgs = [...new Set(events.flatMap(e => e.sdgs || []))];
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {/* Achievements */}
+                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+                  <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 14 }}>
+                    Achievements <span style={{ color: '#30bdb7', fontSize: 14, fontWeight: 500 }}>({rewards.length})</span>
+                  </div>
+                  {rewards.length === 0 ? (
+                    <p style={{ color: '#aaa' }}>No achievements yet.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+                      {rewards.map(r => (
+                        <div
+                          key={r.id}
+                          title={r.description || r.name || r.id}
+                          style={{
+                            background: 'linear-gradient(135deg, #e8f5e9, #f0fdf4)',
+                            border: '1.5px solid #4caf50',
+                            borderRadius: 10,
+                            padding: '12px 10px',
+                            textAlign: 'center',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <div style={{ fontSize: 28 }}>{r.icon || "🏅"}</div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: '#234e7b', marginTop: 4 }}>{r.name || r.id}</div>
+                          {r.description && <div style={{ fontSize: 11, color: '#777', marginTop: 2 }}>{r.description}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* SDG Contributions */}
+                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+                  <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 14 }}>SDG Contributions</div>
+                  {allSdgs.length === 0 ? (
+                    <p style={{ color: '#aaa' }}>No SDG contributions yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      {allSdgs.sort((a, b) => a - b).map(sdg => (
+                        <div
+                          key={sdg}
+                          style={{
+                            background: SDG_COLORS[sdg] || '#234e7b',
+                            color: '#fff',
+                            borderRadius: 8,
+                            padding: '8px 14px',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span style={{ fontSize: 16, fontWeight: 800 }}>#{sdg}</span>
+                          <span>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Event Roles Summary */}
+                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+                  <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 14 }}>Events by Role</div>
+                  {events.length === 0 ? (
+                    <p style={{ color: '#aaa' }}>No events joined yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {events.map(event => (
+                        <div key={event.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f7fafd', borderRadius: 8, padding: '10px 14px' }}>
+                          <span style={{ fontWeight: 600, color: '#234e7b' }}>{event.title}</span>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>{event.role}</span>
+                            <span style={{ color: '#888', fontSize: 13 }}>+{event.pointsEarned} pts</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
