@@ -83,6 +83,88 @@ const restoreBackup = async (request) => {
     }
   }
 
+  // Restore Firebase Auth users if backup contains them
+  let authRestored = 0;
+  let authDeleted = 0;
+  const backupAuthUsers = backupData._authUsers || [];
+
+  if (backupAuthUsers.length > 0) {
+    // Build a set of UIDs that existed at backup time
+    const backupUids = new Set(backupAuthUsers.map((u) => u.uid));
+
+    // Get all current Auth users
+    const currentUids = new Set();
+    try {
+      let nextPageToken;
+      do {
+        const listResult = await admin.auth().listUsers(1000, nextPageToken);
+        for (const user of listResult.users) {
+          currentUids.add(user.uid);
+        }
+        nextPageToken = listResult.pageToken;
+      } while (nextPageToken);
+    } catch (err) {
+      errors.push("Failed to list current Auth users: " + err.message);
+    }
+
+    // Delete Auth users that were created AFTER the backup
+    // (exist now but not in backup), except the admin performing the restore
+    for (const uid of currentUids) {
+      if (!backupUids.has(uid) && uid !== callerUid) {
+        try {
+          await admin.auth().deleteUser(uid);
+          authDeleted++;
+        } catch (err) {
+          errors.push(`Failed to delete Auth user ${uid}: ${err.message}`);
+        }
+      }
+    }
+
+    // Recreate Auth users that were in the backup but are now missing
+    for (const backupUser of backupAuthUsers) {
+      if (!currentUids.has(backupUser.uid)) {
+        try {
+          const createProps = {
+            uid: backupUser.uid,
+            email: backupUser.email || undefined,
+            emailVerified: backupUser.emailVerified || false,
+            displayName: backupUser.displayName || undefined,
+            photoURL: backupUser.photoURL || undefined,
+            phoneNumber: backupUser.phoneNumber || undefined,
+            disabled: backupUser.disabled || false,
+          };
+          await admin.auth().createUser(createProps);
+          authRestored++;
+        } catch (err) {
+          errors.push(
+            `Failed to recreate Auth user ${backupUser.uid}: ${err.message}`,
+          );
+        }
+      }
+    }
+
+    // Also delete Firestore "users" docs for users not in backup
+    // (except the current admin)
+    try {
+      const usersSnapshot = await db.collection("users").get();
+      const deleteBatch = db.batch();
+      let deleteCount = 0;
+      usersSnapshot.forEach((doc) => {
+        if (!backupUids.has(doc.id) && doc.id !== callerUid) {
+          deleteBatch.delete(doc.ref);
+          deleteCount++;
+        }
+      });
+      if (deleteCount > 0) {
+        await deleteBatch.commit();
+      }
+    } catch (err) {
+      errors.push(
+        "Failed to clean up extra Firestore user docs: " + err.message,
+      );
+    }
+  }
+
   // Log the restore action
   await db.collection("backups").doc(backupId).update({
     lastRestoredAt: FieldValue.serverTimestamp(),
@@ -98,6 +180,8 @@ const restoreBackup = async (request) => {
     backupId,
     collectionsRestored: collectionsToRestore,
     restoredDocuments,
+    authUsersRestored: authRestored,
+    authUsersDeleted: authDeleted,
     timestamp: FieldValue.serverTimestamp(),
   });
 
@@ -105,8 +189,10 @@ const restoreBackup = async (request) => {
     success: errors.length === 0,
     restoredDocuments,
     collectionsRestored: collectionsToRestore,
+    authUsersRestored: authRestored,
+    authUsersDeleted: authDeleted,
     errors,
-    message: `Restored ${restoredDocuments} documents from backup.`,
+    message: `Restored ${restoredDocuments} documents from backup. Auth: ${authRestored} recreated, ${authDeleted} removed.`,
   };
 };
 

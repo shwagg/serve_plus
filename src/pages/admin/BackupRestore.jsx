@@ -139,7 +139,8 @@ export default function BackupRestore() {
               <h3 className="backup-create-title">Create Manual Backup</h3>
               <p className="backup-create-desc">
                 Back up all volunteer accounts, project data, events,
-                announcements, documents, and audit logs.
+                announcements, documents, audit logs, and Firebase
+                Authentication users.
               </p>
             </div>
           </div>
@@ -245,7 +246,8 @@ export default function BackupRestore() {
                         {confirmRestore === backup.backupId ? (
                           <div className="backup-confirm-group">
                             <span className="backup-confirm-text">
-                              Restore this backup?
+                              Restore this backup? Users created after this
+                              backup will be removed from Auth.
                             </span>
                             <button
                               className="backup-btn backup-btn-confirm"
@@ -325,6 +327,10 @@ export default function BackupRestore() {
             { name: "Audit Logs", desc: "System activity records" },
             { name: "Announcements", desc: "Global announcements" },
             { name: "Documents", desc: "Uploaded forms & files metadata" },
+            {
+              name: "Auth Users",
+              desc: "Firebase Authentication accounts",
+            },
           ].map((col) => (
             <div key={col.name} className="backup-collection-chip">
               <strong>{col.name}</strong>

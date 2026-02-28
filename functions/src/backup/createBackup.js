@@ -60,6 +60,35 @@ const createBackup = async (request) => {
     }
   }
 
+  // Also back up Firebase Auth users
+  const authUsers = [];
+  try {
+    let nextPageToken;
+    do {
+      const listResult = await admin.auth().listUsers(1000, nextPageToken);
+      for (const userRecord of listResult.users) {
+        authUsers.push({
+          uid: userRecord.uid,
+          email: userRecord.email || null,
+          emailVerified: userRecord.emailVerified || false,
+          displayName: userRecord.displayName || null,
+          photoURL: userRecord.photoURL || null,
+          phoneNumber: userRecord.phoneNumber || null,
+          disabled: userRecord.disabled || false,
+          providerData: (userRecord.providerData || []).map((p) => ({
+            providerId: p.providerId,
+            uid: p.uid,
+          })),
+          customClaims: userRecord.customClaims || null,
+        });
+      }
+      nextPageToken = listResult.pageToken;
+    } while (nextPageToken);
+  } catch (err) {
+    console.warn("Could not back up Auth users:", err.message);
+  }
+  backupData._authUsers = authUsers;
+
   // Serialize and upload to Cloud Storage
   const jsonData = JSON.stringify(
     backupData,
@@ -114,6 +143,7 @@ const createBackup = async (request) => {
       callerDoc.data().email || callerDoc.data().name || callerUid,
     collections: collectionsToBackup,
     totalDocuments,
+    totalAuthUsers: authUsers.length,
     sizeInBytes,
     storagePath: filePath,
     status: "completed",
@@ -126,7 +156,7 @@ const createBackup = async (request) => {
     backupId,
     totalDocuments,
     sizeInBytes,
-    message: `Backup created successfully with ${totalDocuments} documents.`,
+    message: `Backup created successfully with ${totalDocuments} documents and ${authUsers.length} auth users.`,
   };
 };
 
