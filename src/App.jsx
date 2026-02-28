@@ -31,7 +31,7 @@ import Chat from "./pages/global/Chat";
 import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
 import EventDetails from "./pages/student/missions/EventDetails";
 import EventActivity from "./pages/student/missions/EventActivity";
-import BadgeManage from "./pages/admin/BadgeManage";
+//import BadgeManage from "./pages/admin/BadgeManage";
 import Profile from "./pages/global/Profile";
 import ProjectList from "./pages/global/ProjectList";
 import ProposeProject from "./pages/global/ProposeProject";
@@ -40,8 +40,7 @@ import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
 import PartnerHome from "./pages/partner/PartnerHome";
 import StudentHome from "./pages/student/StudentHome";
-import EventActivity from "./pages/student/missions/EventActivity";
-import EventDetails from "./pages/student/missions/EventDetails";
+
 
 function App() {
   // Check for upcoming events and create notifications
@@ -84,8 +83,9 @@ function App() {
             />
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
+            <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="current-event/:missionId?" element={<CurrentEvent />} />
-            <Route path="system/badges" element={<BadgeManage />} />
+            {/*<Route path="system/badges" element={<BadgeManage />} /> */}
           </Route>
 
           <Route
