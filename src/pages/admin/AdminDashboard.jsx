@@ -185,13 +185,29 @@ export default function AdminDashboard() {
     fetchPublishedMissions();
   }, []);
 
-  const engagement = [
-    { label: "Senior Citizen Care Day", value: 95 },
-    { label: "Laguna Lake Cleanup", value: 90 },
-    { label: "Disaster Prep Workshop", value: 78 },
-    { label: "Community Youth Seminar", value: 65 },
-    { label: "Financial Literacy Clinic", value: 55 },
-  ];
+
+  // Engagement metrics: only published missions, blank value for now
+  const [engagement, setEngagement] = useState([]);
+
+  useEffect(() => {
+    const fetchEngagement = async () => {
+      try {
+        const snap = await getDocs(collection(db, "missions"));
+        const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const published = rows.filter((m) => (m.status || "draft") === "published");
+        setEngagement(
+          published.map((m) => ({
+            id: m.id,
+            label: m.title || m.alt || m.name || "Untitled Mission",
+            value: ""
+          }))
+        );
+      } catch (err) {
+        setEngagement([]);
+      }
+    };
+    fetchEngagement();
+  }, []);
 
   return (
     <div className="admin-outlet">
@@ -207,7 +223,13 @@ export default function AdminDashboard() {
             <div className="panel-body">
               <div className="bar-list">
                 {engagement.map((x) => (
-                  <div className="bar-row" key={x.label}>
+                  <div
+                    className="bar-row"
+                    key={x.label}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/admin/events/${x.id}/monitor`)}
+                    title="View Event Monitoring"
+                  >
                     <div className="bar-label">{x.label}</div>
                     <div className="bar-track">
                       <div

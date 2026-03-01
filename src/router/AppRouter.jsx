@@ -16,6 +16,7 @@ import ProjectProposal from "../pages/global/proposal/ProjectProposal";
 import StudentHome from "../pages/student/StudentHome";
 import EventActivity from "../pages/student/missions/EventActivity";
 import EventDetails from "../pages/student/missions/EventDetails";
+import CurrentEventMonitoring from "../pages/admin/CurrentEventMonitoring";
 
 export default function AppRouter() {
   return (
@@ -43,6 +44,7 @@ export default function AppRouter() {
           <Route path="backup-restore" element={<BackupRestore />} />
           <Route path="system/agreements" element={<AgreementEditor />} />
           <Route path="roster" element={<RosterAccountManagement />} />
+          <Route path="events/:eventId/monitor" element={<CurrentEventMonitoring />} />
         </Route>
       </Routes>
     </Router>
