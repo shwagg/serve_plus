@@ -163,13 +163,15 @@ export default function ProjectDetails() {
         };
       }
 
-      {/*this is where mission is set as "published"*/ }
+      // this is where mission is set as "published"
       if (nextStatus === "published") {
         payload.publishedAt = serverTimestamp();
-        {/*community feedback form metadata */ }
-        payload.feedback.isActive = true;
-        payload.feedback.avgRating = null;
-        payload.feedback.multiplier = null;
+        // community feedback form metadata
+        payload.feedback = {
+          isActive: true,
+          avgRating: null,
+          multiplier: null,
+        };
       }
 
       await updateDoc(ref, payload);
