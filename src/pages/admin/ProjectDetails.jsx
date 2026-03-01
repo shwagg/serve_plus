@@ -163,9 +163,13 @@ export default function ProjectDetails() {
         };
       }
 
+      {/*this is where mission is set as "published"*/ }
       if (nextStatus === "published") {
         payload.publishedAt = serverTimestamp();
-
+        {/*community feedback form metadata */ }
+        payload.feedback.isActive = true;
+        payload.feedback.avgRating = null;
+        payload.feedback.multiplier = null;
       }
 
       await updateDoc(ref, payload);
@@ -310,7 +314,14 @@ export default function ProjectDetails() {
       <p style={{ color: "#111" }}><b>Date:</b> {project.date || "—"}</p>
       <p style={{ color: "#111" }}><b>Location:</b> {project.location || "—"}</p>
       <p style={{ color: "#111" }}><b>Points:</b> {typeof project.points === "number" ? project.points : "—"}</p>
-
+      <p style={{ color: "#111" }}>
+        <b>Community Feedback:</b>{" "}
+        {project.feedback?.isActive === false ? (
+          <span style={{ color: "#28a745", fontWeight: 600 }}>Closed</span>
+        ) : (
+          <span style={{ color: "#ffc107", fontWeight: 600 }}>Active</span>
+        )}
+      </p>
       <hr />
 
       <h3 style={{ color: "#111" }}>Approvals</h3>
@@ -378,6 +389,32 @@ export default function ProjectDetails() {
           type="button"
         >
           {showFeedbackQR ? "Hide Feedback QR" : "Show Feedback QR"}
+        </button>
+
+        <button
+          disabled={saving}
+          onClick={async () => {
+            await updateDoc(doc(db, "missions", projectId), {
+              "feedback.isActive": false,
+              updatedAt: serverTimestamp()
+            });
+            await load();
+          }}
+        >
+          Close Feedback
+        </button>
+
+        <button
+          disabled={saving}
+          onClick={async () => {
+            await updateDoc(doc(db, "missions", projectId), {
+              "feedback.isActive": true,
+              updatedAt: serverTimestamp()
+            });
+            await load();
+          }}
+        >
+          Reopen Feedback
         </button>
       </div>
 

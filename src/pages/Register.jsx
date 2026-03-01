@@ -38,17 +38,17 @@ function Register() {
             try {
                 const missionsRef = collection(db, "Missions");
                 const missionsSnap = await getDocs(missionsRef);
-                
+
                 const now = new Date();
                 let nearestEvent = null;
                 let nearestDate = null;
-                
+
                 console.log('Fetching events for new user registration...');
-                
+
                 missionsSnap.docs.forEach(doc => {
                     const data = doc.data();
                     console.log('Event:', data.title, 'Date:', data.date, 'Status:', data.status);
-                    
+
                     if (data.date && (data.status === 'published' || !data.status)) {
                         let eventDate;
                         if (data.dateAt?.toDate) {
@@ -57,18 +57,18 @@ function Register() {
                             // Try parsing the date string
                             eventDate = new Date(data.date);
                         }
-                        
+
                         console.log('Parsed date:', eventDate, 'Is future:', eventDate > now);
-                        
+
                         if (eventDate && eventDate > now && (!nearestDate || eventDate < nearestDate)) {
                             nearestDate = eventDate;
                             nearestEvent = data.title || 'Upcoming Event';
                         }
                     }
                 });
-                
+
                 console.log('Nearest event found:', nearestEvent);
-                
+
                 if (nearestEvent) {
                     upcomingEventLabel = `Joined Event: ${nearestEvent}`;
                 }
@@ -80,11 +80,11 @@ function Register() {
             const eventHistory = [
                 { label: "Registered", date: new Date().toISOString().slice(0, 10) }
             ];
-            
+
             if (upcomingEventLabel) {
-                eventHistory.push({ 
-                    label: upcomingEventLabel, 
-                    date: new Date().toISOString().slice(0, 10) 
+                eventHistory.push({
+                    label: upcomingEventLabel,
+                    date: new Date().toISOString().slice(0, 10)
                 });
             }
 
@@ -97,6 +97,7 @@ function Register() {
                 status: "active",
                 createdAt: new Date(),
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || username)}&background=30bdb7&color=fff&size=120`,
+                totalPoints: 0,
                 level: 1,
                 levelProgress: 0,
                 skills: ["React", "Firebase", "UI/UX"],

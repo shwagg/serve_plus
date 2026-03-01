@@ -3,8 +3,20 @@ import { ListAltOutlinedIcon } from "../../components/icons/index";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
-import { releaseMissionPoints } from "../global/rewardSaveSystem";
+import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
 import "../../styles/DocumentLibrary.css";
+
+function toTitleCase(str) {
+  if (!str) return str;
+
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(" ");
+}
 
 export default function DocumentLibrary() {
   const [stats, setStats] = useState({});
@@ -14,6 +26,7 @@ export default function DocumentLibrary() {
   const [currentMissionId, setCurrentMissionId] = useState(null);
   const [missionAvgRating, setMissionAvgRating] = useState(0);
   const [isMissionReleased, setIsMissionReleased] = useState(false);
+  const [isFeedbackActive, setIsFeedbackActive] = useState(true);
   const [volunteers, setVolunteers] = useState([]);
   const allComplete =
     volunteers.length > 0 &&
@@ -130,43 +143,64 @@ export default function DocumentLibrary() {
   const handleViewSubmissions = async (missionId) => {
     setCurrentMissionId(missionId);
     const missionSnap = await getDoc(doc(db, "missions", missionId));
-    const isReleased = missionData?.released === true;
     const missionData = missionSnap.data();
+    const isReleased = missionData?.released === true;
     const avgRating = missionData?.feedback?.avgRating || 0;
+    const feedbackActive = missionData?.feedback?.isActive !== false;
 
+    setIsFeedbackActive(feedbackActive);
     setShowSubmissionsModal(true);
     // Fetch volunteers for the selected mission
-    const snap = await getDocs(collection(db, "missions", missionId, "volunteer"));
-    const volunteersRaw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log('[DEBUG] Volunteers fetched:', volunteersRaw);
+    const snap = await getDocs(
+      collection(db, "missions", missionId, "volunteer")
+    );
 
-    // Fetch survey answers for each volunteer
-    const volunteers = await Promise.all(volunteersRaw.map(async (v) => {
-      // Pre-Activity Survey
-      let preSurveyAnswers = null;
-      try {
-        const preDoc = await getDoc(doc(db, "missions", missionId, "volunteer", v.id, "preSurvey", "response"));
-        if (preDoc.exists()) {
-          preSurveyAnswers = preDoc.data();
-        }
-      } catch (e) { console.log('[DEBUG] Error fetching preSurvey for', v.id, e); }
-
-      // Post-Activity Survey
-      let postSurveyAnswers = null;
-      try {
-        const postDoc = await getDoc(doc(db, "missions", missionId, "volunteer", v.id, "postSurvey", "response"));
-        if (postDoc.exists()) {
-          postSurveyAnswers = postDoc.data();
-        }
-      } catch (e) { console.log('[DEBUG] Error fetching postSurvey for', v.id, e); }
-
-      const result = {
-        ...v,
-        preSurveyAnswers,
-        postSurveyAnswers,
-      };
-      return result;
+    const volunteersRaw = snap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
     }));
+
+    const usersSnap = await getDocs(collection(db, "users"));
+    const usersMap = new Map();
+
+    usersSnap.docs.forEach(userDoc => {
+      usersMap.set(userDoc.id, userDoc.data());
+    });
+
+    const volunteers = await Promise.all(
+      volunteersRaw.map(async (v) => {
+
+        // Fetching survey answers
+        let preSurveyAnswers = null;
+        let postSurveyAnswers = null;
+
+        try {
+          const preDoc = await getDoc(
+            doc(db, "missions", missionId, "volunteer", v.id, "preSurvey", "response")
+          );
+          if (preDoc.exists()) preSurveyAnswers = preDoc.data();
+        } catch (e) { }
+
+        try {
+          const postDoc = await getDoc(
+            doc(db, "missions", missionId, "volunteer", v.id, "postSurvey", "response")
+          );
+          if (postDoc.exists()) postSurveyAnswers = postDoc.data();
+        } catch (e) { }
+
+        const userData = usersMap.get(v.id);
+        //validation to keep names in title case
+        const rawName = userData?.name || userData?.username || "Unknown User";
+
+        return {
+          ...v,
+          name: toTitleCase(rawName),
+          preSurveyAnswers,
+          postSurveyAnswers
+        };
+      })
+    );
+
     setVolunteers(volunteers);
     setMissionAvgRating(avgRating);
     setIsMissionReleased(isReleased);
@@ -210,7 +244,7 @@ export default function DocumentLibrary() {
               const attendance = missionVolunteers.length ? missionVolunteers.filter(v => v.progress?.attendance === 'present').length : s?.attendance || 0;
 
               return (
-                <div className="library-card" style={{
+                <div key={mission.id} className="library-card" style={{
                   background: '#fff',
                   borderRadius: '20px',
                   boxShadow: '0 2px 8px #0001',
@@ -319,8 +353,24 @@ export default function DocumentLibrary() {
             >
               ×
             </button>
+
             {/*Headings of the summary table modal */}
             <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Submissions</h2>
+
+            {isFeedbackActive && (
+              <div style={{
+                background: '#fff3cd',
+                color: '#856404',
+                padding: '10px 16px',
+                borderRadius: 8,
+                marginBottom: 16,
+                fontWeight: 600,
+                textAlign: 'center'
+              }}>
+                Community feedback form is still active. Points cannot be released yet.
+              </div>
+            )}
+
             <div className="table-scroll-wrapper">
               <table className="submission-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 8px #0001' }}>
                 <thead>
@@ -355,25 +405,51 @@ export default function DocumentLibrary() {
                     // Compute points without saving yet
                     let previewPoints = null;
 
-                    if (missionAvgRating && v.participationStatus) {
-
+                    if (v.participationStatus) {
                       const rawRole =
-                        v.preSurveyAnswers?.engagement?.participation?.[0] ||
-                        null;
+                        v.preSurveyAnswers?.engagement?.participation?.[0] || null;
 
                       if (rawRole) {
-                        const role = rawRole.trim().toLowerCase();
+                        const role = rawRole
+                          .trim()
+                          .toLowerCase()
+                          .replace(/\s+/g, "_");
+
+                        console.log("Volunteer:", v.name);
+                        console.log("Raw Role:", rawRole);
+                        console.log("Normalized Role:", role);
+
+                        const normalizedParticipation =
+                          v.participationStatus?.toLowerCase();
+
+                        console.log("====== PREVIEW DEBUG ======");
+                        console.log("Volunteer:", v.name);
+                        console.log("Role (raw):", rawRole);
+                        console.log("Role (normalized):", role);
+                        console.log("missionAvgRating:", missionAvgRating);
+                        console.log("Participation (raw):", v.participationStatus);
+                        console.log("Participation (normalized):", normalizedParticipation);
 
                         previewPoints = computeFinalPoints(
                           role,
-                          missionAvgRating,
-                          v.participationStatus
+                          missionAvgRating || 0,
+                          normalizedParticipation
                         );
+
+                        console.log("Preview Points:", previewPoints);
+                        console.log("===========================");
                       }
                     }
+
+                    const isReadyToRelease =
+                      individualCompletion === 100 &&
+                      !isFeedbackActive &&
+                      !isMissionReleased &&
+                      !(v.pointsEarned > 0);
+
                     return (
                       <tr key={v.id} style={{ background: idx % 2 === 0 ? '#f8f9fb' : '#fff', color: '#23335b' }}>
-                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'left', fontWeight: 500 }}>{v.name || v.respondent?.name || v.id}</td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'left', fontWeight: 500 }}>{v.name}</td>
                         <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
                           {v.progress?.attendance === 'present' ? 'Present' : ''}
                         </td>
@@ -418,30 +494,69 @@ export default function DocumentLibrary() {
                         </td>
 
                         <td className="submission-table-cell">
-                          {/*"-" if not computed; preview; pointsEarned if saved from firestore*/}
-                          {v.pointsEarned ?? previewPoints ?? "-"}
+                          {
+                            isMissionReleased && v.pointsEarned !== undefined
+                              ? v.pointsEarned
+                              : individualCompletion === 100
+                                ? previewPoints ?? "-"
+                                : "-"
+                          }
                         </td>
-                        <td className="submission-table-cell">
-                          {idx === 0 && allComplete && !isMissionReleased && (
+                        {/*release button column */}
+                        <td className="submission-table-cell" style={{ textAlign: "center" }}>
+                          {/* Already Released */}
+                          {v.pointsEarned > 0 ? (
+                            <span
+                              style={{
+                                fontWeight: 700,
+                                color: "#555",
+                              }}
+                            >
+                              Released
+                            </span>
+                          ) : individualCompletion !== 100 ? (
+                            /* Not completed – light grey flat text */
+                            <span
+                              style={{
+                                color: "#c0c0c0",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Release
+                            </span>
+                          ) : (
+                            /* Completed – teal clickable button */
                             <button
-                              className="release-btn"
+                              style={{
+                                background: "#30bdb7",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 6,
+                                padding: "6px 14px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
                               onClick={async () => {
                                 try {
-                                  await releaseMissionPoints(currentMissionId);
-
-                                  const snap = await getDocs(
-                                    collection(db, "missions", currentMissionId, "volunteer")
+                                  const finalPoints = await releaseVolunteerPoints(
+                                    currentMissionId,
+                                    v.id
                                   );
-                                  const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                                  setVolunteers(refreshed);
 
-                                  alert("Points released successfully!");
+                                  setVolunteers(prev =>
+                                    prev.map(vol =>
+                                      vol.id === v.id
+                                        ? { ...vol, pointsEarned: finalPoints }
+                                        : vol
+                                    )
+                                  );
+
                                 } catch (err) {
                                   alert(err.message);
                                 }
                               }}
                             >
-                              Release Points
+                              Release
                             </button>
                           )}
                         </td>

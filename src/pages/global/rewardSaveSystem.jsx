@@ -1,6 +1,6 @@
 // Saving computation to firestore such as updating
 // user account points
-import { doc, getDoc, getDocs, collection, updateDoc, increment } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, updateDoc, increment, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { checkAndAssignBadges } from "../../hooks/badgeSystem";
@@ -16,7 +16,7 @@ export const releaseMissionPoints = async (missionId) => {
     const missionData = missionSnap.data();
     const avgRating = missionData.feedback?.avgRating;
 
-    if (!avgRating) {
+    if (avgRating === undefined || avgRating === null) {
         throw new Error("Mission feedback not computed yet.");
     }
 
@@ -65,18 +65,18 @@ export const releaseMissionPoints = async (missionId) => {
         const finalPoints = computeFinalPoints(
             role,
             avgRating,
-            volunteerData.participationStatus
+            volunteerData.participationStatus?.toLowerCase()
         );
 
         console.log("Computed Final Points:", finalPoints);
         console.log("===========================");
 
-        // Update user total points
+        // Update user total points under user collection
         if (volunteerData.userId) {
             await updateDoc(
                 doc(db, "users", volunteerData.userId),
                 {
-                    pointsEarned: increment(finalPoints)
+                    totalPoints: increment(finalPoints)
                 }
             );
         }
@@ -100,8 +100,94 @@ export const releaseMissionPoints = async (missionId) => {
 
     // After release points to user, locks the document lib to prevent future edit
     await updateDoc(missionRef, {
-        released: true
+        released: true,
+        "feedback.isActive": false
     });
 
     return true;
+};
+
+export const releaseVolunteerPoints = async (missionId, volunteerId) => {
+    const missionRef = doc(db, "missions", missionId);
+    const missionSnap = await getDoc(missionRef);
+
+    if (!missionSnap.exists()) {
+        throw new Error("Mission not found.");
+    }
+
+    const missionData = missionSnap.data();
+    const avgRating = missionData.feedback?.avgRating;
+
+    if (avgRating === undefined || avgRating === null) {
+        throw new Error("Mission feedback not computed yet.");
+    }
+
+    const volunteerRef = doc(db, "missions", missionId, "volunteer", volunteerId);
+    const volunteerSnap = await getDoc(volunteerRef);
+
+    if (!volunteerSnap.exists()) {
+        throw new Error("Volunteer not found.");
+    }
+
+    const volunteerData = volunteerSnap.data();
+
+    if (!volunteerData.participationStatus) {
+        throw new Error("Participation status not set.");
+    }
+
+    const preDoc = await getDoc(
+        doc(db, "missions", missionId, "volunteer", volunteerId, "preSurvey", "response")
+    );
+
+    if (!preDoc.exists()) {
+        throw new Error("Pre-survey not found.");
+    }
+
+    const preData = preDoc.data();
+    const rawRole = preData.engagement?.participation?.[0];
+
+    if (!rawRole) {
+        throw new Error("Role not found.");
+    }
+
+    const role = rawRole
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_");
+
+    const normalizedParticipation =
+        volunteerData.participationStatus?.toLowerCase();
+
+    console.log("========== RELEASE DEBUG ==========");
+    console.log("Volunteer ID:", volunteerId);
+    console.log("Role (raw):", rawRole);
+    console.log("Role (normalized):", role);
+    console.log("Feedback avgRating:", avgRating);
+    console.log("Participation Status (raw):", volunteerData.participationStatus);
+    console.log("Participation Status (normalized):", normalizedParticipation);
+
+    const finalPoints = computeFinalPoints(
+        role,
+        avgRating,
+        normalizedParticipation
+    );
+
+    console.log("Final Points Computed:", finalPoints);
+    console.log("===================================");
+
+    // Increment user totalPoints
+    if (volunteerData.userId) {
+        await updateDoc(
+            doc(db, "users", volunteerData.userId),
+            {
+                totalPoints: increment(finalPoints)
+            }
+        );
+    }
+
+    await updateDoc(volunteerRef, {
+        pointsEarned: finalPoints
+    });
+
+    return finalPoints;
 };

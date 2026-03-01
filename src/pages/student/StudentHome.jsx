@@ -170,33 +170,22 @@ const StudentHome = () => {
               setCurrentPoints(progress);
               setNextLevelPoints(100);
             }
+
+            // Calculate total points earned across all events
+            const totalPoints = userData.totalPoints || 0;
+
+            // Update current points with actual points earned
+            setCurrentPoints(totalPoints);
+
+            // Calculate level based on points (every 100 points = 1 level)
+            const calculatedLevel = Math.floor(totalPoints / 100) + 1;
+            setLevel(calculatedLevel);
+
+            // Calculate progress to next level
+            setNextLevelPoints(100);
           } else {
             console.log("No user document found in Firestore");
           }
-
-          // Calculate total points earned across all events
-          const missionsRef = collection(db, "missions");
-          const missionsSnap = await getDocs(missionsRef);
-          let totalPoints = 0;
-
-          for (const missionDoc of missionsSnap.docs) {
-            const volunteerRef = doc(db, "missions", missionDoc.id, "volunteer", user.uid);
-            const volunteerSnap = await getDoc(volunteerRef);
-            if (volunteerSnap.exists()) {
-              totalPoints += volunteerSnap.data().pointsEarned || 0;
-            }
-          }
-
-          // Update current points with actual points earned
-          setCurrentPoints(totalPoints);
-
-          // Calculate level based on points (every 100 points = 1 level)
-          const calculatedLevel = Math.floor(totalPoints / 100) + 1;
-          setLevel(calculatedLevel);
-
-          // Calculate progress to next level
-          const pointsInCurrentLevel = totalPoints % 100;
-          setNextLevelPoints(100);
 
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -242,48 +231,28 @@ const StudentHome = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Fetch all users first
         const usersRef = collection(db, "users");
         const usersSnap = await getDocs(usersRef);
 
-        // Fetch all missions once
-        const missionsRef = collection(db, "missions");
-        const missionsSnap = await getDocs(missionsRef);
-
-        // Build a map of userId -> totalPoints by fetching all volunteers
-        const userPointsMap = new Map();
-
-        for (const missionDoc of missionsSnap.docs) {
-          const volunteersRef = collection(db, "missions", missionDoc.id, "volunteer");
-          const volunteersSnap = await getDocs(volunteersRef);
-
-          volunteersSnap.docs.forEach(volunteerDoc => {
-            const userId = volunteerDoc.id;
-            const points = volunteerDoc.data().pointsEarned || 0;
-            userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + points);
-          });
-        }
-
-        // Build leaderboard data
-        const leaderboardData = [];
-
-        usersSnap.docs.forEach(userDoc => {
+        const leaderboardData = usersSnap.docs.map(userDoc => {
           const userData = userDoc.data();
-          const userId = userDoc.id;
-          const totalPoints = userPointsMap.get(userId) || 0;
 
-          // Include all users who have at least email/name data
-          if (userData.email || userData.name || userData.username) {
-            leaderboardData.push({
-              uid: userId,
-              name: userData.username || userData.name || userData.email?.split('@')[0] || 'User',
-              points: totalPoints,
-              avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || userData.name || 'User')}&background=30bdb7&color=fff&size=120`
-            });
-          }
+          return {
+            uid: userDoc.id,
+            name:
+              userData.username ||
+              userData.name ||
+              userData.email?.split("@")[0] ||
+              "User",
+            points: userData.totalPoints || 0,
+            avatar:
+              userData.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                userData.username || userData.name || "User"
+              )}&background=30bdb7&color=fff&size=120`,
+          };
         });
 
-        // Sort by points descending
         leaderboardData.sort((a, b) => b.points - a.points);
         setLeaderboard(leaderboardData);
       } catch (error) {

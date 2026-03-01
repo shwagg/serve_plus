@@ -3,17 +3,17 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm }) {
   const softSkills = [
-    "Teamwork", "Communication", "Problem Solving", "Leadership", "Time Management", 
+    "Teamwork", "Communication", "Problem Solving", "Leadership", "Time Management",
     "Adaptability", "Conflict Resolution", "Empathy", "Critical Thinking", "Responsibility"
   ];
   const technicalSkills = [
-    "Data Analysis", "Coding/Programming", "Web Design", "Social Media Management", 
-    "Digital Literacy", "Spreadsheet Skills", "Presentation Software", "Video Editing", 
+    "Data Analysis", "Coding/Programming", "Web Design", "Social Media Management",
+    "Digital Literacy", "Spreadsheet Skills", "Presentation Software", "Video Editing",
     "IT Troubleshooting", "Database Management"
   ];
   const specializedSkills = [
-    "Project Planning", "Grant Writing", "Event Coordination", "Research Methods", 
-    "Survey Design", "Workshop Facilitation", "Community Assessment", "Policy Analysis", 
+    "Project Planning", "Grant Writing", "Event Coordination", "Research Methods",
+    "Survey Design", "Workshop Facilitation", "Community Assessment", "Policy Analysis",
     "Report Writing", "Monitoring & Evaluation"
   ];
   const presetInterests = ["Design", "Coding", "Music", "Art", "Sports", "Reading", "Travel", "Gaming", "Science", "Technology"];
@@ -44,15 +44,15 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
         alert("Image size should be less than 5MB");
         return;
       }
-      
+
       setUploading(true);
-      
+
       try {
         // Compress image before uploading
         const img = new Image();
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        
+
         const reader = new FileReader();
         reader.onload = async (event) => {
           img.src = event.target.result;
@@ -61,7 +61,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
             const maxSize = 400;
             let width = img.width;
             let height = img.height;
-            
+
             if (width > height) {
               if (width > maxSize) {
                 height *= maxSize / width;
@@ -73,11 +73,11 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
                 height = maxSize;
               }
             }
-            
+
             canvas.width = width;
             canvas.height = height;
             ctx.drawImage(img, 0, 0, width, height);
-            
+
             // Convert to blob
             canvas.toBlob(async (blob) => {
               try {
@@ -89,11 +89,11 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
                   setUploading(false);
                   return;
                 }
-                
+
                 const storageRef = ref(storage, `profile-pictures/${user.uid}/profile.jpg`);
                 await uploadBytes(storageRef, blob);
                 const downloadURL = await getDownloadURL(storageRef);
-                
+
                 setAvatar(downloadURL);
                 setUploading(false);
               } catch (err) {
@@ -122,8 +122,8 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
           <div className="profile-modal-avatar-box">
             <div className="profile-modal-avatar-wrapper">
               <img src={avatar} alt="avatar" className="profile-modal-avatar" />
-              <input 
-                type="file" 
+              <input
+                type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
                 style={{ display: 'none' }}
@@ -247,20 +247,20 @@ const SDG_COLORS = [
 function computeAchievements(events, totalPoints, level) {
   const roles = [...new Set(events.map(e => e.role).filter(Boolean))];
   return [
-    { id: "first_step",  icon: "🌱", name: "First Step",       desc: "Joined your first event",        unlocked: events.length >= 1 },
-    { id: "active",      icon: "⭐", name: "Active Volunteer",  desc: "Joined 3+ events",               unlocked: events.length >= 3 },
-    { id: "dedicated",   icon: "🌟", name: "Dedicated",         desc: "Joined 5+ events",               unlocked: events.length >= 5 },
-    { id: "super",       icon: "🏆", name: "Super Volunteer",   desc: "Joined 10+ events",              unlocked: events.length >= 10 },
-    { id: "pts50",       icon: "💫", name: "Point Starter",     desc: "Earned 50+ points",              unlocked: totalPoints >= 50 },
-    { id: "pts100",      icon: "💎", name: "Point Collector",   desc: "Earned 100+ points",             unlocked: totalPoints >= 100 },
-    { id: "pts500",      icon: "👑", name: "Point Master",      desc: "Earned 500+ points",             unlocked: totalPoints >= 500 },
-    { id: "organizer",   icon: "📋", name: "Event Organizer",   desc: "Served as an organizer",         unlocked: events.some(e => e.role === "organizer") },
-    { id: "lead_org",    icon: "🎯", name: "Lead Organizer",    desc: "Served as lead organizer",       unlocked: events.some(e => e.role === "lead_organizer") },
-    { id: "donor",       icon: "💝", name: "Generous Donor",    desc: "Donated to a cause",             unlocked: events.some(e => e.role === "donor") },
-    { id: "all_rounder", icon: "🎨", name: "All-Rounder",       desc: "Held 3+ different roles",        unlocked: roles.length >= 3 },
-    { id: "lv5",         icon: "🚀", name: "Rising Star",       desc: "Reached Level 5",                unlocked: (level || 1) >= 5 },
-    { id: "lv10",        icon: "🦅", name: "Veteran",           desc: "Reached Level 10",               unlocked: (level || 1) >= 10 },
-    { id: "sdg3",        icon: "🌍", name: "SDG Champion",      desc: "Contributed to 3+ SDG goals",   unlocked: [...new Set(events.flatMap(e => e.sdgs || []))].length >= 3 },
+    { id: "first_step", icon: "🌱", name: "First Step", desc: "Joined your first event", unlocked: events.length >= 1 },
+    { id: "active", icon: "⭐", name: "Active Volunteer", desc: "Joined 3+ events", unlocked: events.length >= 3 },
+    { id: "dedicated", icon: "🌟", name: "Dedicated", desc: "Joined 5+ events", unlocked: events.length >= 5 },
+    { id: "super", icon: "🏆", name: "Super Volunteer", desc: "Joined 10+ events", unlocked: events.length >= 10 },
+    { id: "pts50", icon: "💫", name: "Point Starter", desc: "Earned 50+ points", unlocked: totalPoints >= 50 },
+    { id: "pts100", icon: "💎", name: "Point Collector", desc: "Earned 100+ points", unlocked: totalPoints >= 100 },
+    { id: "pts500", icon: "👑", name: "Point Master", desc: "Earned 500+ points", unlocked: totalPoints >= 500 },
+    { id: "organizer", icon: "📋", name: "Event Organizer", desc: "Served as an organizer", unlocked: events.some(e => e.role === "organizer") },
+    { id: "lead_org", icon: "🎯", name: "Lead Organizer", desc: "Served as lead organizer", unlocked: events.some(e => e.role === "lead_organizer") },
+    { id: "donor", icon: "💝", name: "Generous Donor", desc: "Donated to a cause", unlocked: events.some(e => e.role === "donor") },
+    { id: "all_rounder", icon: "🎨", name: "All-Rounder", desc: "Held 3+ different roles", unlocked: roles.length >= 3 },
+    { id: "lv5", icon: "🚀", name: "Rising Star", desc: "Reached Level 5", unlocked: (level || 1) >= 5 },
+    { id: "lv10", icon: "🦅", name: "Veteran", desc: "Reached Level 10", unlocked: (level || 1) >= 10 },
+    { id: "sdg3", icon: "🌍", name: "SDG Champion", desc: "Contributed to 3+ SDG goals", unlocked: [...new Set(events.flatMap(e => e.sdgs || []))].length >= 3 },
   ];
 }
 
@@ -378,6 +378,7 @@ export default function Profile() {
     const fetchProfileAndEvents = async () => {
       setLoading(true);
       setError("");
+
       try {
         const user = auth.currentUser;
         if (!user) {
@@ -386,56 +387,70 @@ export default function Profile() {
           setLoading(false);
           return;
         }
+
         // Fetch profile
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
-        let profileData = docSnap.exists() ? docSnap.data() : mockProfile;
+        let profileData = docSnap.exists()
+          ? docSnap.data()
+          : mockProfile;
 
-        // Calculate total points earned across all events
+        // Fetch events (NO POINT CALCULATION HERE)
         const missionsRef = collection(db, "missions");
         const missionsSnap = await getDocs(missionsRef);
-        let totalPoints = 0;
+
         let registeredEvents = [];
-        
+
         for (const eventDoc of missionsSnap.docs) {
           const eventId = eventDoc.id;
           const eventData = eventDoc.data();
-          const eventTitle = eventData.title || eventId;
-          
-          // Check if user is a volunteer
-          const volunteerRef = doc(db, "missions", eventId, "volunteer", user.uid);
+
+          const volunteerRef = doc(
+            db,
+            "missions",
+            eventId,
+            "volunteer",
+            user.uid
+          );
+
           const volunteerSnap = await getDoc(volunteerRef);
-          
+
           if (volunteerSnap.exists()) {
             const vData = volunteerSnap.data();
+
             registeredEvents.push({
               id: eventId,
-              title: eventTitle,
+              title: eventData.title || eventId,
               role: vData.role || "participant",
               pointsEarned: vData.pointsEarned || 0,
               sdgs: eventData.sdgs || [],
             });
-            // Add points from this event
-            totalPoints += vData.pointsEarned || 0;
           }
         }
-        
+
         profileData.registeredEvents = registeredEvents;
+
+        //Reading totalPoints DIRECTLY FROM USER DOC
+        const totalPoints = profileData.totalPoints || 0;
+
         profileData.totalPoints = totalPoints;
-        
-        // Calculate level based on points (every 100 points = 1 level)
-        const calculatedLevel = Math.floor(totalPoints / 100) + 1;
-        profileData.level = calculatedLevel;
-        
-        // Calculate progress to next level (0-100%)
-        const pointsInCurrentLevel = totalPoints % 100;
-        profileData.levelProgress = pointsInCurrentLevel;
+        profileData.level = Math.floor(totalPoints / 100) + 1;
+        profileData.levelProgress = totalPoints % 100;
 
         setProfile(profileData);
 
-        // Fetch rewards from subcollection
-        const rewardsSnap = await getDocs(collection(db, "users", user.uid, "rewards"));
-        setRewards(rewardsSnap.docs.map(r => ({ id: r.id, ...r.data() })));
+        // Fetch rewards
+        const rewardsSnap = await getDocs(
+          collection(db, "users", user.uid, "rewards")
+        );
+
+        setRewards(
+          rewardsSnap.docs.map(r => ({
+            id: r.id,
+            ...r.data(),
+          }))
+        );
+
       } catch (err) {
         setError("Failed to load profile.");
         setProfile(mockProfile);
@@ -443,6 +458,7 @@ export default function Profile() {
         setLoading(false);
       }
     };
+
     fetchProfileAndEvents();
   }, []);
 

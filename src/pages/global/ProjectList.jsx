@@ -123,20 +123,6 @@ export default function ProjectList({ mode = "admin" }) {
             "approvals.faculty.decidedBy": user.uid,
         });
     };
-    const handlePublish = async (projectId) => {
-        const ref = doc(db, "missions", projectId);
-
-        await updateDoc(ref, {
-            status: "published",
-            publishedAt: serverTimestamp(),
-            publishedBy: user.uid,
-            //for community feedback form to be filled up
-            //since this is a published project
-            "feedback.isActive": true,
-            "feedback.openedAt": serverTimestamp()
-        });
-    };
-
 
     const normalizedSearch = search.trim().toLowerCase();
 
@@ -328,6 +314,7 @@ export default function ProjectList({ mode = "admin" }) {
                                                                 key={p.id}
                                                                 project={p}
                                                                 mode={mode}
+                                                                navigate={navigate}
                                                                 onPartnerApprove={handlePartnerApprove}
                                                                 onPartnerReject={handlePartnerReject}
                                                             />
@@ -384,7 +371,7 @@ function ProjectProgress({ status }) {
     );
 }
 //kanban board card
-function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject }) {
+function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject, navigate }) {
     const partnerApproved = p.approvals?.partner?.approved;
     const facultyApproved = p.approvals?.faculty?.approved;
     const completedSteps = [
@@ -404,7 +391,7 @@ function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject }) {
             className="kanban-card"
             onClick={() => {
                 if (mode === "admin") {
-                    window.location.href = `/admin/projects/${p.id}`;
+                    navigate(`/admin/projects/${p.id}`);
                 }
             }}
         >
@@ -471,10 +458,10 @@ function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject }) {
                             className="btn-success"
                             onClick={(e) => {
                                 e.stopPropagation(); // prevents opening ProjectDetails
-                                handlePublish(p.id);
+                                navigate(`/admin/projects/${p.id}`);
                             }}
                         >
-                            Publish
+                            Go to Publish
                         </button>
                     )}
 

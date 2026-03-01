@@ -129,7 +129,7 @@ export default function PublicFeedback() {
         return <div className="feedback-page"><div className="feedback-card">Mission not found.</div></div>;
     }
 
-    if (mission.status !== "published" || !mission.feedback?.isActive) {
+    if (!mission.feedback?.isActive) {
         return (
             <div className="feedback-page">
                 <div className="feedback-card">

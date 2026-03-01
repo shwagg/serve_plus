@@ -1,5 +1,4 @@
 //This file allows to email or for now in the emulator send the MFA code in the terminal.
-
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const crypto = require("crypto");

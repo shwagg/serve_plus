@@ -25,11 +25,11 @@ export default function CurrentEvent() {
                 const volunteerRef = collection(db, "missions", missionId, "volunteer");
 
                 const pendingSnap = await getDocs(
-                    query(volunteerRef, where("status", "==", "pending"))
+                    query(volunteerRef, where("registrationStatus", "==", "pending"))
                 );
 
                 const approvedSnap = await getDocs(
-                    query(volunteerRef, where("status", "==", "approved"))
+                    query(volunteerRef, where("registrationStatus", "==", "approved"))
                 );
 
                 missionData.push({
@@ -48,74 +48,73 @@ export default function CurrentEvent() {
     }, []);
 
     //fetch mission volunteers wanting to join
-    useEffect(() => {
-        if (!missionId) return;
+    async function fetchMissionVolunteers() {
+        const volunteersRef = collection(
+            db,
+            "missions",
+            missionId,
+            "volunteer"
+        );
+        const pendingSnap = await getDocs(
+            query(volunteersRef, where("registrationStatus", "==", "pending"))
+        );
 
-        async function fetchMissionVolunteers() {
-            const volunteersRef = collection(
-                db,
-                "missions",
-                missionId,
-                "volunteer"
-            );
+        const approvedSnap = await getDocs(
+            query(volunteersRef, where("registrationStatus", "==", "approved"))
+        );
 
-            const pendingSnap = await getDocs(
-                query(volunteersRef, where("status", "==", "pending"))
-            );
+        const pendingResults = [];
+        const approvedResults = [];
 
-            const approvedSnap = await getDocs(
-                query(volunteersRef, where("status", "==", "approved"))
-            );
+        for (const docSnap of pendingSnap.docs) {
+            const userId = docSnap.id;
+            const volunteerData = docSnap.data();
 
-            const pendingResults = [];
-            const approvedResults = [];
+            const userDoc = await getDoc(doc(db, "users", userId));
+            const userData = userDoc.exists() ? userDoc.data() : {};
 
-            for (const docSnap of pendingSnap.docs) {
-                const userId = docSnap.id;
-                const volunteerData = docSnap.data();
-
-                const userDoc = await getDoc(doc(db, "users", userId));
-                const userData = userDoc.exists() ? userDoc.data() : {};
-
-                pendingResults.push({
-                    id: userId,
-                    name: userData.name || "Unknown",
-                    level: userData.level || 1,
-                    joinedAt: volunteerData.joinedAt
-                });
-            }
-
-            for (const docSnap of approvedSnap.docs) {
-                const userId = docSnap.id;
-                const volunteerData = docSnap.data();
-
-                const userDoc = await getDoc(doc(db, "users", userId));
-                const userData = userDoc.exists() ? userDoc.data() : {};
-
-                approvedResults.push({
-                    id: userId,
-                    name: userData.name || "Unknown",
-                    level: userData.level || 1,
-                    joinedAt: volunteerData.joinedAt
-                });
-            }
-
-            setPendingVolunteers(pendingResults);
-            setApprovedVolunteers(approvedResults);
+            pendingResults.push({
+                id: userId,
+                name: userData.name || "Unknown",
+                level: userData.level || "--",
+                joinedAt: volunteerData.joinedAt
+            });
         }
 
+        for (const docSnap of approvedSnap.docs) {
+            const userId = docSnap.id;
+            const volunteerData = docSnap.data();
+
+            const userDoc = await getDoc(doc(db, "users", userId));
+            const userData = userDoc.exists() ? userDoc.data() : {};
+
+            approvedResults.push({
+                id: userId,
+                name: userData.name || "Unknown",
+                level: userData.level || "--",
+                joinedAt: volunteerData.joinedAt
+            });
+        }
+        setPendingVolunteers(pendingResults);
+        setApprovedVolunteers(approvedResults);
+    }
+
+    useEffect(() => {
+        if (!missionId) return;
         fetchMissionVolunteers();
     }, [missionId]);
 
     const handleApprove = async (userId) => {
         await updateDoc(
             doc(db, "missions", missionId, "volunteer", userId),
-            { status: "approved" }
+            {
+                registrationStatus: "approved", //if admin approved request to join an event
+                completionStatus: "in_progress" //volunteers status for submission of requirements
+            }
         );
-
-        setPendingVolunteers(prev =>
-            prev.filter(v => v.id !== userId)
-        );
+        //Moving users from pending approval to approved list
+        //Auto refresh list
+        await fetchMissionVolunteers();
 
         try {
             const notificationsRef = collection(db, "users", userId, "notifications");
@@ -143,12 +142,10 @@ export default function CurrentEvent() {
     const handleReject = async (userId) => {
         await updateDoc(
             doc(db, "missions", missionId, "volunteer", userId),
-            { status: "rejected" }
+            { registrationStatus: "rejected" }
         );
 
-        setPendingVolunteers(prev =>
-            prev.filter(v => v.id !== userId)
-        );
+        await fetchMissionVolunteers();
     };
 
     if (missionId) {

@@ -36,10 +36,15 @@ export default function PublicProfile() {
         }
         const profileData = { uid, ...userSnap.data() };
 
+        const totalPoints = profileData.totalPoints || 0;
+
+        profileData.totalPoints = totalPoints;
+        profileData.level = Math.floor(totalPoints / 100) + 1;
+        profileData.levelProgress = totalPoints % 100;
+
         // Fetch events the user is registered in (volunteer subcollection)
         const missionsSnap = await getDocs(collection(db, "missions"));
         const registeredEvents = [];
-        let totalPoints = 0;
 
         for (const eventDoc of missionsSnap.docs) {
           const eventId = eventDoc.id;
@@ -55,13 +60,8 @@ export default function PublicProfile() {
               role: vData.role || "participant",
               pointsEarned: vData.pointsEarned || 0,
             });
-            totalPoints += vData.pointsEarned || 0;
           }
         }
-
-        profileData.totalPoints = totalPoints;
-        profileData.level = Math.floor(totalPoints / 100) + 1;
-        profileData.levelProgress = totalPoints % 100;
 
         setProfile(profileData);
         setEvents(registeredEvents);

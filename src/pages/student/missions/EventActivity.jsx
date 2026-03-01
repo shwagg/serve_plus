@@ -1,5 +1,5 @@
 import { getAuth } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, serverTimestamp, Timestamp, onSnapshot } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef } from "react";
@@ -14,8 +14,8 @@ import ChooseGroup from './ChooseGroup';
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
 //forms
-import PreActivitySurvey from "../../../../public/forms/PreActivitySurvey.jsx";
-import PostActivitySurvey from "../../../../public/forms/PostActivitySurvey.jsx";
+import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
+import PostActivitySurvey from "../../../forms/PostActivitySurvey.jsx";
 
 export default function EventActivity() {
   const { userData } = useSession();
@@ -622,7 +622,7 @@ export default function EventActivity() {
       // Update local state
       setEnrolledTasks((prev) => ({ ...prev, [taskId]: true }));
       alert(`Successfully joined ${isNew ? 'new' : ''} group!`);
-      
+
       // Reload tasks to reflect enrollment
       await fetchUserJournals();
     } catch (err) {
@@ -1201,10 +1201,8 @@ export default function EventActivity() {
   const previousRankRef = useRef(null);
   const hasLeaderboardLoadedRef = useRef(false);
 
-  // Helper to determine survey status (progress or subcollection)
-  const [surveyStatus, setSurveyStatus] = useState({ pre: null, post: null });
-
   useEffect(() => {
+    let unsubscribe = null;
     async function fetchEvent() {
       try {
         const eventRef = doc(db, "missions", id);
@@ -1225,42 +1223,22 @@ export default function EventActivity() {
           const user = auth.currentUser;
           if (user) {
             const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
-            let volunteerSnap = await getDoc(volunteerRef);
-            //fetch from what EventDetails created 'volunteer'
-            if (!volunteerSnap.exists()) {
-              navigate(`/event/${id}`);
-              return;
-            }
+            unsubscribe = onSnapshot(volunteerRef, (snap) => {
+              if (!snap.exists()) {
+                navigate(`/event/${id}`);
+                return;
+              }
 
-            if (volunteerSnap.data().status !== "approved") {
-              navigate(`/event/${id}`);
-              return;
-            }
+              const data = snap.data();
 
-            let progress = volunteerSnap.data().progress || {};
+              if (data.registrationStatus !== "approved") {
+                navigate(`/event/${id}`);
+                return;
+              }
 
-            // --- Sync progress with actual survey subcollections ---
-            // Pre-Activity Survey
-            const preSurveyDoc = await getDoc(doc(db, "missions", id, "volunteer", user.uid, "preSurvey", "response"));
-            // Post-Activity Survey
-            const postSurveyDoc = await getDoc(doc(db, "missions", id, "volunteer", user.uid, "postSurvey", "response"));
-
-            // Set surveyStatus for UI
-            setSurveyStatus({
-              pre: progress.preSurvey === "submitted" || preSurveyDoc.exists() ? "submitted" : progress.preSurvey || null,
-              post: progress.postSurvey === "submitted" || postSurveyDoc.exists() ? "submitted" : progress.postSurvey || null
+              setVolunteerProgress(data.progress || {});
+              setTotalPointsEarned(data.pointsEarned || 0);
             });
-
-            // Update progress fields if needed
-            if (preSurveyDoc.exists() && progress.preSurvey !== "submitted") {
-              progress.preSurvey = "submitted";
-              await updateDoc(volunteerRef, { "progress.preSurvey": "submitted" });
-            }
-            if (postSurveyDoc.exists() && progress.postSurvey !== "submitted") {
-              progress.postSurvey = "submitted";
-              await updateDoc(volunteerRef, { "progress.postSurvey": "submitted" });
-            }
-            setVolunteerProgress(progress);
 
             // Enrollment status for each task
             const enrollmentStatus = {};
@@ -1290,6 +1268,9 @@ export default function EventActivity() {
       }
     }
     fetchEvent();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [id]);
 
   useEffect(() => {
@@ -1578,25 +1559,7 @@ export default function EventActivity() {
                     className="image-badge"
                   />
                 </div>
-
-                {/* QR button only */}
-                <div style={{ marginTop: 16, display: "flex", flexDirection: "row", justifyContent: "center", gap: 18 }}>
-                  <button
-                    className="event-qr-button"
-                    onClick={() => setShowQRModal(true)}
-                    disabled={mode !== "active"}
-                  >
-                    {mode === "active"
-                      ? "Scan Attendance QR Code"
-                      : "Attendance Locked"}
-                  </button>
-                </div>
-
               </div>
-              <div className="event-status-label incomplete">
-                Status: Incomplete
-              </div>
-
             </div>
           </div>
 
@@ -1830,18 +1793,17 @@ export default function EventActivity() {
           <div className="event-activities-panel">
             <h3 className="event-activities-title">Requirements</h3>
             <div className="requirements-status">
-              Status: <span className={`status-text ${
-                surveyStatus.pre === 'submitted' &&
+              Status: <span className={`status-text ${volunteerProgress?.preSurvey === 'submitted' &&
                 volunteerProgress?.consent === 'submitted' &&
                 volunteerProgress?.attendance === 'present' &&
-                surveyStatus.post === 'submitted'
-                  ? 'complete'
-                  : 'incomplete'
-              }`}>
-                {surveyStatus.pre === 'submitted' &&
-                volunteerProgress?.consent === 'submitted' &&
-                volunteerProgress?.attendance === 'present' &&
-                surveyStatus.post === 'submitted'
+                volunteerProgress?.postSurvey === 'submitted'
+                ? 'complete'
+                : 'incomplete'
+                }`}>
+                {volunteerProgress?.preSurvey === 'submitted' &&
+                  volunteerProgress?.consent === 'submitted' &&
+                  volunteerProgress?.attendance === 'present' &&
+                  volunteerProgress?.postSurvey === 'submitted'
                   ? 'Complete'
                   : 'Incomplete'}
               </span>
@@ -1850,13 +1812,13 @@ export default function EventActivity() {
             <div className="activity-card">
               <RequirementItem
                 label="Pre-Activity Survey"
-                status={surveyStatus.pre}
+                status={volunteerProgress?.preSurvey}
                 onOpen={() => { console.log("Pre-activity clicked"); setShowPreSurveyModal(true) }}
               />
             </div>
             <div className="activity-card">
               <RequirementItem
-                label="Parent Consent (In Person)"
+                label="Parent Consent"
                 status={volunteerProgress?.consent}
                 onOpen={() => setShowConsentModal(true)}
               />
@@ -1874,9 +1836,9 @@ export default function EventActivity() {
 
             <RequirementItem
               label="Post-Activity Survey"
-              status={surveyStatus.post}
+              status={volunteerProgress?.postSurvey}
               locked={
-                surveyStatus.pre !== "submitted" ||
+                volunteerProgress?.preSurvey !== "submitted" ||
                 volunteerProgress?.consent !== "verified" ||
                 volunteerProgress?.attendance !== "present"
               }
