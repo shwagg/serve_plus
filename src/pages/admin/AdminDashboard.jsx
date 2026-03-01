@@ -227,7 +227,7 @@ export default function AdminDashboard() {
                     className="bar-row"
                     key={x.label}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/admin/events/${x.id}/monitor`)}
+                    onClick={() => navigate(`/admin/events/${x.id}`)}
                     title="View Event Monitoring"
                   >
                     <div className="bar-label">{x.label}</div>
