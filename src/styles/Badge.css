@@ -1,0 +1,43 @@
+/*PAPALITAN NG REAL IMAGE. MAGDESIGN PA AKO*/
+.badge-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.badge-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease;
+}
+
+.badge-circle:hover {
+  transform: scale(1.05);
+}
+
+/* Category colors */
+
+.badge-commitment {
+  background: linear-gradient(145deg, #3B82F6, #2563EB);
+}
+
+.badge-performance {
+  background: linear-gradient(145deg, #FFD700, #F59E0B);
+}
+
+.badge-leadership {
+  background: linear-gradient(145deg, #8B5CF6, #6D28D9);
+}
+
+.badge-institutional {
+  background: linear-gradient(145deg, #991B1B, #7F1D1D);
+}

@@ -3,6 +3,7 @@
 import { doc, getDoc, getDocs, collection, updateDoc, increment } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
+import { checkAndAssignBadges } from "../../hooks/badgeSystem";
 
 export const releaseMissionPoints = async (missionId) => {
     const missionRef = doc(db, "missions", missionId);
@@ -80,7 +81,7 @@ export const releaseMissionPoints = async (missionId) => {
             );
         }
 
-        // Save under volunteer document
+        // Save under volunteer based on the mission joined
         await updateDoc(
             doc(db, "missions", missionId, "volunteer", volunteerDoc.id),
             {
@@ -88,6 +89,19 @@ export const releaseMissionPoints = async (missionId) => {
             }
         );
     }
+
+    // Check and assign badges after points are released
+    for (const volunteerDoc of volunteerSnap.docs) {
+        const volunteerData = volunteerDoc.data();
+        if (volunteerData.userId) {
+            await checkAndAssignBadges(volunteerData.userId);
+        }
+    }
+
+    // After release points to user, locks the document lib to prevent future edit
+    await updateDoc(missionRef, {
+        released: true
+    });
 
     return true;
 };

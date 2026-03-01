@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ListAltOutlinedIcon } from "../../components/icons/index";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
+import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { releaseMissionPoints } from "../global/rewardSaveSystem";
 import "../../styles/DocumentLibrary.css";
 
@@ -11,6 +12,8 @@ export default function DocumentLibrary() {
   const [proposals, setProposals] = useState([]);
   const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
   const [currentMissionId, setCurrentMissionId] = useState(null);
+  const [missionAvgRating, setMissionAvgRating] = useState(0);
+  const [isMissionReleased, setIsMissionReleased] = useState(false);
   const [volunteers, setVolunteers] = useState([]);
   const allComplete =
     volunteers.length > 0 &&
@@ -126,6 +129,11 @@ export default function DocumentLibrary() {
 
   const handleViewSubmissions = async (missionId) => {
     setCurrentMissionId(missionId);
+    const missionSnap = await getDoc(doc(db, "missions", missionId));
+    const isReleased = missionData?.released === true;
+    const missionData = missionSnap.data();
+    const avgRating = missionData?.feedback?.avgRating || 0;
+
     setShowSubmissionsModal(true);
     // Fetch volunteers for the selected mission
     const snap = await getDocs(collection(db, "missions", missionId, "volunteer"));
@@ -157,11 +165,11 @@ export default function DocumentLibrary() {
         preSurveyAnswers,
         postSurveyAnswers,
       };
-      console.log('[DEBUG] Volunteer with answers:', result);
       return result;
     }));
     setVolunteers(volunteers);
-    console.log('[DEBUG] Final volunteers with answers:', volunteers);
+    setMissionAvgRating(avgRating);
+    setIsMissionReleased(isReleased);
   };
 
   // Helper to open answer modal
@@ -344,24 +352,25 @@ export default function DocumentLibrary() {
                     ].filter(Boolean).length;
 
                     const individualCompletion = Math.round((completedItems / 5) * 100);
-                    // Live compute preview (without saving)
+                    // Compute points without saving yet
                     let previewPoints = null;
 
-                    if (v.participationStatus && avgRating) {
+                    if (missionAvgRating && v.participationStatus) {
 
-                      const rawRole = v.role || v.preSurveyRole || null;
+                      const rawRole =
+                        v.preSurveyAnswers?.engagement?.participation?.[0] ||
+                        null;
 
                       if (rawRole) {
                         const role = rawRole.trim().toLowerCase();
 
                         previewPoints = computeFinalPoints(
                           role,
-                          avgRating,
+                          missionAvgRating,
                           v.participationStatus
                         );
                       }
                     }
-
                     return (
                       <tr key={v.id} style={{ background: idx % 2 === 0 ? '#f8f9fb' : '#fff', color: '#23335b' }}>
                         <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'left', fontWeight: 500 }}>{v.name || v.respondent?.name || v.id}</td>
@@ -392,6 +401,7 @@ export default function DocumentLibrary() {
                           <select
                             className="participation-select"
                             value={v.participationStatus || ""}
+                            disabled={isMissionReleased}
                             onChange={(e) =>
                               handleParticipationChange(currentMissionId, v.id, e.target.value)
                             }
@@ -408,10 +418,11 @@ export default function DocumentLibrary() {
                         </td>
 
                         <td className="submission-table-cell">
-                          {v.pointsEarned ? previewPoints : "-"}
+                          {/*"-" if not computed; preview; pointsEarned if saved from firestore*/}
+                          {v.pointsEarned ?? previewPoints ?? "-"}
                         </td>
                         <td className="submission-table-cell">
-                          {idx === 0 && allComplete && (
+                          {idx === 0 && allComplete && !isMissionReleased && (
                             <button
                               className="release-btn"
                               onClick={async () => {

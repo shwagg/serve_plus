@@ -1,9 +1,9 @@
 //icons
 import {
-    HomeRoundedIcon,
-    ListAltIcon,
-    DesignServicesOutlinedIcon,
-    SettingsOutlinedIcon,
+  HomeRoundedIcon,
+  ListAltIcon,
+  DesignServicesOutlinedIcon,
+  SettingsOutlinedIcon,
 } from "../components/icons/index";
 
 //admin side
@@ -36,10 +36,10 @@ export const adminLinks = [
   {
     key: "forms",
     label: "Forms",
-            children: [
-            { label: "Document Library", to: "/admin/documents" },
-        ],    
-      },
+    children: [
+      { label: "Document Library", to: "/admin/documents" },
+    ],
+  },
   {
     key: "system",
     label: "System",
@@ -49,6 +49,7 @@ export const adminLinks = [
       { label: "Students Banner", to: "/admin/system/banner" },
       { label: "Announcement", to: "/admin/system/announcement" },
       { label: "Privacy & Terms", to: "/admin/system/agreements" },
+      { label: "Badges", to: "/admin/system/badges" },
     ],
   },
 ];
@@ -59,9 +60,9 @@ export const partnerLinks = [
     key: "project",
     label: "Project",
     children: [
-            { label: "Project List", to: "/partner/projects" },
-        ],    
-      },
+      { label: "Project List", to: "/partner/projects" },
+    ],
+  },
 ];
 
 //faculty side
@@ -79,14 +80,14 @@ export const facultyLinks = [
     key: "project",
     label: "Project",
     children: [
-            { label: "Project List", to: "/faculty/projects" },
-        ],    
-      },
+      { label: "Project List", to: "/faculty/projects" },
+    ],
+  },
   {
     key: "forms",
     label: "Forms",
     children: [
-            { label: "Document Library", to: "/admindocuments" },
-        ],  
-      },
+      { label: "Document Library", to: "/admindocuments" },
+    ],
+  },
 ];
