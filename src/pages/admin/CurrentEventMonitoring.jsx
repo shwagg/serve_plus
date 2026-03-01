@@ -557,28 +557,16 @@ export default function CurrentEventMonitoring() {
                           </button>
                           <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Pre Activity Survey Analytics</h2>
                           {preSurveyAnalytics ? (
-                            <div>
-                              {/* DEBUG: Show the first preSurveyAnswers object for key inspection */}
-                              <div style={{ background: '#f3f3f3', color: '#333', fontSize: 13, padding: 10, borderRadius: 6, marginBottom: 18 }}>
-                                <b>Debug: Example preSurveyAnswers object:</b>
-                                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
-                                  {JSON.stringify(
-                                    (volunteers.find(v => v.preSurveyAnswers) || {}).preSurveyAnswers || {},
-                                    null,
-                                    2
-                                  )}
-                                </pre>
-                              </div>
-                              {/* Update the fieldOrder and likertQuestions keys below to match the debug output above */}
+                            <>
                               {(() => {
                                 const fieldOrder = [
-                                  { key: 'college', label: 'College/Department/Organization:' },
-                                  { key: 'program', label: 'Program:' },
-                                  { key: 'engagementType', label: 'Type of Engagement:' },
-                                  { key: 'initiativeTitle', label: 'Title of Initiative:' },
-                                  { key: 'participationLevel', label: 'Type/Level of Participation:' },
-                                  { key: 'prevCommunityService', label: 'Previous Community Service Experience:' },
-                                  { key: 'frequency', label: 'Frequency of Community Service:' },
+                                  { key: 'respondent.college', label: 'College/Department/Organization:' },
+                                  { key: 'respondent.program', label: 'Program:' },
+                                  { key: 'engagement.type', label: 'Type of Engagement:' },
+                                  { key: 'engagement.initiativeTitle', label: 'Title of Initiative:' },
+                                  { key: 'engagement.participation', label: 'Type/Level of Participation:' },
+                                  { key: 'background.previousService', label: 'Previous Community Service Experience:' },
+                                  { key: 'background.frequency', label: 'Frequency of Community Service:' },
                                 ];
                                 const likertQuestions = [
                                   {
@@ -614,29 +602,109 @@ export default function CurrentEventMonitoring() {
                                     label: 'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.'
                                   },
                                 ];
-                                // Render bar chart for each field
+                                // Render bar chart and table for each field
+                                const renderPieChartAndLegend = (counts, colorList) => {
+                                  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+                                  const entries = Object.entries(counts);
+                                  const radius = 48;
+                                  const cx = 60, cy = 60, r = radius, strokeWidth = 32;
+                                  let acc = 0;
+                                  const pieData = entries.map(([answer, count], idx) => {
+                                    const value = count / total;
+                                    const startAngle = acc;
+                                    const endAngle = acc + value * 2 * Math.PI;
+                                    acc = endAngle;
+                                    return { answer, count, idx, value, startAngle, endAngle };
+                                  });
+                                  // Helper to get arc path
+                                  function describeArc(cx, cy, r, startAngle, endAngle) {
+                                    const polarToCartesian = (cx, cy, r, angle) => [
+                                      cx + r * Math.cos(angle - Math.PI / 2),
+                                      cy + r * Math.sin(angle - Math.PI / 2)
+                                    ];
+                                    const [x1, y1] = polarToCartesian(cx, cy, r, startAngle);
+                                    const [x2, y2] = polarToCartesian(cx, cy, r, endAngle);
+                                    const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+                                    return [
+                                      `M ${x1} ${y1}`,
+                                      `A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`
+                                    ].join(' ');
+                                  }
+                                  return (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap', marginBottom: 18 }}>
+                                      <svg width={120} height={120} viewBox="0 0 120 120">
+                                        {pieData.map((d, idx) => (
+                                          <path
+                                            key={d.answer}
+                                            d={describeArc(cx, cy, r, d.startAngle, d.endAngle)}
+                                            fill="none"
+                                            stroke={colorList[idx % colorList.length]}
+                                            strokeWidth={strokeWidth}
+                                            strokeLinecap="butt"
+                                          />
+                                        ))}
+                                        {/* Center text: percent of top answer */}
+                                        {pieData.length > 0 && (
+                                          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fontSize="1.2rem" fontWeight="bold" fill="#23335b">
+                                            {Math.round((pieData[0].count / total) * 100)}%
+                                          </text>
+                                        )}
+                                      </svg>
+                                      <div style={{ flex: 1, minWidth: 180 }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 0 }}>
+                                          <tbody>
+                                            {entries.map(([answer, count], idx) => (
+                                              <tr key={answer}>
+                                                <td style={{ padding: '6px 10px', display: 'flex', alignItems: 'center' }}>
+                                                  <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 7, background: colorList[idx % colorList.length], marginRight: 8 }}></span>
+                                                  <span style={{ fontWeight: 500 }}>{answer}</span>
+                                                </td>
+                                                <td style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 600 }}>{count}</td>
+                                                <td style={{ textAlign: 'right', padding: '6px 10px', color: '#888' }}>{((count / total) * 100).toFixed(1)}%</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  );
+                                };
+                                // Helper to get value by dot notation
+                                function getValueByPath(obj, path) {
+                                  return path.split('.').reduce((o, p) => (o ? o[p] : undefined), obj);
+                                }
+
+                                // Re-aggregate analytics for new fieldOrder keys
+                                const newPreSurveyAnalytics = {};
+                                if (Array.isArray(volunteers)) {
+                                  fieldOrder.forEach(({ key }) => {
+                                    const counts = {};
+                                    volunteers.forEach(v => {
+                                      const ans = v.preSurveyAnswers;
+                                      if (!ans) return;
+                                      const val = getValueByPath(ans, key);
+                                      if (val === undefined || val === null || val === "") return;
+                                      // For participation (array), join as string
+                                      if (Array.isArray(val)) {
+                                        val.forEach(item => {
+                                          if (!item) return;
+                                          counts[item] = (counts[item] || 0) + 1;
+                                        });
+                                      } else {
+                                        counts[val] = (counts[val] || 0) + 1;
+                                      }
+                                    });
+                                    newPreSurveyAnalytics[key] = counts;
+                                  });
+                                }
                                 return (
                                   <div>
                                     {fieldOrder.map(({ key, label }) => (
-                                      preSurveyAnalytics[key] ? (
-                                        <div key={key} style={{ marginBottom: 32 }}>
-                                          <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 8 }}>{label}</div>
-                                          <div style={{ border: '1.5px solid #2196f3', borderRadius: 4, padding: 12, background: '#fafdff' }}>
-                                            {Object.entries(preSurveyAnalytics[key]).map(([answer, count], idx) => (
-                                              <div key={answer} style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-                                                <span style={{ width: 90, fontWeight: 500, color: '#1a237e', fontSize: 15 }}>{answer}</span>
-                                                <div style={{ flex: 1, marginLeft: 8, background: '#e3f2fd', borderRadius: 4, height: 18, position: 'relative' }}>
-                                                  <div style={{
-                                                    width: `${Math.max(8, (count / Math.max(...Object.values(preSurveyAnalytics[key]))) * 100)}%`,
-                                                    background: ['#1a237e', '#3949ab', '#1976d2', '#00bcd4', '#0097a7'][idx % 5],
-                                                    height: 18,
-                                                    borderRadius: 4,
-                                                  }} />
-                                                  <span style={{ position: 'absolute', right: 8, top: 0, color: '#fff', fontWeight: 600, fontSize: 14 }}>{count}</span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
+                                      newPreSurveyAnalytics[key] && Object.keys(newPreSurveyAnalytics[key]).length > 0 ? (
+                                        <div key={key} style={{ marginBottom: 36, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0001', padding: 24, border: '1.5px solid #e3eafc' }}>
+                                          <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 2 }}>{label}</div>
+                                          <div style={{ color: '#888', fontSize: 14, marginBottom: 12 }}>{Object.values(newPreSurveyAnalytics[key]).reduce((a, b) => a + b, 0)} responses</div>
+                                          {renderPieChartAndLegend(newPreSurveyAnalytics[key], ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
                                         </div>
                                       ) : null
                                     ))}
@@ -644,33 +712,30 @@ export default function CurrentEventMonitoring() {
                                     <div style={{ fontWeight: 600, fontSize: 18, margin: '32px 0 12px 0' }}>
                                       Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):
                                     </div>
-                                    {likertQuestions.map(({ key, label }) => (
-                                      preSurveyAnalytics[key] ? (
-                                        <div key={key} style={{ marginBottom: 28 }}>
-                                          <div style={{ fontWeight: 500, fontSize: 16, marginBottom: 6 }}>{label}</div>
-                                          <div style={{ border: '1.5px solid #bdbdbd', borderRadius: 4, padding: 12, background: '#fafbfc' }}>
-                                            {Object.entries(preSurveyAnalytics[key]).map(([answer, count], idx) => (
-                                              <div key={answer} style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-                                                <span style={{ width: 40, fontWeight: 500, color: '#1a237e', fontSize: 15 }}>{answer}</span>
-                                                <div style={{ flex: 1, marginLeft: 8, background: '#e3f2fd', borderRadius: 4, height: 18, position: 'relative' }}>
-                                                  <div style={{
-                                                    width: `${Math.max(8, (count / Math.max(...Object.values(preSurveyAnalytics[key]))) * 100)}%`,
-                                                    background: ['#1a237e', '#3949ab'][idx % 2],
-                                                    height: 18,
-                                                    borderRadius: 4,
-                                                  }} />
-                                                  <span style={{ position: 'absolute', right: 8, top: 0, color: '#fff', fontWeight: 600, fontSize: 14 }}>{count}</span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
+                                    {likertQuestions.map(({ key, label }) => {
+                                      // Aggregate likert analytics from volunteers
+                                      const counts = {};
+                                      if (Array.isArray(volunteers)) {
+                                        volunteers.forEach(v => {
+                                          const ans = v.preSurveyAnswers;
+                                          if (!ans || !ans.likert) return;
+                                          const val = ans.likert[key];
+                                          if (val === undefined || val === null || val === "") return;
+                                          counts[val] = (counts[val] || 0) + 1;
+                                        });
+                                      }
+                                      return Object.keys(counts).length > 0 ? (
+                                        <div key={key} style={{ marginBottom: 36, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0001', padding: 24, border: '1.5px solid #e3eafc' }}>
+                                          <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
+                                          <div style={{ color: '#888', fontSize: 14, marginBottom: 12 }}>{Object.values(counts).reduce((a, b) => a + b, 0)} responses</div>
+                                          {renderPieChartAndLegend(counts, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
                                         </div>
-                                      ) : null
-                                    ))}
+                                      ) : null;
+                                    })}
                                   </div>
                                 );
                               })()}
-                            </div>
+                            </>
                           ) : (
                             <div style={{ color: '#888', textAlign: 'center', margin: '32px 0' }}>
                               No submissions yet.
