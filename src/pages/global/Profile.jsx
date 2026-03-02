@@ -298,41 +298,40 @@ export default function Profile() {
       const el = portfolioPdfRef.current;
       const displayName = profile?.username || (profile?.email ? profile.email.split("@")[0] : "Portfolio");
 
-      // ── Place element visibly in document flow for capture ──────────────
-      // html2canvas cannot capture elements off-screen or with display:none.
-      // We briefly move it to top-left of the page, behind a blocking overlay.
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99998;pointer-events:none;';
-      document.body.appendChild(overlay);
-
-      el.style.cssText = `
+      // ── Prepare an off-DOM clone for capture so original UI doesn't jump ──
+      const clone = el.cloneNode(true);
+      clone.id = 'portfolio-pdf-clone';
+      // ensure images are allowed for cross-origin capture where possible
+      clone.querySelectorAll && clone.querySelectorAll('img').forEach(img => img.setAttribute('crossOrigin', 'anonymous'));
+      // place the clone far off-screen using transform so it doesn't visibly appear
+      clone.style.cssText = `
         position: absolute !important;
         top: 0 !important;
         left: 0 !important;
+        transform: translateX(2000px) !important;
         width: 794px !important;
         z-index: 99999 !important;
         background: #fff !important;
         pointer-events: none !important;
       `;
+      document.body.appendChild(clone);
 
       // Two frames: layout + paint
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      const canvas = await html2canvas(el, {
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        width: el.offsetWidth,
-        height: el.offsetHeight,
+        width: clone.offsetWidth,
+        height: clone.offsetHeight,
         windowWidth: 794,
         x: 0,
         y: 0,
       });
-
-      // ── Restore hidden state immediately ────────────────────────────────
-      document.body.removeChild(overlay);
-      el.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;font-family:\'Segoe UI\',Arial,sans-serif;color:#1a1a2e;padding:0;';
+      // remove helper clone
+      document.body.removeChild(clone);
 
       // ── Build multi-page PDF ─────────────────────────────────────────────
       const imgData = canvas.toDataURL('image/jpeg', 0.97);
@@ -418,12 +417,41 @@ export default function Profile() {
           if (volunteerSnap.exists()) {
             const vData = volunteerSnap.data();
 
+            // Fetch tasks for this event where the user has a participant document
+            const tasksDone = [];
+            try {
+              const tasksRef = collection(db, "missions", eventId, "task");
+              const tasksSnap = await getDocs(tasksRef);
+              for (const taskDoc of tasksSnap.docs) {
+                try {
+                  const participantRef = doc(db, "missions", eventId, "task", taskDoc.id, "participants", user.uid);
+                  const participantSnap = await getDoc(participantRef);
+                  if (participantSnap.exists()) {
+                    const pdata = participantSnap.data();
+                    tasksDone.push({
+                      id: taskDoc.id,
+                      title: taskDoc.data().title || taskDoc.id,
+                      status: pdata.status || "todo",
+                      pointsEarned: pdata.pointsEarned || 0,
+                      completedAt: pdata.completedAt || pdata.lastUpdated || pdata.joinedAt || null,
+                      reflection: pdata.reflection || "",
+                    });
+                  }
+                } catch (e) {
+                  console.warn(`Failed to load participant for task ${taskDoc.id} in ${eventId}:`, e);
+                }
+              }
+            } catch (e) {
+              console.warn(`Failed to load tasks for event ${eventId}:`, e);
+            }
+
             registeredEvents.push({
               id: eventId,
               title: eventData.title || eventId,
               role: vData.role || "participant",
               pointsEarned: vData.pointsEarned || 0,
               sdgs: eventData.sdgs || [],
+              tasksDone,
             });
           }
         }
@@ -606,7 +634,11 @@ export default function Profile() {
 
           {activeTab === "Portfolio" && (() => {
             const events = profile.registeredEvents || [];
-            const allSdgs = [...new Set(events.flatMap(e => e.sdgs || []))];
+            const sdgCounts = events.flatMap(e => e.sdgs || []).reduce((acc, sdg) => {
+              acc[sdg] = (acc[sdg] || 0) + 1;
+              return acc;
+            }, {});
+            const allSdgs = Object.keys(sdgCounts).map(k => Number(k));
             const displayName = profile.username || (profile.email ? profile.email.split('@')[0] : 'Volunteer');
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -678,11 +710,12 @@ export default function Profile() {
                             fontSize: 13,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 6,
+                            gap: 10,
                           }}
                         >
                           <span style={{ fontSize: 16, fontWeight: 800 }}>#{sdg}</span>
-                          <span>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                          <span style={{ flex: '1 1 auto' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                          <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 8px', borderRadius: 6, fontSize: 12, fontWeight: 800 }}>{sdgCounts[sdg]}×</span>
                         </div>
                       ))}
                     </div>
@@ -697,12 +730,29 @@ export default function Profile() {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {events.map(event => (
-                        <div key={event.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f7fafd', borderRadius: 8, padding: '10px 14px' }}>
-                          <span style={{ fontWeight: 600, color: '#234e7b' }}>{event.title}</span>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>{event.role}</span>
-                            <span style={{ color: '#888', fontSize: 13 }}>+{event.pointsEarned} pts</span>
+                        <div key={event.id} style={{ background: '#f7fafd', borderRadius: 8, padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 600, color: '#234e7b' }}>{event.title}</span>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>{event.role}</span>
+                              <span style={{ color: '#888', fontSize: 13 }}>+{event.pointsEarned} pts</span>
+                            </div>
                           </div>
+                          {event.tasksDone && event.tasksDone.length > 0 && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e6eef3', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {event.tasksDone.map(t => (
+                                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginLeft: 20 }}>
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <span style={{ fontSize: 12, color: '#234e7b', fontWeight: 600 }}>{t.title}</span>
+                                        <span style={{ fontSize: 11, color: '#666' }}>· {t.status}</span>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <span style={{ fontSize: 11, color: '#888' }}>+{t.pointsEarned} pts</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -715,7 +765,11 @@ export default function Profile() {
           {/* ── Hidden PDF layout ── */}
           {profile && (() => {
             const events = profile.registeredEvents || [];
-            const allSdgs = [...new Set(events.flatMap(e => e.sdgs || []))];
+            const sdgCounts = events.flatMap(e => e.sdgs || []).reduce((acc, sdg) => {
+              acc[sdg] = (acc[sdg] || 0) + 1;
+              return acc;
+            }, {});
+            const allSdgs = Object.keys(sdgCounts).map(k => Number(k));
             const displayName = profile.username || (profile.email ? profile.email.split('@')[0] : 'Volunteer');
             return (
               <div
@@ -803,18 +857,19 @@ export default function Profile() {
                   {/* SDG Contributions */}
                   <div>
                     <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>SDG Contributions</div>
-                    {allSdgs.length === 0 ? (
-                      <p style={{ color: '#bbb', fontSize: 12 }}>No SDG contributions yet.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {allSdgs.sort((a, b) => a - b).map(sdg => (
-                          <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontWeight: 800 }}>#{sdg}</span>
-                            <span>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      {allSdgs.length === 0 ? (
+                        <p style={{ color: '#bbb', fontSize: 12 }}>No SDG contributions yet.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {allSdgs.sort((a, b) => a - b).map(sdg => (
+                            <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 800 }}>#{sdg}</span>
+                              <span style={{ flex: '1 1 auto' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                              <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 800, fontSize: 11 }}>{sdgCounts[sdg]}×</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                   </div>
 
                   {/* Divider */}
@@ -836,13 +891,30 @@ export default function Profile() {
                         </thead>
                         <tbody>
                           {events.map((event, idx) => (
-                            <tr key={event.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f7fafd' }}>
-                              <td style={{ padding: '8px 12px', color: '#333', borderBottom: '1px solid #f0f4f8' }}>{event.title}</td>
-                              <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #f0f4f8' }}>
-                                <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 4, padding: '2px 9px', fontWeight: 600 }}>{event.role}</span>
-                              </td>
-                              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#234e7b', borderBottom: '1px solid #f0f4f8' }}>+{event.pointsEarned}</td>
-                            </tr>
+                            <React.Fragment key={event.id}>
+                              <tr style={{ background: idx % 2 === 0 ? '#fff' : '#f7fafd' }}>
+                                <td style={{ padding: '8px 12px', color: '#333', borderBottom: '1px solid #f0f4f8' }}>{event.title}</td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #f0f4f8' }}>
+                                  <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 4, padding: '2px 9px', fontWeight: 600 }}>{event.role}</span>
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#234e7b', borderBottom: '1px solid #f0f4f8' }}>+{event.pointsEarned}</td>
+                              </tr>
+
+                              {event.tasksDone && event.tasksDone.length > 0 && (
+                                <tr>
+                                  <td colSpan={3} style={{ padding: '8px 12px', borderBottom: '1px solid #f0f4f8', background: idx % 2 === 0 ? '#fafcfd' : '#fefefe' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                      {event.tasksDone.map(t => (
+                                        <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 11, paddingLeft: 20 }}>
+                                          <div style={{ color: '#234e7b', fontWeight: 600, fontSize: 11 }}>{t.title} <span style={{ color: '#666', fontWeight: 500, fontSize: 11 }}>· {t.status}</span></div>
+                                          <div style={{ color: '#234e7b', fontWeight: 600, fontSize: 11 }}>+{t.pointsEarned} pts</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           ))}
                         </tbody>
                       </table>
