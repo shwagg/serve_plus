@@ -496,22 +496,22 @@ export default function Profile() {
   return (
     <div className="profile-page-bg">
       <Header />
-      <div className="profile-main-flex" style={{ display: 'flex', gap: '32px' }}>
+      <div className="profile-main-flex">
         <div className="profile-card">
           <div className="profile-avatar">
-            <img src={profile.avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%" }} />
+            <img src={profile.avatar} alt="avatar" className="profile-avatar-img" />
           </div>
           {/* Username above name */}
           {profile.username && (
-            <h2 style={{ color: "#234e7b", fontWeight: 700, fontSize: 28, marginBottom: 4 }}>{profile.username}</h2>
+            <h2 className="profile-username">{profile.username}</h2>
           )}
           {!profile.username && profile.email && (
-            <h2 style={{ color: "#234e7b", fontWeight: 700, fontSize: 28, marginBottom: 4 }}>{profile.email.split('@')[0]}</h2>
+            <h2 className="profile-username">{profile.email.split('@')[0]}</h2>
           )}
-          <div style={{ color: '#30bdb7', fontWeight: 600, fontSize: 18, marginBottom: 8 }}>{profile.name}</div>
-          <div style={{ color: "#555", fontSize: 16, marginBottom: 18 }}>{profile.email}</div>
+          <div className="profile-name">{profile.name}</div>
+          <div className="profile-email">{profile.email}</div>
           <div className="profile-level-label">Level {profile.level}</div>
-          <div style={{ width: "100%", margin: "16px 0" }}>
+          <div className="profile-level-section">
             <div className="profile-level-bar-bg">
               <div className="profile-level-bar-fill" style={{ width: `${profile.levelProgress}%` }}></div>
               <div className="profile-level-bar-label">
@@ -520,33 +520,28 @@ export default function Profile() {
             </div>
           </div>
           <div style={{ width: "100%", marginTop: 18 }}>
-            <div className="profile-skills-label" style={{ fontWeight: 600, marginBottom: 6 }}>Skills</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="profile-skills-label">Skills</div>
+            <div className="profile-skills-list">
               {profile.skills && profile.skills.map(skill => (
                 <span className="profile-skill-badge" key={skill}>{skill}</span>
               ))}
             </div>
           </div>
           <div style={{ width: "100%", marginTop: 18 }}>
-            <div className="profile-interests-label" style={{ fontWeight: 600, marginBottom: 6 }}>Interests</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="profile-interests-label">Interests</div>
+            <div className="profile-interests-list">
               {profile.interests && profile.interests.map(interest => (
                 <span className="profile-interest-badge" key={interest}>{interest}</span>
               ))}
             </div>
           </div>
           <div style={{ width: "100%", marginTop: 18 }}>
-            <div className="profile-achievements-label" style={{ fontWeight: 600, marginBottom: 6 }}>Rewards</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="profile-achievements-label">Rewards</div>
+            <div className="profile-achievements-list">
               {rewards.map(reward => (
-                <div
-                  key={reward.id}
-                  className="profile-reward-container"
-                >
+                <div key={reward.id} className="profile-reward-container">
                   <span className="profile-reward-icon">{reward.icon || "🏅"}</span>
-                  <span className="profile-reward-name">
-                    {reward.name || reward.id}
-                  </span>
+                  <span className="profile-reward-name">{reward.name || reward.id}</span>
                 </div>
               ))}
             </div>
@@ -581,25 +576,11 @@ export default function Profile() {
             }}
           />
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="profile-right-column">
           {/* Tab Navigation */}
-          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e0e7ef', marginBottom: 4 }}>
+          <div className="profile-tab-row">
             {PROFILE_TABS.map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: '10px 28px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeTab === tab ? '3px solid #234e7b' : '3px solid transparent',
-                  color: activeTab === tab ? '#234e7b' : '#888',
-                  fontWeight: activeTab === tab ? 700 : 500,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`profile-tab-btn ${activeTab === tab ? 'active' : ''}`}>
                 {tab}
               </button>
             ))}
@@ -643,48 +624,23 @@ export default function Profile() {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {/* Export button */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={exportToPDF}
-                    disabled={exporting}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      background: exporting ? '#aaa' : 'linear-gradient(135deg, #234e7b, #30bdb7)',
-                      color: '#fff', border: 'none', borderRadius: 10,
-                      padding: '10px 22px', fontWeight: 700, fontSize: 14,
-                      cursor: exporting ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 2px 8px rgba(35,78,123,0.18)',
-                      transition: 'all 0.2s',
-                    }}
-                  >
+                <div className="export-row">
+                  <button onClick={exportToPDF} disabled={exporting} className={`profile-export-btn ${exporting ? 'disabled' : ''}`}>
                     {exporting ? '⏳ Exporting...' : '⬇ Export PDF'}
                   </button>
                 </div>
                 {/* Achievements */}
                 <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                  <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 14 }}>
-                    Achievements <span style={{ color: '#30bdb7', fontSize: 14, fontWeight: 500 }}>({rewards.length})</span>
-                  </div>
+                  <div className="card-title">Achievements <span className="muted-count">({rewards.length})</span></div>
                   {rewards.length === 0 ? (
                     <p style={{ color: '#aaa' }}>No achievements yet.</p>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+                    <div className="achievements-grid">
                       {rewards.map(r => (
-                        <div
-                          key={r.id}
-                          title={r.description || r.name || r.id}
-                          style={{
-                            background: 'linear-gradient(135deg, #e8f5e9, #f0fdf4)',
-                            border: '1.5px solid #4caf50',
-                            borderRadius: 10,
-                            padding: '12px 10px',
-                            textAlign: 'center',
-                            transition: 'all 0.2s',
-                          }}
-                        >
-                          <div style={{ fontSize: 28 }}>{r.icon || "🏅"}</div>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: '#234e7b', marginTop: 4 }}>{r.name || r.id}</div>
-                          {r.description && <div style={{ fontSize: 11, color: '#777', marginTop: 2 }}>{r.description}</div>}
+                        <div key={r.id} title={r.description || r.name || r.id} className="achievement-card">
+                          <div className="achievement-icon">{r.icon || "🏅"}</div>
+                          <div className="achievement-name">{r.name || r.id}</div>
+                          {r.description && <div className="achievement-desc">{r.description}</div>}
                         </div>
                       ))}
                     </div>
@@ -693,29 +649,16 @@ export default function Profile() {
 
                 {/* SDG Contributions */}
                 <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                  <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 14 }}>SDG Contributions</div>
+                  <div className="card-title">SDG Contributions</div>
                   {allSdgs.length === 0 ? (
-                    <p style={{ color: '#aaa' }}>No SDG contributions yet.</p>
+                    <p className="muted-text">No SDG contributions yet.</p>
                   ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    <div className="sdg-list">
                       {allSdgs.sort((a, b) => a - b).map(sdg => (
-                        <div
-                          key={sdg}
-                          style={{
-                            background: SDG_COLORS[sdg] || '#234e7b',
-                            color: '#fff',
-                            borderRadius: 8,
-                            padding: '8px 14px',
-                            fontWeight: 700,
-                            fontSize: 13,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                          }}
-                        >
-                          <span style={{ fontSize: 16, fontWeight: 800 }}>#{sdg}</span>
-                          <span style={{ flex: '1 1 auto' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
-                          <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 8px', borderRadius: 6, fontSize: 12, fontWeight: 800 }}>{sdgCounts[sdg]}×</span>
+                        <div key={sdg} className="sdg-badge" style={{ background: SDG_COLORS[sdg] || '#234e7b' }}>
+                          <span className="sdg-index">#{sdg}</span>
+                          <span className="sdg-label">{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                          <span className="sdg-count">{sdgCounts[sdg]}×</span>
                         </div>
                       ))}
                     </div>
@@ -724,33 +667,31 @@ export default function Profile() {
 
                 {/* Event Roles Summary */}
                 <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                  <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 14 }}>Events by Role</div>
+                  <div className="card-title">Events by Role</div>
                   {events.length === 0 ? (
-                    <p style={{ color: '#aaa' }}>No events joined yet.</p>
+                    <p className="muted-text">No events joined yet.</p>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div className="events-list">
                       {events.map(event => (
-                        <div key={event.id} style={{ background: '#f7fafd', borderRadius: 8, padding: '10px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontWeight: 600, color: '#234e7b' }}>{event.title}</span>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>{event.role}</span>
-                              <span style={{ color: '#888', fontSize: 13 }}>+{event.pointsEarned} pts</span>
+                        <div key={event.id} className="event-card">
+                          <div className="event-card-row">
+                            <span className="event-title">{event.title}</span>
+                            <div className="event-meta">
+                              <span className="event-role">{event.role}</span>
+                              <span className="event-points">+{event.pointsEarned} pts</span>
                             </div>
                           </div>
                           {event.tasksDone && event.tasksDone.length > 0 && (
-                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e6eef3', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div className="event-tasks">
                               {event.tasksDone.map(t => (
-                                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginLeft: 20 }}>
-                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        <span style={{ fontSize: 12, color: '#234e7b', fontWeight: 600 }}>{t.title}</span>
-                                        <span style={{ fontSize: 11, color: '#666' }}>· {t.status}</span>
-                                      </div>
-                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        <span style={{ fontSize: 11, color: '#888' }}>+{t.pointsEarned} pts</span>
-                                      </div>
-                                    </div>
-                                  ))}
+                                <div key={t.id} className="event-task-row">
+                                  <div className="task-left">
+                                    <span className="task-title">{t.title}</span>
+                                    <span className="task-status">· {t.status}</span>
+                                  </div>
+                                  <div className="task-points">+{t.pointsEarned} pts</div>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>

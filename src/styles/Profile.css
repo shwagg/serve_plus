@@ -362,3 +362,85 @@
     max-width: 100%;
   }
 }
+
+/* Additional layout and component styles moved from inline styles in Profile.jsx */
+.profile-right-column { flex: 1; display: flex; flex-direction: column; gap: 24px; }
+
+/* Avatar */
+.profile-avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+/* Header info */
+.profile-username { color: #234e7b; font-weight: 700; font-size: 28px; margin-bottom: 4px; }
+.profile-name { color: #30bdb7; font-weight: 600; font-size: 18px; margin-bottom: 8px; }
+.profile-email { color: #555; font-size: 16px; margin-bottom: 18px; }
+
+/* Level bar */
+.profile-level-section { width: 100%; margin: 16px 0; }
+.profile-level-bar-bg { background: #e6eef3; border-radius: 8px; height: 14px; position: relative; overflow: hidden; }
+.profile-level-bar-fill { background: linear-gradient(90deg,#234e7b,#30bdb7); height: 100%; transition: width .3s ease; }
+.profile-level-bar-label { position: absolute; left: 0; right: 0; text-align: center; top: 0; font-size: 12px; color: #234e7b; font-weight: 700; }
+
+/* Lists */
+.profile-skills-list, .profile-interests-list, .profile-achievements-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.profile-skill-badge { background: #f0f4f8; padding: 6px 10px; border-radius: 16px; font-weight: 600; color: #234e7b; }
+.profile-interest-badge { background: #30bdb7; color: #fff; padding: 6px 10px; border-radius: 16px; font-weight: 600; }
+
+/* Export and tabs */
+.profile-tab-row { display: flex; gap: 0; border-bottom: 2px solid #e0e7ef; margin-bottom: 4px; }
+.profile-tab-btn { padding: 10px 28px; background: none; border: none; border-bottom: 3px solid transparent; color: #888; font-weight: 500; font-size: 15px; cursor: pointer; transition: all .2s; }
+.profile-tab-btn.active { border-bottom-color: #234e7b; color: #234e7b; font-weight: 700; }
+.export-row { display: flex; justify-content: flex-end; }
+.profile-export-btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#234e7b,#30bdb7); color: #fff; border: none; border-radius: 10px; padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(35,78,123,0.18); transition: all .2s; }
+.profile-export-btn.disabled, .profile-export-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+/* Card titles */
+.card-title { font-weight: 700; color: #234e7b; font-size: 18px; margin-bottom: 14px; }
+.muted-count { color: #30bdb7; font-size: 14px; font-weight: 500; }
+.muted-text { color: #aaa; }
+
+/* Achievements grid */
+.achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.achievement-card { background: linear-gradient(135deg,#e8f5e9,#f0fdf4); border: 1.5px solid #4caf50; border-radius: 10px; padding: 12px 10px; text-align: center; transition: all .2s; }
+.achievement-icon { font-size: 28px; }
+.achievement-name { font-weight: 700; font-size: 13px; color: #234e7b; margin-top: 4px; }
+.achievement-desc { font-size: 11px; color: #777; margin-top: 2px; }
+
+/* SDG list */
+.sdg-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.sdg-badge { color: #fff; border-radius: 8px; padding: 8px 14px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.sdg-index { font-size: 16px; font-weight: 800; }
+.sdg-label { flex: 1 1 auto; }
+.sdg-count { background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; }
+
+/* Events */
+.events-list { display: flex; flex-direction: column; gap: 10px; }
+.event-card { background: #f7fafd; border-radius: 12px; padding: 16px; }
+.event-card-row { display: flex; align-items: center; justify-content: space-between; }
+.event-title { font-weight: 600; color: #234e7b; }
+.event-meta { display: flex; gap: 8px; align-items: center; }
+.event-role { background: #30bdb7; color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+.event-points { color: #888; font-size: 13px; }
+.event-tasks { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e6eef3; display: flex; flex-direction: column; gap: 6px; }
+.event-task-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-left: 20px; }
+.task-left { display: flex; gap: 8px; align-items: center; }
+.task-title { font-size: 12px; color: #234e7b; font-weight: 600; }
+.task-status { font-size: 11px; color: #666; }
+.task-points { font-size: 11px; color: #888; }
+
+/* PDF layout moved into CSS for off-DOM capture */
+.portfolio-pdf { position: fixed; left: -9999px; top: 0; width: 794px; background: #fff; font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; padding: 0; }
+.pdf-header-banner { background: linear-gradient(135deg, #234e7b 0%, #30bdb7 100%); padding: 36px 40px 28px; }
+.pdf-header-banner img { object-fit: cover; }
+.pdf-header-meta { margin-left: auto; text-align: right; }
+.pdf-meta-title { color: rgba(255,255,255,0.6); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.pdf-meta-date { color: rgba(255,255,255,0.5); font-size: 11px; margin-top: 4px; }
+.pdf-body { padding: 28px 40px; display: flex; flex-direction: column; gap: 22px; }
+.pdf-skills-interests-row { display: flex; gap: 20px; }
+.pdf-box { flex: 1; background: #f7fafd; border-radius: 10px; padding: 16px 18px; border: 1px solid #e0e7ef; }
+.pdf-box-title { font-weight: 700; color: #234e7b; font-size: 13px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.pdf-box-content { display: flex; flex-wrap: wrap; gap: 6px; }
+.pdf-pill { border-radius: 20px; padding: 3px 12px; font-size: 11px; font-weight: 600; }
+.pdf-pill-dark { background: #234e7b; color: #fff; }
+.pdf-pill-accent { background: #30bdb7; color: #fff; }
+.pdf-none { color: #aaa; font-size: 12px; }
+
