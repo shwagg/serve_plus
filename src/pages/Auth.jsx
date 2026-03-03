@@ -173,7 +173,7 @@ function Auth() {
       } else if (role === "faculty") {
         navigate("/faculty/projects", { replace: true });
       } else if (role === "partner") {
-        navigate("/partner/projects", { replace: true });
+        navigate("/partner/dashboard", { replace: true });
       } else {
         navigate("/student/home", { replace: true });
       }

@@ -1,0 +1,122 @@
+.partner-dashboard {
+  padding: 32px 24px;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+.dashboard-cards-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.dashboard-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 32px;
+  min-width: 220px;
+}
+
+.dashboard-card-icon {
+  font-size: 2.2rem;
+  color: #2563eb;
+}
+
+.dashboard-card-title {
+  font-size: 1rem;
+  color: #64748b;
+}
+
+.dashboard-card-value {
+  font-size: 1.7rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.dashboard-section-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 18px;
+  color: #1e293b;
+}
+
+.dashboard-events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+}
+
+.dashboard-event-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 22px 24px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-event-category {
+  background: #e0e7ff;
+  color: #2563eb;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  padding: 2px 12px;
+  align-self: flex-start;
+  margin-bottom: 4px;
+}
+
+.dashboard-event-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.dashboard-event-info {
+  font-size: 0.97rem;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-event-icon {
+  margin-right: 6px;
+  color: #64748b;
+}
+
+.dashboard-event-progress-label {
+  font-size: 0.93rem;
+  color: #64748b;
+  margin-top: 8px;
+}
+
+.dashboard-event-progress-bar {
+  position: relative;
+  background: #e5e7eb;
+  border-radius: 8px;
+  height: 8px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  width: 100%;
+}
+
+.dashboard-event-progress-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.4s;
+}
+
+.dashboard-event-progress-bar-text {
+  position: absolute;
+  right: 8px;
+  top: -18px;
+  font-size: 0.93rem;
+  color: #2563eb;
+  font-weight: 500;
+}

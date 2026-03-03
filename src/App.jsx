@@ -40,6 +40,7 @@ import PublicProfile from "./pages/global/PublicProfile";
 import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
 import PartnerHome from "./pages/partner/PartnerHome";
+import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import StudentHome from "./pages/student/StudentHome";
 
 function App() {
@@ -140,6 +141,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="dashboard" element={<PartnerDashboard />} />
             <Route path="projects" element={<ProjectList mode="partner" />} />
           </Route>
           <Route path="/event/:id" element={<EventDetails />} />
