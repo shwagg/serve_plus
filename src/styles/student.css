@@ -550,25 +550,25 @@
 /*GLOBAL NOTIFICATION*/
 .global-feed-toggle {
   position: fixed;
-  right: 16px;
-  top: 20%;
+  right: 20px;
+  top: 90px;
   z-index: 1200;
 
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  outline: #000 solid 1px;
-  background: linear-gradient(135deg, #30bdb7, #68e1ab);
+  border-radius: 8px;
+  outline: none;
+  background: #30bdb7;
   color: #ffffff;
-  font-size: 20px;
+  font-size: 14px;
+  font-weight: 600;
   border: none;
   cursor: pointer;
+  padding: 10px 16px;
 
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
 
-  box-shadow: 0 8px 20px rgba(48, 189, 183, 0.35);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -596,23 +596,27 @@
 }
 .global-feed {
   position: fixed;
-  top: 60px;
-  right: -340px; /* hidden */
-  width: 320px;
-  height: 90vh;
+  top: 80px;
+  right: 0;
+  height: calc(100vh - 80px);
+  width: 380px;
 
   background: #ffffff;
-  border-left: 1px solid #e5e7eb;
+  border-left: 2px solid #30bdb7;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 
-  z-index: 2;
-  transition: right 0.3s ease;
+  z-index: 999;
+  transition: transform 0.3s ease;
+  transform: translateX(100%);
+  pointer-events: none;
 
   display: flex;
   flex-direction: column;
 }
 
 .global-feed.open {
-  right: 0;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .global-feed-header {
@@ -1200,7 +1204,141 @@
     padding-left: 8px;
     padding-right: 8px;
   }
-}@media (max-width: 768px) {
+}/* ========== PHONE (≤ 600px) ========== */
+@media (max-width: 600px) {
+
+  /* Landing / promo */
+  .landing-section {
+    padding: 16px 12px;
+    min-height: unset;
+    gap: 12px;
+  }
+  .landing-promo-page {
+    height: 240px;
+  }
+  .promo-overlay {
+    padding: 14px;
+    gap: 4px;
+  }
+  .promo-overlay h2 {
+    font-size: 18px;
+    margin: 0;
+  }
+  .promo-overlay p {
+    width: auto;
+    font-size: 12px;
+    margin: 0;
+  }
+  .promo-overlay .ui-btn {
+    width: 140px;
+    font-size: 13px;
+    height: 28px;
+  }
+
+  /* Player strip */
+  .player-strip-inner {
+    grid-template-columns: 1fr;
+    padding: 10px 16px;
+    gap: 8px;
+    text-align: center;
+  }
+  .player-profile {
+    justify-self: center;
+    order: 1;
+  }
+  .player-missions {
+    justify-self: center;
+    order: 2;
+  }
+  .player-level {
+    justify-self: center;
+    order: 3;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* Mission */
+  .mission-section {
+    padding: 20px 0 24px;
+  }
+  .mission-list {
+    width: 92%;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    padding-top: 16px;
+  }
+  .mission-card {
+    max-width: 100%;
+    height: 210px;
+  }
+  .mission-card-image img {
+    height: 110px;
+  }
+  .mission-card-title {
+    font-size: 13px;
+  }
+
+  /* Leaderboard */
+  .leaderboard-section {
+    height: auto;
+    padding: 20px 0 24px;
+  }
+  .leaderboard-body {
+    padding: 16px 12px;
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .leaderboard-podium {
+    gap: 8px;
+    padding-top: 20px;
+  }
+  .podium-item {
+    width: 90px;
+  }
+  .podium-avatar-wrap img {
+    width: 68px;
+    height: 68px;
+  }
+  .podium-item.rank-1 .podium-top img {
+    width: 86px;
+    height: 86px;
+  }
+  .podium-name {
+    font-size: 11px;
+    max-width: 72px;
+  }
+  .podium-points {
+    font-size: 11px;
+  }
+  .leaderboard-list {
+    width: 100%;
+    max-width: 100%;
+  }
+  .leaderboard-row {
+    padding: 10px 10px;
+    gap: 8px;
+    min-height: 50px;
+  }
+
+  /* Global feed toggle */
+  .global-feed-toggle {
+    top: 70px;
+    right: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  /* Global feed panel — full width on phones */
+  .global-feed {
+    width: 100vw;
+    top: 60px;
+    height: calc(100vh - 60px);
+  }
+}
+
+@media (max-width: 768px) {
   .event-details-grid {
     grid-template-columns: 1fr;
     gap: 24px;

@@ -875,3 +875,15 @@ const GlobalAnnouncements = () => {
 };
 
 export default GlobalAnnouncements;
+
+export const GlobalNotificationButton = ({ unreadCount, onClick }) => (
+  <button
+    className="global-feed-toggle"
+    onClick={onClick}
+  >
+    📢 Update
+    {unreadCount > 0 && (
+      <span className="global-feed-badge">{unreadCount}</span>
+    )}
+  </button>
+);

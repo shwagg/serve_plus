@@ -10,6 +10,7 @@ import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
 import { useSession } from '../../../context/SessionContext';
 import ChooseGroup from './ChooseGroup';
+import { GlobalNotificationButton } from "../../../components/GlobalAnnouncements";
 //styles
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
@@ -2047,15 +2048,10 @@ export default function EventActivity() {
       )}
 
       {/* Global Announcements Toggle Button */}
-      <button
-        className="global-feed-toggle"
+      <GlobalNotificationButton
+        unreadCount={announcementUnreadCount}
         onClick={() => setOpen(!open)}
-      >
-        📢 Update
-        {announcementUnreadCount > 0 && (
-          <span className="global-feed-badge">{announcementUnreadCount}</span>
-        )}
-      </button>
+      />
 
       {/* SLIDE-IN PANEL */}
       <aside className={`global-feed ${open ? 'open' : ''}`}

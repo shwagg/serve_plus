@@ -7,6 +7,7 @@ import { createNotification } from '../../../utils/notificationUtils';
 import Header from '../../../components/Header';
 import GlobalAnnouncements from '../../../components/GlobalAnnouncements';
 import '../../../styles/student.css';
+import { GlobalNotificationButton } from "../../../components/GlobalAnnouncements";
 
 export default function EventDetails() {
   const [open, setOpen] = useState(false);
@@ -249,31 +250,11 @@ export default function EventDetails() {
         </div>
       </div>
 
-      {/* Community Updates Toggle Button and Slide-in Panel */}
-      <button
-        className="global-feed-toggle"
+      {/* TOGGLE BUTTON */}
+      <GlobalNotificationButton
+        unreadCount={announcementUnreadCount}
         onClick={() => setOpen(!open)}
-        style={{
-          position: 'fixed',
-          top: 90,
-          right: 20,
-          background: '#30bdb7',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          padding: '10px 16px',
-          cursor: 'pointer',
-          fontWeight: 600,
-          fontSize: 14,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-          zIndex: 1000
-        }}
-      >
-        📢 Update
-        {announcementUnreadCount > 0 && (
-          <span className="global-feed-badge">{announcementUnreadCount}</span>
-        )}
-      </button>
+      />
       <aside className={`global-feed ${open ? 'open' : ''}`}
         style={{
           position: 'fixed',

@@ -10,6 +10,7 @@ import GlobalAnnouncements from "../../components/GlobalAnnouncements";
 import "../../styles/student.css";
 import "../../styles/ui.css";
 import { WestIcon, EastIcon } from "../../components/icons";
+import { GlobalNotificationButton } from "../../components/GlobalAnnouncements";
 
 //sample-- to be paltan ng saved profile pic sa firestore
 import mission1 from '../../assets/mission1.jpg';
@@ -574,47 +575,12 @@ const StudentHome = () => {
         </section>
       </div>
       {/* TOGGLE BUTTON */}
-      <button
-        className="global-feed-toggle"
+      <GlobalNotificationButton
+        unreadCount={announcementUnreadCount}
         onClick={() => setOpen(!open)}
-        style={{
-          position: 'fixed',
-          top: 90,
-          right: 20,
-          background: '#30bdb7',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          padding: '10px 16px',
-          cursor: 'pointer',
-          fontWeight: 600,
-          fontSize: 14,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-          zIndex: 1000
-        }}
-      >
-        📢 Update
-        {announcementUnreadCount > 0 && (
-          <span className="global-feed-badge">{announcementUnreadCount}</span>
-        )}
-      </button>
-
+      />
       {/* SLIDE-IN PANEL */}
-      <aside className={`global-feed ${open ? 'open' : ''}`}
-        style={{
-          position: 'fixed',
-          top: 80,
-          right: 0,
-          height: 'calc(100vh - 80px)',
-          width: 380,
-          background: '#fff',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          borderLeft: '2px solid #30bdb7',
-          zIndex: 999,
-          transition: 'transform 0.3s',
-          transform: open ? 'translateX(0)' : 'translateX(100%)',
-          pointerEvents: open ? 'auto' : 'none'
-        }}>
+      <aside className={`global-feed ${open ? 'open' : ''}`}>
         <GlobalAnnouncements />
       </aside>
     </div>

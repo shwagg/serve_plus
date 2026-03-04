@@ -224,6 +224,7 @@ import Header from "../../components/Header.jsx";
 import "../../styles/Profile.css";
 import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { GlobalNotificationButton } from "../../components/GlobalAnnouncements";
 
 const PROFILE_TABS = ["Overview", "Portfolio"];
 
@@ -287,6 +288,8 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [exporting, setExporting] = useState(false);
   const portfolioPdfRef = useRef(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
 
   const exportToPDF = async () => {
     if (!portfolioPdfRef.current) return;
