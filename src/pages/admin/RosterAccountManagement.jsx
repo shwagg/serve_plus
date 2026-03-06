@@ -323,6 +323,16 @@ export default function RosterAccountManagement() {
               <input
                 type="radio"
                 name="role"
+                checked={roleFilter === "partner"}
+                onChange={() => handleRoleFilterChange("partner")}
+                className="filter-role"
+              />
+              <span>Partner</span>
+            </label>
+            <label className="filter-label">
+              <input
+                type="radio"
+                name="role"
                 checked={roleFilter === "points"}
                 onChange={() => handleRoleFilterChange("points")}
                 className="filter-role"

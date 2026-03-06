@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../../firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import '../../../styles/ProjectProposal.css';
 import SummaryPanel from '../SummaryPanel';
 
@@ -36,7 +36,27 @@ function ProjectProposal({ projectType, onClose }) {
     affiliation: '', // College/Program/Department/Student Org
     studentOutcomes: '',
     alt: '', // Alt text for image
+    partnerSchool: '',
   });
+  const [partnerSchools, setPartnerSchools] = useState([]);
+  const [loadingSchools, setLoadingSchools] = useState(true);
+
+  useEffect(() => {
+    async function fetchPartners() {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        const partners = snap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(user => user.role === 'partner' && user.name);
+        setPartnerSchools(partners);
+      } catch {
+        setPartnerSchools([]);
+      } finally {
+        setLoadingSchools(false);
+      }
+    }
+    fetchPartners();
+  }, []);
   // Get user info and update formData.preparedBy on mount or when user changes
   // Effect: Fetch user info and update preparedBy field on mount or when user changes
   useEffect(() => {
@@ -202,7 +222,6 @@ function ProjectProposal({ projectType, onClose }) {
           {/* Basic Information */}
           <div className="form-section">
             <h2>Basic Information</h2>
-            
             <div className="form-group">
               <label htmlFor="title">
                 {projectType === 'service-learning'
@@ -217,6 +236,25 @@ function ProjectProposal({ projectType, onClose }) {
                 onChange={handleInputChange}
                 required
               />
+            </div>
+            <div className="form-group">
+              <label htmlFor="partnerSchool">Partner School</label>
+              {loadingSchools ? (
+                <div>Loading schools...</div>
+              ) : (
+                <select
+                  id="partnerSchool"
+                  name="partnerSchool"
+                  value={formData.partnerSchool || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Select Partner School</option>
+                  {partnerSchools.map(school => (
+                    <option key={school.id} value={school.name}>{school.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {projectType === 'service-learning' && (
