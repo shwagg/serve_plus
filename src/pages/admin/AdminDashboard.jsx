@@ -227,7 +227,7 @@ export default function AdminDashboard() {
                     className="bar-row"
                     key={x.label}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/admin/events/${x.id}`)}
+                    onClick={() => x.id && navigate(`/current-event/${x.id}`)}
                     title="View Event Monitoring"
                   >
                     <div className="bar-label">{x.label}</div>
@@ -380,7 +380,7 @@ export default function AdminDashboard() {
                     <div
                       className="event-card"
                       key={e.id}
-                      onClick={() => navigate(`/admin/events/${e.id}`)}
+                      onClick={() => e.id && navigate(`/current-event/${e.id}`)}
                       style={{ cursor: "pointer" }}
                     >
                       <div className="event-title">
@@ -395,7 +395,7 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={(evt) => {
                             evt.stopPropagation();
-                            navigate(`/admin/events/${e.id}`);
+                            e.id && navigate(`/current-event/${e.id}`);
                           }}
                         >
                           Details
@@ -428,7 +428,7 @@ export default function AdminDashboard() {
                     <div
                       className="event-card"
                       key={e.id}
-                      onClick={() => navigate(`/admin/events/${e.id}`)}
+                      onClick={() => e.id && navigate(`/current-event/${e.id}`)}
                       style={{ cursor: "pointer" }}
                     >
                       <div className="event-title">
@@ -443,7 +443,7 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={(evt) => {
                             evt.stopPropagation();
-                            navigate(`/admin/events/${e.id}`);
+                            e.id && navigate(`/current-event/${e.id}`);
                           }}
                         >
                           Details

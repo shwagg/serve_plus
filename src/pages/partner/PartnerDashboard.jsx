@@ -82,7 +82,7 @@ export default function PartnerDashboard() {
             className="dashboard-event-card"
             key={proposal.id}
             style={{ cursor: 'pointer' }}
-            onClick={() => navigate(`/current-event/${proposal.id}`)}
+            onClick={() => proposal.id && navigate(`/current-event/${proposal.id}`)}
           >
             <span className="dashboard-event-category">{proposal.nature || proposal.projectType || "Event"}</span>
             <div className="dashboard-event-title">{proposal.title}</div>

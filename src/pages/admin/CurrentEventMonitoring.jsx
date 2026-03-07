@@ -9,6 +9,11 @@ import ImpactMetrics from "./ImpactMetrics";
 
 export default function CurrentEventMonitoring() {
   const { missionId } = useParams();
+  // Guard: If missionId is missing, do not attempt to fetch or render event data
+  if (!missionId) {
+    console.error("No missionId provided in route params.");
+    return <div className="error">No event selected. Please select an event from the dashboard or project list.</div>;
+  }
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
   const [volunteers, setVolunteers] = useState([]);
@@ -23,6 +28,7 @@ export default function CurrentEventMonitoring() {
 
   useEffect(() => {
     const fetchEventData = async () => {
+      if (!missionId) return; // Guard: do not fetch if missionId is missing
       try {
         setLoading(true);
 
@@ -136,6 +142,7 @@ export default function CurrentEventMonitoring() {
   }
 
   if (!mission || typeof mission !== 'object') {
+    console.error("Event not found for missionId:", missionId);
     return <div className="error">Event not found</div>;
   }
 

@@ -186,6 +186,11 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* Fallback: If /admin/current-event is accessed without an ID, redirect to dashboard */}
+          <Route
+            path="/admin/current-event"
+            element={<Navigate to="/admin/dashboard" replace />}
+          />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>
