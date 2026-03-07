@@ -8,7 +8,13 @@ import "../../styles/CurrentEventMonitoring.css";
 import ImpactMetrics from "./ImpactMetrics";
 
 export default function CurrentEventMonitoring() {
-  const { missionId } = useParams();
+  // Support both missionId (partner route) and eventId (admin route)
+  const params = useParams();
+  const missionId = params.missionId || params.eventId;
+  // Guard: If missionId is missing, do not attempt to fetch or render event data
+  if (!missionId) {
+    return <div className="error">No event selected. Please select an event from the dashboard or project list.</div>;
+  }
   // Guard: If missionId is missing, do not attempt to fetch or render event data
   if (!missionId) {
     console.error("No missionId provided in route params.");

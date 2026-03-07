@@ -20,9 +20,7 @@ export const adminLinks = [
     key: "events",
     label: "Events",
     children: [
-      // The Current Event link should not navigate directly to /admin/current-event without an ID.
-      // Instead, direct to dashboard where events can be selected for monitoring.
-      { label: "Current Event", to: "/admin/dashboard" },
+      { label: "Current Event", to: "/admin/current-event" },
       { label: "Roster", to: "/admin/roster" },
       { label: "Partner Hub", to: "/admin/events/partners" },
     ],

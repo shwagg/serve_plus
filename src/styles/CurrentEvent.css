@@ -1,8 +1,33 @@
-.current-events-container {
+
+.current-events-horizontal-container {
+  width: 100%;
+  padding: 24px 0 24px 0;
+  background: transparent;
+}
+
+.current-events-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-  padding: 20px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 24px;
+  padding: 0 32px;
+}
+
+@media (max-width: 1200px) {
+  .current-events-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .current-events-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .current-events-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .mission-card {

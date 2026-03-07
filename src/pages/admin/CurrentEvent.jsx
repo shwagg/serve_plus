@@ -1,33 +1,54 @@
 import { collection, getDocs, getDoc, doc, updateDoc, query, where } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "../../styles/CurrentEvent.css";
 import { createNotification } from "../../utils/notificationUtils";
+
+const MissionCard = memo(function MissionCard({ mission, onClick }) {
+    return (
+        <div
+            className="mission-card"
+            onClick={onClick}
+        >
+            {mission.pendingCount > 0 && (
+                <span className="pending-badge">
+                    {mission.pendingCount}
+                </span>
+            )}
+            <h3>{mission.title}</h3>
+            <div className="mission-info">
+                <p>Status: <strong>{mission.status}</strong></p>
+                <p>Volunteers Joined: <strong>{mission.approvedCount}</strong></p>
+            </div>
+        </div>
+    );
+});
 
 export default function CurrentEvent() {
     const { missionId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     const [missions, setMissions] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [pendingVolunteers, setPendingVolunteers] = useState([]);
     const [approvedVolunteers, setApprovedVolunteers] = useState([]);
     const [missionTitle, setMissionTitle] = useState("");
 
     useEffect(() => {
+        let isMounted = true;
         async function fetchMissions() {
+            setLoading(true);
             const missionSnap = await getDocs(collection(db, "missions"));
             const missionData = [];
             for (const missionDoc of missionSnap.docs) {
                 const mId = missionDoc.id;
                 const mission = missionDoc.data();
                 const volunteerRef = collection(db, "missions", mId, "volunteer");
-                const pendingSnap = await getDocs(
-                    query(volunteerRef, where("registrationStatus", "==", "pending"))
-                );
-                const approvedSnap = await getDocs(
-                    query(volunteerRef, where("registrationStatus", "==", "approved"))
-                );
+                const [pendingSnap, approvedSnap] = await Promise.all([
+                    getDocs(query(volunteerRef, where("registrationStatus", "==", "pending"))),
+                    getDocs(query(volunteerRef, where("registrationStatus", "==", "approved")))
+                ]);
                 missionData.push({
                     id: mId,
                     title: mission.title,
@@ -36,9 +57,13 @@ export default function CurrentEvent() {
                     approvedCount: approvedSnap.size
                 });
             }
-            setMissions(missionData);
+            if (isMounted) {
+                setMissions(missionData);
+                setLoading(false);
+            }
         }
         fetchMissions();
+        return () => { isMounted = false; };
     }, []);
 
     // Fetch mission title if not provided in location.state
@@ -254,30 +279,24 @@ export default function CurrentEvent() {
     }
 
     return (
-        <div className="current-events-container">
-            {missions.map(mission => (
-                <div
-                    key={mission.id}
-                    className="mission-card"
-                    onClick={() =>
-                        navigate(`/admin/current-event/${mission.id}`, {
-                            state: { missionTitle: mission.title }
-                        })
-                    }
-                >
-                    {mission.pendingCount > 0 && (
-                        <span className="pending-badge">
-                            {mission.pendingCount}
-                        </span>
-                    )}
-                    <h3>{mission.title}</h3>
-
-                    <div className="mission-info">
-                        <p>Status: <strong>{mission.status}</strong></p>
-                        <p>Volunteers Joined: <strong>{mission.approvedCount}</strong></p>
-                    </div>
+        <div className="current-events-horizontal-container">
+            {loading ? (
+                <div style={{ color: '#888', fontSize: 18, padding: 32 }}>Loading events...</div>
+            ) : (
+                <div className="current-events-row">
+                    {missions.map(mission => (
+                        <MissionCard
+                            key={mission.id}
+                            mission={mission}
+                            onClick={() =>
+                                navigate(`/admin/current-event/${mission.id}`, {
+                                    state: { missionTitle: mission.title }
+                                })
+                            }
+                        />
+                    ))}
                 </div>
-            ))}
+            )}
         </div>
     );
 }

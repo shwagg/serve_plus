@@ -44,6 +44,7 @@ import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import StudentHome from "./pages/student/StudentHome";
 
 function App() {
+            {/* Route for admin current event tile click (member approval UI) - must be nested under /admin */}
   // Check for upcoming events and create notifications
   useUpcomingEventNotifications();
 
@@ -67,6 +68,9 @@ function App() {
             }
           >
             <Route path="dashboard" element={<AdminDashboard />} />
+                                    <Route path="current-event" element={<CurrentEvent />} />
+                                    <Route path="current-event/:missionId" element={<CurrentEvent />} />
+                        <Route path="current-event/:missionId" element={<CurrentEvent />} />
             <Route path="documents" element={<DocumentLibrary />} />
             <Route
               path="events/:eventId"
@@ -142,6 +146,15 @@ function App() {
             <Route path="dashboard" element={<PartnerDashboard />} />
             <Route path="projects" element={<ProjectList mode="partner" />} />
           </Route>
+          {/* Partner and Admin: Event Monitoring (Current Event) */}
+          <Route
+            path="/current-event/:missionId"
+            element={
+              <ProtectedRoute allowedRoles={["partner", "admin"]}>
+                <CurrentEventMonitoring />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/event/:id" element={<EventDetails />} />
           <Route path="/event/:id/activity" element={<EventActivity />} />
           <Route
@@ -178,19 +191,6 @@ function App() {
           />
           <Route path="/global/terms-condition" element={<TermsCondition />} />
           <Route path="/global/privacy-policy" element={<PrivacyPolicy />} />
-          <Route
-            path="/current-event/:missionId"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "partner"]}>
-                <CurrentEventMonitoring />
-              </ProtectedRoute>
-            }
-          />
-          {/* Fallback: If /admin/current-event is accessed without an ID, redirect to dashboard */}
-          <Route
-            path="/admin/current-event"
-            element={<Navigate to="/admin/dashboard" replace />}
-          />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>
