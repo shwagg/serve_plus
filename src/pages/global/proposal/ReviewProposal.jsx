@@ -54,25 +54,54 @@ export default function ReviewProposal() {
   }
   const userApprovalField = getUserApprovalField();
 
+  // Helper: context-aware status label for each row
+  function getContextStatusLabel(proposal) {
+    // Determine which step this user is on
+    if (userApprovalField === "reviewedBy") {
+      if (!proposal.reviewedBy) return "For Approval";
+      if (proposal.reviewedBy && !proposal.recommendedBy && !proposal.endorsedBy && !proposal.approvedBy) return "Pending";
+    }
+    if (userApprovalField === "recommendedBy") {
+      if (proposal.reviewedBy && !proposal.recommendedBy) return "For Approval";
+      if (proposal.reviewedBy && proposal.recommendedBy && !proposal.endorsedBy && !proposal.approvedBy) return "Pending";
+    }
+    if (userApprovalField === "endorsedBy") {
+      if (proposal.reviewedBy && proposal.recommendedBy && !proposal.endorsedBy) return "For Approval";
+      if (proposal.reviewedBy && proposal.recommendedBy && proposal.endorsedBy && !proposal.approvedBy) return "Pending";
+    }
+    if (userApprovalField === "approvedBy") {
+      if (proposal.reviewedBy && proposal.recommendedBy && proposal.endorsedBy && !proposal.approvedBy) return "For Approval";
+    }
+    // Fallback to default
+    return formatStatus(proposal.status);
+  }
+
   const filteredProposals = useMemo(() => {
     let data = [...proposals];
     if (userApprovalField) {
       data = data.filter(p => {
+        const status = (p.status || "").toLowerCase();
+        // Always show drafts in overall/draft filters for all roles
+        if (statusFilter === "overall" || statusFilter === "draft") {
+          if (status === "draft") return true;
+        }
         if (userApprovalField === "reviewedBy") {
-          // Show proposals that are not yet reviewed (for approval), and also those already reviewed (pending)
-          // Pending: reviewedBy is filled, recommendedBy, endorsedBy, approvedBy are empty, status is not published/completed
-          const isForApproval = !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy && (!p.status || (p.status !== "published" && p.status !== "completed"));
-          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!p.status || (p.status !== "published" && p.status !== "completed"));
+          const isForApproval = !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy && (!status || (status !== "published" && status !== "completed"));
+          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
           return isForApproval || isPending;
         }
         if (userApprovalField === "recommendedBy") {
-          return typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!p.status || (p.status !== "published" && p.status !== "completed"));
+          const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
+          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && status === "pending";
+          return isForApproval || isPending;
         }
         if (userApprovalField === "endorsedBy") {
-          return typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!p.status || (p.status !== "published" && p.status !== "completed"));
+          const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
+          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!p.approvedBy || p.approvedBy.trim() === "") && status === "pending";
+          return isForApproval || isPending;
         }
         if (userApprovalField === "approvedBy") {
-          return typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!p.approvedBy || p.approvedBy.trim() === "") && (!p.status || (p.status !== "published" && p.status !== "completed"));
+          return typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
         }
         return false;
       });
@@ -112,7 +141,7 @@ export default function ReviewProposal() {
     if (!status) return "Draft";
     const s = status.toLowerCase();
     if (s === "for_approval" || s === "for-approval") return "For Approval";
-    if (s === "pending") return "For Approval";
+    if (s === "pending") return "Pending";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
@@ -205,7 +234,7 @@ export default function ReviewProposal() {
                         </td>
                         <td className="text-center">
                           <span className={`status-badge ${getStatusBadgeClass(proposal.status)}`}>
-                            {formatStatus(proposal.status) || "Draft"}
+                            {getContextStatusLabel(proposal) || "Draft"}
                           </span>
                         </td>
                       </tr>
