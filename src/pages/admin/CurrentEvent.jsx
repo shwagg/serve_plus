@@ -12,40 +12,53 @@ export default function CurrentEvent() {
     const [missions, setMissions] = useState([]);
     const [pendingVolunteers, setPendingVolunteers] = useState([]);
     const [approvedVolunteers, setApprovedVolunteers] = useState([]);
+    const [missionTitle, setMissionTitle] = useState("");
 
     useEffect(() => {
         async function fetchMissions() {
             const missionSnap = await getDocs(collection(db, "missions"));
             const missionData = [];
-
             for (const missionDoc of missionSnap.docs) {
-                const missionId = missionDoc.id;
+                const mId = missionDoc.id;
                 const mission = missionDoc.data();
-
-                const volunteerRef = collection(db, "missions", missionId, "volunteer");
-
+                const volunteerRef = collection(db, "missions", mId, "volunteer");
                 const pendingSnap = await getDocs(
                     query(volunteerRef, where("registrationStatus", "==", "pending"))
                 );
-
                 const approvedSnap = await getDocs(
                     query(volunteerRef, where("registrationStatus", "==", "approved"))
                 );
-
                 missionData.push({
-                    id: missionId,
+                    id: mId,
                     title: mission.title,
                     status: mission.eventStatus || "Accepting Students",
                     pendingCount: pendingSnap.size,
                     approvedCount: approvedSnap.size
                 });
             }
-
             setMissions(missionData);
         }
-
         fetchMissions();
     }, []);
+
+    // Fetch mission title if not provided in location.state
+    useEffect(() => {
+        async function fetchTitle() {
+            if (!missionId) return;
+            if (location.state && location.state.missionTitle) {
+                setMissionTitle(location.state.missionTitle);
+            } else {
+                // Fetch from Firestore
+                const missionDoc = await getDoc(doc(db, "missions", missionId));
+                if (missionDoc.exists()) {
+                    setMissionTitle(missionDoc.data().title || "Event");
+                } else {
+                    setMissionTitle("Event");
+                }
+            }
+        }
+        fetchTitle();
+    }, [missionId, location.state]);
 
     //fetch mission volunteers wanting to join
     async function fetchMissionVolunteers() {
@@ -151,7 +164,7 @@ export default function CurrentEvent() {
     if (missionId) {
         return (
             <div className="admin-table-container">
-                <h2>{location.state?.missionTitle}</h2>
+                <h2>{missionTitle}</h2>
 
                 {/* ================= PENDING SECTION ================= */}
                 <div className="section-header">

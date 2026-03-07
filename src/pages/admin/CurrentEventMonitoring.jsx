@@ -8,7 +8,7 @@ import "../../styles/CurrentEventMonitoring.css";
 import ImpactMetrics from "./ImpactMetrics";
 
 export default function CurrentEventMonitoring() {
-  const { eventId } = useParams();
+  const { missionId } = useParams();
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
   const [volunteers, setVolunteers] = useState([]);
@@ -43,7 +43,7 @@ export default function CurrentEventMonitoring() {
         setUsersById(userMap);
 
         // Fetch mission data
-        const missionRef = doc(db, "missions", eventId);
+        const missionRef = doc(db, "missions", missionId);
         const missionSnap = await getDoc(missionRef);
 
         if (missionSnap.exists()) {
@@ -53,7 +53,7 @@ export default function CurrentEventMonitoring() {
           const volunteersRef = collection(
             db,
             "missions",
-            eventId,
+            missionId,
             "volunteer",
           );
           const volunteersSnap = await getDocs(volunteersRef);
@@ -69,13 +69,13 @@ export default function CurrentEventMonitoring() {
               let postSurveyAnswers = null;
               try {
                 const preDoc = await getDoc(
-                  doc(db, "missions", eventId, "volunteer", v.id, "preSurvey", "response")
+                  doc(db, "missions", missionId, "volunteer", v.id, "preSurvey", "response")
                 );
                 if (preDoc.exists()) preSurveyAnswers = preDoc.data();
               } catch (e) {}
               try {
                 const postDoc = await getDoc(
-                  doc(db, "missions", eventId, "volunteer", v.id, "postSurvey", "response")
+                  doc(db, "missions", missionId, "volunteer", v.id, "postSurvey", "response")
                 );
                 if (postDoc.exists()) postSurveyAnswers = postDoc.data();
               } catch (e) {}
@@ -89,7 +89,7 @@ export default function CurrentEventMonitoring() {
           setVolunteers(volunteersWithSurveys);
 
           // Fetch tasks
-          const tasksRef = collection(db, "missions", eventId, "task");
+          const tasksRef = collection(db, "missions", missionId, "task");
           const tasksSnap = await getDocs(tasksRef);
           const tasksData = tasksSnap.docs.map((doc) => ({
             id: doc.id,
@@ -103,7 +103,7 @@ export default function CurrentEventMonitoring() {
             const participantsRef = collection(
               db,
               "missions",
-              eventId,
+              missionId,
               "task",
               task.id,
               "participants",
@@ -129,18 +129,18 @@ export default function CurrentEventMonitoring() {
     };
 
     fetchEventData();
-  }, [eventId]);
+  }, [missionId]);
 
   if (loading) {
     return <div className="loading">Loading event details...</div>;
   }
 
-  if (!mission) {
+  if (!mission || typeof mission !== 'object') {
     return <div className="error">Event not found</div>;
   }
 
-  // Only allow published missions
-  if (mission.status !== "published") {
+  // Only allow published missions, with defensive check
+  if (!mission.status || typeof mission.status !== 'string' || mission.status !== "published") {
     return <div className="error">Event is not published or not available for monitoring.</div>;
   }
 
@@ -213,7 +213,7 @@ export default function CurrentEventMonitoring() {
     const participantRef = doc(
       db,
       "missions",
-      eventId,
+      missionId,
       "task",
       participant.taskId,
       "participants",
@@ -234,8 +234,8 @@ export default function CurrentEventMonitoring() {
         newStatus === "approved"
           ? `Your reflection for "${taskTitleById[participant.taskId]}" was approved.`
           : `Your reflection for "${taskTitleById[participant.taskId]}" needs revision.`,
-      link: `/event/${eventId}/activity?mode=active`,
-      eventId,
+      link: `/event/${missionId}/activity?mode=active`,
+      eventId: missionId,
       taskId: participant.taskId,
     });
 
@@ -278,28 +278,30 @@ export default function CurrentEventMonitoring() {
           <h2 className="cem-panel-title">Project Summary & Details</h2>
 
           <div className="cem-summary-content">
-            <h3 className="cem-project-name">{mission.title}</h3>
+
+            <h3 className="cem-project-name">{mission.title || "Untitled Event"}</h3>
             <p className="cem-published">
               Published By:{" "}
-              <strong>{mission.waiver || "wala pa sa firestore"}</strong>
+              <strong>{typeof mission.waiver === 'string' ? mission.waiver : "wala pa sa firestore"}</strong>
             </p>
             <p className="cem-partner">
               Partnering Organization:{""}
-              <strong>{"wala pa sa firestore"}</strong>
+              <strong>{mission.partnerOrg || "wala pa sa firestore"}</strong>
             </p>
             <p></p>
             <strong>Details</strong>
 
             <div className="cem-description">
-              <p>{mission.description}</p>
+              <p>{mission.description || "No description provided."}</p>
             </div>
 
             <div className="cem-info-section">
               <h4 className="cem-info-title">Location:</h4>
               <ul className="cem-info-list">
                 <li>
-                  {mission.location ||
-                    "San Juan River, Brgy. Poblacion II, Calamba City, Laguna"}
+                  {mission.location && typeof mission.location === 'string'
+                    ? mission.location
+                    : "San Juan River, Brgy. Poblacion II, Calamba City, Laguna"}
                 </li>
               </ul>
             </div>
@@ -308,9 +310,9 @@ export default function CurrentEventMonitoring() {
               <h4 className="cem-info-title">Date & Time:</h4>
               <ul className="cem-info-list">
                 <li>
-                  {mission.targetDate?.toDate
+                  {mission.targetDate && typeof mission.targetDate === 'object' && typeof mission.targetDate.toDate === 'function'
                     ? mission.targetDate.toDate().toLocaleDateString()
-                    : mission.targetDate
+                    : mission.targetDate && typeof mission.targetDate === 'string'
                       ? new Date(mission.targetDate).toLocaleDateString()
                       : "Date not set"}{" "}
                   | 7:00 AM to 12:00 PM

@@ -86,10 +86,8 @@ function App() {
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="system/agreements" element={<AgreementEditor />} />
-            <Route
-              path="current-event/:missionId?"
-              element={<CurrentEvent />}
-            />
+            {/* current-event route moved to top-level below */}
+                    {/* Allow both admin and partner to access event monitoring - must be outside all nested routes */}
             {/*<Route path="system/badges" element={<BadgeManage />} /> */}
           </Route>
 
@@ -180,6 +178,14 @@ function App() {
           />
           <Route path="/global/terms-condition" element={<TermsCondition />} />
           <Route path="/global/privacy-policy" element={<PrivacyPolicy />} />
+          <Route
+            path="/current-event/:missionId"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "partner"]}>
+                <CurrentEventMonitoring />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>

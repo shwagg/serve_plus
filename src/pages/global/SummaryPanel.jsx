@@ -74,6 +74,9 @@ function SummaryPanel({
         // Affiliation
         affiliation: formData.affiliation || '',
 
+        // Partner School (for filtering)
+        partnerSchool: formData.partnerSchool || '',
+
         // Activities
         activities: [],
 

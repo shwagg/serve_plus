@@ -31,6 +31,29 @@ export default function ProjectList({ mode = "admin" }) {
     const [statusFilter, setStatusFilter] = useState("all");
     const [sortBy, setSortBy] = useState("date_asc"); // nearest date by default
 
+    // Partner school for filtering
+    const [partnerSchool, setPartnerSchool] = useState("");
+
+    // Fetch partner's school if mode is partner
+    useEffect(() => {
+        const fetchPartnerSchool = async () => {
+            if (mode === "partner" && user?.uid) {
+                try {
+                    const { getDoc, doc } = await import("firebase/firestore");
+                    const userDoc = await getDoc(doc(db, "users", user.uid));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        if (data.partnerSchool) setPartnerSchool(data.partnerSchool);
+                        else if (data.name) setPartnerSchool(data.name); // fallback: use partner's name
+                    }
+                } catch (err) {
+                    setPartnerSchool("");
+                }
+            }
+        };
+        fetchPartnerSchool();
+    }, [mode, user]);
+
     useEffect(() => {
         const fetchMissions = async () => {
             try {
@@ -47,14 +70,12 @@ export default function ProjectList({ mode = "admin" }) {
                 setLoading(false);
             }
         };
-
         fetchMissions();
     }, []);
 
     useEffect(() => {
         localStorage.setItem("projectView", view);
     }, [view]);
-
 
     //search bar and filter
     const getTitle = (p) =>
@@ -129,29 +150,40 @@ export default function ProjectList({ mode = "admin" }) {
     const filteredAndSorted = projects
         .filter((p) => {
             const st = p.status ?? "draft";
-            const partnerDecidedByMe = p.approvals?.partner?.decidedBy === user.uid;
-            const facultyDecidedByMe = p.approvals?.faculty?.decidedBy === user.uid;
-            //(PARTNER SIDE)
+            const partnerDecidedByMe = p.approvals?.partner?.decidedBy === user?.uid;
+            const facultyDecidedByMe = p.approvals?.faculty?.decidedBy === user?.uid;
+            // (PARTNER SIDE)
             if (mode === "partner") {
+                // Only show proposals for this partner school
+                if (!partnerSchool) return false;
+                if (p.partnerSchool !== partnerSchool) return false;
+
+                // Always show the event if the partner is the owner (by id or other logic)
+                // You can add a prop/eventId to force-show a specific event if needed
+                // For now, show all events for this partner
+
                 // waiting for admin action
                 if (st === "for_approval") return true;
                 // already live projects they participated in
                 if (st === "published") return true;
                 // past projects
                 if (st === "archived") return true;
+
+                // Optionally: show all events for this partner regardless of status
+                // return true;
+
                 return false;
             }
 
-            //(FACULTY SIDE)
+            // (FACULTY SIDE)
             if (mode === "faculty") {
                 //this is after partner approved the project
                 if (st === "approved") return true;
                 if (facultyDecidedByMe &&
                     (st === "rejected" || st === "to_publish")) { return true; }
                 return false;
-
             }
-            //(ADMIN SIDE)
+            // (ADMIN SIDE)
             if (statusFilter !== "all" && st !== statusFilter) return false;
             if (!normalizedSearch) return true;
             const hay = `${getTitle(p)} ${p.location || ""}`.toLowerCase();
