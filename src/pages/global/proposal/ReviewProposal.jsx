@@ -40,6 +40,7 @@ export default function ReviewProposal() {
   const positionField = userData?.position || userData?.positions || userData?.Position || userData?.Positions || "";
   const userPositions = Array.isArray(positionField) ? positionField : positionField ? [positionField] : [];
   const normalizedPositions = userPositions.map(p => String(p).toLowerCase().trim().replace(/\s+/g, " ")).filter(p => p.length > 0);
+  const isPartner = role.toLowerCase() === "partner";
 
   function getUserApprovalField() {
     if (role.toLowerCase() === "faculty") {
@@ -78,26 +79,33 @@ export default function ReviewProposal() {
 
   const filteredProposals = useMemo(() => {
     let data = [...proposals];
-    if (userApprovalField) {
+    if (isPartner) {
+      // Only show proposals where partnerSchool matches this partner's name
+      const partnerName = userData?.name || userData?.displayName || "";
+      data = data.filter(p => (p.partnerSchool || "").toLowerCase() === partnerName.toLowerCase());
+    } else if (userApprovalField) {
       data = data.filter(p => {
         const status = (p.status || "").toLowerCase();
-        // Always show drafts in overall/draft filters for all roles
-        if (statusFilter === "overall" || statusFilter === "draft") {
-          if (status === "draft") return true;
+        // Always show drafts and published in overall/draft/published filters for all roles
+        if (statusFilter === "overall" || statusFilter === "draft" || statusFilter === "published") {
+          if (status === "draft" || status === "published") return true;
         }
         if (userApprovalField === "reviewedBy") {
+          // Show if not published/completed and this user is/was the reviewer
           const isForApproval = !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy && (!status || (status !== "published" && status !== "completed"));
-          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
+          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
           return isForApproval || isPending;
         }
         if (userApprovalField === "recommendedBy") {
+          // Show if not published/completed and this user is/was the recommender
           const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
-          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && status === "pending";
+          const isPending = typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
           return isForApproval || isPending;
         }
         if (userApprovalField === "endorsedBy") {
+          // Show if not published/completed and this user is/was the endorser
           const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
-          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!p.approvedBy || p.approvedBy.trim() === "") && status === "pending";
+          const isPending = typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
           return isForApproval || isPending;
         }
         if (userApprovalField === "approvedBy") {
@@ -116,7 +124,7 @@ export default function ReviewProposal() {
       data = data.filter(p => (p.status || "").toLowerCase() === statusFilter);
     }
     return data;
-  }, [proposals, searchTerm, statusFilter, userApprovalField]);
+  }, [proposals, searchTerm, statusFilter, userApprovalField, isPartner, userData]);
 
   // Debug logs for troubleshooting
   console.log("[DEBUG] userData:", userData);
@@ -247,7 +255,7 @@ export default function ReviewProposal() {
         </div>
       </div>
       {/* Proposal Summary Modal */}
-      {showModal && <ReviewModal proposal={selectedProposal} onClose={handleCloseModal} onApprovalChange={handleApprovalChange} />}
+      {showModal && <ReviewModal proposal={selectedProposal} onClose={handleCloseModal} onApprovalChange={handleApprovalChange} isPartner={isPartner} />}
     </>
   );
 }

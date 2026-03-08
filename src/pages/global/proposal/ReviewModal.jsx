@@ -5,7 +5,7 @@ import { createNotification, notifyUsersByRoles } from "../../../utils/notificat
 import { SessionContext } from "../../../context/SessionContext";
 import "./ReviewModal.css";
 
-export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
+export default function ReviewModal({ proposal, onClose, onApprovalChange, isPartner }) {
 
   //prevent modal rendering while session loads
   const { userData: contextUserData } = useContext(SessionContext);
@@ -531,7 +531,12 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange }) {
           )}
 
           <div className="modal-actions">
-            {!actionSaved ? (
+            {/* Partners see only Close button, no approve/reject */}
+            {isPartner ? (
+              <button className="btn-close" onClick={onClose}>
+                Close
+              </button>
+            ) : !actionSaved ? (
               <>
                 <button
                   className="btn-approve"
