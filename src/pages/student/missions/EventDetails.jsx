@@ -17,7 +17,8 @@ export default function EventDetails() {
   const [mission, setMission] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [volunteer, setVolunteer] = useState(null); //ADD THIS FOR TESTING
+  const [joining, setJoining] = useState(false);
+  const [volunteer, setVolunteer] = useState(null);
 
 
   useEffect(() => {
@@ -75,64 +76,87 @@ export default function EventDetails() {
   }, [id, navigate]);
 
   const handleJoinEvent = async () => {
-    console.log("JOIN BUTTON CLICKED");
     const user = auth.currentUser;
     if (!user) {
       alert("Please log in to join this event.");
       return;
     }
+    setJoining(true);
 
-    const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
-
-    await setDoc(volunteerRef, {
-      joinedAt: new Date().toISOString(),
-
-      registrationStatus: "pending", //for admin approval
-      completionStatus: "pending_approval", // event completion requirements
-      pointsEarned: 0,
-
-      progress: {
-        preSurvey: "locked",
-        consent: "locked",
-        attendance: "not_checked_in",
-        postSurvey: "locked"
-      },
-
-    });
-    setVolunteer({
-      status: "pending"
-    });
-
-    // Create a registration notification (once per event)
     try {
-      const notificationsRef = collection(db, "users", user.uid, "notifications");
-      const existingQuery = query(
-        notificationsRef,
-        where("type", "==", "event_registration"),
-        where("eventId", "==", id)
-      );
-      const existing = await getDocs(existingQuery);
+      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
 
-      if (existing.empty) {
-        await createNotification(user.uid, {
-          type: "event_registration",
-          title: "Registration Submitted",
-          message: `Your registration for "${mission?.title || "this event"}" is submitted.`,
-          link: `/event/${id}`,
-          eventId: id,
-        });
+      await setDoc(volunteerRef, {
+        joinedAt: new Date().toISOString(),
+        registrationStatus: "pending",
+        completionStatus: "pending_approval",
+        pointsEarned: 0,
+
+        progress: {
+          preSurvey: "locked",
+          consent: "locked",
+          attendance: "not_checked_in",
+          postSurvey: "locked"
+        },
+      });
+      setVolunteer({ registrationStatus: "pending" });
+
+      // Create a registration notification (once per event)
+      try {
+        const notificationsRef = collection(db, "users", user.uid, "notifications");
+        const existingQuery = query(
+          notificationsRef,
+          where("type", "==", "event_registration"),
+          where("eventId", "==", id)
+        );
+        const existing = await getDocs(existingQuery);
+
+        if (existing.empty) {
+          await createNotification(user.uid, {
+            type: "event_registration",
+            title: "Registration Submitted",
+            message: `Your registration for "${mission?.title || "this event"}" is submitted.`,
+            link: `/event/${id}`,
+            eventId: id,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to create registration notification:", e);
       }
-    } catch (e) {
-      // Non-blocking: joining the event should still succeed even if notification fails.
-      console.error("Failed to create registration notification:", e);
+    } finally {
+      setJoining(false);
     }
   };
 
   if (loading) {
-    return <div className="full-page"><Header /><div className="content-page" style={{ padding: 32 }}>Loading...</div></div>;
+    return (
+      <div className="full-page">
+        <Header />
+        <div className="header-spacer"></div>
+        <div className="content-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="page-spinner" />
+            <p style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>Loading event...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
   if (!mission) {
-    return <div className="full-page"><Header /><div className="content-page" style={{ padding: 32 }}>Event not found.</div></div>;
+    return (
+      <div className="full-page">
+        <Header />
+        <div className="header-spacer"></div>
+        <div className="content-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <span style={{ fontSize: 48 }}>😕</span>
+            <h2 style={{ color: '#374151', marginTop: 12 }}>Event not found</h2>
+            <p style={{ color: '#6b7280' }}>This event may have been removed or doesn't exist.</p>
+            <button className="ui-btn" style={{ marginTop: 16 }} onClick={() => navigate('/student')}>Back to Home</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -143,7 +167,7 @@ export default function EventDetails() {
         <div className="event-details-center">
           <div className="event-details-image">
             {mission.img && mission.img.trim() !== "" && (
-              <img src={mission.img} alt={mission.alt || "Event image"} />
+              <img src={mission.img} alt={mission.alt || "Event image"} loading="lazy" />
             )}
           </div>
           <div className="event-details-card">
@@ -153,16 +177,14 @@ export default function EventDetails() {
               <div className="event-details-left">
                 <h1 className="event-details-title">{mission.title}</h1>
                 <p className="event-details-desc">{mission.description}</p>
-                <div className="event-details-meta">
-                  <div className="event-meta-item">
+                <div className="event-details-meta" role="list" aria-label="Event information">
+                  <div className="event-meta-item" role="listitem">
                     📅 <span>{mission.targetDate || "Date TBA"}</span>
                   </div>
-
-                  <div className="event-meta-item">
+                  <div className="event-meta-item" role="listitem">
                     📍 <span>{mission.location || "Location TBA"}</span>
                   </div>
-
-                  <div className="event-meta-item">
+                  <div className="event-meta-item" role="listitem">
                     ⏱ <span>
                       {mission.volunteerHours
                         ? `${mission.volunteerHours} hours`
@@ -224,26 +246,29 @@ export default function EventDetails() {
                     ? "rejected"
                     : ""
                   }`}
-                disabled={volunteer?.registrationStatus === "pending"}
+                disabled={volunteer?.registrationStatus === "pending" || joining}
+                aria-busy={joining}
                 onClick={() => {
                   if (!volunteer) {
                     handleJoinEvent();
                   } else if (volunteer.registrationStatus === "approved") {
                     navigate(`/event/${id}/activity?mode=active`);
                   } else if (volunteer.registrationStatus === "rejected") {
-                    handleJoinEvent(); // allow re-request
+                    handleJoinEvent();
                   }
                 }}
               >
-                {!volunteer
-                  ? "JOIN EVENT"
-                  : volunteer.registrationStatus === "pending"
-                    ? "PENDING REQUEST"
-                    : volunteer.registrationStatus === "approved"
-                      ? "VIEW EVENT"
-                      : volunteer.registrationStatus === "rejected"
-                        ? "REQUEST REJECTED"
-                        : "JOIN EVENT"}
+                {joining
+                  ? "Joining..."
+                  : !volunteer
+                    ? "JOIN EVENT"
+                    : volunteer.registrationStatus === "pending"
+                      ? "⏳ PENDING REQUEST"
+                      : volunteer.registrationStatus === "approved"
+                        ? "VIEW EVENT →"
+                        : volunteer.registrationStatus === "rejected"
+                          ? "RE-REQUEST"
+                          : "JOIN EVENT"}
               </button>
             </div>
           </div>

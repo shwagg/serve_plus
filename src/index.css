@@ -76,3 +76,17 @@ button {
   }
 }
 
+/* Page loading spinner for lazy-loaded routes */
+.page-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #30bdb7;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+

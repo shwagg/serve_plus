@@ -2,7 +2,7 @@ import { getAuth } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, serverTimestamp, Timestamp, onSnapshot } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
@@ -11,10 +11,8 @@ import { createNotification } from "../../../utils/notificationUtils";
 import { useSession } from '../../../context/SessionContext';
 import ChooseGroup from './ChooseGroup';
 import { GlobalNotificationButton } from "../../../components/GlobalAnnouncements";
-//styles
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
-//forms
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
 import PostActivitySurvey from "../../../forms/PostActivitySurvey.jsx";
 
@@ -27,14 +25,14 @@ export default function EventActivity() {
       (label === "Attendance (QR)" && mode !== "active");
 
     return (
-      <div className={`requirement-item ${status}`}>
+      <div className={`requirement-item ${status}`} role="listitem">
         <span className="req-label">{label}</span>
 
-        {isLocked && <span className="req-status muted">Locked</span>}
+        {isLocked && <span className="req-status muted" aria-label="Locked">🔒 Locked</span>}
         {status === "pending" && <span className="req-status pending">Pending</span>}
-        {status === "submitted" && <span className="req-status done">Submitted</span>}
+        {status === "submitted" && <span className="req-status done">✓ Submitted</span>}
         {onOpen && status !== "submitted" && (
-          <button className="req-action" onClick={onOpen}>
+          <button className="req-action" onClick={onOpen} aria-label={`Open ${label}`}>
             Open
           </button>
         )}

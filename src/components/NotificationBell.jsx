@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebaseConfig";
 import notificationIcon from "../assets/headassets/Notification Icon.svg";
@@ -15,6 +15,8 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState(null);
   const navigate = useNavigate();
+  const dropdownRef = useRef(null);
+  const bellButtonRef = useRef(null);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
@@ -38,7 +40,15 @@ export default function NotificationBell() {
     return () => unsubscribe();
   }, [userId]);
 
-  const handleNotificationClick = async (notification) => {
+  // Focus first item when dropdown opens
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const firstItem = dropdownRef.current.querySelector(".notification-item");
+      firstItem?.focus();
+    }
+  }, [isOpen]);
+
+  const handleNotificationClick = useCallback(async (notification) => {
     if (!userId) return;
     if (!notification.read) {
       await markNotificationAsRead(userId, notification.id);
@@ -47,47 +57,31 @@ export default function NotificationBell() {
       navigate(notification.link);
     }
     setIsOpen(false);
-  };
+  }, [userId, navigate]);
 
-  const handleMarkAllAsRead = async () => {
+  const handleMarkAllAsRead = useCallback(async () => {
     if (!userId) return;
     await markAllNotificationsAsRead(userId);
-  };
+  }, [userId]);
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case "event_registration":
-        return "✅";
-      case "event_approved":
-        return "✅";
-      case "event_upcoming":
-        return "⏰";
-      case "event_cancelled":
-        return "❌";
-      case "level_up":
-        return "🎉";
-      case "badge_earned":
-        return "🏆";
-      case "points_earned":
-        return "⭐";
-      case "reflection_submitted":
-        return "✍️";
-      case "reflection_overdue":
-        return "⏰";
-      case "reflection_approved":
-        return "✔️";
-      case "reflection_needs_revision":
-        return "📝";
-      case "proposal_submitted":
-        return "📨";
-      case "proposal_status":
-        return "📌";
-      case "deadline_approaching":
-        return "⚠️";
-      case "certificate_ready":
-        return "📜";
-      default:
-        return "🔔";
+      case "event_registration": return "✅";
+      case "event_approved":     return "✅";
+      case "event_upcoming":     return "⏰";
+      case "event_cancelled":    return "❌";
+      case "level_up":           return "🎉";
+      case "badge_earned":       return "🏆";
+      case "points_earned":      return "⭐";
+      case "reflection_submitted":      return "✍️";
+      case "reflection_overdue":        return "⏰";
+      case "reflection_approved":       return "✔️";
+      case "reflection_needs_revision": return "📝";
+      case "proposal_submitted": return "📨";
+      case "proposal_status":    return "📌";
+      case "deadline_approaching": return "⚠️";
+      case "certificate_ready":  return "📜";
+      default:                   return "🔔";
     }
   };
 
@@ -104,38 +98,83 @@ export default function NotificationBell() {
   return (
     <div className="notification-bell-container">
       <button
+        ref={bellButtonRef}
         className="notification-bell-button"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-label="Notifications"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
       >
-        <img src={notificationIcon} alt="Notifications" width="24" height="24" />
+        <img src={notificationIcon} alt="" width="24" height="24" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="notification-badge">{unreadCount}</span>
+          <span className="notification-badge" aria-hidden="true">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="notification-dropdown">
+        <div
+          ref={dropdownRef}
+          className="notification-dropdown"
+          role="dialog"
+          aria-label="Notifications"
+          aria-modal="true"
+        >
           <div className="notification-header">
-            <h3>Notifications</h3>
-            {unreadCount > 0 && (
-              <button className="mark-all-read-btn" onClick={handleMarkAllAsRead}>
-                Mark all as read
+            <h3 id="notification-heading">Notifications</h3>
+            <div className="notification-header-actions">
+              {unreadCount > 0 && (
+                <button
+                  className="mark-all-read-btn"
+                  onClick={handleMarkAllAsRead}
+                  aria-label="Mark all notifications as read"
+                >
+                  Mark all as read
+                </button>
+              )}
+              <button
+                className="notification-close-btn"
+                onClick={() => {
+                  setIsOpen(false);
+                  bellButtonRef.current?.focus();
+                }}
+                aria-label="Close notifications"
+              >
+                ×
               </button>
-            )}
+            </div>
           </div>
 
-          <div className="notification-list">
+          <div
+            className="notification-list"
+            role="list"
+            aria-live="polite"
+            aria-label="Notification items"
+          >
             {notifications.length === 0 ? (
-              <div className="no-notifications">No notifications yet</div>
+              <div className="no-notifications" role="status">
+                <span className="no-notifications-icon">🔔</span>
+                <p>You're all caught up!</p>
+                <p className="no-notifications-sub">No notifications yet</p>
+              </div>
             ) : (
               notifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={`notification-item ${!notification.read ? "unread" : ""}`}
+                  role="listitem button"
+                  tabIndex={0}
                   onClick={() => handleNotificationClick(notification)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleNotificationClick(notification);
+                    }
+                  }}
+                  aria-label={`${!notification.read ? "Unread: " : ""}${notification.title}. ${notification.message}. ${formatTimeAgo(notification.createdAt)}`}
                 >
-                  <div className="notification-icon">
+                  <div className="notification-icon" aria-hidden="true">
                     {getNotificationIcon(notification.type)}
                   </div>
                   <div className="notification-content">
@@ -145,7 +184,9 @@ export default function NotificationBell() {
                       {formatTimeAgo(notification.createdAt)}
                     </div>
                   </div>
-                  {!notification.read && <div className="notification-unread-dot"></div>}
+                  {!notification.read && (
+                    <div className="notification-unread-dot" aria-hidden="true" />
+                  )}
                 </div>
               ))
             )}
@@ -154,7 +195,11 @@ export default function NotificationBell() {
       )}
 
       {isOpen && (
-        <div className="notification-backdrop" onClick={() => setIsOpen(false)}></div>
+        <div
+          className="notification-backdrop"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
       )}
     </div>
   );

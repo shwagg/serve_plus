@@ -1,9 +1,8 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { auth, functions, db } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import Header from "../../components/Header";
 import GlobalAnnouncements from "../../components/GlobalAnnouncements";
@@ -12,23 +11,17 @@ import "../../styles/ui.css";
 import { WestIcon, EastIcon } from "../../components/icons";
 import { GlobalNotificationButton } from "../../components/GlobalAnnouncements";
 
-//sample-- to be paltan ng saved profile pic sa firestore
 import mission1 from '../../assets/mission1.jpg';
-import podium1 from '../../assets/user1.png';
 import podium2 from '../../assets/user2.png';
-import podium3 from '../../assets/user3.png';
 import banner from '../../assets/banner.jpg';
 
 const StudentHome = () => {
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [menuOverlayOpen, setMenuOverlayOpen] = useState(false);
-  const [chatOverlayOpen, setChatOverlayOpen] = useState(false);
-  const [open, setOpen] = useState(false); // Global feed panel state
+  const [open, setOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
-  const [activeTab, setActiveTab] = useState("all"); // All Missions are selected initially
-  const button2Ref = React.useRef(null);
-  const button3Ref = React.useRef(null);
+  const [activeTab, setActiveTab] = useState("all");
+  const [isLoading, setIsLoading] = useState(true);
 
   // Update unread count from GlobalAnnouncements
   useEffect(() => {
@@ -44,28 +37,24 @@ const StudentHome = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Dynamic placeholders
   const [level, setLevel] = useState(1);
   const [currentPoints, setCurrentPoints] = useState(0);
   const [nextLevelPoints, setNextLevelPoints] = useState(100);
   const [studentName, setStudentName] = useState("");
   const [studentUsername, setStudentUsername] = useState("");
   const [studentAvatar, setStudentAvatar] = useState("");
-  const [studentRank, setStudentRank] = useState(8);
   const currentUserRef = useRef(null);
   const leaderboardListRef = useRef(null);
   const [missionCards, setMissionCards] = useState([]);
   const [enrolledMissions, setEnrolledMissions] = useState({});
+  const [completedMissions, setCompletedMissions] = useState(0);
 
-  // Landing promos which can be created by admins for
-  //students to see
-  // Change to real data in firestore
-  const landingPromos = [
+  const landingPromos = useMemo(() => [
     {
       id: 1,
       title: "Youth Leadership Program",
-      description: "A  hands-on journey to build confidence, strengthen teamwork, and practice real-world leadership skills.",
-      image: mission1, //image link from firestore
+      description: "A hands-on journey to build confidence, strengthen teamwork, and practice real-world leadership skills.",
+      image: mission1,
       buttonText: "Learn More",
       buttonLink: "/programs/leadership",
     },
@@ -80,26 +69,30 @@ const StudentHome = () => {
     {
       id: 3,
       title: "Entrepreneurship Bootcamp",
-      description: "A practical training ground to turn ideas into ventures, with guidance on innovation, business planning, and pitching",
-      image: podium1,
+      description: "A practical training ground to turn ideas into ventures, with guidance on innovation, business planning, and pitching.",
+      image: mission1,
       buttonText: "Register",
       buttonLink: "/programs/bootcamp",
     },
-  ];
+  ], []);
+
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = landingPromos.length;
   const currentPromo = landingPromos[currentPage];
-  const prevPage = () => {
-    setCurrentPage((prev) =>
-      prev === 0 ? totalPages - 1 : prev - 1
-    );
-  };
 
-  const nextPage = () => {
-    setCurrentPage((prev) =>
-      prev === totalPages - 1 ? 0 : prev + 1
-    );
-  };
+  const prevPage = useCallback(() => {
+    setCurrentPage((prev) => (prev === 0 ? totalPages - 1 : prev - 1));
+  }, [totalPages]);
+
+  const nextPage = useCallback(() => {
+    setCurrentPage((prev) => (prev === totalPages - 1 ? 0 : prev + 1));
+  }, [totalPages]);
+
+  // Auto-rotate promo carousel every 6 seconds
+  useEffect(() => {
+    const timer = setInterval(nextPage, 6000);
+    return () => clearInterval(timer);
+  }, [nextPage]);
 
   // Fetch missions from Firestore
   useEffect(() => {
@@ -109,31 +102,27 @@ const StudentHome = () => {
 
         const querySnapshot = await getDocs(collection(db, "missions"));
         const missions = querySnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
           .filter(m => m.status === "published");
 
         setMissionCards(missions);
 
-        // Check if user is enrolled
         const enrollmentMap = {};
+        let completed = 0;
 
         if (user) {
           for (const mission of missions) {
-            const volunteerRef = doc(
-              db,
-              "missions",
-              mission.id,
-              "volunteer",
-              user.uid
-            );
-
+            const volunteerRef = doc(db, "missions", mission.id, "volunteer", user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
             enrollmentMap[mission.id] = volunteerSnap.exists();
+            if (volunteerSnap.exists() && volunteerSnap.data().completionStatus === "completed") {
+              completed++;
+            }
           }
         }
 
         setEnrolledMissions(enrollmentMap);
-
+        setCompletedMissions(completed);
       } catch (error) {
         console.error("Error fetching missions:", error);
       }
@@ -142,7 +131,6 @@ const StudentHome = () => {
     fetchMissions();
   }, []);
 
-  const [menuProfileName, setMenuProfileName] = useState("Joshua Garcia");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -153,7 +141,6 @@ const StudentHome = () => {
         setShowLogoutPopup(false);
         const resolvedName = user.displayName || user.email || "Student";
         setStudentName(resolvedName);
-        setMenuProfileName(resolvedName);
 
         // Fetch user profile data from Firestore
         try {
@@ -190,8 +177,11 @@ const StudentHome = () => {
 
         } catch (error) {
           console.error("Error fetching user profile:", error);
+        } finally {
+          setIsLoading(false);
         }
       } else {
+        setIsLoading(false);
         setShowLogoutPopup(true);
       }
     });
@@ -220,10 +210,6 @@ const StudentHome = () => {
 
     navigate("/auth");
   }
-
-  const handleMenuOverlayToggle = () => setMenuOverlayOpen((open) => !open);
-  const handleChatOverlayToggle = () => setChatOverlayOpen((open) => !open);
-
 
   //leaderboard with actual data from Firestore
   const [leaderboard, setLeaderboard] = useState([]);
@@ -264,29 +250,22 @@ const StudentHome = () => {
     fetchLeaderboard();
   }, []);
 
-  //for leaderboards ranking in the podium UI
-  //do not delete
-  const sortedLeaderboard = [...leaderboard].sort(
-    (a, b) => b.points - a.points
+  // Memoize sorted leaderboard to avoid re-sorting on every render
+  const sortedLeaderboard = useMemo(
+    () => [...leaderboard].sort((a, b) => b.points - a.points),
+    [leaderboard]
   );
+
   const top1 = sortedLeaderboard[0];
   const top2 = sortedLeaderboard[1];
   const top3 = sortedLeaderboard[2];
-  const podium = [top2, top1, top3].filter(Boolean);
+  const podium = useMemo(() => [top2, top1, top3].filter(Boolean), [top1, top2, top3]);
 
-  //use current user's actual uid
   const currentUserId = auth.currentUser?.uid;
   const currentUserIndex = sortedLeaderboard.findIndex(
     (user) => user.uid === currentUserId
   );
-  const currentUserRank =
-    currentUserIndex !== -1 ? currentUserIndex + 1 : null;
-
-
-  const visibleLeaderboard = sortedLeaderboard.slice(
-    Math.max(0, currentUserIndex - 1),
-    currentUserIndex + 2
-  );
+  const currentUserRank = currentUserIndex !== -1 ? currentUserIndex + 1 : null;
 
   //purpose: scroll the leaderboard-list to current rank of user logged in
   useEffect(() => {
@@ -326,15 +305,23 @@ const StudentHome = () => {
     return `${rank}th`;
   };
 
+  // Filtered missions based on active tab
+  const filteredMissions = useMemo(() => {
+    if (activeTab === "your") {
+      return missionCards.filter(m => enrolledMissions[m.id]);
+    }
+    return missionCards;
+  }, [activeTab, missionCards, enrolledMissions]);
+
   return (
-    <div className="full-page" >
+    <div className="full-page">
       {/* Logout Popup */}
       {showLogoutPopup && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', padding: '32px 40px', borderRadius: 16, boxShadow: '0 4px 24px #0003', textAlign: 'center' }}>
-            <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 12, color: '#234e7b' }}>You have been logged out</div>
-            <div style={{ fontSize: 16, color: '#555', marginBottom: 18 }}>Your session has ended. Please log in again to continue.</div>
-            <button style={{ background: '#234e7b', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 32px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }} onClick={() => { setShowLogoutPopup(false); navigate('/auth', { replace: true }); }}>OK</button>
+        <div className="logout-overlay" role="dialog" aria-modal="true" aria-labelledby="logout-title">
+          <div className="logout-popup">
+            <div className="logout-popup-title" id="logout-title">You have been logged out</div>
+            <div className="logout-popup-desc">Your session has ended. Please log in again to continue.</div>
+            <button className="logout-popup-btn" onClick={() => { setShowLogoutPopup(false); navigate('/auth', { replace: true }); }}>OK</button>
           </div>
         </div>
       )}
@@ -345,19 +332,19 @@ const StudentHome = () => {
       <div className="content-page">
 
         {/* LANDING or PROMO POSTER PAGE */}
-        <section className="landing-section">
+        <section className="landing-section" aria-label="Featured programs">
           <div className="landing-promo-page">
             <img
               src={currentPromo.image}
               alt={currentPromo.title}
               className="promo-image"
+              loading="lazy"
             />
             <div className="promo-overlay">
               <h2>{currentPromo.title}</h2>
-              <p className="ui-smallText">{currentPromo.description}</p>
-
+              <p className="promo-description">{currentPromo.description}</p>
               <button
-                className="ui-btn"
+                className="ui-btn promo-cta"
                 onClick={() => navigate(currentPromo.buttonLink)}
               >
                 {currentPromo.buttonText}
@@ -365,46 +352,60 @@ const StudentHome = () => {
             </div>
           </div>
 
-          <div className="landing-page-control">
-            <button className="ui-btn-page"
-              onClick={prevPage}>
+          <div className="landing-page-control" role="navigation" aria-label="Promo pagination">
+            <button
+              className="ui-btn-page"
+              onClick={prevPage}
+              aria-label="Previous promo"
+            >
               <WestIcon />
             </button>
 
-            <span className="ui-smallText" style={{ color: "black" }}>
-              {String(currentPage + 1).padStart(2, "0")} /{" "}
-              {String(totalPages).padStart(2, "0")}
-            </span>
+            <div className="promo-dots">
+              {landingPromos.map((_, idx) => (
+                <button
+                  key={idx}
+                  className={`promo-dot ${idx === currentPage ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(idx)}
+                  aria-label={`Go to promo ${idx + 1}`}
+                  aria-current={idx === currentPage ? 'true' : undefined}
+                />
+              ))}
+            </div>
+
             <button
               className="ui-btn-page"
-              onClick={nextPage}              >
+              onClick={nextPage}
+              aria-label="Next promo"
+            >
               <EastIcon />
             </button>
           </div>
         </section>
 
         {/* PROFILE LEVEL RANK */}
-        <section className="player-strip">
+        <section className="player-strip" aria-label="Player stats">
           <div className="player-strip-inner">
             <div className="player-level">
               <span className="level-label">Level {level}</span>
-              <div className="level-bar">
-                <div className="level-bar-fill" style={{ width: `${(currentPoints % 100)}%` }}></div>
+              <div className="level-bar" role="progressbar" aria-valuenow={currentPoints % 100} aria-valuemin={0} aria-valuemax={100}>
+                <div className="level-bar-fill" style={{ width: `${currentPoints % 100}%` }}></div>
               </div>
               <span className="level-points">{currentPoints} pts ({currentPoints % 100}/100 to next level)</span>
             </div>
 
             <div className="player-missions">
               <span className="missions-label">Missions Completed</span>
-              <span className="missions-count">0</span>
+              <span className="missions-count">{completedMissions}</span>
             </div>
 
             <div className="player-profile">
-              {studentAvatar ? (
-                <img src={studentAvatar} alt="Profile" className="player-avatar" />
-              ) : (
-                <img src={podium2} alt="Profile" className="player-avatar" />
-              )}
+              <img
+                src={studentAvatar || podium2}
+                alt="Profile"
+                className="player-avatar"
+                loading="lazy"
+              />
               <span className="player-greeting">
                 Hi, {studentUsername || (currentUser?.email ? currentUser.email.split('@')[0] : studentName)}!
               </span>
@@ -412,40 +413,39 @@ const StudentHome = () => {
           </div>
         </section>
         {/* MISSION */}
-        <section className="mission-section">
+        <section className="mission-section" aria-label="Missions">
           <div className="mission-section-header">
-            <h2 style={{ color: '#000' }}>Find Your Next Mission</h2>
-            <div className="mission-section-header links">
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveTab("all");
-                }}
-                className={activeTab === "all" ? "active" : ""}
+            <h2 className="mission-section-title">Find Your Next Mission</h2>
+            <div className="mission-tabs" role="tablist">
+              <button
+                role="tab"
+                aria-selected={activeTab === "all"}
+                className={`mission-tab ${activeTab === "all" ? "active" : ""}`}
+                onClick={() => setActiveTab("all")}
               >
                 All Missions
-              </a>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveTab("your");
-                }}
-                className={activeTab === "your" ? "active" : ""}
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeTab === "your"}
+                className={`mission-tab ${activeTab === "your" ? "active" : ""}`}
+                onClick={() => setActiveTab("your")}
               >
                 Your Missions
-              </a>
+              </button>
             </div>
           </div>
-          <div className="mission-list">
-            {missionCards.length === 0 ? (
-              <div className="ui-smallText">No missions available.</div>
+          <div className="mission-list" role="tabpanel">
+            {filteredMissions.length === 0 ? (
+              <div className="mission-empty-state">
+                <span className="mission-empty-icon">🔍</span>
+                <p>{activeTab === "your" ? "You haven't joined any missions yet." : "No missions available right now."}</p>
+              </div>
             ) : (
-              missionCards.map((mission, idx) => (
+              filteredMissions.map((mission) => (
                 <div
                   key={mission.id}
-                  className="mission-card"
+                  className={`mission-card ${enrolledMissions[mission.id] ? 'enrolled' : ''}`}
                   onClick={() => {
                     if (enrolledMissions[mission.id]) {
                       navigate(`/event/${mission.id}/activity?mode=preview`);
@@ -453,17 +453,31 @@ const StudentHome = () => {
                       navigate(`/event/${mission.id}`);
                     }
                   }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      if (enrolledMissions[mission.id]) {
+                        navigate(`/event/${mission.id}/activity?mode=preview`);
+                      } else {
+                        navigate(`/event/${mission.id}`);
+                      }
+                    }
+                  }}
                 >
+                  {enrolledMissions[mission.id] && (
+                    <span className="mission-enrolled-badge">Enrolled</span>
+                  )}
                   <div className="mission-card-image">
-                    <img src={mission.img || mission1} alt={mission.alt || mission.title} />
+                    <img src={mission.img || mission1} alt={mission.alt || mission.title} loading="lazy" />
                   </div>
                   <div className="mission-card-body">
                     <h3 className="mission-card-title">{mission.title}</h3>
                     <div className="mission-card-meta">
-                      <span className="mission-card-participants">
-                        👥 124 Joined
+                      <span className="mission-card-date">
+                        📅 {mission.targetDate || mission.date || "Date TBA"}
                       </span>
-                      <span className="mission-card-date">{mission.date}</span>
                     </div>
                   </div>
                 </div>
@@ -472,10 +486,12 @@ const StudentHome = () => {
           </div>
         </section>
         {/* LEADERBOARD */}
-        <section className="leaderboard-section">
+        <section className="leaderboard-section" aria-label="Leaderboard">
           <div className="mission-section-header">
-            <h2 style={{ color: '#000' }}>Leaderboard</h2>
-            <div style={{ color: '#000' }} >You are in {getOrdinal(currentUserRank)} place.</div>
+            <h2 className="mission-section-title">Leaderboard</h2>
+            <p className="leaderboard-rank-text">
+              {currentUserRank ? `You are in ${getOrdinal(currentUserRank)} place.` : "Join a mission to get ranked!"}
+            </p>
           </div>
           <div className="leaderboard-body">
             <div className="leaderboard-podium">
@@ -571,8 +587,7 @@ const StudentHome = () => {
             </div>
           </div>
         </section>
-        <section className="landing-section" style={{ display: 'none' }}>
-        </section>
+
       </div>
       {/* TOGGLE BUTTON */}
       <GlobalNotificationButton

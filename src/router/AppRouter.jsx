@@ -1,27 +1,48 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import AdminDashboard from "../pages/admin/AdminDashboard";
+import React, { Suspense, lazy } from "react";
+
+// Eagerly loaded (main entry points)
 import AdminLayout from "../pages/admin/AdminLayout";
-import AgreementEditor from "../pages/admin/AgreementEditor";
-import AuditLogs from "../pages/admin/AuditLogs";
-import BackupRestore from "../pages/admin/BackupRestore";
-import ProjectDetails from "../pages/admin/ProjectDetails";
-import ProjectTasks from "../pages/admin/ProjectTasks";
-import RosterAccountManagement from "../pages/admin/RosterAccountManagement";
-import CreateProject from "../pages/global/CreateProject";
-import Profile from "../pages/global/Profile";
-import ProjectList from "../pages/global/ProjectList";
-import PublicProfile from "../pages/global/PublicProfile";
-import ViewProposals from "../pages/global/ViewProposals";
-import ProjectProposal from "../pages/global/proposal/ProjectProposal";
-import StudentHome from "../pages/student/StudentHome";
-import EventActivity from "../pages/student/missions/EventActivity";
-import EventDetails from "../pages/student/missions/EventDetails";
-import CurrentEventMonitoring from "../pages/admin/CurrentEventMonitoring";
+
+// Lazy-loaded student pages
+const StudentHome = lazy(() => import("../pages/student/StudentHome"));
+const EventActivity = lazy(() => import("../pages/student/missions/EventActivity"));
+const EventDetails = lazy(() => import("../pages/student/missions/EventDetails"));
+
+// Lazy-loaded admin pages
+const AdminDashboard = lazy(() => import("../pages/admin/AdminDashboard"));
+const AgreementEditor = lazy(() => import("../pages/admin/AgreementEditor"));
+const AuditLogs = lazy(() => import("../pages/admin/AuditLogs"));
+const BackupRestore = lazy(() => import("../pages/admin/BackupRestore"));
+const ProjectDetails = lazy(() => import("../pages/admin/ProjectDetails"));
+const ProjectTasks = lazy(() => import("../pages/admin/ProjectTasks"));
+const RosterAccountManagement = lazy(() => import("../pages/admin/RosterAccountManagement"));
+const CurrentEventMonitoring = lazy(() => import("../pages/admin/CurrentEventMonitoring"));
+
+// Lazy-loaded global pages
+const CreateProject = lazy(() => import("../pages/global/CreateProject"));
+const Profile = lazy(() => import("../pages/global/Profile"));
+const ProjectList = lazy(() => import("../pages/global/ProjectList"));
+const PublicProfile = lazy(() => import("../pages/global/PublicProfile"));
+const ViewProposals = lazy(() => import("../pages/global/ViewProposals"));
+const ProjectProposal = lazy(() => import("../pages/global/proposal/ProjectProposal"));
+
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f6f7fb' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div className="page-spinner" />
+        <p style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 export default function AppRouter() {
   return (
     <Router>
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
         {/* Student and event routes */}
         <Route path="/student" element={<StudentHome />} />
         <Route path="/event/:id" element={<EventDetails />} />
@@ -47,6 +68,7 @@ export default function AppRouter() {
           <Route path="events/:eventId/monitor" element={<CurrentEventMonitoring />} />
         </Route>
       </Routes>
+      </Suspense>
     </Router>
   );
 }

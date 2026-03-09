@@ -518,30 +518,45 @@ const GlobalAnnouncements = () => {
     <div className="global-announcements-container">
       {/* Header with title and buttons */}
       <div className="global-feed-header">
-        <h3 className="global-feed-title">Community Updates</h3>
-        <p className="global-feed-subtitle">Whats happening this week</p>
+        <div className="global-feed-header-top">
+          <div>
+            <h3 className="global-feed-title">Community Updates</h3>
+            <p className="global-feed-subtitle">What&rsquo;s happening this week</p>
+          </div>
+          {unreadCount > 0 && (
+            <span className="unread-badge" role="status" aria-live="polite">
+              {unreadCount} new
+            </span>
+          )}
+        </div>
         <div className="mark-all-buttons">
-          <button className="mark-all-btn" onClick={markAllAsRead}>
-            ✓ Read
+          <button
+            className="mark-all-btn"
+            onClick={markAllAsRead}
+            aria-label="Mark all announcements as read"
+          >
+            ✓ Mark all read
           </button>
-          <button className="mark-all-btn" onClick={markAllAsUnread}>
-            ↻ Unread
+          <button
+            className="mark-all-btn secondary"
+            onClick={markAllAsUnread}
+            aria-label="Mark all announcements as unread"
+          >
+            ↻ Reset
           </button>
         </div>
       </div>
       
-      {/* Display unread count badge if there are unseen announcements */}
-      {unreadCount > 0 && (
-        <div className="unread-badge">
-          {unreadCount} unread announcement{unreadCount !== 1 ? 's' : ''}
-        </div>
-      )}
-      
       {/* All announcements sorted by timestamp */}
       {sortedAnnouncements.length === 0 ? (
-        <div className="no-announcements">No new announcements.</div>
+        <div className="no-announcements" role="status">
+          <span className="no-announcements-icon">📢</span>
+          <p>No new announcements.</p>
+          <p className="no-announcements-sub">Check back soon!</p>
+        </div>
       ) : (
-        sortedAnnouncements.map(item => {
+        <div role="feed" aria-label="Community announcements">
+        {sortedAnnouncements.map(item => {
           if (item.type === 'milestone') {
             const milestone = item.data;
             const isUnseen = !seen.has(toKey('milestone', item.id));
@@ -549,10 +564,20 @@ const GlobalAnnouncements = () => {
               <div
                 key={item.id}
                 className={`global-feed-item milestone ${isUnseen ? 'unseen' : 'seen'}`}
+                role="article"
+                tabIndex={0}
                 onClick={() => {
                   markAsSeen(item.id, 'milestone');
                   openModal({ ...milestone, id: milestone.eventId }, 'milestone');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    markAsSeen(item.id, 'milestone');
+                    openModal({ ...milestone, id: milestone.eventId }, 'milestone');
+                  }
+                }}
+                aria-label={`Milestone: ${milestone.title} reached ${milestone.count} volunteers${isUnseen ? ' - unread' : ''}`}
               >
                 <span className="feed-icon">🏆</span>
                 <div className="feed-content">
@@ -572,10 +597,20 @@ const GlobalAnnouncements = () => {
               <div
                 key={item.id}
                 className={`global-feed-item closing-soon ${isClosingUnseen ? 'unseen' : 'seen'}`}
+                role="article"
+                tabIndex={0}
                 onClick={() => {
                   markAsSeen(event.id, 'closing');
                   openModal(event, 'closing');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    markAsSeen(event.id, 'closing');
+                    openModal(event, 'closing');
+                  }
+                }}
+                aria-label={`Closing soon: ${event.title || 'Untitled Event'}${isClosingUnseen ? ' - unread' : ''}`}
               >
                 <span className="feed-icon">⌛</span>
                 <div className="feed-content">
@@ -615,10 +650,20 @@ const GlobalAnnouncements = () => {
               <div
                 key={item.id}
                 className={`global-feed-item info ${isInfoUnseen ? 'unseen' : 'seen'}`}
+                role="article"
+                tabIndex={0}
                 onClick={() => {
                   markAsSeen(item.id, 'info');
                   openModal(info, 'info');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    markAsSeen(item.id, 'info');
+                    openModal(info, 'info');
+                  }
+                }}
+                aria-label={`${info.title || 'SDG Impact'}: ${info.message}${isInfoUnseen ? ' - unread' : ''}`}
               >
                 <span className="feed-icon">🌍</span>
                 <div className="feed-content">
@@ -638,10 +683,20 @@ const GlobalAnnouncements = () => {
               <div
                 key={item.id}
                 className={`global-feed-item full ${isFullUnseen ? 'unseen' : 'seen'}`}
+                role="article"
+                tabIndex={0}
                 onClick={() => {
                   markAsSeen(event.id, 'full');
                   openModal(event, 'full');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    markAsSeen(event.id, 'full');
+                    openModal(event, 'full');
+                  }
+                }}
+                aria-label={`Fully booked: ${event.title || 'Untitled Event'}${isFullUnseen ? ' - unread' : ''}`}
               >
                 <span className="feed-icon">🚫</span>
                 <div className="feed-content">
@@ -665,10 +720,20 @@ const GlobalAnnouncements = () => {
               <div
                 key={item.id}
                 className={`global-feed-item ${className} ${isEventUnseen ? 'unseen' : 'seen'}`}
+                role="article"
+                tabIndex={0}
                 onClick={() => {
                   markAsSeen(event.id, 'event');
                   openModal(event, 'event');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    markAsSeen(event.id, 'event');
+                    openModal(event, 'event');
+                  }
+                }}
+                aria-label={`New event: ${event.title || 'Untitled Event'}${isEventUnseen ? ' - unread' : ''}`}
               >
                 <span className="feed-icon">{icon}</span>
                 <div className="feed-content">
@@ -697,15 +762,26 @@ const GlobalAnnouncements = () => {
               </div>
             );
           }
-        })
+        })}
+        </div>
       )}
 
       {/* Modal - rendered at document body level using portal */}
       {modalOpen && selectedEvent && ReactDOM.createPortal(
-        <div className="modal-overlay" onClick={closeModal}>
+        <div
+          className="modal-overlay"
+          onClick={closeModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="announcement-modal-title"
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             {/* Close button */}
-            <button className="modal-close-btn" onClick={closeModal}>
+            <button
+              className="modal-close-btn"
+              onClick={closeModal}
+              aria-label="Close announcement"
+            >
               ×
             </button>
 
@@ -713,7 +789,7 @@ const GlobalAnnouncements = () => {
             {modalType === 'milestone' ? (
               <>
                 <div className="modal-icon">🏆</div>
-                <h2 className="modal-title">
+                <h2 id="announcement-modal-title" className="modal-title">
                   Milestone Reached!
                 </h2>
                 <p className="modal-milestone-text">
@@ -733,7 +809,7 @@ const GlobalAnnouncements = () => {
             ) : modalType === 'info' ? (
               <>
                 <div className="modal-icon">🌍</div>
-                <h2 className="modal-title">
+                <h2 id="announcement-modal-title" className="modal-title">
                   {selectedEvent.title || 'SDG Impact'}
                 </h2>
                 {selectedEvent.message && (
@@ -750,7 +826,7 @@ const GlobalAnnouncements = () => {
             ) : modalType === 'closing' ? (
               <>
                 <div className="modal-icon">⌛</div>
-                <h2 className="modal-title">
+                <h2 id="announcement-modal-title" className="modal-title">
                   Mission Closing Soon!
                 </h2>
                 <h3 className="modal-subtitle">
@@ -782,7 +858,7 @@ const GlobalAnnouncements = () => {
             ) : modalType === 'full' ? (
               <>
                 <div className="modal-icon">🚫</div>
-                <h2 className="modal-title">
+                <h2 id="announcement-modal-title" className="modal-title">
                   Event Fully Booked
                 </h2>
                 <h3 className="modal-subtitle">
@@ -809,7 +885,7 @@ const GlobalAnnouncements = () => {
             ) : (
               <>
                 <div className="modal-icon">🆕</div>
-                <h2 className="modal-title">
+                <h2 id="announcement-modal-title" className="modal-title">
                   {selectedEvent.title || 'New Event Proposal'}
                 </h2>
                 {selectedEvent.createdAt && (

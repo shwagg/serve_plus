@@ -6,7 +6,7 @@
 /* MOTHER DIV */
 .full-page {
   width: 100%;
-  min-height: 100vh;      /* fills browser height */
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: #ffffff;
@@ -16,7 +16,72 @@
     display: flex;
     overflow-y: auto;
     flex-direction: column;
+    scroll-behavior: smooth;
 }
+
+/* ====== LOGOUT POPUP (extracted from inline styles) ====== */
+.logout-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.25);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.logout-popup {
+  background: #fff;
+  padding: 32px 40px;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  text-align: center;
+  animation: scaleUp 0.25s ease;
+}
+.logout-popup-title {
+  font-weight: 700;
+  font-size: 22px;
+  margin-bottom: 12px;
+  color: #234e7b;
+}
+.logout-popup-desc {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 18px;
+}
+.logout-popup-btn {
+  background: #234e7b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 32px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.logout-popup-btn:hover {
+  background: #1a3a5c;
+}
+
+/* ====== ANIMATIONS ====== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleUp {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ====== LANDING / PROMO ====== */
 .landing-section {
   width: 100%;
   min-height: calc(100vh - 60px);
@@ -67,12 +132,27 @@
   width: 500px;
   margin-top: 0;
 }
+.promo-description {
+  color: #fff;
+  width: 500px;
+  margin-top: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
 .promo-overlay button{
   width: 200px;
   height: 30px;
   font-size: 14px;
   background: #000;
   outline: #fff solid 2px;
+}
+.promo-cta {
+  margin-top: 8px !important;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.promo-cta:hover {
+  transform: scale(1.05);
 }
 
 .landing-page-control{
@@ -83,6 +163,32 @@
   justify-content: space-between;
   gap: 16px;
 }
+
+/* Dot pagination for promos */
+.promo-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.promo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+.promo-dot.active {
+  background: #fff;
+  transform: scale(1.25);
+}
+.promo-dot:hover {
+  background: rgba(255,255,255,0.5);
+}
+
 .landing-page-num {
   width: 280px;
   display: flex;
@@ -188,7 +294,6 @@
 
 /*MISSION*/
 .mission-section {
-  /*min-height: calc(100vh - 60px);*/
   height: auto;
   max-height: none;
   display: flex;
@@ -196,6 +301,7 @@
   align-items: center;
   justify-content: center;
   padding: 35px 0 50px 0;
+  animation: slideUp 0.4s ease;
 }
 .mission-section-header {
   display: flex;
@@ -203,6 +309,45 @@
   justify-content: space-between;
   align-items: center;
 }
+.mission-section-title {
+  color: #000;
+  margin: 0;
+}
+
+/* Mission tabs (replaced anchor tags) */
+.mission-tabs {
+  width: 230px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.mission-tab {
+  background: none;
+  border: none;
+  color: #7a7a7a;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 8px 16px; 
+  border: 2px solid transparent; 
+  border-radius: 20px; 
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.mission-tab.active {
+  color: #000;
+  font-weight: 600;
+  border: 2px solid #000; /* Make the border visible for active tab */
+  background-color: #f9f9f9; /* Optional: Add a subtle background for active tab */
+}
+.mission-tab:hover {
+  color: #333;
+  border-color: #333; /* Add hover effect for the border */
+}
+
+/* Keep backward compat for links */
 .mission-section-header.links{
   width: 230px;
   display: flex;
@@ -247,16 +392,54 @@
   outline: #000 solid 2px;
   border-radius: 12px;
   overflow: hidden;
-
+  position: relative;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   cursor: pointer;
-
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: slideUp 0.3s ease backwards;
 }
 
 .mission-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.mission-card.enrolled {
+  outline-color: #30bdb7;
+}
+
+.mission-enrolled-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: #30bdb7;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+
+/* Empty state for missions */
+.mission-empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: #6b7280;
+  text-align: center;
+}
+.mission-empty-icon {
+  font-size: 40px;
+  opacity: 0.6;
+}
+.mission-empty-state p {
+  margin: 0;
+  font-size: 15px;
 }
 .mission-card-body {
   display: flex;
@@ -304,8 +487,6 @@
 
 /*LEADERBOARD*/
 .leaderboard-section {
-  /*background: #ffffff;*/
-  /*background: #f1f8fa;*/
   background: linear-gradient(to right, #f1f8fa, #dbeef4);
   height: 500px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -314,6 +495,12 @@
   align-items: center;
   justify-content: center;
   padding: 35px 0;
+  animation: slideUp 0.5s ease;
+}
+.leaderboard-rank-text {
+  color: #000;
+  font-size: 14px;
+  margin: 4px 0 0;
 }
 .leaderboard-body {
   width: 100%;
@@ -891,6 +1078,21 @@
   box-shadow: 0 10px 30px rgba(102, 126, 234, 0.6);
   background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
 }
+.event-details-join-btn:disabled {
+  background: linear-gradient(135deg, #d1d5db, #9ca3af);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.event-details-join-btn.pending {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.3);
+  cursor: not-allowed;
+}
+.event-details-join-btn.rejected {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+}
 
 
 
@@ -1224,15 +1426,24 @@
     font-size: 18px;
     margin: 0;
   }
-  .promo-overlay p {
+  .promo-overlay p,
+  .promo-description {
     width: auto;
     font-size: 12px;
     margin: 0;
   }
-  .promo-overlay .ui-btn {
+  .promo-overlay .ui-btn,
+  .promo-cta {
     width: 140px;
     font-size: 13px;
     height: 28px;
+  }
+  .promo-dots {
+    gap: 6px;
+  }
+  .promo-dot {
+    width: 8px;
+    height: 8px;
   }
 
   /* Player strip */
@@ -1278,6 +1489,29 @@
   }
   .mission-card-title {
     font-size: 13px;
+  }
+  .mission-tabs {
+    width: 200px;
+  }
+  .mission-tab {
+    font-size: 13px;
+  }
+  .mission-enrolled-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+  .mission-empty-state {
+    padding: 24px 16px;
+  }
+  .mission-empty-icon {
+    font-size: 32px;
+  }
+  .logout-popup {
+    padding: 24px 20px;
+    margin: 0 16px;
+  }
+  .logout-popup-title {
+    font-size: 18px;
   }
 
   /* Leaderboard */
