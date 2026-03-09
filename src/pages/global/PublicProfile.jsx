@@ -85,7 +85,10 @@ export default function PublicProfile() {
     return (
       <div className="profile-page-bg">
         <Header />
-        <div style={{ textAlign: "center", marginTop: 80, color: "#234e7b" }}>Loading profile...</div>
+        <div className="profile-loading-state" role="status" aria-live="polite">
+          <span className="profile-spinner" aria-hidden="true"></span>
+          <p>Loading profile…</p>
+        </div>
       </div>
     );
   }
@@ -94,7 +97,11 @@ export default function PublicProfile() {
     return (
       <div className="profile-page-bg">
         <Header />
-        <div style={{ textAlign: "center", marginTop: 80, color: "#e53e3e" }}>{error || "User not found."}</div>
+        <div className="profile-error-state" role="alert">
+          <span className="profile-error-icon">⚠️</span>
+          <p>{error || "User not found."}</p>
+          <button className="pub-back-btn" onClick={() => navigate(-1)}>← Go Back</button>
+        </div>
       </div>
     );
   }
@@ -111,6 +118,11 @@ export default function PublicProfile() {
     <div className="profile-page-bg">
       <Header />
       <div className="pub-profile-container">
+        {/* Back button */}
+        <button className="pub-back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+          ← Back
+        </button>
+
         {/* Profile Header Card */}
         <div className="pub-profile-header-card">
           <img
@@ -145,14 +157,30 @@ export default function PublicProfile() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="pub-profile-tabs">
+        <div className="pub-profile-tabs" role="tablist" aria-label="Profile sections">
           {TABS.map(tab => (
             <button
               key={tab}
+              role="tab"
+              aria-selected={activeTab === tab}
+              aria-controls={`pub-tabpanel-${tab}`}
+              id={`pub-tab-${tab}`}
               className={`pub-profile-tab-btn${activeTab === tab ? " active" : ""}`}
               onClick={() => setActiveTab(tab)}
+              onKeyDown={e => {
+                const idx = TABS.indexOf(tab);
+                if (e.key === 'ArrowRight') { e.preventDefault(); setActiveTab(TABS[(idx + 1) % TABS.length]); }
+                if (e.key === 'ArrowLeft')  { e.preventDefault(); setActiveTab(TABS[(idx - 1 + TABS.length) % TABS.length]); }
+              }}
             >
+              {tab === 'Overview' && '📊 '}{tab === 'Events Joined' && '📅 '}{tab === 'Rewards & Badges' && '🏅 '}
               {tab}
+              {tab === 'Events Joined' && events.length > 0 && (
+                <span className="pub-tab-badge">{events.length}</span>
+              )}
+              {tab === 'Rewards & Badges' && rewards.length > 0 && (
+                <span className="pub-tab-badge">{rewards.length}</span>
+              )}
             </button>
           ))}
         </div>
@@ -160,7 +188,7 @@ export default function PublicProfile() {
         {/* Tab Content */}
         <div className="pub-profile-tab-content">
           {activeTab === "Overview" && (
-            <div className="pub-profile-overview">
+            <div className="pub-profile-overview pub-tab-panel" role="tabpanel" id="pub-tabpanel-Overview" aria-labelledby="pub-tab-Overview">
               {profile.skills && profile.skills.length > 0 && (
                 <div className="pub-profile-section">
                   <h3>Skills</h3>
@@ -191,7 +219,7 @@ export default function PublicProfile() {
           )}
 
           {activeTab === "Events Joined" && (
-            <div className="pub-profile-section">
+            <div className="pub-profile-section pub-tab-panel" role="tabpanel" id="pub-tabpanel-Events Joined" aria-labelledby="pub-tab-Events Joined">
               <h3>Events Joined ({events.length})</h3>
               {events.length === 0 ? (
                 <p className="pub-empty-msg">No events joined yet.</p>
@@ -219,7 +247,7 @@ export default function PublicProfile() {
           )}
 
           {activeTab === "Rewards & Badges" && (
-            <div className="pub-profile-section">
+            <div className="pub-profile-section pub-tab-panel" role="tabpanel" id="pub-tabpanel-Rewards & Badges" aria-labelledby="pub-tab-Rewards & Badges">
               <h3>Rewards & Badges ({rewards.length})</h3>
               {rewards.length === 0 ? (
                 <p className="pub-empty-msg">No rewards or badges earned yet.</p>

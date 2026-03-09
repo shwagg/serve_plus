@@ -493,8 +493,24 @@ export default function Profile() {
     fetchProfileAndEvents();
   }, []);
 
-  if (loading) return <div className="profile-page-bg"><Header /><div>Loading profile...</div></div>;
-  if (error) return <div className="profile-page-bg"><Header /><div>Error: {error}</div></div>;
+  if (loading) return (
+    <div className="profile-page-bg">
+      <Header />
+      <div className="profile-loading-state" role="status" aria-live="polite">
+        <span className="profile-spinner" aria-hidden="true"></span>
+        <p>Loading your profile…</p>
+      </div>
+    </div>
+  );
+  if (error) return (
+    <div className="profile-page-bg">
+      <Header />
+      <div className="profile-error-state" role="alert">
+        <span className="profile-error-icon">⚠️</span>
+        <p>{error}</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="profile-page-bg">
@@ -502,7 +518,11 @@ export default function Profile() {
       <div className="profile-main-flex">
         <div className="profile-card">
           <div className="profile-avatar">
-            <img src={profile.avatar} alt="avatar" className="profile-avatar-img" />
+            <img
+              src={profile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=30bdb7&color=fff&size=256`}
+              alt={`${profile.username || profile.name || 'User'}'s avatar`}
+              className="profile-avatar-img"
+            />
           </div>
           {/* Username above name */}
           {profile.username && (
@@ -549,7 +569,13 @@ export default function Profile() {
               ))}
             </div>
           </div>
-          <button className="profile-edit-btn" onClick={() => setEditOpen(true)}>Edit Profile</button>
+          <button
+            className="profile-edit-btn"
+            onClick={() => setEditOpen(true)}
+            aria-label="Edit your profile"
+          >
+            ✏️ Edit Profile
+          </button>
           <EditProfileModal
             open={editOpen}
             onClose={() => setEditOpen(false)}
@@ -581,16 +607,29 @@ export default function Profile() {
         </div>
         <div className="profile-right-column">
           {/* Tab Navigation */}
-          <div className="profile-tab-row">
+          <div className="profile-tab-row" role="tablist" aria-label="Profile sections">
             {PROFILE_TABS.map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`profile-tab-btn ${activeTab === tab ? 'active' : ''}`}>
-                {tab}
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={activeTab === tab}
+                aria-controls={`profile-tabpanel-${tab}`}
+                id={`profile-tab-${tab}`}
+                onClick={() => setActiveTab(tab)}
+                className={`profile-tab-btn ${activeTab === tab ? 'active' : ''}`}
+                onKeyDown={e => {
+                  const idx = PROFILE_TABS.indexOf(tab);
+                  if (e.key === 'ArrowRight') { e.preventDefault(); setActiveTab(PROFILE_TABS[(idx + 1) % PROFILE_TABS.length]); }
+                  if (e.key === 'ArrowLeft')  { e.preventDefault(); setActiveTab(PROFILE_TABS[(idx - 1 + PROFILE_TABS.length) % PROFILE_TABS.length]); }
+                }}
+              >
+                {tab === 'Overview' ? '📋 Overview' : '🗂️ Portfolio'}
               </button>
             ))}
           </div>
 
           {activeTab === "Overview" && (
-            <>
+            <div role="tabpanel" id="profile-tabpanel-Overview" aria-labelledby="profile-tab-Overview" className="profile-tab-panel">
               <div className="profile-event-history-card">
                 <div className="profile-event-history-title">Event History</div>
                 {profile.eventHistory && profile.eventHistory.map((event, idx) => (
@@ -613,7 +652,7 @@ export default function Profile() {
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {activeTab === "Portfolio" && (() => {
