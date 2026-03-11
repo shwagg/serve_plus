@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ListAltOutlinedIcon } from "../../components/icons/index";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
@@ -19,6 +20,7 @@ function toTitleCase(str) {
 }
 
 export default function DocumentLibrary() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState([]);
@@ -384,6 +386,7 @@ export default function DocumentLibrary() {
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Completion %</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Points</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}> </th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, textAlign: 'center', fontSize: '1.05rem' }}>Certificate</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -559,6 +562,31 @@ export default function DocumentLibrary() {
                               Release
                             </button>
                           )}
+                        </td>
+                        {/* Certificate column */}
+                        <td className="submission-table-cell" style={{ textAlign: "center" }}>
+                          <button
+                            style={{
+                              background: '#1a3764',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 6,
+                              padding: '6px 14px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => {
+                              // Pass recipient and course/event as state
+                              navigate('/certificate-generator', {
+                                state: {
+                                  recipient: v.name,
+                                  course: (proposals.find(m => m.id === currentMissionId)?.title) || '',
+                                }
+                              });
+                            }}
+                          >
+                            Certificate
+                          </button>
                         </td>
                       </tr>
                     );

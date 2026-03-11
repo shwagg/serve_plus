@@ -10,6 +10,7 @@ import { useUpcomingEventNotifications } from "./hooks/useUpcomingEventNotificat
 import PrivacyPolicy from "./pages/global/agreement/PrivacyPolicy";
 import TermsCondition from "./pages/global/agreement/TermsCondition";
 import { ProtectedRoute } from "./router/ProtectedRoute";
+import CertificateGenerator from "./components/certificateGenerator";
 
 import "./App.css";
 import Auth from "./pages/Auth"; //changed login to authorization page
@@ -191,6 +192,7 @@ function App() {
           />
           <Route path="/global/terms-condition" element={<TermsCondition />} />
           <Route path="/global/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/certificate-generator" element={<CertificateGenerator />} />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>
