@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { useLocation } from "react-router-dom";
 import "./certificateGenerator.css";
 
@@ -34,13 +35,100 @@ export default function CertificateGenerator() {
     }
   }, [location.state]);
 
-  // Download as image or PDF (placeholder)
-  const handleDownload = () => {
-    window.print(); // For demo, use print dialog
+
+  // Modal state for PDF preview
+  const [showModal, setShowModal] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+
+  // Helper: Fill PDF with form data
+  const fillCertificatePdf = async () => {
+    // Fetch the template PDF
+    const existingPdfBytes = await fetch('/assets/SERVE+ Certificate (1).pdf').then(res => res.arrayBuffer());
+    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+    // Get the form (AcroForm) from the PDF
+    const form = pdfDoc.getForm();
+
+    // Fill the fields by their names
+    form.getTextField('text_4lt').setText(recipient || ''); // Recipient Name
+    form.getTextField('text_5ablb').setText(course || ''); // Mission Title
+    form.getTextField('text_6sfji').setText(date || ''); // Date
+    form.getTextField('text_7mfui').setText(loc || ''); // Location
+    form.getTextField('text_8bhoi').setText(day || ''); // Day
+    form.getTextField('text_9gtoh').setText(month || ''); // Month
+    form.getTextField('text_10fuuc').setText(year || ''); // Year
+
+    // Optionally, you can flatten the form to make the fields uneditable
+    form.flatten();
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
+  };
+
+  const handleDownload = async () => {
+    const url = await fillCertificatePdf();
+    setPdfUrl(url);
+    setShowModal(true);
+  };
+  const handleCloseModal = () => {
+    setShowModal(false);
+    if (pdfUrl) {
+      URL.revokeObjectURL(pdfUrl);
+      setPdfUrl(null);
+    }
   };
 
   return (
     <div className="certificate-generator-container">
+      {/* Modal Popup for PDF Preview */}
+      {showModal && pdfUrl && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 8,
+            padding: 16,
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            boxShadow: '0 2px 16px rgba(0,0,0,0.3)',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center'
+          }}>
+            <button onClick={handleCloseModal} style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              background: '#e74c3c',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              padding: '4px 12px',
+              cursor: 'pointer',
+              fontSize: 18
+            }}>X</button>
+            <h2 style={{marginBottom: 12}}>SERVE+ Certificate PDF Preview</h2>
+            <iframe
+              src={pdfUrl}
+              title="Certificate PDF"
+              style={{ width: '70vw', height: '70vh', border: '1px solid #ccc', borderRadius: 4 }}
+            />
+            <a href={pdfUrl} download="Filled_CERTIFICATE.pdf" style={{marginTop: 16, color: '#1a3764', fontWeight: 600}}>Download PDF</a>
+          </div>
+        </div>
+      )}
       <div className="certificate-form-panel">
         <h2>Certificate Details</h2>
 
