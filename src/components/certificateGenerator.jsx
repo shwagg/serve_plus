@@ -110,6 +110,16 @@ export default function CertificateGenerator() {
         releasedAt: serverTimestamp(),
       };
       await addDoc(collection(doc(db, "users", userID), "certificates"), certData);
+
+      // Create notification for the student
+      await addDoc(collection(doc(db, "users", userID), "notifications"), {
+        type: "certificate_obtained",
+        message: `Congratulations! A certificate has been obtained for event "${course}".`,
+        event: course,
+        createdAt: serverTimestamp(),
+        read: false
+      });
+
       alert("Certificate released to student, saved to Storage, and recorded in Firestore!");
     } catch (err) {
       alert("Failed to release certificate: " + err.message);
@@ -126,75 +136,28 @@ export default function CertificateGenerator() {
   return (
     <div className="certificate-generator-centered-container">
       {/* Back Button */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', marginTop: 24, marginBottom: 0 }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            marginLeft: 24,
-            background: '#1a3764',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            padding: '8px 18px',
-            fontWeight: 600,
-            fontSize: 16,
-            cursor: 'pointer',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
-          }}
-        >
+      <div className="certificate-back-row">
+        <button className="certificate-back-btn" onClick={() => navigate(-1)}>
           ← Back
         </button>
-        <div style={{ flex: 1 }} />
+        <div className="certificate-back-spacer" />
       </div>
       {/* Sample Preview Title at the very top */}
-      <div style={{ width: '100%', textAlign: 'center', margin: '16px 0 12px 0' }}>
-        <span style={{ fontWeight: 700, fontSize: '1.5rem', color: '#1a3764', letterSpacing: 1 }}>Sample Preview</span>
+      <div className="certificate-preview-title-row">
+        <span className="certificate-preview-title">Sample Preview</span>
       </div>
       {/* Modal Popup for PDF Preview */}
       {showModal && pdfUrl && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: '#fff',
-            borderRadius: 8,
-            padding: 16,
-            maxWidth: '90vw',
-            maxHeight: '90vh',
-            boxShadow: '0 2px 16px rgba(0,0,0,0.3)',
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center'
-          }}>
-            <button onClick={handleCloseModal} style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              background: '#e74c3c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 4,
-              padding: '4px 12px',
-              cursor: 'pointer',
-              fontSize: 18
-            }}>X</button>
-            <h2 style={{marginBottom: 12}}>SERVE+ Certificate PDF Preview</h2>
+        <div className="certificate-modal-overlay">
+          <div className="certificate-modal-content">
+            <button className="certificate-modal-close-btn" onClick={handleCloseModal}>X</button>
+            <h2 className="certificate-modal-title">SERVE+ Certificate PDF Preview</h2>
             <iframe
               src={pdfUrl}
               title="Certificate PDF"
-              style={{ width: '70vw', height: '70vh', border: '1px solid #ccc', borderRadius: 4 }}
+              className="certificate-modal-iframe"
             />
-            <a href={pdfUrl} download="Filled_CERTIFICATE.pdf" style={{marginTop: 16, color: '#1a3764', fontWeight: 600}}>Download PDF</a>
+            <a href={pdfUrl} download="Filled_CERTIFICATE.pdf" className="certificate-modal-download-link">Download PDF</a>
           </div>
         </div>
       )}
@@ -268,9 +231,6 @@ export default function CertificateGenerator() {
 
           <button className="download-btn" onClick={handleDownload}>
             Download Certificate
-          </button>
-          <button className="save-btn">
-            Save Certificate
           </button>
           <button className="release-btn" onClick={handleReleaseToStudent}>
             Release to Student

@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, getDocs, onSnapshot } from "firebase/firestore";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm }) {
   const softSkills = [
@@ -223,7 +224,7 @@ import { SessionContext } from "../../context/SessionContext.jsx";
 import Header from "../../components/Header.jsx";
 import "../../styles/Profile.css";
 import { auth, db } from "../../firebaseConfig";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { GlobalNotificationButton } from "../../components/GlobalAnnouncements";
 
 const PROFILE_TABS = ["Overview", "Portfolio"];
@@ -492,11 +493,11 @@ export default function Profile() {
               return;
             }
             const userID = user.uid;
-            const certsSnap = await getDocs(collection(db, "users", userID, "certificates"));
-            const certs = certsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setCertificates(certs);
-            // Debug output
-            console.log("Fetched certificates:", certs);
+            const certsRef = collection(db, "users", userID, "certificates");
+            return onSnapshot(certsRef, (snapshot) => {
+              const certs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              setCertificates(certs);
+            });
           } catch (err) {
             setCertificates([]);
             console.error("Error fetching certificates:", err);
