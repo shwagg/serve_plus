@@ -282,6 +282,7 @@ const mockProfile = {
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [rewards, setRewards] = useState([]);
+  const [certificates, setCertificates] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -481,6 +482,27 @@ export default function Profile() {
             ...r.data(),
           }))
         );
+
+        // Fetch certificates for the logged-in user
+        const fetchCertificates = async () => {
+          try {
+            const user = auth.currentUser;
+            if (!user) {
+              setCertificates([]);
+              return;
+            }
+            const userID = user.uid;
+            const certsSnap = await getDocs(collection(db, "users", userID, "certificates"));
+            const certs = certsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setCertificates(certs);
+            // Debug output
+            console.log("Fetched certificates:", certs);
+          } catch (err) {
+            setCertificates([]);
+            console.error("Error fetching certificates:", err);
+          }
+        };
+        fetchCertificates();
 
       } catch (err) {
         setError("Failed to load profile.");
@@ -736,6 +758,24 @@ export default function Profile() {
                               ))}
                             </div>
                           )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Certificates Container */}
+                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+                  <div className="card-title">Certificates</div>
+                  {certificates.length === 0 ? (
+                    <p className="muted-text">No certificates yet.</p>
+                  ) : (
+                    <div className="certificates-list">
+                      {certificates.map(cert => (
+                        <div key={cert.id} className="certificate-card" style={{ marginBottom: 16, padding: 12, border: '1px solid #eee', borderRadius: 8 }}>
+                          <div style={{ color: '#1a3764', fontWeight: 700 }}>{cert.course}</div>
+                          <div style={{ color: '#000' }}>Recipient: {cert.recipient}</div>
+                          <div style={{ color: '#000' }}>Date: {cert.date}</div>
+                          <a href={cert.downloadURL} target="_blank" rel="noopener noreferrer" style={{ color: '#1a3764', fontWeight: 600 }}>View Certificate</a>
                         </div>
                       ))}
                     </div>

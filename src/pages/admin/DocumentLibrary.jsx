@@ -576,9 +576,10 @@ export default function DocumentLibrary() {
                               cursor: 'pointer',
                             }}
                             onClick={() => {
-                              // Pass recipient and course/event as state
+                              // Pass userID, recipient, and course/event as state
                               navigate('/certificate-generator', {
                                 state: {
+                                  userID: v.id, // This is the student's userID
                                   recipient: v.name,
                                   course: (proposals.find(m => m.id === currentMissionId)?.title) || '',
                                 }

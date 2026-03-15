@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import { useLocation, useNavigate } from "react-router-dom";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { app, db } from "../firebaseConfig";
+import { doc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import "./certificateGenerator.css";
 
 const today = new Date();
@@ -20,7 +24,10 @@ const courseOptions = [
 export default function CertificateGenerator() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [recipient, setRecipient] = useState("");
+  // Get userID and optionally recipient from navigation state (admin flow)
+  const userID = location.state?.userID || "";
+  const initialRecipient = location.state?.recipient || "";
+  const [recipient, setRecipient] = useState(initialRecipient);
   const [course, setCourse] = useState("");
   const [date, setDate] = useState("");
   const [loc, setLoc] = useState("");
@@ -40,29 +47,26 @@ export default function CertificateGenerator() {
   const [showModal, setShowModal] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(null);
 
-  // Helper: Fill PDF with form data
-  const fillCertificatePdf = async () => {
-    // Fetch the template PDF
+  // Helper: Fill PDF with form data and return Blob
+  const fillCertificatePdfBlob = async () => {
     const existingPdfBytes = await fetch('/assets/SERVE+ Certificate (1).pdf').then(res => res.arrayBuffer());
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
-
-    // Get the form (AcroForm) from the PDF
     const form = pdfDoc.getForm();
-
-    // Fill the fields by their names
-    form.getTextField('text_4lt').setText(recipient || ''); // Recipient Name
-    form.getTextField('text_5ablb').setText(course || ''); // Mission Title
-    form.getTextField('text_6sfji').setText(date || ''); // Date
-    form.getTextField('text_7mfui').setText(loc || ''); // Location
-    form.getTextField('text_8bhoi').setText(day || ''); // Day
-    form.getTextField('text_9gtoh').setText(month || ''); // Month
-    form.getTextField('text_10fuuc').setText(year || ''); // Year
-
-    // Optionally, you can flatten the form to make the fields uneditable
+    form.getTextField('text_4lt').setText(recipient || '');
+    form.getTextField('text_5ablb').setText(course || '');
+    form.getTextField('text_6sfji').setText(date || '');
+    form.getTextField('text_7mfui').setText(loc || '');
+    form.getTextField('text_8bhoi').setText(day || '');
+    form.getTextField('text_9gtoh').setText(month || '');
+    form.getTextField('text_10fuuc').setText(year || '');
     form.flatten();
-
     const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  };
+
+  // Helper: Fill PDF and return URL for preview
+  const fillCertificatePdf = async () => {
+    const blob = await fillCertificatePdfBlob();
     return URL.createObjectURL(blob);
   };
 
@@ -70,6 +74,46 @@ export default function CertificateGenerator() {
     const url = await fillCertificatePdf();
     setPdfUrl(url);
     setShowModal(true);
+  };
+
+  // Handler: Release to Student (save to Storage)
+  const handleReleaseToStudent = async () => {
+    try {
+      // Use userID from navigation state (admin flow)
+      if (!userID) {
+        alert("No student selected. Please select a student.");
+        return;
+      }
+      // Generate the PDF Blob
+      const blob = await fillCertificatePdfBlob();
+      // Compose file name: volunteername_eventname.pdf
+      const safeRecipient = (recipient || "recipient").replace(/[^a-zA-Z0-9_\-]/g, "_");
+      const safeCourse = (course || "event").replace(/[^a-zA-Z0-9_\-]/g, "_");
+      const fileName = `${safeRecipient}_${safeCourse}.pdf`;
+      // Get Firebase Storage instance (emulator)
+      const storage = getStorage(app);
+      const storageRef = ref(storage, `event-certificates/${userID}/${fileName}`);
+      await uploadBytes(storageRef, blob);
+      // Get download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      // Save certificate metadata to Firestore under users/{userID}/certificates
+      const certData = {
+        fileName,
+        downloadURL,
+        recipient,
+        course,
+        date,
+        loc,
+        day,
+        month,
+        year,
+        releasedAt: serverTimestamp(),
+      };
+      await addDoc(collection(doc(db, "users", userID), "certificates"), certData);
+      alert("Certificate released to student, saved to Storage, and recorded in Firestore!");
+    } catch (err) {
+      alert("Failed to release certificate: " + err.message);
+    }
   };
   const handleCloseModal = () => {
     setShowModal(false);
@@ -228,7 +272,7 @@ export default function CertificateGenerator() {
           <button className="save-btn">
             Save Certificate
           </button>
-          <button className="release-btn">
+          <button className="release-btn" onClick={handleReleaseToStudent}>
             Release to Student
           </button>
         </div>

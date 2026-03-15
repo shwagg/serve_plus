@@ -43,4 +43,4 @@ if (emulateStorage) {
   connectStorageEmulator(storage, "localhost", 9199);
 }
 
-export { auth, db, functions, storage };
+export { app, auth, db, functions, storage };
