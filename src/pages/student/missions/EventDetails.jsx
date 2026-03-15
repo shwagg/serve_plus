@@ -8,6 +8,7 @@ import Header from '../../../components/Header';
 import GlobalAnnouncements from '../../../components/GlobalAnnouncements';
 import '../../../styles/student.css';
 import { GlobalNotificationButton } from "../../../components/GlobalAnnouncements";
+import PreActivitySurvey from '../../../forms/PreActivitySurvey';
 
 export default function EventDetails() {
   const [open, setOpen] = useState(false);
@@ -19,6 +20,12 @@ export default function EventDetails() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [volunteer, setVolunteer] = useState(null);
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [surveyData, setSurveyData] = useState(null);
+  const [consentFile, setConsentFile] = useState(null);
+  const [consentUploading, setConsentUploading] = useState(false);
+  const [surveyError, setSurveyError] = useState('');
+  const [userName, setUserName] = useState('');
 
 
   useEffect(() => {
@@ -75,30 +82,76 @@ export default function EventDetails() {
     fetchMission();
   }, [id, navigate]);
 
+
+  // Show modal instead of joining directly
   const handleJoinEvent = async () => {
+    setSurveyError('');
+    // Try to get the user's name from Firebase Auth or Firestore profile
+    let name = '';
     const user = auth.currentUser;
-    if (!user) {
-      alert("Please log in to join this event.");
+    if (user) {
+      // Try displayName first
+      name = user.displayName || '';
+      // Optionally, fetch from Firestore user profile if needed
+      if (!name) {
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            name = userDocSnap.data().name || '';
+          }
+        } catch {}
+      }
+    }
+    setUserName(name);
+    setShowSurveyModal(true);
+  };
+
+  // Handles the actual join after survey and consent
+  const handleSurveyAndConsentSubmit = async (surveyForm) => {
+    setSurveyError('');
+    if (!consentFile) {
+      setSurveyError('Please upload your signed activity consent form.');
       return;
     }
-    setJoining(true);
-
+    const user = auth.currentUser;
+    if (!user) {
+      setSurveyError('Please log in to join this event.');
+      return;
+    }
+    setConsentUploading(true);
     try {
-      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+      // Upload consent file to Firebase Storage (optional: adjust path as needed)
+      let consentUrl = '';
+      if (consentFile) {
+        const storageModule = await import('firebase/storage');
+        const { getStorage, ref, uploadBytes, getDownloadURL } = storageModule;
+        const storage = getStorage();
+        const fileRef = ref(storage, `missions/${id}/consent_forms/${user.uid}_${consentFile.name}`);
+        await uploadBytes(fileRef, consentFile);
+        consentUrl = await getDownloadURL(fileRef);
+      }
 
+      // Save volunteer registration with survey and consent info
+      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
       await setDoc(volunteerRef, {
         joinedAt: new Date().toISOString(),
         registrationStatus: "pending",
         completionStatus: "pending_approval",
         pointsEarned: 0,
-
         progress: {
-          preSurvey: "locked",
-          consent: "locked",
+          preSurvey: "submitted",
+          consent: "submitted",
           attendance: "not_checked_in",
           postSurvey: "locked"
         },
+        preActivitySurvey: surveyForm,
+        consentFormUrl: consentUrl,
       });
+
+      // Also save pre-activity survey to subcollection preSurvey/response
+      const preSurveyResponseRef = doc(db, "missions", id, "volunteer", user.uid, "preSurvey", "response");
+      await setDoc(preSurveyResponseRef, surveyForm);
       setVolunteer({ registrationStatus: "pending" });
 
       // Create a registration notification (once per event)
@@ -110,7 +163,6 @@ export default function EventDetails() {
           where("eventId", "==", id)
         );
         const existing = await getDocs(existingQuery);
-
         if (existing.empty) {
           await createNotification(user.uid, {
             type: "event_registration",
@@ -123,8 +175,11 @@ export default function EventDetails() {
       } catch (e) {
         console.error("Failed to create registration notification:", e);
       }
+      setShowSurveyModal(false);
+    } catch (err) {
+      setSurveyError('Failed to upload consent form or submit survey. Please try again.');
     } finally {
-      setJoining(false);
+      setConsentUploading(false);
     }
   };
 
@@ -172,7 +227,6 @@ export default function EventDetails() {
           </div>
           <div className="event-details-card">
             <div className="event-details-grid">
-
               {/* LEFT COLUMN */}
               <div className="event-details-left">
                 <h1 className="event-details-title">{mission.title}</h1>
@@ -193,9 +247,7 @@ export default function EventDetails() {
                   </div>
                 </div>
               </div>
-
               <div className="event-details-divider" />
-
               {/* RIGHT COLUMN */}
               <div className="event-details-right">
                 <div className="event-details-section">
@@ -207,12 +259,10 @@ export default function EventDetails() {
                       ))}
                   </ul>
                 </div>
-
                 <div className="event-details-section">
                   <span className="event-details-activity-label">
                     Included Tasks
                   </span>
-
                   {tasks.length === 0 ? (
                     <p className="event-details-empty">
                       No tasks added yet.
@@ -234,11 +284,9 @@ export default function EventDetails() {
                     </ul>
                   )}
                 </div>
-
               </div>
             </div>
             <div className="event-details-cta">
-
               <button
                 className={`event-details-join-btn ${volunteer?.registrationStatus === "pending"
                   ? "pending"
@@ -273,8 +321,104 @@ export default function EventDetails() {
             </div>
           </div>
         </div>
+        {/* Modal for Pre-Activity Survey and Consent Upload */}
+        {showSurveyModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(44,62,80,0.18)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{
+              background: '#fff',
+              borderRadius: 16,
+              boxShadow: '0 4px 32px rgba(44,62,80,0.18)',
+              padding: 0,
+              minWidth: 380,
+              maxWidth: 650,
+              width: '95vw',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              position: 'relative',
+            }}>
+              <button
+                onClick={() => setShowSurveyModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 18,
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 22,
+                  color: '#888',
+                  cursor: 'pointer',
+                  zIndex: 10,
+                }}
+                aria-label="Close survey modal"
+              >×</button>
+              <div style={{ padding: '32px 24px 24px 24px' }}>
+                <h2 style={{ color: '#23235b', fontWeight: 700, fontSize: 22, marginBottom: 18 }}>Before Joining: Pre-Activity Survey & Consent</h2>
+                <PreActivitySurvey
+                  initialName={userName}
+                  initialInitiativeTitle={mission?.title || ''}
+                  onSubmit={async (form) => {
+                    // Validate consent file
+                    if (!consentFile) {
+                      setSurveyError('Please upload your signed activity consent form.');
+                      return;
+                    }
+                    setSurveyError('');
+                    await handleSurveyAndConsentSubmit(form);
+                  }}
+                >
+                  {/* Consent upload and error inside form */}
+                  <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                    <label style={{ fontWeight: 600, color: '#23235b', marginBottom: 8, display: 'block', textAlign: 'center', width: '100%' }}>
+                      Upload Signed Activity Consent Form *
+                    </label>
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      onChange={e => setConsentFile(e.target.files[0])}
+                      style={{ marginBottom: 8, display: 'block' }}
+                    />
+                    {consentFile && (
+                      <div style={{ fontSize: 13, color: '#555', marginBottom: 8, textAlign: 'center' }}>
+                        Selected: {consentFile.name}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 8, textAlign: 'center', width: '100%' }}>
+                      <a
+                        href="/assets/Activity%20Consent%20Form%20Fillable.pdf"
+                        download
+                        style={{
+                          color: '#30bdb7',
+                          textDecoration: 'underline',
+                          fontWeight: 500,
+                          fontSize: 15,
+                        }}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Download Activity Consent Form (PDF)
+                      </a>
+                    </div>
+                  </div>
+                  {surveyError && (
+                    <div style={{ color: '#c0392b', fontWeight: 500, marginBottom: 12 }}>{surveyError}</div>
+                  )}
+                </PreActivitySurvey>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
       {/* TOGGLE BUTTON */}
       <GlobalNotificationButton
         unreadCount={announcementUnreadCount}
