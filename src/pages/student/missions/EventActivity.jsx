@@ -118,14 +118,14 @@ export default function EventActivity() {
           "progress.attendance": "present"
         });
 
-        // If we have coordinates, attempt reverse geocoding (best-effort) to get a human-friendly place name
+        // If we have coordinates, attempt reverse geocoding via Google Maps Geocoding API (best-effort)
         if (locData) {
           try {
-            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(locData.lat)}&lon=${encodeURIComponent(locData.lng)}`;
-            const resp = await fetch(url, { method: 'GET' });
+            const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(locData.lat)},${encodeURIComponent(locData.lng)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+            const resp = await fetch(url);
             if (resp.ok) {
               const json = await resp.json();
-              const locationName = json.display_name || json.name || null;
+              const locationName = (json.results && json.results[0]?.formatted_address) || null;
               if (locationName) {
                 // save the resolved name to Firestore
                 await updateDoc(volunteerRef, { "scanAttendance.locationName": locationName });
