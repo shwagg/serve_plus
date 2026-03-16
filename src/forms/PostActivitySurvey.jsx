@@ -1,3 +1,43 @@
+// --- Example Parent Component Usage ---
+// Place this code in your parent component (not in this file, just for reference):
+/*
+import React, { useEffect, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebaseConfig'; // adjust path as needed
+import PostActivitySurvey from './PostActivitySurvey';
+
+function PostSurveyWrapper({ missionId, volunteerId, ...otherProps }) {
+  const [proposal, setProposal] = useState({ initiativeTitle: '', location: '' });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProposal() {
+      setLoading(true);
+      const missionRef = doc(db, 'missions', missionId);
+      const missionSnap = await getDoc(missionRef);
+      if (missionSnap.exists()) {
+        setProposal({
+          initiativeTitle: missionSnap.data().initiativeTitle || '',
+          location: missionSnap.data().location || '',
+        });
+      }
+      setLoading(false);
+    }
+    if (missionId) fetchProposal();
+  }, [missionId]);
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <PostActivitySurvey
+      initiativeTitle={proposal.initiativeTitle}
+      location={proposal.location}
+      {...otherProps}
+    />
+  );
+}
+*/
+// --- End Example ---
 import React, { useState } from 'react';
 
 const colleges = [
@@ -43,17 +83,32 @@ const colleges = [
   },
 ];
 
-const PostActivitySurvey = ({ onSubmit, initialName = '' }) => {
+
+const PostActivitySurvey = ({
+  onSubmit,
+  initialName = '',
+  initiativeTitle = '',
+  location = ''
+}) => {
   const [form, setForm] = useState({
     name: initialName,
     college: '',
     program: '',
     nonAcademicOrg: '',
     engagementType: '',
-    initiativeTitle: '',
+    initiativeTitle: initiativeTitle,
     dateOfImplementation: '',
-    location: '',
+    location: location,
   });
+
+  // Update form state if initiativeTitle or location props change
+  React.useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      initiativeTitle,
+      location,
+    }));
+  }, [initiativeTitle, location]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -202,7 +257,15 @@ const PostActivitySurvey = ({ onSubmit, initialName = '' }) => {
       <div style={{ marginBottom: 18 }}>
         <label>
           Title of Service-Learning / Community Engagement Initiative *
-          <input name="initiativeTitle" value={form.initiativeTitle} onChange={handleChange} required placeholder="e.g., Feeding Program for Barangay 123" autoComplete="off" />
+          <input
+            name="initiativeTitle"
+            value={form.initiativeTitle}
+            onChange={handleChange}
+            required
+            placeholder="e.g., Feeding Program for Barangay 123"
+            autoComplete="off"
+            readOnly
+          />
         </label>
       </div>
       <div style={{ marginBottom: 18 }}>
@@ -214,7 +277,15 @@ const PostActivitySurvey = ({ onSubmit, initialName = '' }) => {
       <div style={{ marginBottom: 24 }}>
         <label>
           Location/Venue *
-          <input name="location" value={form.location} onChange={handleChange} required placeholder="e.g., Barangay 123 Hall" autoComplete="off" />
+          <input
+            name="location"
+            value={form.location}
+            onChange={handleChange}
+            required
+            placeholder="e.g., Barangay 123 Hall"
+            autoComplete="off"
+            readOnly
+          />
         </label>
       </div>
       {/* Likert Scale Section */}

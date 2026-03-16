@@ -1981,6 +1981,8 @@ export default function EventActivity() {
 
             <PostActivitySurvey
               initialName={userData?.name || ''}
+              initiativeTitle={event?.title || ''}
+              location={event?.location || ''}
               onSubmit={async (form) => {
                 // Mark user as present in Firestore and save survey
                 const user = auth.currentUser;
