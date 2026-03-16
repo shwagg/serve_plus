@@ -13,6 +13,19 @@ export default function RosterAccountManagement() {
   const [editingRoleUserId, setEditingRoleUserId] = useState(null);
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+    // Department options for faculty
+    const departments = [
+      "College of Arts and Science (CAS)",
+      "College of Computer and Information Science (CCIS)",
+      "College of Health Sciences (CHS)",
+      "College of Nursing (CN)",
+      "College of Maritime Education and Training (CMET)",
+      "E.T. Yuchengco College of Business (ETYCB)",
+      "Mapua-Laguna Institute of Aviation (MIA)",
+      "Mapua Institute of Technology at Laguna (MITL)",
+      "Mapua MCL Senior High School (SHS)"
+    ];
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState("overall");
@@ -101,10 +114,11 @@ export default function RosterAccountManagement() {
     setRoleFilter(filter);
   };
 
-  const handleChangeRoleClick = (userId, currentRole, currentPosition) => {
+  const handleChangeRoleClick = (userId, currentRole, currentPosition, currentDepartment) => {
     setEditingRoleUserId(userId);
     setSelectedRole(currentRole || "");
     setSelectedPosition(currentPosition || "");
+    setSelectedDepartment(currentDepartment || "");
   };
 
   const handleRoleChange = async (userId) => {
@@ -113,6 +127,11 @@ export default function RosterAccountManagement() {
     // Check if position is required but not selected
     if ((selectedRole === "faculty" || selectedRole === "admin") && !selectedPosition) {
       alert("Please select a position for this role.");
+      return;
+    }
+    // Check if department is required but not selected (faculty only)
+    if (selectedRole === "faculty" && !selectedDepartment) {
+      alert("Please select a department for faculty role.");
       return;
     }
 
@@ -127,17 +146,31 @@ export default function RosterAccountManagement() {
         updateData = {
           ...updateData,
           position: deleteField(),
+          department: deleteField(),
           skills: currentUser.skills || [],
           eventHistory: currentUser.eventHistory || [],
           interests: currentUser.interests || [],
           level: currentUser.level || 1,
           levelprogress: currentUser.levelprogress || 0
         };
-      } else if (selectedRole === "faculty" || selectedRole === "admin") {
-        // Faculty/Admin: set position, delete student fields
+      } else if (selectedRole === "faculty") {
+        // Faculty: set position and department, delete student fields
         updateData = {
           ...updateData,
           position: selectedPosition,
+          department: selectedDepartment,
+          skills: deleteField(),
+          eventHistory: deleteField(),
+          interests: deleteField(),
+          level: deleteField(),
+          levelProgress: deleteField()
+        };
+      } else if (selectedRole === "admin") {
+        // Admin: set position, delete department and student fields
+        updateData = {
+          ...updateData,
+          position: selectedPosition,
+          department: deleteField(),
           skills: deleteField(),
           eventHistory: deleteField(),
           interests: deleteField(),
@@ -145,10 +178,11 @@ export default function RosterAccountManagement() {
           levelProgress: deleteField()
         };
       } else {
-        // Partner or other roles: delete both position and student fields
+        // Partner or other roles: delete both position, department, and student fields
         updateData = {
           ...updateData,
           position: deleteField(),
+          department: deleteField(),
           skills: deleteField(),
           eventHistory: deleteField(),
           interests: deleteField(),
@@ -167,17 +201,30 @@ export default function RosterAccountManagement() {
           updatedUser = {
             ...updatedUser,
             position: undefined,
+            department: undefined,
             skills: user.skills || [],
             eventHistory: user.eventHistory || [],
             interests: user.interests || [],
             level: user.level || 1,
             levelprogress: user.levelprogress || 0
           };
-        } else if (selectedRole === "faculty" || selectedRole === "admin") {
+        } else if (selectedRole === "faculty") {
+          updatedUser = {
+            ...updatedUser,
+            position: selectedPosition,
+            department: selectedDepartment
+          };
+          delete updatedUser.skills;
+          delete updatedUser.eventHistory;
+          delete updatedUser.interests;
+          delete updatedUser.level;
+          delete updatedUser.levelprogress;
+        } else if (selectedRole === "admin") {
           updatedUser = {
             ...updatedUser,
             position: selectedPosition
           };
+          delete updatedUser.department;
           delete updatedUser.skills;
           delete updatedUser.eventHistory;
           delete updatedUser.interests;
@@ -188,6 +235,7 @@ export default function RosterAccountManagement() {
             ...updatedUser
           };
           delete updatedUser.position;
+          delete updatedUser.department;
           delete updatedUser.skills;
           delete updatedUser.eventHistory;
           delete updatedUser.interests;
@@ -200,6 +248,7 @@ export default function RosterAccountManagement() {
       setEditingRoleUserId(null);
       setSelectedRole("");
       setSelectedPosition("");
+      setSelectedDepartment("");
     } catch (err) {
       console.error("Error updating role:", err);
       alert("Failed to update role. Please try again.");
@@ -210,6 +259,7 @@ export default function RosterAccountManagement() {
     setEditingRoleUserId(null);
     setSelectedRole("");
     setSelectedPosition("");
+    setSelectedDepartment("");
   };
 
   return (
@@ -388,6 +438,7 @@ export default function RosterAccountManagement() {
                               onChange={(e) => {
                                 setSelectedRole(e.target.value);
                                 setSelectedPosition(""); // Reset position when role changes
+                                setSelectedDepartment(""); // Reset department when role changes
                               }}
                               className="role-select"
                             >
@@ -396,7 +447,7 @@ export default function RosterAccountManagement() {
                               <option value="partner">Partner</option>
                               <option value="admin">Admin</option>
                             </select>
-                            
+
                             {(selectedRole === "faculty" || selectedRole === "admin") && (
                               <select 
                                 value={selectedPosition} 
@@ -411,7 +462,20 @@ export default function RosterAccountManagement() {
                                 ))}
                               </select>
                             )}
-                            
+
+                            {selectedRole === "faculty" && (
+                              <select
+                                value={selectedDepartment}
+                                onChange={(e) => setSelectedDepartment(e.target.value)}
+                                className="role-select"
+                              >
+                                <option value="">Select Department</option>
+                                {departments.map((dept) => (
+                                  <option key={dept} value={dept}>{dept}</option>
+                                ))}
+                              </select>
+                            )}
+
                             <div className="role-edit-actions">
                               <button 
                                 onClick={() => handleRoleChange(user.id)}
@@ -431,7 +495,7 @@ export default function RosterAccountManagement() {
                           <div className="role-display">
                             <span>{user.role || "N/A"}</span>
                             <button
-                              onClick={() => handleChangeRoleClick(user.id, user.role, user.position)}
+                              onClick={() => handleChangeRoleClick(user.id, user.role, user.position, user.department)}
                               className="change-role-btn"
                             >
                               <img src={ChangeIcon} alt="Change Role" />
