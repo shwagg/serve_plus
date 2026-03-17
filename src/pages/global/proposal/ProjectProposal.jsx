@@ -34,10 +34,23 @@ function ProjectProposal({ projectType, onClose }) {
     budget: '',
     preparedBy: '', // Faculty in Charge/Proponent
     affiliation: '', // College/Program/Department/Student Org
+    affiliatedDepartment: '', // NEW: Affiliated Department
     studentOutcomes: '',
     alt: '', // Alt text for image
     partnerSchool: '',
   });
+    // Department options for dropdown
+    const departments = [
+      "College of Arts and Science (CAS)",
+      "College of Computer and Information Science (CCIS)",
+      "College of Health Sciences (CHS)",
+      "College of Nursing (CN)",
+      "College of Maritime Education and Training (CMET)",
+      "E.T. Yuchengco College of Business (ETYCB)",
+      "Mapua-Laguna Institute of Aviation (MIA)",
+      "Mapua Institute of Technology at Laguna (MITL)",
+      "Mapua MCL Senior High School (SHS)"
+    ];
   const [partnerSchools, setPartnerSchools] = useState([]);
   const [loadingSchools, setLoadingSchools] = useState(true);
 
@@ -257,6 +270,23 @@ function ProjectProposal({ projectType, onClose }) {
               )}
             </div>
 
+            {/* Affiliated Department Dropdown (for both project types) */}
+            <div className="form-group">
+              <label htmlFor="affiliatedDepartment">Affiliated Department</label>
+              <select
+                id="affiliatedDepartment"
+                name="affiliatedDepartment"
+                value={formData.affiliatedDepartment}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Select Department</option>
+                {departments.map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+
             {projectType === 'service-learning' && (
               <div className="form-group">
                 <label htmlFor="preparedBy">Faculty-in-Charge / Proponent(s) *</label>
@@ -302,18 +332,6 @@ function ProjectProposal({ projectType, onClose }) {
                     readOnly={hasProponentName}
                     required
                     placeholder="e.g., Juan Dela Cruz"
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="affiliation">Affiliation</label>
-                  <input
-                    type="text"
-                    id="affiliation"
-                    name="affiliation"
-                    value={formData.affiliation}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="e.g., College of Science"
                   />
                 </div>
               </div>
