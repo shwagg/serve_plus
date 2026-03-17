@@ -43,9 +43,16 @@ const colleges = [
   },
 ];
 
-const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle = '', children }) => {
+const PreActivitySurvey = ({
+  initialName = "",
+  initialEngagementType = "",
+  initialTitle = "",
+  onSubmit }) => {
+
   const [form, setForm] = useState({
     name: initialName,
+    engagementType: initialEngagementType,
+    initiativeTitle: initialTitle,
     college: '',
     program: '',
     nonAcademicOrg: '',
@@ -55,6 +62,14 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
     participationOther: '',
     prevService: '',
     frequency: '',
+    likert_0: '',
+    likert_1: '',
+    likert_2: '',
+    likert_3: '',
+    likert_4: '',
+    likert_5: '',
+    likert_6: '',
+    likert_7: '',
   });
 
   const handleChange = (e) => {
@@ -64,16 +79,29 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
 
   const handleParticipationChange = (e) => {
     const { value, checked } = e.target;
-    if (checked) {
-      setForm((prev) => ({ ...prev, participation: [...prev.participation, value] }));
-    } else {
-      setForm((prev) => ({ ...prev, participation: prev.participation.filter((p) => p !== value) }));
-    }
+    setForm((prev) => {
+      let updatedParticipation = [...prev.participation];
+
+      if (checked) {
+        if (!updatedParticipation.includes(value)) {
+          updatedParticipation.push(value);
+        }
+      } else {
+        updatedParticipation = updatedParticipation.filter((p) => p !== value);
+      }
+
+      return {
+        ...prev,
+        participation: updatedParticipation,
+      };
+    });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(form);
+    if (onSubmit) {
+      onSubmit(form);
+    }
   };
 
   const selectedCollege = colleges.find((c) => c.name === form.college);
@@ -99,7 +127,6 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
           font-weight: 700;
           color: #23235b;
           margin-bottom: 18px;
-          border-left: 3px solid #5b6ee1;
           padding-left: 10px;
         }
         .pre-activity-survey-form label {
@@ -132,6 +159,12 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
         .pre-activity-survey-form select:focus,
         .pre-activity-survey-form textarea:focus {
           border: 1.5px solid #5b6ee1;
+        }
+        .pre-activity-survey-form input:disabled,
+        .pre-activity-survey-form select:disabled {
+          color: #808080;
+          background: #f1f1f1;
+          cursor: not-allowed;
         }
         .pre-activity-survey-form fieldset {
           border: none;
@@ -186,7 +219,19 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
       <h2>Pre-Activity Survey</h2>
       <label>
         Name *
-        <input name="name" value={form.name} onChange={handleChange} required autoComplete="off" />
+        <input name="name" type='text' value={form.name} onChange={handleChange} required autoComplete="on" />
+      </label>
+      <label>
+        Title of Service-Learning / Community Engagement Initiative *
+        <input name="initiativeTitle" value={form.initiativeTitle} disabled required placeholder="e.g., Feeding Program for Barangay 123" autoComplete="off" />
+      </label>
+      <label>
+        Type of Engagement *
+        <select name="engagementType" value={form.engagementType} disabled required>
+          <option value="">Select Type</option>
+          <option value="sl">Service-Learning</option>
+          <option value="ce">Community Engagement</option>
+        </select>
       </label>
       <label>
         College/Department/Organization *
@@ -215,18 +260,7 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
           </label>
         )
       )}
-      <label>
-        Type of Engagement *
-        <select name="engagementType" value={form.engagementType} onChange={handleChange} required>
-          <option value="">Select Type</option>
-          <option value="SL">Service-Learning (SL)</option>
-          <option value="CE">Community Engagement (CE)</option>
-        </select>
-      </label>
-      <label>
-        Title of Service-Learning / Community Engagement Initiative *
-        <input name="initiativeTitle" value={form.initiativeTitle} onChange={handleChange} required placeholder="e.g., Feeding Program for Barangay 123" autoComplete="off" />
-      </label>
+
       <fieldset>
         <legend>Type/Level of Participation <span style={{ fontWeight: 400, color: '#888', fontSize: 13 }}>(Select all that apply)</span></legend>
         <div className="checkbox-group">
@@ -277,7 +311,7 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
           <thead>
             <tr style={{ background: '#f3f4f8' }}>
               <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: '#23235b', fontSize: 15 }}>Statement</th>
-              {[5,4,3,2,1,0].map(val => (
+              {[5, 4, 3, 2, 1, 0].map(val => (
                 <th key={val} style={{ textAlign: 'center', padding: '8px 0', fontWeight: 600, color: '#23235b', fontSize: 15 }}>{val}</th>
               ))}
             </tr>
@@ -295,7 +329,7 @@ const PreActivitySurvey = ({ onSubmit, initialName = '', initialInitiativeTitle 
             ].map((statement, idx) => (
               <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f6f7fa' }}>
                 <td style={{ padding: '10px 12px', fontSize: 15, color: '#222', fontWeight: 500 }}>{statement}</td>
-                {[5,4,3,2,1,0].map(val => (
+                {[5, 4, 3, 2, 1, 0].map(val => (
                   <td key={val} style={{ textAlign: 'center', padding: '10px 0' }}>
                     <input
                       type="radio"

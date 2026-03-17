@@ -63,10 +63,6 @@ export default function EventDetails() {
           if (user) {
             const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
-            //if (volunteerSnap.exists()) {
-            // navigate(`/event/${id}/activity`, { replace: true });
-            //return;
-            //} DELETING THIS FOR TESTING, REPLACED WITH THIS:
             if (volunteerSnap.exists()) {
               setVolunteer(volunteerSnap.data());
             }
@@ -101,7 +97,7 @@ export default function EventDetails() {
           if (userDocSnap.exists()) {
             name = userDocSnap.data().name || '';
           }
-        } catch {}
+        } catch { }
       }
     }
     setUserName(name);
@@ -154,6 +150,28 @@ export default function EventDetails() {
       const preSurveyResponseRef = doc(db, "missions", id, "volunteer", user.uid, "preSurvey", "response");
       await setDoc(preSurveyResponseRef, surveyForm);
       setVolunteer({ registrationStatus: "pending" });
+
+      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+
+      await setDoc(volunteerRef, {
+        joinedAt: new Date().toISOString(),
+
+        registrationStatus: "pending", //for admin approval
+        completionStatus: "pending_approval", // event completion requirements
+        pointsEarned: 0,
+
+        progress: {
+          preSurvey: "locked",
+          consent: "locked",
+          attendance: "not_checked_in",
+          postSurvey: "locked"
+        },
+
+      });
+      //updates the UI button to 'pending'
+      setVolunteer({
+        registrationStatus: "pending"
+      });
 
       // Create a registration notification (once per event)
       try {
@@ -301,7 +319,7 @@ export default function EventDetails() {
                   if (!volunteer) {
                     handleJoinEvent();
                   } else if (volunteer.registrationStatus === "approved") {
-                    navigate(`/event/${id}/activity?mode=active`);
+                    navigate(`/event/${id}/activity`);
                   } else if (volunteer.registrationStatus === "rejected") {
                     handleJoinEvent();
                   }

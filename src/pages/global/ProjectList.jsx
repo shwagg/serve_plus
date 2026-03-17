@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
+import ProjectDetails from "../admin/ProjectDetails";
 import "../../styles/ProjectList.css";
 import { ViewKanbanOutlinedIcon, ListAltOutlinedIcon } from "../../components/icons/index";
 
@@ -20,6 +21,7 @@ export default function ProjectList({ mode = "admin" }) {
     const user = auth.currentUser;
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedProjectId, setSelectedProjectId] = useState(null);
     const [view, setView] = useState(() => {
         return localStorage.getItem("projectView") || "list";
     });
@@ -349,6 +351,7 @@ export default function ProjectList({ mode = "admin" }) {
                                                                 navigate={navigate}
                                                                 onPartnerApprove={handlePartnerApprove}
                                                                 onPartnerReject={handlePartnerReject}
+                                                                setSelectedProjectId={setSelectedProjectId}
                                                             />
 
                                                         ))
@@ -365,6 +368,7 @@ export default function ProjectList({ mode = "admin" }) {
                                                 key={p.id}
                                                 project={p}
                                                 mode={mode}
+                                                setSelectedProjectId={setSelectedProjectId}
                                             />
                                         ))}
                                     </div>
@@ -375,10 +379,23 @@ export default function ProjectList({ mode = "admin" }) {
                     </div>
                 </div>
             </div>
+            {
+                selectedProjectId && (
+                    <div className="project-side-panel">
+                        <ProjectDetails
+                            projectId={selectedProjectId}
+                            onClose={() => setSelectedProjectId(null)}
+                        />
+                    </div>
+                )
+            }
 
         </div >
+
     );
 }
+
+
 //progress bar
 function ProjectProgress({ status }) {
     const stepMap = {
@@ -403,7 +420,7 @@ function ProjectProgress({ status }) {
     );
 }
 //kanban board card
-function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject, navigate }) {
+function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject, navigate, setSelectedProjectId }) {
     const partnerApproved = p.approvals?.partner?.approved;
     const facultyApproved = p.approvals?.faculty?.approved;
     const completedSteps = [
@@ -422,8 +439,8 @@ function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject, navi
         <div
             className="kanban-card"
             onClick={() => {
-                if (mode === "admin") {
-                    navigate(`/admin/projects/${p.id}`);
+                if (mode === "admin" && setSelectedProjectId) {
+                    setSelectedProjectId(p.id);
                 }
             }}
         >

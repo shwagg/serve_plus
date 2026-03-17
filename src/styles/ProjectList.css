@@ -55,6 +55,21 @@
   font-size: 11px;
   color: var(--muted);
 }
+
+.project-side-panel{
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  height: 100vh;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.08);
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 24px;
+}
+
 /*Kanban Board*/
 .kanban-board {
   display: flex;

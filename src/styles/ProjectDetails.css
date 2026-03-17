@@ -38,3 +38,57 @@
   font-weight: 700;
   color: #000;
 }
+/*Added Modern UI*/
+.mission-title{
+font-size:20px;
+font-weight:600;
+margin-bottom:10px;
+}
+
+.mission-tags{
+display:flex;
+flex-wrap:wrap;
+flex-direction:row;
+gap:8px;
+margin-bottom:20px;
+}
+
+.tag{
+background:#f3f4f6;
+padding:4px 10px;
+border-radius:20px;
+font-size:12px;
+}
+
+.progress-bar{
+height:8px;
+background:#e5e7eb;
+border-radius:6px;
+overflow:hidden;
+}
+
+.progress-fill{
+height:100%;
+background:#8b5cf6;
+}
+
+.qr-card{
+display:flex;
+justify-content:space-between;
+align-items:center;
+background:#f9fafb;
+padding:14px;
+border-radius:10px;
+margin-bottom:10px;
+}
+
+.avatar{
+width:36px;
+height:36px;
+border-radius:50%;
+background:#ddd;
+display:flex;
+align-items:center;
+justify-content:center;
+margin-right:10px;
+}

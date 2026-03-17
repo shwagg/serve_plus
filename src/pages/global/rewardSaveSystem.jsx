@@ -1,108 +1,19 @@
 // Saving computation to firestore such as updating
-// user account points
+// user account 'totalPoints' and in mission 'pointsEarned'
 import { doc, getDoc, getDocs, collection, updateDoc, increment, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
+import { getAuth } from "firebase/auth";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
-import { checkAndAssignBadges } from "../../hooks/badgeSystem";
+//import { checkAndAssignBadges } from "../../hooks/badgeSystem";
 
 export const releaseMissionPoints = async (missionId) => {
-    const missionRef = doc(db, "missions", missionId);
-    const missionSnap = await getDoc(missionRef);
-
-    if (!missionSnap.exists()) {
-        throw new Error("Mission not found.");
-    }
-
-    const missionData = missionSnap.data();
-    const avgRating = missionData.feedback?.avgRating;
-
-    if (avgRating === undefined || avgRating === null) {
-        throw new Error("Mission feedback not computed yet.");
-    }
-
     const volunteerSnap = await getDocs(
         collection(db, "missions", missionId, "volunteer")
     );
 
     for (const volunteerDoc of volunteerSnap.docs) {
-
-        const volunteerData = volunteerDoc.data();
-
-        if (!volunteerData.participationStatus) {
-            console.log("❌ No participationStatus for:", volunteerDoc.id);
-            continue;
-        }
-
-        // Getting role from preSurvey subcollection
-        const preDoc = await getDoc(
-            doc(db, "missions", missionId, "volunteer", volunteerDoc.id, "preSurvey", "response")
-        );
-
-        if (!preDoc.exists()) {
-            console.log("❌ No preSurvey found for:", volunteerDoc.id);
-            continue;
-        }
-
-        const preData = preDoc.data();
-
-        const rawRole = preData.engagement?.participation?.[0];
-
-        if (!rawRole) {
-            console.log("❌ No role found in preSurvey for:", volunteerDoc.id);
-            continue;
-        }
-
-        // depends on the choices from preSurvey
-        const role = rawRole.trim().toLowerCase();
-        // DEBUG LOGS
-        console.log("========== DEBUG ==========");
-        console.log("Volunteer ID:", volunteerDoc.id);
-        console.log("Role (raw):", rawRole);
-        console.log("Role (for rewardSystem):", role);
-        console.log("Feedback avgRating:", avgRating);
-        console.log("Participation Status:", volunteerData.participationStatus);
-
-        const finalPoints = computeFinalPoints(
-            role,
-            avgRating,
-            volunteerData.participationStatus?.toLowerCase()
-        );
-
-        console.log("Computed Final Points:", finalPoints);
-        console.log("===========================");
-
-        // Update user total points under user collection
-        if (volunteerData.userId) {
-            await updateDoc(
-                doc(db, "users", volunteerData.userId),
-                {
-                    totalPoints: increment(finalPoints)
-                }
-            );
-        }
-
-        // Save under volunteer based on the mission joined
-        await updateDoc(
-            doc(db, "missions", missionId, "volunteer", volunteerDoc.id),
-            {
-                pointsEarned: finalPoints
-            }
-        );
+        await releaseVolunteerPoints(missionId, volunteerDoc.id);
     }
-
-    // Check and assign badges after points are released
-    for (const volunteerDoc of volunteerSnap.docs) {
-        const volunteerData = volunteerDoc.data();
-        if (volunteerData.userId) {
-            await checkAndAssignBadges(volunteerData.userId);
-        }
-    }
-
-    // After release points to user, locks the document lib to prevent future edit
-    await updateDoc(missionRef, {
-        released: true,
-        "feedback.isActive": false
-    });
 
     return true;
 };
@@ -130,6 +41,9 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     }
 
     const volunteerData = volunteerSnap.data();
+    if (volunteerData.releasedAt) {
+        throw new Error("Points already released for this volunteer.");
+    }
 
     if (!volunteerData.participationStatus) {
         throw new Error("Participation status not set.");
@@ -144,7 +58,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     }
 
     const preData = preDoc.data();
-    const rawRole = preData.engagement?.participation?.[0];
+    const rawRole = preData.engagement?.participation || [];
 
     if (!rawRole) {
         throw new Error("Role not found.");
@@ -158,22 +72,13 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     const normalizedParticipation =
         volunteerData.participationStatus?.toLowerCase();
 
-    console.log("========== RELEASE DEBUG ==========");
-    console.log("Volunteer ID:", volunteerId);
-    console.log("Role (raw):", rawRole);
-    console.log("Role (normalized):", role);
-    console.log("Feedback avgRating:", avgRating);
-    console.log("Participation Status (raw):", volunteerData.participationStatus);
-    console.log("Participation Status (normalized):", normalizedParticipation);
-
-    const finalPoints = computeFinalPoints(
+    const breakdown = computeFinalPoints(
         role,
         avgRating,
-        normalizedParticipation
+        volunteerData.participationStatus?.toLowerCase()
     );
 
-    console.log("Final Points Computed:", finalPoints);
-    console.log("===================================");
+    const finalPoints = breakdown.finalPoints;
 
     // Increment user totalPoints
     if (volunteerData.userId) {
@@ -185,8 +90,27 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         );
     }
 
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    let adminName = "Admin";
+
+    if (currentUser) {
+        const adminSnap = await getDoc(doc(db, "users", currentUser.uid));
+        if (adminSnap.exists()) {
+            const adminData = adminSnap.data();
+            adminName =
+                adminData.name ||
+                adminData.username ||
+                currentUser.email;
+        }
+    }
+
     await updateDoc(volunteerRef, {
-        pointsEarned: finalPoints
+        pointsEarned: finalPoints,
+        completionStatus: "graded",
+        releasedAt: serverTimestamp(),
+        releasedBy: adminName,
     });
 
     return finalPoints;

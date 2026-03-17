@@ -83,22 +83,24 @@ const colleges = [
   },
 ];
 
-
-const PostActivitySurvey = ({
-  onSubmit,
+const PostActivitySurvey = ({ onSubmit,
   initialName = '',
-  initiativeTitle = '',
-  location = ''
-}) => {
+  initialEngagementType = '',
+  initialTitle = '',
+  initialDate = '',
+  initialCollege = '',
+  initialProgram = '',
+  initialNonAcademicOrg = '' }) => {
+
   const [form, setForm] = useState({
     name: initialName,
-    college: '',
-    program: '',
-    nonAcademicOrg: '',
-    engagementType: '',
-    initiativeTitle: initiativeTitle,
-    dateOfImplementation: '',
-    location: location,
+    engagementType: initialEngagementType,
+    initiativeTitle: initialTitle,
+    dateOfImplementation: initialDate,
+    college: initialCollege,
+    program: initialProgram,
+    nonAcademicOrg: initialNonAcademicOrg,
+    location: '',
   });
 
   // Update form state if initiativeTitle or location props change
@@ -143,7 +145,6 @@ const PostActivitySurvey = ({
           font-weight: 700;
           color: #23235b;
           margin-bottom: 18px;
-          border-left: 3px solid #5b6ee1;
           padding-left: 10px;
         }
         .post-activity-survey-form label {
@@ -176,6 +177,12 @@ const PostActivitySurvey = ({
         .post-activity-survey-form select:focus,
         .post-activity-survey-form textarea:focus {
           border: 1.5px solid #5b6ee1;
+        }
+        .post-activity-survey-form input:disabled,
+        .post-activity-survey-form select:disabled {
+          color: #808080;
+          background: #f1f1f1;
+          cursor: not-allowed;
         }
         .post-activity-survey-form fieldset {
           border: none;
@@ -213,8 +220,24 @@ const PostActivitySurvey = ({
       </div>
       <div style={{ marginBottom: 18 }}>
         <label>
+          Title of Service-Learning / Community Engagement Initiative *
+          <input name="initiativeTitle" value={form.initiativeTitle} disabled required placeholder="e.g., Feeding Program for Barangay 123" autoComplete="off" />
+        </label>
+      </div>
+      <div style={{ marginBottom: 18 }}>
+        <label>
+          Type of Engagement *
+          <select name="engagementType" value={form.engagementType} disabled required>
+            <option value="">Select Type</option>
+            <option value="sl">Service-Learning</option>
+            <option value="ce">Community Engagement</option>
+          </select>
+        </label>
+      </div>
+      <div style={{ marginBottom: 18 }}>
+        <label>
           College/Department/Organization *
-          <select name="college" value={form.college} onChange={handleChange} required>
+          <select name="college" value={form.college} disabled required>
             <option value="">Select College/Department/Org</option>
             {colleges.map((c) => (
               <option key={c.name} value={c.name}>{c.name}</option>
@@ -226,7 +249,7 @@ const PostActivitySurvey = ({
         <div style={{ marginBottom: 18 }}>
           <label>
             Organization Name *
-            <input name="nonAcademicOrg" value={form.nonAcademicOrg} onChange={handleChange} required autoComplete="off" />
+            <input name="nonAcademicOrg" value={form.nonAcademicOrg} disabled required autoComplete="off" />
           </label>
         </div>
       ) : (
@@ -234,7 +257,7 @@ const PostActivitySurvey = ({
           <div style={{ marginBottom: 18 }}>
             <label>
               Program *
-              <select name="program" value={form.program} onChange={handleChange} required>
+              <select name="program" value={form.program} disabled required>
                 <option value="">Select Program</option>
                 {selectedCollege.programs.map((p) => (
                   <option key={p} value={p}>{p}</option>
@@ -257,15 +280,7 @@ const PostActivitySurvey = ({
       <div style={{ marginBottom: 18 }}>
         <label>
           Title of Service-Learning / Community Engagement Initiative *
-          <input
-            name="initiativeTitle"
-            value={form.initiativeTitle}
-            onChange={handleChange}
-            required
-            placeholder="e.g., Feeding Program for Barangay 123"
-            autoComplete="off"
-            readOnly
-          />
+          <input name="initiativeTitle" value={form.initiativeTitle} onChange={handleChange} required placeholder="e.g., Feeding Program for Barangay 123" autoComplete="off" />
         </label>
       </div>
       <div style={{ marginBottom: 18 }}>
@@ -304,7 +319,7 @@ const PostActivitySurvey = ({
           <thead>
             <tr style={{ background: '#f3f4f8' }}>
               <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: '#23235b', fontSize: 15 }}>Statement</th>
-              {[5,4,3,2,1,0].map(val => (
+              {[5, 4, 3, 2, 1, 0].map(val => (
                 <th key={val} style={{ textAlign: 'center', padding: '8px 0', fontWeight: 600, color: '#23235b', fontSize: 15 }}>{val}</th>
               ))}
             </tr>
@@ -322,7 +337,7 @@ const PostActivitySurvey = ({
             ].map((statement, idx) => (
               <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f6f7fa' }}>
                 <td style={{ padding: '10px 12px', fontSize: 15, color: '#222', fontWeight: 500 }}>{statement}</td>
-                {[5,4,3,2,1,0].map(val => (
+                {[5, 4, 3, 2, 1, 0].map(val => (
                   <td key={val} style={{ textAlign: 'center', padding: '10px 0' }}>
                     <input
                       type="radio"

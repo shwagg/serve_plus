@@ -4,6 +4,46 @@ import { useNavigate } from "react-router-dom";
 import { db, auth } from "../../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import { FaCalendarAlt, FaUserFriends, FaFileAlt, FaMapMarkerAlt, FaUsers } from "react-icons/fa";
+//import { FaCalendarAlt, FaUserFriends, FaFileAlt, FaMapMarkerAlt, FaUsers } from "react-icons/fa";
+
+const events = [
+  {
+    category: "Environmental",
+    title: "Community Clean-Up Drive",
+    date: "March 15, 2026 • 9:00 AM",
+    location: "Central Park, Downtown",
+    registered: 45,
+    capacity: 60,
+    percent: 75,
+  },
+  {
+    category: "Education",
+    title: "Youth Mentorship Workshop",
+    date: "March 18, 2026 • 2:00 PM",
+    location: "Community Center Hall",
+    registered: 32,
+    capacity: 40,
+    percent: 80,
+  },
+  {
+    category: "Social Services",
+    title: "Food Distribution Event",
+    date: "March 22, 2026 • 10:00 AM",
+    location: "West Side Community Hub",
+    registered: 58,
+    capacity: 50,
+    percent: 116,
+  },
+  {
+    category: "Healthcare",
+    title: "Senior Care & Wellness Fair",
+    date: "March 25, 2026 • 1:00 PM",
+    location: "Riverside Senior Center",
+    registered: 28,
+    capacity: 50,
+    percent: 56,
+  },
+];
 
 export default function PartnerDashboard() {
   const navigate = useNavigate();

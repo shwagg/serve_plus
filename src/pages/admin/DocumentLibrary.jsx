@@ -27,7 +27,6 @@ export default function DocumentLibrary() {
   const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
   const [currentMissionId, setCurrentMissionId] = useState(null);
   const [missionAvgRating, setMissionAvgRating] = useState(0);
-  const [isMissionReleased, setIsMissionReleased] = useState(false);
   const [isFeedbackActive, setIsFeedbackActive] = useState(true);
   const [volunteers, setVolunteers] = useState([]);
   const allComplete =
@@ -146,7 +145,7 @@ export default function DocumentLibrary() {
     setCurrentMissionId(missionId);
     const missionSnap = await getDoc(doc(db, "missions", missionId));
     const missionData = missionSnap.data();
-    const isReleased = missionData?.released === true;
+    const isReleased = missionData?.gradeReleased === true;
     const avgRating = missionData?.feedback?.avgRating || 0;
     const feedbackActive = missionData?.feedback?.isActive !== false;
 
@@ -205,7 +204,6 @@ export default function DocumentLibrary() {
 
     setVolunteers(volunteers);
     setMissionAvgRating(avgRating);
-    setIsMissionReleased(isReleased);
   };
 
   // Helper to open answer modal
@@ -220,6 +218,49 @@ export default function DocumentLibrary() {
     setAnswerModalData(data);
     setShowAnswerModal(true);
   };
+
+  const allReadyToRelease =
+    volunteers.length > 0 &&
+    volunteers.every(v => {
+      const rawRoles =
+        v.preSurveyAnswers?.engagement?.participation || [];
+
+      const normalizedRoles = rawRoles.map(r =>
+        r.trim().toLowerCase().replace(/\s+/g, "_")
+      );
+
+      const isDonorOnly =
+        normalizedRoles.includes("donor") &&
+        !normalizedRoles.includes("participant");
+
+      let requiredItems;
+
+      if (isDonorOnly) {
+        requiredItems = [
+          v.participationStatus
+        ];
+      } else {
+        requiredItems = [
+          v.preSurveyAnswers,
+          v.postSurveyAnswers,
+          v.progress?.consent === "submitted",
+          v.progress?.attendance === "present",
+          v.participationStatus
+        ];
+      }
+
+      const completedItems = requiredItems.filter(Boolean).length;
+      const completion =
+        Math.round((completedItems / requiredItems.length) * 100);
+
+      const eligible =
+        (completion === 100 ||
+          v.participationStatus === "no_show") &&
+        v.pointsEarned === undefined;
+
+      return eligible;
+    }) &&
+    !isFeedbackActive;
 
   return (
     <>
@@ -359,6 +400,7 @@ export default function DocumentLibrary() {
             {/*Headings of the summary table modal */}
             <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Submissions</h2>
 
+            {/*Community feedback warning block */}
             {isFeedbackActive && (
               <div style={{
                 background: '#fff3cd',
@@ -373,11 +415,52 @@ export default function DocumentLibrary() {
               </div>
             )}
 
+            {/*Release button appear if all users have submitted their requirements */}
+            {allReadyToRelease && (
+              <div style={{ textAlign: "center", marginBottom: 16 }}>
+                <button
+                  style={{
+                    background: "#23335b",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 18px",
+                    fontWeight: 600,
+                    cursor: "pointer"
+                  }}
+                  onClick={async () => {
+                    for (const v of volunteers) {
+                      if (v.pointsEarned === undefined) {
+                        await releaseVolunteerPoints(
+                          currentMissionId,
+                          v.id
+                        );
+                      }
+                    }
+
+                    const updatedSnap = await getDocs(
+                      collection(db, "missions", currentMissionId, "volunteer")
+                    );
+
+                    const updated = updatedSnap.docs.map(doc => ({
+                      id: doc.id,
+                      ...doc.data()
+                    }));
+
+                    setVolunteers(updated);
+                  }}
+                >
+                  Release All Grades
+                </button>
+              </div>
+            )}
+
             <div className="table-scroll-wrapper">
               <table className="submission-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 8px #0001' }}>
                 <thead>
                   <tr style={{ background: '#f3f4f8', color: '#23335b', borderBottom: '2px solid #e0e4ea' }}>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'left', fontSize: '1.05rem' }}>Student Name / Participant</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Role</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Attendance</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Pre-Activity Survey</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Activity Consent Form</th>
@@ -396,17 +479,43 @@ export default function DocumentLibrary() {
 
                     </tr>
                   ) : volunteers.map((v, idx) => {
-                    const completedItems = [
-                      v.preSurveyAnswers,
-                      v.postSurveyAnswers,
-                      v.progress?.consent === "submitted",
-                      v.progress?.attendance === "present",
-                      v.participationStatus
-                    ].filter(Boolean).length;
+                    const rawRoles =
+                      v.preSurveyAnswers?.engagement?.participation || [];
 
-                    const individualCompletion = Math.round((completedItems / 5) * 100);
+                    const normalizedRoles = rawRoles.map(r =>
+                      r.trim().toLowerCase().replace(/\s+/g, "_")
+                    );
+
+                    const isDonorOnly =
+                      normalizedRoles.includes("donor") &&
+                      !normalizedRoles.includes("participant");
+
+                    let requiredItems;
+
+                    if (isDonorOnly) {
+                      // Donor does NOT require any attendance nor requirements as per CSCE procedures
+                      requiredItems = [
+                        v.participationStatus
+                      ];
+                    } else {
+                      // Participant or both & partipant
+                      requiredItems = [
+                        v.preSurveyAnswers,
+                        v.postSurveyAnswers,
+                        v.progress?.consent === "submitted",
+                        v.progress?.attendance === "present",
+                        v.participationStatus
+                      ];
+                    }
+
+                    const completedItems = requiredItems.filter(Boolean).length;
+                    const individualCompletion = Math.round(
+                      (completedItems / requiredItems.length) * 100
+                    );
+                    // Compute points without saving yet
                     // Compute points without saving yet
                     let previewPoints = null;
+                    let breakdown = null;
 
                     if (v.participationStatus) {
                       const rawRole =
@@ -418,41 +527,64 @@ export default function DocumentLibrary() {
                           .toLowerCase()
                           .replace(/\s+/g, "_");
 
-                        console.log("Volunteer:", v.name);
-                        console.log("Raw Role:", rawRole);
-                        console.log("Normalized Role:", role);
-
                         const normalizedParticipation =
                           v.participationStatus?.toLowerCase();
 
-                        console.log("====== PREVIEW DEBUG ======");
-                        console.log("Volunteer:", v.name);
-                        console.log("Role (raw):", rawRole);
-                        console.log("Role (normalized):", role);
-                        console.log("missionAvgRating:", missionAvgRating);
-                        console.log("Participation (raw):", v.participationStatus);
-                        console.log("Participation (normalized):", normalizedParticipation);
-
-                        previewPoints = computeFinalPoints(
+                        breakdown = computeFinalPoints(
                           role,
                           missionAvgRating || 0,
                           normalizedParticipation
                         );
 
-                        console.log("Preview Points:", previewPoints);
-                        console.log("===========================");
+                        previewPoints = breakdown.finalPoints;
+                      }
+                    }
+
+                    if (v.participationStatus) {
+                      const rawRoles =
+                        v.preSurveyAnswers?.engagement?.participation || [];
+
+                      if (rawRoles.length > 0) {
+                        const normalizedParticipation =
+                          v.participationStatus?.toLowerCase();
+
+                        // Computation of grades
+                        breakdown = computeFinalPoints(
+                          rawRoles,
+                          missionAvgRating || 0,
+                          normalizedParticipation
+                        );
+
+                        previewPoints = breakdown.finalPoints;
                       }
                     }
 
                     const isReadyToRelease =
                       individualCompletion === 100 &&
                       !isFeedbackActive &&
-                      !isMissionReleased &&
-                      !(v.pointsEarned > 0);
+                      !(v.releasedAt);
 
                     return (
                       <tr key={v.id} style={{ background: idx % 2 === 0 ? '#f8f9fb' : '#fff', color: '#23335b' }}>
                         <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'left', fontWeight: 500 }}>{v.name}</td>
+                        <td
+                          style={{
+                            padding: '12px 10px',
+                            borderBottom: '1px solid #e0e4ea',
+                            borderRight: '1px solid #e0e4ea',
+                            textAlign: 'center',
+                            fontWeight: 500
+                          }}
+                        >
+                          {(v.preSurveyAnswers?.engagement?.participation || [])
+                            .map(role =>
+                              role
+                                .toLowerCase()
+                                .replace(/_/g, " ")
+                                .replace(/\b\w/g, c => c.toUpperCase())
+                            )
+                            .join(", ") || "-"}
+                        </td>
                         <td style={{ padding: '12px 10px', borderBottom: '1px solid #e0e4ea', borderRight: '1px solid #e0e4ea', textAlign: 'center' }}>
                           {v.progress?.attendance === 'present' ? 'Present' : ''}
                         </td>
@@ -480,7 +612,7 @@ export default function DocumentLibrary() {
                           <select
                             className="participation-select"
                             value={v.participationStatus || ""}
-                            disabled={isMissionReleased}
+                            disabled={v.releasedAt}
                             onChange={(e) =>
                               handleParticipationChange(currentMissionId, v.id, e.target.value)
                             }
@@ -498,17 +630,24 @@ export default function DocumentLibrary() {
 
                         <td className="submission-table-cell">
                           {
-                            isMissionReleased && v.pointsEarned !== undefined
+                            v.releasedAt
                               ? v.pointsEarned
-                              : individualCompletion === 100
-                                ? previewPoints ?? "-"
+                              : individualCompletion === 100 && previewPoints !== null
+                                ? (
+                                  <span
+                                    title={breakdown ? `Role: ${breakdown.base} | Multiplier: ${breakdown.multiplier} | Factor: ${breakdown.factor}` : ""}
+                                    style={{ cursor: "help" }}
+                                  >
+                                    {previewPoints}
+                                  </span>
+                                )
                                 : "-"
                           }
                         </td>
                         {/*release button column */}
                         <td className="submission-table-cell" style={{ textAlign: "center" }}>
                           {/* Already Released */}
-                          {v.pointsEarned > 0 ? (
+                          {v.releasedAt ? (
                             <span
                               style={{
                                 fontWeight: 700,
@@ -517,8 +656,12 @@ export default function DocumentLibrary() {
                             >
                               Released
                             </span>
-                          ) : individualCompletion !== 100 ? (
-                            /* Not completed – light grey flat text */
+                          ) : (
+                            (individualCompletion !== 100 &&
+                              v.participationStatus !== "no_show")
+                            || isFeedbackActive
+                          ) ? (
+                            /* Not completed – light grey flat text style */
                             <span
                               style={{
                                 color: "#c0c0c0",
@@ -528,7 +671,7 @@ export default function DocumentLibrary() {
                               Release
                             </span>
                           ) : (
-                            /* Completed – teal clickable button */
+                            /* Release Button (if requirements complete) – teal clickable button */
                             <button
                               style={{
                                 background: "#30bdb7",
@@ -544,6 +687,13 @@ export default function DocumentLibrary() {
                                   const finalPoints = await releaseVolunteerPoints(
                                     currentMissionId,
                                     v.id
+                                  );
+                                  //update firestore 'completionStatus' of the volunteer
+                                  await updateDoc(
+                                    doc(db, "missions", currentMissionId, "volunteer", v.id),
+                                    {
+                                      completionStatus: "complete"
+                                    }
                                   );
 
                                   setVolunteers(prev =>

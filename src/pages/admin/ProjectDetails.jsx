@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
 import { createNotification } from "../../utils/notificationUtils";
@@ -13,8 +13,8 @@ import ceBg from "../../assets/ce-proposal-page1.png";
 import { QRCodeCanvas } from "qrcode.react";
 
 
-export default function ProjectDetails() {
-  const { projectId } = useParams();
+export default function ProjectDetails({ projectId, onClose }) {
+
   const navigate = useNavigate();
   const [attendees, setAttendees] = useState([]);
   const [allVolunteers, setAllVolunteers] = useState([]);
@@ -299,23 +299,116 @@ export default function ProjectDetails() {
   //will be fixing ui here shortly - aly
   return (
     <div>
-      <button type="button" onClick={() => navigate("/admin/projects")}>
-        ← Back to Project List
-      </button>
-
-      <h1 style={{ marginTop: 12, color: "#111" }}>
-        {project.title || project.alt || "Untitled Mission"}
-      </h1>
+      <div className="project-details-header">
+        <button onClick={onClose}>✕</button>
+      </div>
 
       {/* Export PDF using proposal under assets (demo) */}
       <button disabled type="button" onClick={handleExportPdf}>
         Export PDF (still editing)
       </button>
 
-      <p style={{ color: "#111" }}><b>Status:</b> {project.status}</p>
-      <p style={{ color: "#111" }}><b>Date:</b> {project.date || "—"}</p>
-      <p style={{ color: "#111" }}><b>Location:</b> {project.location || "—"}</p>
-      <p style={{ color: "#111" }}><b>Points:</b> {typeof project.points === "number" ? project.points : "—"}</p>
+      <div className="mission-header">
+
+        {/*mission title */}
+        <h2 className="mission-title">
+          {project.title || "Untitled Mission"}
+        </h2>
+
+        {/*tags */}
+        <div className="mission-tags">
+          <span className="tag">
+            📅 {project.targetDate || "No target date"}
+          </span>
+          <span className={`tag status-${project.status}`}>
+            {project.status}
+          </span>
+          <span className="tag">
+            ⏰ {project.startTime || "TBD"}
+          </span>
+          <span className="tag">
+            🏫 {project.department || "—"}
+          </span>
+          <span className="tag">
+            👤 {project.preparedBy || "Organizer"}
+          </span>
+        </div>
+      </div>
+
+      {/*progress bar no. of joined */}
+      <div className="mission-progress">
+        <div className="progress-info">
+          {attendees.length} / {project.maxStudents || 0} students joined
+        </div>
+        <div className="progress-bar">
+          <div
+            className="progress-fill"
+            style={{
+              width: `${(attendees.length / (project.maxStudents || 1)) * 100}%`
+            }}
+          />
+        </div>
+      </div>
+
+      {/*points and badges */}
+      <div className="mission-points">
+        <div className="points-value">
+          ⭐ {project.points || 0} Points
+        </div>
+        <button className="add-badge-btn">
+          +
+        </button>
+      </div>
+      {/*manage tasks */}
+      <h3 style={{ color: "#111" }}>Tasks</h3>
+      <button
+        onClick={() => navigate(`/admin/projects/${projectId}/tasks`)}
+        style={{
+          background: '#007bff',
+          color: '#fff',
+          padding: '10px 20px',
+          border: 'none',
+          borderRadius: 4,
+          cursor: 'pointer',
+          fontWeight: 600,
+          marginBottom: 12
+        }}
+      >
+        Manage Tasks
+      </button>
+      <p style={{ color: "#888", fontSize: 14 }}>
+        {taskCount > 0 ? `${taskCount} task(s) for this project` : 'No tasks yet'}
+      </p>
+
+      {/*attendance & community feedback form */}
+      <div className="mission-section">
+        <h3>Mission Access</h3>
+        <div className="qr-card">
+          <div>
+            <strong>Attendance QR</strong>
+            <p>Students scan to mark attendance</p>
+          </div>
+
+          <div className="qr-actions">
+            <button onClick={() => setShowQR(true)}>View</button>
+            <button onClick={generateNewQR}>Reset</button>
+          </div>
+
+        </div>
+        <div className="qr-card">
+          <div>
+            <strong>Community Feedback</strong>
+            <p>Scan to submit feedback</p>
+          </div>
+
+          <div className="qr-actions">
+            <button onClick={() => setShowFeedbackQR(true)}>View</button>
+            <button>Close</button>
+          </div>
+
+        </div>
+      </div>
+
       <p style={{ color: "#111" }}>
         <b>Community Feedback:</b>{" "}
         {project.feedback?.isActive === false ? (
@@ -326,9 +419,43 @@ export default function ProjectDetails() {
       </p>
       <hr />
 
-      <h3 style={{ color: "#111" }}>Approvals</h3>
-      <p style={{ color: "#111" }}>Faculty: {project.approvals.faculty.approved ? "Approved" : "Pending"}</p>
-      <p style={{ color: "#111" }}>Community Partner: {project.approvals.partner.approved ? "Approved" : "Pending"}</p>
+      {/*approvals */}
+      <div className="mission-section">
+        <h3>Approvals</h3>
+        <div className="approval-item">
+          <div className="avatar">F</div>
+          <div>
+            <div className="approval-name">
+              Faculty
+            </div>
+
+            {project.approvals.faculty.decidedAt
+              ? new Date(project.approvals.faculty.decidedAt.seconds * 1000).toLocaleString()
+              : "Pending"}
+
+            <div className="approval-comment">
+              Approved by faculty reviewer
+            </div>
+          </div>
+        </div>
+
+        <div className="approval-item">
+          <div className="avatar">P</div>
+          <div>
+            <div className="approval-name">
+              Community Partner
+            </div>
+
+            {project.approvals.partner.decidedAt
+              ? new Date(project.approvals.partner.decidedAt.seconds * 1000).toLocaleString()
+              : "Pending"}
+
+            <div className="approval-comment">
+              Awaiting decision
+            </div>
+          </div>
+        </div>
+      </div>
 
       <hr />
 
@@ -367,58 +494,8 @@ export default function ProjectDetails() {
         <button disabled={!canPublish || saving} onClick={() => setStatus("published")}>
           Publish
         </button>
-
-        {/* Attendance QR Code */}
-        <button
-          style={{ background: '#222', color: '#fff', borderRadius: 20, padding: '12px 24px', fontWeight: 600 }}
-          onClick={() => setShowQR((prev) => !prev)}
-          disabled={saving}
-          type="button"
-        >
-          {showQR ? "Hide QR Code" : "Show Attendance QR Code"}
-        </button>
-
-        {/* Feedback QR Code */}
-        <button
-          style={{
-            background: '#30bdb7',
-            color: '#fff',
-            borderRadius: 20,
-            padding: '12px 24px',
-            fontWeight: 600
-          }}
-          onClick={() => setShowFeedbackQR(prev => !prev)}
-          type="button"
-        >
-          {showFeedbackQR ? "Hide Feedback QR" : "Show Feedback QR"}
-        </button>
-
-        <button
-          disabled={saving}
-          onClick={async () => {
-            await updateDoc(doc(db, "missions", projectId), {
-              "feedback.isActive": false,
-              updatedAt: serverTimestamp()
-            });
-            await load();
-          }}
-        >
-          Close Feedback
-        </button>
-
-        <button
-          disabled={saving}
-          onClick={async () => {
-            await updateDoc(doc(db, "missions", projectId), {
-              "feedback.isActive": true,
-              updatedAt: serverTimestamp()
-            });
-            await load();
-          }}
-        >
-          Reopen Feedback
-        </button>
       </div>
+
 
       {/* ATTENDANCE QR CODE */}
       {showQR && (
@@ -619,25 +696,6 @@ export default function ProjectDetails() {
 
       <hr />
 
-      <h3 style={{ color: "#111" }}>Tasks</h3>
-      <button
-        onClick={() => navigate(`/admin/projects/${projectId}/tasks`)}
-        style={{
-          background: '#007bff',
-          color: '#fff',
-          padding: '10px 20px',
-          border: 'none',
-          borderRadius: 4,
-          cursor: 'pointer',
-          fontWeight: 600,
-          marginBottom: 12
-        }}
-      >
-        Manage Tasks
-      </button>
-      <p style={{ color: "#888", fontSize: 14 }}>
-        {taskCount > 0 ? `${taskCount} task(s) for this project` : 'No tasks yet'}
-      </p>
 
       {/* Hidden div for PDF export */}
       <div className="pdf-export-wrap">
@@ -685,7 +743,6 @@ export default function ProjectDetails() {
           )}
         </div>
       </div>
-
     </div>
   );
 }

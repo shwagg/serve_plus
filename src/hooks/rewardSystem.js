@@ -36,12 +36,28 @@ const PARTICIPATION_FACTOR = {
 };
 
 //Final Point Computation
-export function computeFinalPoints(role, avgRating, participationStatus) {
-    const base = ROLE_POINTS[role];
+export function computeFinalPoints(roles, avgRating, participationStatus) {
     const multiplier = getProgramMultiplier(avgRating);
-    const factor = PARTICIPATION_FACTOR[participationStatus];
+    const factor = PARTICIPATION_FACTOR[participationStatus] ?? 0;
 
-    if (!base || !factor) return 0;
+    if (!factor) return { base: 0, multiplier, factor, finalPoints: 0 };
 
-    return Number((base * multiplier * factor).toFixed(2));
+    // Check what are the roles picked
+    const roleArray = Array.isArray(roles) ? roles : [roles];
+
+    let totalBase = 0;
+
+    roleArray.forEach(role => {
+        const normalized = role.trim().toLowerCase().replace(/\s+/g, "_");
+        totalBase += ROLE_POINTS[normalized] || 0;
+    });
+
+    if (!totalBase) {
+        return { base: 0, multiplier, factor, finalPoints: 0 };
+    }
+
+    const finalPoints = Number((totalBase * multiplier * factor).toFixed(2));
+
+    //Return all variables for computation details information
+    return { base: totalBase, multiplier, factor, finalPoints };
 }
