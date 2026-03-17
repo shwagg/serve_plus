@@ -1,5 +1,7 @@
 /*EVENT ACTIVITY.JSX*/
-h1, h2, h3 {
+.event-activity-container h1,
+.event-activity-container h2,
+.event-activity-container h3 {
   color: #1f2937;
 }
 .event-activities-panel,

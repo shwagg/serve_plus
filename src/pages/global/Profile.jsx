@@ -25,6 +25,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
   const [skills, setSkills] = useState(profile.skills || []);
   const [interests, setInterests] = useState(profile.interests || []);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   // Reset state when modal opens or profile changes
   useEffect(() => {
@@ -42,7 +43,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
+        setUploadError('Image size must be less than 5MB.');
         return;
       }
 
@@ -86,7 +87,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
                 const storage = getStorage();
                 const user = auth.currentUser;
                 if (!user) {
-                  alert("You must be logged in to upload an image");
+                  setUploadError('You must be logged in to upload an image.');
                   setUploading(false);
                   return;
                 }
@@ -96,10 +97,11 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
                 const downloadURL = await getDownloadURL(storageRef);
 
                 setAvatar(downloadURL);
+                setUploadError('');
                 setUploading(false);
               } catch (err) {
                 console.error("Upload error:", err);
-                alert("Failed to upload image: " + err.message);
+                setUploadError('Failed to upload image. Please try again.');
                 setUploading(false);
               }
             }, 'image/jpeg', 0.7);
@@ -108,7 +110,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
         reader.readAsDataURL(file);
       } catch (err) {
         console.error("Error processing image:", err);
-        alert("Failed to process image");
+        setUploadError('Failed to process image. Please try a different file.');
         setUploading(false);
       }
     }
@@ -134,6 +136,9 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
               <label htmlFor="avatar-upload" className="profile-modal-upload-btn" style={{ opacity: uploading ? 0.6 : 1, cursor: uploading ? 'not-allowed' : 'pointer' }}>
                 {uploading ? '⏳ Uploading...' : '📷 Change Picture'}
               </label>
+              {uploadError && (
+                <div style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: 6, textAlign: 'center' }}>{uploadError}</div>
+              )}
             </div>
           </div>
           <div>
@@ -285,10 +290,12 @@ export default function Profile() {
   const [rewards, setRewards] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
+  const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Overview");
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   const portfolioPdfRef = useRef(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -372,7 +379,7 @@ export default function Profile() {
 
       pdf.save(`${displayName}_portfolio.pdf`);
     } catch (err) {
-      alert("Failed to export PDF: " + (err.message || err));
+      setExportError('Failed to export portfolio. Please try again.');
     } finally {
       setExporting(false);
     }
@@ -594,11 +601,16 @@ export default function Profile() {
           </div>
           <button
             className="profile-edit-btn"
-            onClick={() => setEditOpen(true)}
+            onClick={() => { setEditOpen(true); setProfileMsg({ type: '', text: '' }); }}
             aria-label="Edit your profile"
           >
             ✏️ Edit Profile
           </button>
+          {profileMsg.text && (
+            <div style={{ color: profileMsg.type === 'error' ? '#ef4444' : '#10b981', fontWeight: 500, fontSize: '0.9rem', marginTop: 8, textAlign: 'center' }}>
+              {profileMsg.text}
+            </div>
+          )}
           <EditProfileModal
             open={editOpen}
             onClose={() => setEditOpen(false)}
@@ -620,8 +632,9 @@ export default function Profile() {
                   })
                 );
                 setProfile(prev => ({ ...prev, ...updated }));
+                setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
               } catch (err) {
-                alert("Failed to update profile: " + (err.message || err));
+                setProfileMsg({ type: 'error', text: 'Failed to update profile. Please try again.' });
               } finally {
                 setEditOpen(false);
               }
@@ -693,6 +706,9 @@ export default function Profile() {
                   <button onClick={exportToPDF} disabled={exporting} className={`profile-export-btn ${exporting ? 'disabled' : ''}`}>
                     {exporting ? '⏳ Exporting...' : '⬇ Export PDF'}
                   </button>
+                  {exportError && (
+                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: 6 }}>{exportError}</div>
+                  )}
                 </div>
                 {/* Achievements */}
                 <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
@@ -718,12 +734,12 @@ export default function Profile() {
                   {allSdgs.length === 0 ? (
                     <p className="muted-text">No SDG contributions yet.</p>
                   ) : (
-                    <div className="sdg-list">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {allSdgs.sort((a, b) => a - b).map(sdg => (
-                        <div key={sdg} className="sdg-badge" style={{ background: SDG_COLORS[sdg] || '#234e7b' }}>
-                          <span className="sdg-index">#{sdg}</span>
-                          <span className="sdg-label">{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
-                          <span className="sdg-count">{sdgCounts[sdg]}×</span>
+                        <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 800, color: '#fff' }}>#{sdg}</span>
+                          <span style={{ flex: '1 1 auto', color: '#fff' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                          <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 800, fontSize: 11 }}>{sdgCounts[sdg]}×</span>
                         </div>
                       ))}
                     </div>
@@ -887,8 +903,8 @@ export default function Profile() {
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                           {allSdgs.sort((a, b) => a - b).map(sdg => (
                             <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontWeight: 800 }}>#{sdg}</span>
-                              <span style={{ flex: '1 1 auto' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                              <span style={{ fontWeight: 800, color: '#fff' }}>#{sdg}</span>
+                              <span style={{ flex: '1 1 auto', color: '#fff' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
                               <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 800, fontSize: 11 }}>{sdgCounts[sdg]}×</span>
                             </div>
                           ))}

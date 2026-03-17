@@ -129,12 +129,12 @@
 }
 .promo-overlay p{
   color: #fff;
-  width: 500px;
+  max-width: 500px;
   margin-top: 0;
 }
 .promo-description {
   color: #fff;
-  width: 500px;
+  max-width: 500px;
   margin-top: 0;
   font-size: 14px;
   font-weight: 400;
@@ -189,15 +189,6 @@
   background: rgba(255,255,255,0.5);
 }
 
-.landing-page-num {
-  width: 280px;
-  display: flex;
-  align-items: center;
-  justify-content: space-evenly;
-  gap: 12px;
-  margin-top: 20px;
-}
-
 /*USER PROFILE*/
 .player-strip {
   position: sticky;
@@ -212,11 +203,9 @@
   background: #ffffff;
   border-radius: 2px;
   padding: 6px 50px;
-  margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  box-shadow: 0 -10px 30px rgba(0,0,0,0.06);
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
 }
 .player-level {
@@ -347,29 +336,6 @@
   border-color: #333; /* Add hover effect for the border */
 }
 
-/* Keep backward compat for links */
-.mission-section-header.links{
-  width: 230px;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-.mission-section-header.links a{
-  /*font-size: 16px;
-  font-weight: 400;
-  color: #000;*/
-  color: #7a7a7a;
-  text-decoration: none;
-  font-weight: 500;
-  padding-bottom: 4px;
-  transition: all 0.2s ease;
-}
-.mission-section-header.links a.active {
-  color: #000;
-  font-weight: 600;
-  border-bottom: 2px solid #000;
-}
 .mission-list {
   width: 85%;
   display: grid;
@@ -528,7 +494,7 @@
 }
 .podium-item {
   width: 160px;
-  height: 220x;
+  height: 220px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -697,7 +663,7 @@
   padding: 12px 14px;
   margin: 5px;
   border-radius: 14px;
-  background: #f9fafb;;
+  background: #f9fafb;
   font-size: 14px;
 }
 .leaderboard-row{ cursor: pointer; pointer-events: auto; }
@@ -1042,15 +1008,6 @@
   color: #22c55e;
   font-weight: 600;
 }
-/*.event-details-bg {
-.event-qr-button:hover {
-  background: #32CD32 !important;
-  color: #fff !important;
-} REMOVING THIS FOR TESTING PURPOSES, AND REPLACE IT  BELOW:*/ 
-.event-qr-button:hover {
-  background: #32CD32 !important;
-  color: #fff !important;
-}
 .event-details-cta {
   width: 100%;
   display: flex;
@@ -1139,10 +1096,9 @@
 }
 
 .event-qr-button:hover {
-  background: #32CD32 !important;
-  color: #fff !important;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(50, 205, 50, 0.5);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
 }
 .activity-card {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
@@ -1597,8 +1553,8 @@
     aspect-ratio: 4 / 3; 
   }
   .event-details-center{
-    width: 120%;
-    margin: 0 -10%;
-    padding: 0 60px;
+    width: 100%;
+    margin: 0;
+    padding: 0 24px;
   }
 }

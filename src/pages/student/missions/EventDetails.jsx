@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db, auth } from '../../../firebaseConfig';
+import { db, auth, storage } from '../../../firebaseConfig';
 import { doc, getDoc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { createNotification } from '../../../utils/notificationUtils';
 
 import Header from '../../../components/Header';
@@ -147,7 +148,7 @@ export default function EventDetails() {
         },
         preActivitySurvey: surveyForm,
         consentFormUrl: consentUrl,
-      });
+      }, { merge: true });
 
       // Also save pre-activity survey to subcollection preSurvey/response
       const preSurveyResponseRef = doc(db, "missions", id, "volunteer", user.uid, "preSurvey", "response");
@@ -441,7 +442,7 @@ export default function EventDetails() {
         }}>
         <div className="global-feed-header">
           <h3 className="global-feed-title">Community Updates</h3>
-          <p className="global-feed-subtitle">Whats happening this week</p>
+          <p className="global-feed-subtitle">What's happening this week</p>
         </div>
         <div className="global-feed-list">
           <GlobalAnnouncements />

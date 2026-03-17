@@ -3,7 +3,7 @@ import { auth, functions, db } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, orderBy, limit } from "firebase/firestore";
 import Header from "../../components/Header";
 import GlobalAnnouncements from "../../components/GlobalAnnouncements";
 import "../../styles/student.css";
@@ -15,17 +15,42 @@ import mission1 from '../../assets/mission1.jpg';
 import podium2 from '../../assets/user2.png';
 import banner from '../../assets/banner.jpg';
 
+const landingPromos = [
+  {
+    id: 1,
+    title: "Youth Leadership Program",
+    description: "A hands-on journey to build confidence, strengthen teamwork, and practice real-world leadership skills.",
+    image: mission1,
+    buttonText: "Learn More",
+    buttonLink: "/student",
+  },
+  {
+    id: 2,
+    title: "Volunteer Outreach",
+    image: banner,
+    description: "An opportunity to serve communities, connect with people, and create meaningful social impact.",
+    buttonText: "Join Now",
+    buttonLink: "/student",
+  },
+  {
+    id: 3,
+    title: "Entrepreneurship Bootcamp",
+    description: "A practical training ground to turn ideas into ventures, with guidance on innovation, business planning, and pitching.",
+    image: mission1,
+    buttonText: "Register",
+    buttonLink: "/student",
+  },
+];
+
 const StudentHome = () => {
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [open, setOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [activeTab, setActiveTab] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
 
   // Update unread count from GlobalAnnouncements
   useEffect(() => {
-    // Check immediately
     const checkCount = () => {
       if (window.announcementActions?.getUnreadCount) {
         setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
@@ -33,7 +58,7 @@ const StudentHome = () => {
     };
 
     checkCount();
-    const interval = setInterval(checkCount, 500);
+    const interval = setInterval(checkCount, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -48,33 +73,6 @@ const StudentHome = () => {
   const [missionCards, setMissionCards] = useState([]);
   const [enrolledMissions, setEnrolledMissions] = useState({});
   const [completedMissions, setCompletedMissions] = useState(0);
-
-  const landingPromos = useMemo(() => [
-    {
-      id: 1,
-      title: "Youth Leadership Program",
-      description: "A hands-on journey to build confidence, strengthen teamwork, and practice real-world leadership skills.",
-      image: mission1,
-      buttonText: "Learn More",
-      buttonLink: "/programs/leadership",
-    },
-    {
-      id: 2,
-      title: "Volunteer Outreach",
-      image: banner,
-      description: "An opportunity to serve communities, connect with people, and create meaningful social impact.",
-      buttonText: "Join Now",
-      buttonLink: "/activities/volunteer",
-    },
-    {
-      id: 3,
-      title: "Entrepreneurship Bootcamp",
-      description: "A practical training ground to turn ideas into ventures, with guidance on innovation, business planning, and pitching.",
-      image: mission1,
-      buttonText: "Register",
-      buttonLink: "/programs/bootcamp",
-    },
-  ], []);
 
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = landingPromos.length;
@@ -111,14 +109,18 @@ const StudentHome = () => {
         let completed = 0;
 
         if (user) {
-          for (const mission of missions) {
-            const volunteerRef = doc(db, "missions", mission.id, "volunteer", user.uid);
-            const volunteerSnap = await getDoc(volunteerRef);
-            enrollmentMap[mission.id] = volunteerSnap.exists();
-            if (volunteerSnap.exists() && volunteerSnap.data().completionStatus === "completed") {
+          const enrollmentSnaps = await Promise.all(
+            missions.map((mission) =>
+              getDoc(doc(db, "missions", mission.id, "volunteer", user.uid))
+            )
+          );
+          missions.forEach((mission, i) => {
+            const snap = enrollmentSnaps[i];
+            enrollmentMap[mission.id] = snap.exists();
+            if (snap.exists() && snap.data().completionStatus === "completed") {
               completed++;
             }
-          }
+          });
         }
 
         setEnrolledMissions(enrollmentMap);
@@ -147,41 +149,29 @@ const StudentHome = () => {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            console.log("Fetched user data:", userData); // Debug log
             setStudentUsername(userData.username || "");
             setStudentAvatar(userData.avatar || "");
             setStudentName(userData.name || resolvedName);
             if (userData.level !== undefined) setLevel(userData.level);
             if (userData.levelProgress !== undefined) {
-              // levelProgress is a percentage (0-100)
               const progress = userData.levelProgress;
               setCurrentPoints(progress);
               setNextLevelPoints(100);
             }
 
-            // Calculate total points earned across all events
             const totalPoints = userData.totalPoints || 0;
-
-            // Update current points with actual points earned
             setCurrentPoints(totalPoints);
-
-            // Calculate level based on points (every 100 points = 1 level)
             const calculatedLevel = Math.floor(totalPoints / 100) + 1;
             setLevel(calculatedLevel);
-
-            // Calculate progress to next level
             setNextLevelPoints(100);
-          } else {
-            console.log("No user document found in Firestore");
           }
 
         } catch (error) {
           console.error("Error fetching user profile:", error);
         } finally {
-          setIsLoading(false);
+          // cleanup
         }
       } else {
-        setIsLoading(false);
         setShowLogoutPopup(true);
       }
     });
@@ -192,7 +182,6 @@ const StudentHome = () => {
   async function handleLogout() {
     const user = auth.currentUser;
     try {
-      console.log("Attempting to log logout for:", user?.uid);
       if (user?.uid) {
         const logLogout = httpsCallable(functions, "logLogout");
         await logLogout({ uid: user.uid });
@@ -218,8 +207,12 @@ const StudentHome = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const usersRef = collection(db, "users");
-        const usersSnap = await getDocs(usersRef);
+        const usersQuery = query(
+          collection(db, "users"),
+          orderBy("totalPoints", "desc"),
+          limit(50)
+        );
+        const usersSnap = await getDocs(usersQuery);
 
         const leaderboardData = usersSnap.docs.map(userDoc => {
           const userData = userDoc.data();
@@ -250,18 +243,15 @@ const StudentHome = () => {
     fetchLeaderboard();
   }, []);
 
-  // Memoize sorted leaderboard to avoid re-sorting on every render
-  const sortedLeaderboard = useMemo(
-    () => [...leaderboard].sort((a, b) => b.points - a.points),
-    [leaderboard]
-  );
+  // leaderboard is already sorted by fetchLeaderboard
+  const sortedLeaderboard = leaderboard;
 
   const top1 = sortedLeaderboard[0];
   const top2 = sortedLeaderboard[1];
   const top3 = sortedLeaderboard[2];
   const podium = useMemo(() => [top2, top1, top3].filter(Boolean), [top1, top2, top3]);
 
-  const currentUserId = auth.currentUser?.uid;
+  const currentUserId = currentUser?.uid;
   const currentUserIndex = sortedLeaderboard.findIndex(
     (user) => user.uid === currentUserId
   );
@@ -512,19 +502,11 @@ const StudentHome = () => {
                         role="button"
                         tabIndex={0}
                         onClick={() => {
-                          if (window && typeof window.showUserProfile === "function") {
-                            window.showUserProfile(user.uid);
-                          } else {
-                            window.location.href = `/profile/${user.uid}`;
-                          }
+                          navigate(`/profile/${user.uid}`);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
-                            if (window && typeof window.showUserProfile === "function") {
-                              window.showUserProfile(user.uid);
-                            } else {
-                              window.location.href = `/profile/${user.uid}`;
-                            }
+                            navigate(`/profile/${user.uid}`);
                           }
                         }}
                       >
@@ -557,20 +539,10 @@ const StudentHome = () => {
                     className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""}`}
                     role="button"
                     tabIndex={0}
-                    onClick={() => {
-                      if (window && typeof window.showUserProfile === "function") {
-                        window.showUserProfile(user.uid);
-                      } else {
-                        window.location.href = `/profile/${user.uid}`;
-                      }
-                    }}
+                    onClick={() => navigate(`/profile/${user.uid}`)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
-                        if (window && typeof window.showUserProfile === "function") {
-                          window.showUserProfile(user.uid);
-                        } else {
-                          window.location.href = `/profile/${user.uid}`;
-                        }
+                        navigate(`/profile/${user.uid}`);
                       }
                     }}
                   >
