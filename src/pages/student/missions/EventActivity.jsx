@@ -167,9 +167,6 @@ export default function EventActivity() {
     } else {
       setQRStatus("Location not detected. Please allow GPS access and try again."); setScanSuccess(false);
     }
-  } catch (err) {
-    setQRStatus("Failed to process QR code.");
-  }
 };
 //For saving consent file to be reviewed
 const handleConsentSubmit = async () => {

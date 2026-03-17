@@ -151,7 +151,6 @@ export default function EventDetails() {
       await setDoc(preSurveyResponseRef, surveyForm);
       setVolunteer({ registrationStatus: "pending" });
 
-      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
 
       await setDoc(volunteerRef, {
         joinedAt: new Date().toISOString(),
