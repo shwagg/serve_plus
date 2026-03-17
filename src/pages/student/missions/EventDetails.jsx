@@ -208,7 +208,7 @@ export default function EventDetails() {
             <span style={{ fontSize: 48 }}>😕</span>
             <h2 style={{ color: '#374151', marginTop: 12 }}>Event not found</h2>
             <p style={{ color: '#6b7280' }}>This event may have been removed or doesn't exist.</p>
-            <button className="ui-btn" style={{ marginTop: 16 }} onClick={() => navigate('/student')}>Back to Home</button>
+            <button className="ui-btn" style={{ marginTop: 16 }} onClick={() => navigate('/student/home')}>Back to Home</button>
           </div>
         </div>
       </div>
