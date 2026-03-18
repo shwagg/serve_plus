@@ -54,7 +54,6 @@ const PreActivitySurvey = ({
   const [form, setForm] = useState({
     name: initialName,
     engagementType: initialEngagementType,
-    initiativeTitle: initialTitle,
     college: '',
     program: '',
     nonAcademicOrg: '',

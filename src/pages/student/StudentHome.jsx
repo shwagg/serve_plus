@@ -423,7 +423,7 @@ const StudentHome = () => {
                     if (enrolledMissions[mission.id]) {
                       navigate(`/event/${mission.id}/activity?mode=preview`);
                     } else {
-                      navigate(`/event/${mission.id}`);
+                      setSelectedMissionId(mission.id);
                     }
                   }}
                   role="button"
@@ -434,7 +434,7 @@ const StudentHome = () => {
                       if (enrolledMissions[mission.id]) {
                         navigate(`/event/${mission.id}/activity?mode=preview`);
                       } else {
-                        navigate(`/event/${mission.id}`);
+                        setSelectedMissionId(mission.id);
                       }
                     }
                   }}

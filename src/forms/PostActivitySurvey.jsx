@@ -280,7 +280,15 @@ const PostActivitySurvey = ({ onSubmit,
       <div style={{ marginBottom: 18 }}>
         <label>
           Title of Service-Learning / Community Engagement Initiative *
-          <input name="initiativeTitle" value={form.initiativeTitle} onChange={handleChange} required placeholder="e.g., Feeding Program for Barangay 123" autoComplete="off" />
+          <input
+            name="initiativeTitle"
+            value={form.initiativeTitle}
+            onChange={handleChange}
+            required
+            placeholder="e.g., Feeding Program for Barangay 123"
+            autoComplete="off"
+            readOnly
+          />
         </label>
       </div>
       <div style={{ marginBottom: 18 }}>
