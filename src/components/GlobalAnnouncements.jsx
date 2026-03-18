@@ -200,7 +200,7 @@ const GlobalAnnouncements = () => {
         const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('Fetched event IDs:', events.map(e => e.id));
         setAnnouncements(events);
-        
+
 
         // For each event, check volunteer count in subcollection 'volunteer'
         const milestoneArr = [];
@@ -264,12 +264,12 @@ const GlobalAnnouncements = () => {
           try {
             const volunteerCol = collection(db, `missions/${event.id}/volunteer`);
             const volunteerSnap = await getDocs(volunteerCol);
-            
+
             volunteerSnap.forEach(volunteerDoc => {
               const data = volunteerDoc.data();
               const points = data.pointsEarned || 0;
               const userId = volunteerDoc.id;
-              
+
               if (points > 0) {
                 if (userPointsMap.has(userId)) {
                   const existing = userPointsMap.get(userId);
@@ -457,7 +457,7 @@ const GlobalAnnouncements = () => {
     // Add regular announcements, closing soon, and fully booked
     announcements.forEach(event => {
       const eventTimestamp = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : new Date(0));
-      
+
       // Add regular event announcement
       allItems.push({
         type: 'event',
@@ -546,7 +546,7 @@ const GlobalAnnouncements = () => {
           </button>
         </div>
       </div>
-      
+
       {/* All announcements sorted by timestamp */}
       {sortedAnnouncements.length === 0 ? (
         <div className="no-announcements" role="status">
@@ -556,213 +556,213 @@ const GlobalAnnouncements = () => {
         </div>
       ) : (
         <div role="feed" aria-label="Community announcements">
-        {sortedAnnouncements.map(item => {
-          if (item.type === 'milestone') {
-            const milestone = item.data;
-            const isUnseen = !seen.has(toKey('milestone', item.id));
-            return (
-              <div
-                key={item.id}
-                className={`global-feed-item milestone ${isUnseen ? 'unseen' : 'seen'}`}
-                role="article"
-                tabIndex={0}
-                onClick={() => {
-                  markAsSeen(item.id, 'milestone');
-                  openModal({ ...milestone, id: milestone.eventId }, 'milestone');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+          {sortedAnnouncements.map(item => {
+            if (item.type === 'milestone') {
+              const milestone = item.data;
+              const isUnseen = !seen.has(toKey('milestone', item.id));
+              return (
+                <div
+                  key={item.id}
+                  className={`global-feed-item milestone ${isUnseen ? 'unseen' : 'seen'}`}
+                  role="article"
+                  tabIndex={0}
+                  onClick={() => {
                     markAsSeen(item.id, 'milestone');
                     openModal({ ...milestone, id: milestone.eventId }, 'milestone');
-                  }
-                }}
-                aria-label={`Milestone: ${milestone.title} reached ${milestone.count} volunteers${isUnseen ? ' - unread' : ''}`}
-              >
-                <span className="feed-icon">🏆</span>
-                <div className="feed-content">
-                  {isUnseen && <span className="unread-dot"></span>}
-                  <p className="feed-title">Milestone Reached!</p>
-                  <p className="feed-desc">3+ volunteers have joined <b>{milestone.title}</b>!</p>
-                  <span className="feed-time">
-                    {formatTimeAgo(milestone.milestoneTime)}
-                  </span>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      markAsSeen(item.id, 'milestone');
+                      openModal({ ...milestone, id: milestone.eventId }, 'milestone');
+                    }
+                  }}
+                  aria-label={`Milestone: ${milestone.title} reached ${milestone.count} volunteers${isUnseen ? ' - unread' : ''}`}
+                >
+                  <span className="feed-icon">🏆</span>
+                  <div className="feed-content">
+                    {isUnseen && <span className="unread-dot"></span>}
+                    <p className="feed-title">Milestone Reached!</p>
+                    <p className="feed-desc">3+ volunteers have joined <b>{milestone.title}</b>!</p>
+                    <span className="feed-time">
+                      {formatTimeAgo(milestone.milestoneTime)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          } else if (item.type === 'closing') {
-            const event = item.data;
-            const isClosingUnseen = !seen.has(toKey('closing', event.id));
-            return (
-              <div
-                key={item.id}
-                className={`global-feed-item closing-soon ${isClosingUnseen ? 'unseen' : 'seen'}`}
-                role="article"
-                tabIndex={0}
-                onClick={() => {
-                  markAsSeen(event.id, 'closing');
-                  openModal(event, 'closing');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+              );
+            } else if (item.type === 'closing') {
+              const event = item.data;
+              const isClosingUnseen = !seen.has(toKey('closing', event.id));
+              return (
+                <div
+                  key={item.id}
+                  className={`global-feed-item closing-soon ${isClosingUnseen ? 'unseen' : 'seen'}`}
+                  role="article"
+                  tabIndex={0}
+                  onClick={() => {
                     markAsSeen(event.id, 'closing');
                     openModal(event, 'closing');
-                  }
-                }}
-                aria-label={`Closing soon: ${event.title || 'Untitled Event'}${isClosingUnseen ? ' - unread' : ''}`}
-              >
-                <span className="feed-icon">⌛</span>
-                <div className="feed-content">
-                  {isClosingUnseen && <span className="unread-dot"></span>}
-                  <p className="feed-title">Mission Closing Soon</p>
-                  <p className="feed-desc">
-                    {(() => {
-                      const closingDate = getClosingDate(event.targetDates);
-                      if (!closingDate || isNaN(closingDate.getTime())) return '';
-                      const now = new Date();
-                      const diffMs = closingDate - now;
-                      const diffSec = Math.floor(diffMs / 1000);
-                      const diffMin = Math.floor(diffSec / 60);
-                      const diffHour = Math.floor(diffMin / 60);
-                      const diffDay = Math.floor(diffHour / 24);
-                      if (diffDay > 0) return `Registration closes in ${diffDay === 1 ? '1 day' : diffDay + ' days'}`;
-                      if (diffHour > 0) return `Registration closes in ${diffHour === 1 ? '1 hour' : diffHour + ' hours'}`;
-                      if (diffMin > 0) return `Registration closes in ${diffMin === 1 ? '1 minute' : diffMin + ' minutes'}`;
-                      return 'Registration closing very soon!';
-                    })()}
-                  </p>
-                  <span className="feed-event-title">
-                    {event.title || 'Untitled Event'}
-                    {event.targetDates && (
-                      <span className="event-date-badge">
-                        Registration Closes: {getClosingDate(event.targetDates)?.toLocaleDateString()} at {getClosingDate(event.targetDates)?.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
-                      </span>
-                    )}
-                  </span>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      markAsSeen(event.id, 'closing');
+                      openModal(event, 'closing');
+                    }
+                  }}
+                  aria-label={`Closing soon: ${event.title || 'Untitled Event'}${isClosingUnseen ? ' - unread' : ''}`}
+                >
+                  <span className="feed-icon">⌛</span>
+                  <div className="feed-content">
+                    {isClosingUnseen && <span className="unread-dot"></span>}
+                    <p className="feed-title">Mission Closing Soon</p>
+                    <p className="feed-desc">
+                      {(() => {
+                        const closingDate = getClosingDate(event.targetDates);
+                        if (!closingDate || isNaN(closingDate.getTime())) return '';
+                        const now = new Date();
+                        const diffMs = closingDate - now;
+                        const diffSec = Math.floor(diffMs / 1000);
+                        const diffMin = Math.floor(diffSec / 60);
+                        const diffHour = Math.floor(diffMin / 60);
+                        const diffDay = Math.floor(diffHour / 24);
+                        if (diffDay > 0) return `Registration closes in ${diffDay === 1 ? '1 day' : diffDay + ' days'}`;
+                        if (diffHour > 0) return `Registration closes in ${diffHour === 1 ? '1 hour' : diffHour + ' hours'}`;
+                        if (diffMin > 0) return `Registration closes in ${diffMin === 1 ? '1 minute' : diffMin + ' minutes'}`;
+                        return 'Registration closing very soon!';
+                      })()}
+                    </p>
+                    <span className="feed-event-title">
+                      {event.title || 'Untitled Event'}
+                      {event.targetDates && (
+                        <span className="event-date-badge">
+                          Registration Closes: {getClosingDate(event.targetDates)?.toLocaleDateString()} at {getClosingDate(event.targetDates)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          } else if (item.type === 'info') {
-            const info = item.data;
-            const isInfoUnseen = !seen.has(toKey('info', item.id));
-            return (
-              <div
-                key={item.id}
-                className={`global-feed-item info ${isInfoUnseen ? 'unseen' : 'seen'}`}
-                role="article"
-                tabIndex={0}
-                onClick={() => {
-                  markAsSeen(item.id, 'info');
-                  openModal(info, 'info');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+              );
+            } else if (item.type === 'info') {
+              const info = item.data;
+              const isInfoUnseen = !seen.has(toKey('info', item.id));
+              return (
+                <div
+                  key={item.id}
+                  className={`global-feed-item info ${isInfoUnseen ? 'unseen' : 'seen'}`}
+                  role="article"
+                  tabIndex={0}
+                  onClick={() => {
                     markAsSeen(item.id, 'info');
                     openModal(info, 'info');
-                  }
-                }}
-                aria-label={`${info.title || 'SDG Impact'}: ${info.message}${isInfoUnseen ? ' - unread' : ''}`}
-              >
-                <span className="feed-icon">🌍</span>
-                <div className="feed-content">
-                  {isInfoUnseen && <span className="unread-dot"></span>}
-                  <p className="feed-title">{info.title || 'SDG Impact'}</p>
-                  <p className="feed-desc">{info.message}</p>
-                  <span className="feed-time">
-                    {formatTimeAgo(info.createdAt)}
-                  </span>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      markAsSeen(item.id, 'info');
+                      openModal(info, 'info');
+                    }
+                  }}
+                  aria-label={`${info.title || 'SDG Impact'}: ${info.message}${isInfoUnseen ? ' - unread' : ''}`}
+                >
+                  <span className="feed-icon">🌍</span>
+                  <div className="feed-content">
+                    {isInfoUnseen && <span className="unread-dot"></span>}
+                    <p className="feed-title">{info.title || 'SDG Impact'}</p>
+                    <p className="feed-desc">{info.message}</p>
+                    <span className="feed-time">
+                      {formatTimeAgo(info.createdAt)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          } else if (item.type === 'full') {
-            const event = item.data;
-            const isFullUnseen = !seen.has(toKey('full', event.id));
-            return (
-              <div
-                key={item.id}
-                className={`global-feed-item full ${isFullUnseen ? 'unseen' : 'seen'}`}
-                role="article"
-                tabIndex={0}
-                onClick={() => {
-                  markAsSeen(event.id, 'full');
-                  openModal(event, 'full');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+              );
+            } else if (item.type === 'full') {
+              const event = item.data;
+              const isFullUnseen = !seen.has(toKey('full', event.id));
+              return (
+                <div
+                  key={item.id}
+                  className={`global-feed-item full ${isFullUnseen ? 'unseen' : 'seen'}`}
+                  role="article"
+                  tabIndex={0}
+                  onClick={() => {
                     markAsSeen(event.id, 'full');
                     openModal(event, 'full');
-                  }
-                }}
-                aria-label={`Fully booked: ${event.title || 'Untitled Event'}${isFullUnseen ? ' - unread' : ''}`}
-              >
-                <span className="feed-icon">🚫</span>
-                <div className="feed-content">
-                  {isFullUnseen && <span className="unread-dot"></span>}
-                  <p className="feed-title">Event Fully Booked</p>
-                  <p className="feed-desc">
-                    {event.title || 'Untitled Event'} is now fully booked.
-                  </p>
-                  <span className="feed-time">
-                    {formatTimeAgo(event.fullBookedTime || (event.createdAt?.toDate ? event.createdAt.toDate() : event.createdAt))}
-                  </span>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      markAsSeen(event.id, 'full');
+                      openModal(event, 'full');
+                    }
+                  }}
+                  aria-label={`Fully booked: ${event.title || 'Untitled Event'}${isFullUnseen ? ' - unread' : ''}`}
+                >
+                  <span className="feed-icon">🚫</span>
+                  <div className="feed-content">
+                    {isFullUnseen && <span className="unread-dot"></span>}
+                    <p className="feed-title">Event Fully Booked</p>
+                    <p className="feed-desc">
+                      {event.title || 'Untitled Event'} is now fully booked.
+                    </p>
+                    <span className="feed-time">
+                      {formatTimeAgo(event.fullBookedTime || (event.createdAt?.toDate ? event.createdAt.toDate() : event.createdAt))}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          } else {
-            // Regular event announcement
-            const event = item.data;
-            const { icon, className } = getIconAndClass(event);
-            const isEventUnseen = !seen.has(toKey('event', event.id));
-            return (
-              <div
-                key={item.id}
-                className={`global-feed-item ${className} ${isEventUnseen ? 'unseen' : 'seen'}`}
-                role="article"
-                tabIndex={0}
-                onClick={() => {
-                  markAsSeen(event.id, 'event');
-                  openModal(event, 'event');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+              );
+            } else {
+              // Regular event announcement
+              const event = item.data;
+              const { icon, className } = getIconAndClass(event);
+              const isEventUnseen = !seen.has(toKey('event', event.id));
+              return (
+                <div
+                  key={item.id}
+                  className={`global-feed-item ${className} ${isEventUnseen ? 'unseen' : 'seen'}`}
+                  role="article"
+                  tabIndex={0}
+                  onClick={() => {
                     markAsSeen(event.id, 'event');
                     openModal(event, 'event');
-                  }
-                }}
-                aria-label={`New event: ${event.title || 'Untitled Event'}${isEventUnseen ? ' - unread' : ''}`}
-              >
-                <span className="feed-icon">{icon}</span>
-                <div className="feed-content">
-                  {isEventUnseen && <span className="unread-dot"></span>}
-                  <p className="feed-title">New Event Proposal</p>
-                  <div className="title-container">
-                    <p className="feed-desc bold ellipsis">{event.title || 'Untitled Event'}</p>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      markAsSeen(event.id, 'event');
+                      openModal(event, 'event');
+                    }
+                  }}
+                  aria-label={`New event: ${event.title || 'Untitled Event'}${isEventUnseen ? ' - unread' : ''}`}
+                >
+                  <span className="feed-icon">{icon}</span>
+                  <div className="feed-content">
+                    {isEventUnseen && <span className="unread-dot"></span>}
+                    <p className="feed-title">New Event Proposal</p>
+                    <div className="title-container">
+                      <p className="feed-desc bold ellipsis">{event.title || 'Untitled Event'}</p>
+                    </div>
+                    <span className="feed-time">{
+                      (() => {
+                        let created = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : null);
+                        if (!created) return '';
+                        const now = new Date();
+                        const diffMs = now - created;
+                        const diffSec = Math.floor(diffMs / 1000);
+                        const diffMin = Math.floor(diffSec / 60);
+                        const diffHour = Math.floor(diffMin / 60);
+                        const diffDay = Math.floor(diffHour / 24);
+                        if (diffDay > 0) return diffDay === 1 ? '1 day ago' : `${diffDay} days ago`;
+                        if (diffHour > 0) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+                        if (diffMin > 0) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+                        return 'just now';
+                      })()}
+                    </span>
                   </div>
-                  <span className="feed-time">{
-                    (() => {
-                      let created = event.createdAt?.toDate ? event.createdAt.toDate() : (event.createdAt ? new Date(event.createdAt) : null);
-                      if (!created) return '';
-                      const now = new Date();
-                      const diffMs = now - created;
-                      const diffSec = Math.floor(diffMs / 1000);
-                      const diffMin = Math.floor(diffSec / 60);
-                      const diffHour = Math.floor(diffMin / 60);
-                      const diffDay = Math.floor(diffHour / 24);
-                      if (diffDay > 0) return diffDay === 1 ? '1 day ago' : `${diffDay} days ago`;
-                      if (diffHour > 0) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
-                      if (diffMin > 0) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
-                      return 'just now';
-                    })()}
-                  </span>
                 </div>
-              </div>
-            );
-          }
-        })}
+              );
+            }
+          })}
         </div>
       )}
 
@@ -952,6 +952,18 @@ const GlobalAnnouncements = () => {
 
 export default GlobalAnnouncements;
 
+export const GlobalNotificationButton = ({ unreadCount, onClick }) => (
+  <button
+    className="global-feed-toggle"
+    onClick={onClick}
+    aria-label="Open announcements"
+  >
+    <span className="global-feed-toggle-emoji">📢</span>
+    {unreadCount > 0 && (
+      <span className="global-feed-badge">{unreadCount}</span>
+    )}
+  </button>
+);
 export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
   const [collapsed, setCollapsed] = useState(false);
 

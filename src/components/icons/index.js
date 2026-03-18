@@ -19,6 +19,7 @@ import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
+import Face6RoundedIcon from '@mui/icons-material/Face6Rounded';
 //under project proposal icons
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import ImportContactsOutlinedIcon from '@mui/icons-material/ImportContactsOutlined';
@@ -55,4 +56,5 @@ export {
     ListAltOutlinedIcon,
     GridViewOutlinedIcon,
     HomeRoundedIcon,
+    Face6RoundedIcon,
 };

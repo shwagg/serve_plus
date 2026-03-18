@@ -96,7 +96,7 @@ function Register() {
                 role: "student", // Default role for new registrations
                 status: "active",
                 createdAt: new Date(),
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || username)}&background=30bdb7&color=fff&size=120`,
+                avatar: "",
                 totalPoints: 0,
                 level: 1,
                 levelProgress: 0,

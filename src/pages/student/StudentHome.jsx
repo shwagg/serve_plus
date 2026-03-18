@@ -10,8 +10,10 @@ import "../../styles/student.css";
 import "../../styles/ui.css";
 import { WestIcon, EastIcon } from "../../components/icons";
 import mission1 from '../../assets/mission1.jpg';
-import podium2 from '../../assets/user2.png';
+import { Face6RoundedIcon } from '../../components/icons';
 import banner from '../../assets/banner.jpg';
+import cloudsBg from '../../assets/clouds-bg.jpg';
+import mountainBg from '../../assets/mountain-bg.jpg';
 
 const landingPromos = [
   {
@@ -99,7 +101,7 @@ const StudentHome = () => {
           );
           missions.forEach((mission, i) => {
             const snap = enrollmentSnaps[i];
-            enrollmentMap[mission.id] = snap.exists();
+            enrollmentMap[mission.id] = snap.exists() ? (snap.data().registrationStatus || "pending") : null;
             if (snap.exists() && snap.data().completionStatus === "completed") {
               completed++;
             }
@@ -208,11 +210,7 @@ const StudentHome = () => {
               userData.email?.split("@")[0] ||
               "User",
             points: userData.totalPoints || 0,
-            avatar:
-              userData.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                userData.username || userData.name || "User"
-              )}&background=30bdb7&color=fff&size=120`,
+            avatar: userData.avatar && !userData.avatar.includes('ui-avatars.com') ? userData.avatar : "",
           };
         });
 
@@ -364,7 +362,7 @@ const StudentHome = () => {
               <div className="level-bar" role="progressbar" aria-valuenow={currentPoints % 100} aria-valuemin={0} aria-valuemax={100}>
                 <div className="level-bar-fill" style={{ width: `${currentPoints % 100}%` }}></div>
               </div>
-              <span className="level-points">{currentPoints} pts ({currentPoints % 100}/100 to next level)</span>
+              <span className="level-points">{currentPoints} pts ({currentPoints % 100}/100)</span>
             </div>
 
             <div className="player-missions">
@@ -373,20 +371,24 @@ const StudentHome = () => {
             </div>
 
             <div className="player-profile">
-              <img
-                src={studentAvatar || podium2}
-                alt="Profile"
-                className="player-avatar"
-                loading="lazy"
-              />
+              {studentAvatar && !studentAvatar.includes('ui-avatars.com') ? (
+                <img
+                  src={studentAvatar}
+                  alt="Profile"
+                  className="player-avatar"
+                  loading="lazy"
+                />
+              ) : (
+                <Face6RoundedIcon sx={{ width: 36, height: 36, color: '#30bdb7' }} />
+              )}
               <span className="player-greeting">
-                Hi, {studentUsername || (currentUser?.email ? currentUser.email.split('@')[0] : studentName)}!
+                {studentUsername || (currentUser?.email ? currentUser.email.split('@')[0] : studentName)}
               </span>
             </div>
           </div>
         </section>
         {/* MISSION */}
-        <section className="mission-section" aria-label="Missions">
+        <section className="mission-section" aria-label="Missions" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat' }}>
           <div className="mission-section-header">
             <h2 className="mission-section-title">Find Your Next Mission</h2>
             <div className="mission-tabs" role="tablist">
@@ -418,9 +420,9 @@ const StudentHome = () => {
               filteredMissions.map((mission) => (
                 <div
                   key={mission.id}
-                  className={`mission-card ${enrolledMissions[mission.id] ? 'enrolled' : ''}`}
+                  className={`mission-card ${enrolledMissions[mission.id] === 'approved' ? 'enrolled' : enrolledMissions[mission.id] === 'pending' ? 'requesting' : ''}`}
                   onClick={() => {
-                    if (enrolledMissions[mission.id]) {
+                    if (enrolledMissions[mission.id] === "approved") {
                       navigate(`/event/${mission.id}/activity?mode=preview`);
                     } else {
                       setSelectedMissionId(mission.id);
@@ -431,7 +433,7 @@ const StudentHome = () => {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      if (enrolledMissions[mission.id]) {
+                      if (enrolledMissions[mission.id] === "approved") {
                         navigate(`/event/${mission.id}/activity?mode=preview`);
                       } else {
                         setSelectedMissionId(mission.id);
@@ -439,7 +441,10 @@ const StudentHome = () => {
                     }
                   }}
                 >
-                  {enrolledMissions[mission.id] && (
+                  {enrolledMissions[mission.id] === "pending" && (
+                    <span className="mission-enrolled-badge pending">⏳ Requesting</span>
+                  )}
+                  {enrolledMissions[mission.id] === "approved" && (
                     <span className="mission-enrolled-badge">Enrolled</span>
                   )}
                   <div className="mission-card-image">
@@ -459,58 +464,55 @@ const StudentHome = () => {
           </div>
         </section>
         {/* LEADERBOARD */}
-        <section className="leaderboard-section" aria-label="Leaderboard">
-          <div className="mission-section-header">
-            <h2 className="mission-section-title">Leaderboard</h2>
-            <p className="leaderboard-rank-text">
-              {currentUserRank ? `You are in ${getOrdinal(currentUserRank)} place.` : "Join a mission to get ranked!"}
-            </p>
-          </div>
+        <section className="leaderboard-section" aria-label="Leaderboard" style={{ backgroundImage: `linear-gradient(to bottom, #d1efff 10%, transparent 10%), url(${cloudsBg})`, backgroundSize: '100% 100%, 100% auto', backgroundPosition: '0 0, center top', backgroundRepeat: 'no-repeat, no-repeat', backgroundColor: '#d1efff' }}>
           <div className="leaderboard-body">
-            <div className="leaderboard-podium">
-              {podium.map((user) => {
-                const rank =
-                  user.uid === top1?.uid ? 1 :
-                    user.uid === top2?.uid ? 2 :
-                      3;
+            <div className="leaderboard-podium-col">
+              <h2 className="mission-section-title">Leaderboard</h2>
+              <p className="leaderboard-rank-text">
+                {currentUserRank ? `You are in ${getOrdinal(currentUserRank)} place.` : "Join a mission to get ranked!"}
+              </p>
+              <div className="leaderboard-podium">
+                {podium.map((user) => {
+                  const rank =
+                    user.uid === top1?.uid ? 1 :
+                      user.uid === top2?.uid ? 2 :
+                        3;
 
-                return (
-                  <div
-                    key={user.uid}
-                    className={`podium-item rank-${rank}`}
-                  >
-                    <div className="podium-top">
-                      <div
-                        className="podium-avatar-wrap"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => {
-                          navigate(`/profile/${user.uid}`);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
+                  return (
+                    <div
+                      key={user.uid}
+                      className={`podium-item rank-${rank}`}
+                    >
+                      <div className="podium-top">
+                        <div
+                          className="podium-avatar-wrap"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
                             navigate(`/profile/${user.uid}`);
-                          }
-                        }}
-                      >
-                        <img
-                          src={user.avatar}
-                          alt={user.name}
-                        />
-                        <span className="podium-rank">{rank}</span>
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              navigate(`/profile/${user.uid}`);
+                            }
+                          }}
+                        >
+                          {user.avatar ? <img src={user.avatar} alt={user.name} /> : <Face6RoundedIcon sx={{ width: 80, height: 80, color: '#30bdb7' }} />}
+                          <span className="podium-rank">{rank}</span>
 
-                      </div>
+                        </div>
 
-                      <div className="podium-info">
-                        <div className="podium-name">{user.name}</div>
-                        <div className="podium-points">{user.points} pts</div>
+                        <div className="podium-info">
+                          <div className="podium-name">{user.name}</div>
+                          <div className="podium-points">{user.points} pts</div>
+                        </div>
                       </div>
+                      <div className={`podium-base rank-${rank}`}></div>
                     </div>
-                    <div className={`podium-base rank-${rank}`}></div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
+              </div>
             </div>
             <div className="leaderboard-list" ref={leaderboardListRef}>
               {sortedLeaderboard.map((user, index) => {
@@ -530,10 +532,10 @@ const StudentHome = () => {
                     }}
                   >
                     <span className="rank-num">{rank}</span>
-                    <img
-                      src={user.avatar}
-                      alt={`${user.name}'s avatar`}
-                      className="leaderboard-avatar"></img>
+                    {user.avatar
+                      ? <img src={user.avatar} alt={`${user.name}'s avatar`} className="leaderboard-avatar" />
+                      : <Face6RoundedIcon sx={{ width: 32, height: 32, color: '#30bdb7' }} />
+                    }
                     <span className="rank-name">{user.name}</span>
                     <span className="rank-points">{user.points} pts</span>
                   </div>
@@ -541,6 +543,9 @@ const StudentHome = () => {
               })}
             </div>
           </div>
+
+          {/* MOUNTAIN - no content overlapping, sits at the very bottom */}
+          <img src={mountainBg} alt="" className="mountain-bg-div" />
         </section>
 
       </div>

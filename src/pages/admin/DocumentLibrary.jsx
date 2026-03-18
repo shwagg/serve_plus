@@ -46,6 +46,24 @@ export default function DocumentLibrary() {
   const [answerModalTitle, setAnswerModalTitle] = useState("");
   const [answerModalData, setAnswerModalData] = useState(null);
 
+  const handleBackfillUserId = async () => {
+    if (!window.confirm("Backfill userId for all existing volunteer documents? This is a one-time fix.")) return;
+    const missionsSnap = await getDocs(collection(db, "missions"));
+    let updated = 0;
+    for (const missionDoc of missionsSnap.docs) {
+      const volunteersSnap = await getDocs(collection(db, "missions", missionDoc.id, "volunteer"));
+      for (const volunteerDoc of volunteersSnap.docs) {
+        if (!volunteerDoc.data().userId) {
+          await updateDoc(doc(db, "missions", missionDoc.id, "volunteer", volunteerDoc.id), {
+            userId: volunteerDoc.id,
+          });
+          updated++;
+        }
+      }
+    }
+    alert(`Done. Updated ${updated} volunteer document(s).`);
+  };
+
   const fetchApprovedProposals = async () => {
     const snap = await getDocs(collection(db, "missions"));
     return snap.docs
@@ -265,7 +283,15 @@ export default function DocumentLibrary() {
   return (
     <>
       <div className="document-library" style={documentLibraryStyle}>
-        <h2>Document Library</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <h2>Document Library</h2>
+          <button
+            onClick={handleBackfillUserId}
+            style={{ background: '#23335b', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
+          >
+            Backfill User IDs
+          </button>
+        </div>
 
         {loading ? (
           <p className="loading-state">Loading submissions…</p>

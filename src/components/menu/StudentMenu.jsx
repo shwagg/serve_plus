@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Face6RoundedIcon } from '../icons';
 import createIcon from "../../assets/menuassets/Create.svg";
 import viewIcon from "../../assets/menuassets/View.svg";
 import infoIcon from "../../assets/menuassets/Info.svg";
@@ -40,10 +41,10 @@ export default function StudentMenu({
         className="menu-header-btn"
         onClick={() => handleMenuClick("/profile")}
       >
-        {userAvatar ? (
+        {userAvatar && !userAvatar.includes('ui-avatars.com') ? (
           <img src={userAvatar} alt="avatar" className="user-avatar-img" />
         ) : (
-          <div className="user-avatar">{avatarLetter}</div>
+          <Face6RoundedIcon sx={{ width: 40, height: 40, color: '#ffffff' }} />
         )}
         <div className="user-info">
           <p className="user-name">{displayUsername}</p>

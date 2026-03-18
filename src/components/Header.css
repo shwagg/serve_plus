@@ -9,19 +9,23 @@
 }
 .header-container {
   max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  padding: 0.5rem 2rem;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 100%;
+  box-sizing: border-box;
 }
 /* Logo Section */
 .header-logo {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 130px);
   background: none;
   border: none;
   cursor: pointer;
@@ -42,16 +46,17 @@
 .logo-icon {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: auto;
-  height: 60px; /*height of header*/
-  max-height: 100%;
-  overflow:hidden;
+  justify-content: flex-start;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 .logo-icon img {
   object-fit: contain;
-  width: 200px;
-  height: 200px;
+  height: 46px;
+  width: auto;
+  max-width: 100%;
+  flex-shrink: 1;
 }
 .logo-text {
   font-size: 1.5rem;
@@ -67,20 +72,37 @@
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 2px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  min-width: 100px;
+  overflow: visible;
+}
+.notification-bell-container {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.menu-container {
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 .icon-button {
   background: none;
   border: none;
   color: #00BCD4;
   cursor: pointer;
-  padding: 0.5rem;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 .icon-button:hover {
   background-color: rgba(0, 188, 212, 0.1);
@@ -91,31 +113,27 @@
 }
 /* Responsive Design */
 @media (max-width: 768px) {
-  .header-container {
-    padding: 0.75rem 1rem;
+  .logo-icon img {
+    height: 38px;
   }
-  .logo-text {
-    font-size: 1.25rem;
+  .icon-button {
+    width: 32px;
+    height: 32px;
   }
-  .logo-icon svg {
-    width: 28px;
-    height: 28px;
-  }
-  .icon-button svg {
-    width: 20px;
-    height: 20px;
+  .notification-bell-button {
+    padding: 4px;
   }
 }
 @media (max-width: 480px) {
-  .header-container {
-    padding: 0.5rem 0.75rem;
+  .logo-icon img {
+    height: 34px;
   }
-  .logo-text {
-    font-size: 1.1rem;
+  .icon-button {
+    width: 28px;
+    height: 28px;
   }
-  .logo-icon svg {
-    width: 24px;
-    height: 24px;
+  .notification-bell-button {
+    padding: 2px;
   }
 }
 
