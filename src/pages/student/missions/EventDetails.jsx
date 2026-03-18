@@ -179,6 +179,7 @@ export default function EventDetails() {
       }
       setShowSurveyModal(false);
     } catch (err) {
+      console.error('Join event error:', err);
       setSurveyError('Failed to upload consent form or submit survey. Please try again.');
     } finally {
       setConsentUploading(false);
