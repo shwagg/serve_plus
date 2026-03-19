@@ -45,7 +45,7 @@ export default function ProjectList({ mode = "admin" }) {
                     const userDoc = await getDoc(doc(db, "users", user.uid));
                     if (userDoc.exists()) {
                         const data = userDoc.data();
-                        if (data.partnerSchool) setPartnerSchool(data.partnerSchool);
+                        if (data.organizationName) setPartnerSchool(data.organizationName);
                         else if (data.name) setPartnerSchool(data.name); // fallback: use partner's name
                     }
                 } catch (err) {

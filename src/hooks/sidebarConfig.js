@@ -50,6 +50,7 @@ export const adminLinks = [
       { label: "Announcement", to: "/admin/system/announcement" },
       { label: "Privacy & Terms", to: "/admin/system/agreements" },
       { label: "Badges", to: "/admin/system/badges" },
+      { label: "Support Inbox", to: "/admin/support" },
     ],
   },
 ];

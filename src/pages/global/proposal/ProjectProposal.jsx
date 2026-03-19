@@ -60,7 +60,7 @@ function ProjectProposal({ projectType, onClose }) {
         const snap = await getDocs(collection(db, 'users'));
         const partners = snap.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(user => user.role === 'partner' && user.name);
+          .filter(user => user.role === 'partner');
         setPartnerSchools(partners);
       } catch {
         setPartnerSchools([]);
@@ -275,7 +275,9 @@ function ProjectProposal({ projectType, onClose }) {
                   >
                     <option value="">Select Partner School</option>
                     {partnerSchools.map(school => (
-                      <option key={school.id} value={school.name}>{school.name}</option>
+                      <option key={school.id} value={school.organizationName || school.name}>
+                        {school.organizationName || school.name || school.email}
+                      </option>
                     ))}
                   </select>
                 )}

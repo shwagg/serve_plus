@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
 import AgreementModal, {
   fetchCurrentAgreementVersion,
@@ -35,6 +35,7 @@ function Auth() {
   //only developers can see detailed debug info while developing.
 
   const [step, setStep] = useState("login"); //"login" or "mfa"
+  const intendedPath = useLocation().state?.from || null;
   const [mfaCode, setMfaCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -171,11 +172,11 @@ function Auth() {
         setCooldown(30);
         return;
       } else if (role === "faculty") {
-        navigate("/faculty/projects", { replace: true });
+        navigate(intendedPath || "/faculty/projects", { replace: true });
       } else if (role === "partner") {
-        navigate("/partner/dashboard", { replace: true });
+        navigate(intendedPath || "/partner/dashboard", { replace: true });
       } else {
-        navigate("/student/home", { replace: true });
+        navigate(intendedPath || "/student/home", { replace: true });
       }
     } catch (err) {
       if (isDev) console.error("Login error:", err);

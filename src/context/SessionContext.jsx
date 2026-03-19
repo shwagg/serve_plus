@@ -6,29 +6,38 @@ import { httpsCallable } from "firebase/functions";
 
 export const SessionContext = createContext();
 
-const SESSION_TIMEOUT = 10 * 60 * 1000; // currently 10 seconds, to make it 10 minutes = 10 * 60 * 1000
+const SESSION_TIMEOUTS = {
+  admin:   10 * 60 * 1000,  // 10 minutes
+  faculty: 10 * 60 * 1000,  // 10 minutes
+  student: 30 * 60 * 1000,  // 30 minutes
+  partner: 30 * 60 * 1000,  // 30 minutes
+};
+const DEFAULT_TIMEOUT = 10 * 60 * 1000;
 
 export function SessionProvider({ children }) {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const timeoutIdRef = useRef(null);
   const inactivityTimerRef = useRef(null);
+  const userDataRef = useRef(null);
+
+  // Keep a ref in sync so resetInactivityTimer always reads the latest role
+  useEffect(() => { userDataRef.current = userData; }, [userData]);
 
   // Reset the inactivity timer
   const resetInactivityTimer = () => {
-    // Clear existing timers
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
 
-    // Set new timer
-    //Note: Commment this to avoid loggin out while designing
-    //i'll uncomment after designing some pages
+    const role = userDataRef.current?.role;
+    const timeout = SESSION_TIMEOUTS[role] ?? DEFAULT_TIMEOUT;
 
-    //inactivityTimerRef.current = setTimeout(() => {
-    //  handleSessionTimeout();
-    //}, SESSION_TIMEOUT);
+    inactivityTimerRef.current = setTimeout(() => {
+      handleSessionTimeout();
+    }, timeout);
   };
 
   // Handle session timeout
@@ -59,8 +68,7 @@ export function SessionProvider({ children }) {
       }
       // Push a history entry so Back presses stay on the same page, and redirect to login
       window.history.pushState(null, null, window.location.href);
-      //WILL UNCOMMENT AFTER DESIGNING
-      //window.location.href = "/";
+      window.location.href = "/";
     } catch (error) {
       console.error("Error during logout:", error);
     } finally {
@@ -92,44 +100,42 @@ export function SessionProvider({ children }) {
   // Monitor auth state changes and fetch user data
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        // On successful login clear auto-logout marker and any popstate handler
-        try {
-          sessionStorage.removeItem("autoLoggedOut");
-        } catch (e) {
-          /* ignore */
-        }
-        try {
-          window.onpopstate = null;
-        } catch (e) {
-          /* ignore */
-        }
+      try {
+        if (user) {
+          // On successful login clear auto-logout marker and any popstate handler
+          try { sessionStorage.removeItem("autoLoggedOut"); } catch (e) { /* ignore */ }
+          try { window.onpopstate = null; } catch (e) { /* ignore */ }
 
-        // Fetch user data from Firestore
-        try {
-          const userRef = doc(db, "users", user.uid);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            console.log("SessionContext - Fetched user data:", data);
-            setUserData(data);
-          } else {
-            console.warn("SessionContext - User document not found in Firestore for uid:", user.uid);
+          // Fetch user data from Firestore
+          try {
+            const userRef = doc(db, "users", user.uid);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+              const data = userSnap.data();
+              console.log("SessionContext - Fetched user data:", data);
+              setUserData(data);
+            } else {
+              console.warn("SessionContext - User document not found for uid:", user.uid);
+              setUserData(null);
+            }
+          } catch (error) {
+            console.error("SessionContext - Error fetching user data:", error);
             setUserData(null);
           }
-        } catch (error) {
-          console.error("SessionContext - Error fetching user data:", error);
-          setUserData(null);
-        }
 
-        setIsSessionActive(true);
-        resetInactivityTimer();
-      } else {
-        setIsSessionActive(false);
-        setUserData(null);
-        if (inactivityTimerRef.current) {
-          clearTimeout(inactivityTimerRef.current);
+          setIsSessionActive(true);
+          resetInactivityTimer();
+        } else {
+          setIsSessionActive(false);
+          setUserData(null);
+          if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
         }
+      } finally {
+        // Always resolve authLoading regardless of success or error
+        setAuthLoading(false);
+      }
+
+      if (!user) {
 
         // If we were auto-logged-out, install a popstate handler on the login page
         try {
@@ -164,6 +170,7 @@ export function SessionProvider({ children }) {
 
   const value = {
     isSessionActive,
+    authLoading,
     logout,
     resetInactivityTimer,
     userData,

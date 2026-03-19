@@ -123,7 +123,7 @@ export default function Header() {
         navigate('/faculty/home');
         break;
       case 'partner':
-        navigate('/partner/home');
+        navigate('/partner/dashboard');
         break;
       case 'admin':
         navigate('/admin/dashboard');

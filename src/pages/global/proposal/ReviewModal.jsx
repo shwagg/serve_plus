@@ -193,37 +193,34 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
 
       await updateDoc(proposalRef, updateData);
 
-      const nextStatus = updateData.status || proposal.status || "pending";
-      const statusLabel = formatStatus(nextStatus);
-      try {
-        if (proposal.createdBy) {
-          await createNotification(proposal.createdBy, {
-            type: "proposal_status",
-            title: "Proposal Status Updated",
-            message: `Your proposal "${proposal.title || "Untitled"}" is now ${statusLabel}.`,
-            link: "/global/review-proposals",
-            proposalId: proposal.id,
-          });
-        }
-        await notifyUsersByRoles(["admin", "faculty"], {
-          type: "proposal_status",
-          title: "Proposal Status Updated",
-          message: `"${proposal.title || "Untitled"}" is now ${statusLabel}.`,
-          link: "/global/review-proposals",
-          proposalId: proposal.id,
-        });
-      } catch (notificationError) {
-        console.error("Error creating proposal status notifications:", notificationError);
-      }
+      // Confirm approval immediately so the UI updates without waiting for notifications
       setActionSaved(true);
-      
       if (onApprovalChange) {
         onApprovalChange();
       }
-
       setTimeout(() => {
         onClose();
       }, 1500);
+
+      // Send notifications in background — don't await so they don't block the UI
+      const nextStatus = updateData.status || proposal.status || "pending";
+      const statusLabel = formatStatus(nextStatus);
+      const notifData = {
+        type: "proposal_status",
+        title: "Proposal Status Updated",
+        message: `"${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+        link: "/global/review-proposals",
+        proposalId: proposal.id,
+      };
+      Promise.allSettled([
+        proposal.createdBy
+          ? createNotification(proposal.createdBy, {
+              ...notifData,
+              message: `Your proposal "${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+            })
+          : Promise.resolve(),
+        notifyUsersByRoles(["admin", "faculty"], notifData),
+      ]).catch((err) => console.error("Error sending proposal status notifications:", err));
     } catch (error) {
       console.error("Error approving proposal:", error);
       setApprovalMessage("Error approving proposal. Please try again.");
@@ -263,36 +260,33 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
 
       await updateDoc(proposalRef, updateData);
 
-      const statusLabel = formatStatus(updateData.status);
-      try {
-        if (proposal.createdBy) {
-          await createNotification(proposal.createdBy, {
-            type: "proposal_status",
-            title: "Proposal Status Updated",
-            message: `Your proposal "${proposal.title || "Untitled"}" is now ${statusLabel}.`,
-            link: "/global/review-proposals",
-            proposalId: proposal.id,
-          });
-        }
-        await notifyUsersByRoles(["admin", "faculty"], {
-          type: "proposal_status",
-          title: "Proposal Status Updated",
-          message: `"${proposal.title || "Untitled"}" is now ${statusLabel}.`,
-          link: "/global/review-proposals",
-          proposalId: proposal.id,
-        });
-      } catch (notificationError) {
-        console.error("Error creating proposal status notifications:", notificationError);
-      }
+      // Confirm rejection immediately so the UI updates without waiting for notifications
       setActionSaved(true);
-      
       if (onApprovalChange) {
         onApprovalChange();
       }
-
       setTimeout(() => {
         onClose();
       }, 1500);
+
+      // Send notifications in background
+      const statusLabel = formatStatus(updateData.status);
+      const notifData = {
+        type: "proposal_status",
+        title: "Proposal Status Updated",
+        message: `"${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+        link: "/global/review-proposals",
+        proposalId: proposal.id,
+      };
+      Promise.allSettled([
+        proposal.createdBy
+          ? createNotification(proposal.createdBy, {
+              ...notifData,
+              message: `Your proposal "${proposal.title || "Untitled"}" is now ${statusLabel}.`,
+            })
+          : Promise.resolve(),
+        notifyUsersByRoles(["admin", "faculty"], notifData),
+      ]).catch((err) => console.error("Error sending proposal status notifications:", err));
     } catch (error) {
       console.error("Error rejecting proposal:", error);
       setApprovalMessage("Error rejecting proposal. Please try again.");

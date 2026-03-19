@@ -205,14 +205,19 @@ h3{
 .project-search {
   padding: 8px 14px;
   border-radius: 999px;
-  border: 1px solid #ddd;
+  border: 1px solid #e2e8f0;
+  background: #f4f6fb;
   min-width: 220px;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #1e293b;
+  transition: border-color 0.15s;
 }
-.project-search {
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid #ddd;
-  min-width: 220px;
+
+.project-search:focus {
+  border-color: #94a3b8;
+  background: #fff;
 }
 /*icon button*/
 .view-icon-btn {

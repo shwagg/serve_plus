@@ -19,6 +19,9 @@ if hindi gumana export, use -> firebase emulators:export ./emulator_data --force
 
 isang run ng import and export -> firebase emulators:start --import=./emulator_data --export-on-exit
 
+mas okay gamitin for isahang run (import-export):
+firebase emulators:start --import=./emulator_data --export-on-exit=./emulator_data
+
 
 okay solution mga panget
 kung pagkaexport niyo parang nareplace yung folder from "emulator_data" to whateva 
@@ -27,7 +30,7 @@ close niyo lang lahat from database to vite(react) tas run this command
 
 Rename-Item (currentname)  emulator_data
 Example: 
-Rename-Item "firebase-export-1772484399058P5H1FW" -NewName "emulator_data"
+Rename-Item "firebase-export-1773901846784JB7Wok" -NewName "emulator_data"
 
 Hi, for material-icons, install lang ito:
 close yung run npm dev.

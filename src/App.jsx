@@ -18,6 +18,7 @@ import ForgotPass from "./pages/ForgotPass";
 import OAuthCallback from "./pages/OAuthCallback";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminSupport from "./pages/admin/AdminSupport";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AgreementEditor from "./pages/admin/AgreementEditor";
 import AuditLogs from "./pages/admin/AuditLogs";
@@ -40,6 +41,7 @@ import ProposeProject from "./pages/global/ProposeProject";
 import PublicProfile from "./pages/global/PublicProfile";
 import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
+import Support from "./pages/global/menu/Support";
 import PartnerHome from "./pages/partner/PartnerHome";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import StudentHome from "./pages/student/StudentHome";
@@ -89,6 +91,7 @@ function App() {
               path="projects/:projectId/tasks"
               element={<ProjectTasks />}
             />
+            <Route path="support" element={<AdminSupport />} />
             <Route path="roster" element={<RosterAccountManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="backup-restore" element={<BackupRestore />} />
@@ -192,6 +195,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/global/menu/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
           <Route path="/global/terms-condition" element={<TermsCondition />} />
           <Route path="/global/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/certificate-generator" element={<CertificateGenerator />} />

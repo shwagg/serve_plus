@@ -16,7 +16,7 @@
     "@mui/material": "^7.3.7",
     "axios": "^1.13.6",
     "firebase": "^12.6.0",
-    "firebase-admin": "^13.6.0",
+    "firebase-admin": "^13.7.0",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",
     "html5-qrcode": "^2.3.8",

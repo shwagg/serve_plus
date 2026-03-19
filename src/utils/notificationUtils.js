@@ -29,9 +29,9 @@ export async function notifyUsersByRoles(roles, notificationData) {
   const q = query(usersRef, where("role", "in", roles));
   const snapshot = await getDocs(q);
 
-  for (const docSnap of snapshot.docs) {
-    await createNotification(docSnap.id, notificationData);
-  }
+  await Promise.allSettled(
+    snapshot.docs.map((docSnap) => createNotification(docSnap.id, notificationData))
+  );
 }
 
 export async function markNotificationAsRead(userId, notificationId) {

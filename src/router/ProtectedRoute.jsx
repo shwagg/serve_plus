@@ -1,21 +1,27 @@
-import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import { useSession } from "../context/SessionContext";
 //uses data from SessionContext, to have prevent redundancy
 
 export function ProtectedRoute({ children, allowedRoles }) {
-  const { userData, isSessionActive } = useSession();
+  const { userData, isSessionActive, authLoading } = useSession();
+  const location = useLocation();
 
-  if (isSessionActive && !userData) {
+  // Wait for Firebase to restore auth state before making any redirect decision
+  if (authLoading) {
     return <div>Loading...</div>; //to be replaced with loading animation
   }
 
-  //If not logged in
+  // Not logged in — save intended destination so we can redirect back after login
   if (!isSessionActive) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
   }
 
-  //No specific role required
+  // Still fetching user data from Firestore
+  if (!userData) {
+    return <div>Loading...</div>;
+  }
+
+  // No specific role required
   if (!allowedRoles || allowedRoles.length === 0) {
     return children;
   }

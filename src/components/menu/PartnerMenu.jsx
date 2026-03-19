@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import dashboardIcon from "../../assets/menuassets/Dashboard.svg";
-import feedbackFormIcon from "../../assets/menuassets/FeedbackForm.svg";
 import infoIcon from "../../assets/menuassets/Info.svg";
 import projectListIcon from "../../assets/menuassets/List.svg";
 import privacyPol from "../../assets/menuassets/PrivacyPolicy.svg";
@@ -50,35 +49,24 @@ export default function PartnerMenu({
       <div className="menu-items">
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/partner/dashboard")}
+          onClick={() => { navigate("/partner/dashboard", { state: { scrollTop: true } }); onClose(); }}
         >
           <img src={dashboardIcon} alt="Dashboard" className="menu-icon" />
           Dashboard
         </button>
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/partner/projects")}
+          onClick={() => { handleMenuClick("/partner/dashboard"); setTimeout(() => document.getElementById("section-projects")?.scrollIntoView({ behavior: "smooth" }), 300); }}
         >
           <img src={projectListIcon} alt="Project List" className="menu-icon" />
           Project List
         </button>
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/global/review-proposals")}
+          onClick={() => { navigate("/partner/dashboard", { state: { expandSection: "review" } }); onClose(); }}
         >
           <img src={viewIcon} alt="Review Proposals" className="menu-icon" />
           Review Proposals
-        </button>
-        <button
-          className="menu-item"
-          onClick={() => handleMenuClick(`/global/feedback/${missionId}`)}
-        >
-          <img
-            src={feedbackFormIcon}
-            alt="Feedback Form"
-            className="menu-icon"
-          />
-          Feedback Form
         </button>
         <button
           className="menu-item"

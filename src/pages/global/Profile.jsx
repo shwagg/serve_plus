@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 // Simple modal component
-function EditProfileModal({ open, onClose, profile, onConfirm }) {
+function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
   const softSkills = [
     "Teamwork", "Communication", "Problem Solving", "Leadership", "Time Management",
     "Adaptability", "Conflict Resolution", "Empathy", "Critical Thinking", "Responsibility"
@@ -22,6 +22,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
   const [name, setName] = useState(profile.name || "");
   const [email, setEmail] = useState(profile.email || "");
   const [username, setUsername] = useState(profile.username || "");
+  const [organizationName, setOrganizationName] = useState(profile.organizationName || "");
   const [skills, setSkills] = useState(profile.skills || []);
   const [interests, setInterests] = useState(profile.interests || []);
   const [uploading, setUploading] = useState(false);
@@ -34,6 +35,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
       setName(profile.name || "");
       setEmail(profile.email || "");
       setUsername(profile.username || "");
+      setOrganizationName(profile.organizationName || "");
       setSkills(profile.skills || []);
       setInterests(profile.interests || []);
     }
@@ -149,6 +151,21 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
             <label className="profile-modal-label">Name</label><br />
             <input type="text" value={name} onChange={e => setName(e.target.value)} className="profile-modal-input" />
           </div>
+          {role === 'partner' && (
+            <div>
+              <label className="profile-modal-label">Organization Name</label><br />
+              <input
+                type="text"
+                value={organizationName}
+                onChange={e => setOrganizationName(e.target.value)}
+                className="profile-modal-input"
+                placeholder="e.g., Barangay San Jose, Mapua MCL"
+              />
+              <small style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                This is the name shown to faculty when selecting a partner for a project proposal.
+              </small>
+            </div>
+          )}
           <div>
             <label className="profile-modal-label">Email</label><br />
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="profile-modal-input" />
@@ -219,7 +236,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm }) {
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
-          <button onClick={() => onConfirm({ avatar, name, email, username, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
+          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
@@ -613,6 +630,7 @@ export default function Profile() {
             open={editOpen}
             onClose={() => setEditOpen(false)}
             profile={profile || {}}
+            role={profile?.role}
             onConfirm={async updated => {
               try {
                 const user = auth.currentUser;
