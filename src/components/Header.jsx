@@ -16,6 +16,7 @@ import PartnerMenu from './menu/PartnerMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
 import ChatModal from './ChatModal';
+import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 
 
 const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
@@ -68,6 +69,8 @@ export default function Header() {
   const [selectedProjectType, setSelectedProjectType] = useState('');
   const [showChatModal, setShowChatModal] = useState(false);
   const [showCertificateQRModal, setShowCertificateQRModal] = useState(false);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -99,6 +102,16 @@ export default function Header() {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  useEffect(() => {
+    const checkCount = () => {
+      if (window.announcementActions?.getUnreadCount) {
+        setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
+      }
+    };
+    checkCount();
+    const interval = setInterval(checkCount, 500);
+    return () => clearInterval(interval);
   }, []);
   const handleLogoClick = () => {
     if (!userRole) return;
@@ -180,6 +193,10 @@ export default function Header() {
               <img src={chatIcon} alt="Chat" width="24" height="24" />
             </button>
             <NotificationBell />
+            <GlobalNotificationButton
+              unreadCount={announcementUnreadCount}
+              onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+            />
             <div className="menu-container" ref={menuRef}>
               <button
                 className="icon-button menu-button"
@@ -192,6 +209,25 @@ export default function Header() {
           </div>
         </div>
       </header>
+      <aside
+        className={`global-feed ${announcementsOpen ? 'open' : ''}`}
+        style={{
+          position: 'fixed',
+          top: 80,
+          right: 0,
+          height: 'calc(100vh - 80px)',
+          width: 380,
+          background: '#fff',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          borderLeft: '2px solid #30bdb7',
+          zIndex: 999,
+          transition: 'transform 0.3s',
+          transform: announcementsOpen ? 'translateX(0)' : 'translateX(100%)',
+          pointerEvents: announcementsOpen ? 'auto' : 'none'
+        }}
+      >
+        <GlobalAnnouncements />
+      </aside>
       <ChatModal
         isOpen={showChatModal}
         onClose={() => setShowChatModal(false)}

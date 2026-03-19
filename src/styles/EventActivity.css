@@ -683,3 +683,411 @@
     margin-bottom: 16px;
   }
 }
+
+/* ═══════════════════════════════════════════════════
+   REVAMPED EVENT ACTIVITY — New Component Styles
+═══════════════════════════════════════════════════ */
+
+/* ── Full-page centered states (loading / error) ─── */
+.ea-fullpage-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 60vh;
+  color: #374151;
+  gap: 8px;
+  text-align: center;
+  padding: 32px;
+}
+
+/* ── Event Info Box items ─────────────────────────── */
+.ea-info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f4f8;
+}
+.ea-info-item:last-child { border-bottom: none; }
+
+.ea-info-icon {
+  font-size: 18px;
+  line-height: 1;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.ea-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #9ca3af;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.ea-info-value {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+}
+.ea-pts-value { color: #059669; }
+
+/* ── Points earned hero box ──────────────────────── */
+.ea-points-earned-box {
+  background: linear-gradient(135deg, #234e7b 0%, #30bdb7 100%);
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-align: center;
+  margin: 10px 0 4px;
+  color: #fff;
+}
+.ea-points-earned-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  opacity: 0.8;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ea-points-earned-value {
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.ea-points-earned-sub {
+  font-size: 13px;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+.ea-points-bar-wrap {
+  background: rgba(255,255,255,0.25);
+  border-radius: 8px;
+  height: 6px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.ea-points-bar-fill {
+  height: 100%;
+  background: #fff;
+  border-radius: 8px;
+  transition: width 0.5s ease;
+}
+
+/* ── Step progress indicator ─────────────────────── */
+.ea-steps-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 4px;
+  padding: 0 4px;
+  gap: 2px;
+}
+
+.ea-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.ea-step.done { opacity: 1; }
+
+.ea-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e5e7eb;
+  transition: all 0.2s;
+}
+.ea-step.done .ea-step-circle {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+
+.ea-step-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: center;
+  white-space: nowrap;
+}
+.ea-step.done .ea-step-label { color: #065f46; }
+
+.ea-step-line {
+  flex: 1;
+  height: 2px;
+  background: #e5e7eb;
+  margin-bottom: 16px;
+  transition: background 0.2s;
+}
+.ea-step-line.done { background: #10b981; }
+
+/* ── Task cards (expandable) ─────────────────────── */
+.ea-task-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1.5px solid #e5e7eb;
+  margin-bottom: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.ea-task-card.enrolled {
+  border-left: 4px solid #10b981;
+}
+.ea-task-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.09);
+  border-color: #c7d2fe;
+}
+
+.ea-task-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  gap: 12px;
+}
+.ea-task-header:hover { background: #fafafa; }
+
+.ea-task-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.ea-task-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ea-task-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ea-task-pts {
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ea-enroll-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.ea-enroll-badge.enrolled { background: #dcfce7; color: #166534; }
+.ea-enroll-badge.closed   { background: #f3f4f6; color: #9ca3af; }
+
+.ea-join-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.ea-join-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+}
+
+.ea-expand-icon {
+  font-size: 11px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* ── Task body (expanded content) ────────────────── */
+.ea-task-body {
+  padding: 0 18px 18px;
+  border-top: 1px dashed #e5e7eb;
+  animation: eaBodyIn 0.18s ease;
+}
+@keyframes eaBodyIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Journal section inside task ─────────────────── */
+.ea-journal-section {
+  margin-top: 14px;
+}
+.ea-journal-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ea-journal-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+.ea-journal-locked-note {
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+}
+.ea-journal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  gap: 12px;
+}
+.ea-char-count {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.ea-submit-btn {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 22px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+.ea-submit-btn:hover:not(.locked) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(79,70,229,0.3);
+}
+.ea-submit-btn.locked {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+.ea-submit-status {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ea-submit-status.success { background: #dcfce7; color: #166534; }
+.ea-submit-status.error   { background: #fee2e2; color: #b91c1c; }
+
+.ea-journal-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ── New modal styles ────────────────────────────── */
+.ea-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: eaBodyIn 0.18s ease;
+}
+
+.ea-modal-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 0;
+  min-width: 340px;
+  max-width: 620px;
+  width: 95vw;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+
+.ea-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid #f0f4f8;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.ea-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+.ea-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 50%;
+  font-size: 15px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.ea-modal-close:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  transform: scale(1.1);
+}
+
+/* ── Retry button ────────────────────────────────── */
+.ea-retry-btn {
+  padding: 8px 16px;
+  background: #f0f4f8;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #374151;
+}
+.ea-retry-btn:hover {
+  background: #e0e7ef;
+  transform: translateY(-1px);
+}

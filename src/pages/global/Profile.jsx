@@ -230,8 +230,6 @@ import Header from "../../components/Header.jsx";
 import "../../styles/Profile.css";
 import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
-import { GlobalNotificationButton } from "../../components/GlobalAnnouncements";
-
 const PROFILE_TABS = ["Overview", "Portfolio"];
 
 const SDG_LABELS = {

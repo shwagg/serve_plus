@@ -10,7 +10,6 @@ import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
 import { useSession } from '../../../context/SessionContext';
 import ChooseGroup from './ChooseGroup';
-import { GlobalNotificationButton } from "../../../components/GlobalAnnouncements";
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
@@ -56,27 +55,11 @@ export default function EventActivity() {
   const auth = getAuth();
   const location = useLocation();
   const mode = "active";
-  const [open, setOpen] = useState(false);
-  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrStatus, setQRStatus] = useState("");
   const [scannedLocation, setScannedLocation] = useState(null);
   const [scannerKey, setScannerKey] = useState(0);
   const [scanSuccess, setScanSuccess] = useState(false);
-
-  // Update unread count from GlobalAnnouncements
-  useEffect(() => {
-    // Check immediately
-    const checkCount = () => {
-      if (window.announcementActions?.getUnreadCount) {
-        setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
-      }
-    };
-
-    checkCount();
-    const interval = setInterval(checkCount, 500);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleQRScan = async (decodedText, position) => {
     setQRStatus("");
@@ -277,7 +260,9 @@ const [editingJournalId, setEditingJournalId] = useState(null);
 const [editingJournalText, setEditingJournalText] = useState("");
 const [enrolledTasks, setEnrolledTasks] = useState({});
 const [volunteerProgress, setVolunteerProgress] = useState(null);
+const [expandedTasks, setExpandedTasks] = useState({});
 const canJoinActivities = true;
+const toggleTaskExpand = (taskId) => setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
 // Handler for adding a skill to a level (for placeholder)
 const handleAddSkill = (skill, level) => {
   if (level === "easy")
@@ -1474,30 +1459,45 @@ useEffect(() => {
 
 if (loading) {
   return (
-    <div style={{ padding: 32, color: "#234e7b", fontWeight: 600 }}>
-      Loading...
+    <div className="full-page">
+      <Header />
+      <div className="header-spacer" />
+      <div className="ea-fullpage-center">
+        <div className="page-spinner" />
+        <p style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>Loading event…</p>
+      </div>
     </div>
   );
 }
 if (!event) {
   return (
-    <div style={{ padding: 32, color: "#d32f2f", fontWeight: 700 }}>
-      Event not found.
-      <br />
-      <span style={{ fontWeight: 400, color: "#234e7b" }}>
-        Check the event ID in the URL or verify your Firestore data.
-      </span>
+    <div className="full-page">
+      <Header />
+      <div className="header-spacer" />
+      <div className="ea-fullpage-center">
+        <span style={{ fontSize: 48 }}>😕</span>
+        <h2 style={{ color: '#374151', marginTop: 12 }}>Event not found</h2>
+        <p style={{ color: '#6b7280' }}>Check the event ID in the URL or verify your Firestore data.</p>
+        <button className="ui-btn" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>Go Back</button>
+      </div>
     </div>
   );
 }
 if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
   return (
-    <div style={{ padding: 32, color: "#d32f2f", fontWeight: 700 }}>
-      No tasks found for this event.
-      <br />
-      <span style={{ fontWeight: 400, color: "#234e7b" }}>
-        Check your Firestore tasks subcollection.
-      </span>
+    <div className="full-page">
+      <Header />
+      <div className="header-spacer" />
+      <div className="ea-fullpage-center">
+        <span style={{ fontSize: 48 }}>📋</span>
+        <h2 style={{ color: '#374151', marginTop: 12 }}>No tasks yet</h2>
+        <p style={{ color: '#6b7280' }}>No tasks have been added to this event.</p>
+        <button className="ui-btn" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>Go Back</button>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ display: 'none' }}>
     </div>
   );
 }
@@ -1568,34 +1568,44 @@ return (
             </p>
             {/* White info box */}
             <div className="event-info-box">
-              <div style={{ marginBottom: 10 }}>
-                <strong>Location:</strong>{" "}
-                <span style={{ color: "#234e7b" }}>{event.location}</span>
+              <div className="ea-info-item">
+                <span className="ea-info-icon">📍</span>
+                <div>
+                  <div className="ea-info-label">Location</div>
+                  <div className="ea-info-value">{event.location || 'TBA'}</div>
+                </div>
               </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Date & Time:</strong>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  <li>{event.date}</li>
-                  <li>{event.time}</li>
-                </ul>
+              <div className="ea-info-item">
+                <span className="ea-info-icon">📅</span>
+                <div>
+                  <div className="ea-info-label">Date &amp; Time</div>
+                  <div className="ea-info-value">{event.date || 'TBA'}{event.time ? ` · ${event.time}` : ''}</div>
+                </div>
               </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Points:</strong>{" "}
-                <span style={{ color: "#388e3c" }}>{event.points} PTS</span>
+              <div className="ea-info-item">
+                <span className="ea-info-icon">⭐</span>
+                <div>
+                  <div className="ea-info-label">Event Points</div>
+                  <div className="ea-info-value ea-pts-value">{event.points || 0} pts</div>
+                </div>
               </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Your Points Earned:</strong>{" "}
-                <span style={{ color: "#1976d2", fontWeight: 600, fontSize: 16 }}>{totalPointsEarned} PTS</span>
+              {/* Your Points Earned */}
+              <div className="ea-points-earned-box">
+                <div className="ea-points-earned-label">Your Points Earned</div>
+                <div className="ea-points-earned-value">{totalPointsEarned}</div>
+                <div className="ea-points-earned-sub">pts</div>
+                {event.points > 0 && (
+                  <div className="ea-points-bar-wrap">
+                    <div className="ea-points-bar-fill" style={{ width: `${Math.min(100, (totalPointsEarned / event.points) * 100)}%` }} />
+                  </div>
+                )}
               </div>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Event Badge:</strong>
-                <br />
-                <img
-                  src={event.badge || "/assets/badge.png"}
-                  alt="Event Badge"
-                  className="image-badge"
-                />
-              </div>
+              {event.badge && (
+                <div className="ea-info-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                  <div className="ea-info-label">Event Badge</div>
+                  <img src={event.badge} alt="Event Badge" className="image-badge" />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1688,138 +1698,115 @@ return (
       <div className="event-right-panel">
         <div className="event-activities-panel">
           <h2 className="event-activities-title">
-            Activity
+            Activities
           </h2>
           {/*TASKS AVAILABLE FOR THIS SPECIFIC EVENT*/}
           {tasks &&
             tasks.map((activity, idx) => {
-              // Find journals for this activity
               const journalsForActivity = userJournals.filter(
                 (j) => j.activityId === activity.title
               );
+              const isEnrolled = !!enrolledTasks[activity.id];
+              const isExpanded = !!expandedTasks[activity.id];
+              const journalText = journalReflections[idx] || "";
+              const charCount = journalText.length;
               return (
-                <div key={idx} className="activity-card">
-                  <div className="requirement-item activity-item">
-                    <span className="req-label">
-                      {activity.title} ({activity.points} pts)
-                    </span>
-
-                    {/* JOIN LOGIC */}
-                    {enrolledTasks[activity.id] ? (
-                      <span className="req-status done">Enrolled</span>
-                    ) : canJoinActivities ? (
-                      <button
-                        className="req-action"
-                        onClick={() => handleJoinActivity(activity.id, activity)}
-                      >
-                        Join {activity.type === "grouped" ? "Group" : ""}
-                      </button>
-                    ) : (
-                      <span className="req-status locked">Closed</span>
-                    )}
+                <div key={idx} className={`ea-task-card${isEnrolled ? ' enrolled' : ''}`}>
+                  {/* Card Header */}
+                  <div className="ea-task-header" onClick={() => toggleTaskExpand(activity.id)} role="button" tabIndex={0} aria-expanded={isExpanded} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleTaskExpand(activity.id)}>
+                    <div className="ea-task-header-left">
+                      <span className="ea-task-title">{activity.title}</span>
+                      <span className="ea-task-pts">+{activity.points} pts</span>
+                    </div>
+                    <div className="ea-task-header-right">
+                      {isEnrolled ? (
+                        <span className="ea-enroll-badge enrolled">✓ Enrolled</span>
+                      ) : canJoinActivities ? (
+                        <button
+                          className="ea-join-btn"
+                          onClick={e => { e.stopPropagation(); handleJoinActivity(activity.id, activity); }}
+                        >
+                          {activity.type === "grouped" ? "Join Group" : "Join"}
+                        </button>
+                      ) : (
+                        <span className="ea-enroll-badge closed">Closed</span>
+                      )}
+                      <span className="ea-expand-icon">{isExpanded ? '▲' : '▼'}</span>
+                    </div>
                   </div>
 
-                  {/* User's journals for this activity */}
-                  {journalsForActivity.length > 0 &&
-                    journalsForActivity.map((journal) => (
-                      <div key={journal.id} className="journal-card">
-                        {editingJournalId === journal.taskId ? (
-                          <>
-                            <textarea
-                              value={editingJournalText}
-                              onChange={(e) =>
-                                setEditingJournalText(e.target.value)
-                              }
-                              className="journal-edit-textarea"
-                            />
-                            <button
-                              onClick={() => handleSaveEditJournal(journal)}
-                              className="journal-button journal-button-save"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingJournalId(null)}
-                              className="journal-button journal-button-cancel"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <div className="journal-text">
-                              {journal.reflection}
-                            </div>
-                            <button
-                              onClick={() => handleEditJournal(journal)}
-                              className="journal-button journal-button-edit"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDeleteJournal(journal.taskId)
-                              }
-                              className="journal-button journal-button-delete"
-                            >
-                              Delete
-                            </button>
-                          </>
+                  {/* Expandable body */}
+                  {isExpanded && (
+                    <div className="ea-task-body">
+                      {/* Details list */}
+                      {activity.details && activity.details.length > 0 && (
+                        <ul className="activity-details-list">
+                          {activity.details.map((detail, i) => <li key={i}>{detail}</li>)}
+                        </ul>
+                      )}
+                      {activity.required && (
+                        <div className="activity-required">
+                          <strong>Required:</strong> {activity.required}
+                        </div>
+                      )}
+
+                      {/* Existing journal entries */}
+                      {journalsForActivity.length > 0 && journalsForActivity.map((journal) => (
+                        <div key={journal.id} className="journal-card">
+                          {editingJournalId === journal.taskId ? (
+                            <>
+                              <textarea
+                                value={editingJournalText}
+                                onChange={e => setEditingJournalText(e.target.value)}
+                                className="journal-edit-textarea"
+                              />
+                              <div className="ea-journal-btn-row">
+                                <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
+                                <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="journal-text">{journal.reflection}</div>
+                              <div className="ea-journal-btn-row">
+                                <button onClick={() => handleEditJournal(journal)} className="journal-button journal-button-edit">Edit</button>
+                                <button onClick={() => handleDeleteJournal(journal.taskId)} className="journal-button journal-button-delete">Delete</button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Journal textarea + submit */}
+                      <div className="ea-journal-section">
+                        <div className="ea-journal-label-row">
+                          <span className="ea-journal-label">📝 Reflection Journal</span>
+                          {!isEventDay && <span className="ea-journal-locked-note">🔒 Unlocks on event day</span>}
+                        </div>
+                        <textarea
+                          placeholder={isEventDay ? "Write your reflection here…" : "Will be available during the event"}
+                          className="journal-textarea"
+                          value={journalText}
+                          onChange={e => handleJournalChange(idx, e.target.value)}
+                          disabled={!isEventDay}
+                          maxLength={1000}
+                        />
+                        <div className="ea-journal-footer">
+                          <span className="ea-char-count">{charCount}/1000</span>
+                          <button
+                            className={`ea-submit-btn${!isEventDay || !journalText.trim() ? ' locked' : ''}`}
+                            disabled={!isEventDay || !journalText.trim()}
+                            onClick={() => handleJournalSubmit(idx, activity)}
+                          >
+                            {!isEventDay ? '🔒 Locked' : 'Submit Reflection'}
+                          </button>
+                        </div>
+                        {submitStatus[idx] && (
+                          <div className={`ea-submit-status${submitStatus[idx].startsWith('Reflection submitted') ? ' success' : ' error'}`}>
+                            {submitStatus[idx]}
+                          </div>
                         )}
                       </div>
-                    ))}
-                  <ul className="activity-details-list">
-                    {activity.details &&
-                      activity.details.map((detail, i) => (
-                        <li key={i}>{detail}</li>
-                      ))}
-                  </ul>
-                  {activity.required && (
-                    <div className="activity-required">
-                      <strong>Required:</strong> {activity.required}
-                    </div>
-                  )}
-                  <textarea
-                    placeholder={
-                      !isEventDay
-                        ? "Journal will be available during the event"
-                        : "Journal Reflection"
-                    }
-                    className="journal-textarea"
-                    value={journalReflections[idx] || ""}
-                    onChange={(e) => handleJournalChange(idx, e.target.value)}
-                    disabled={!isEventDay}
-                  />
-                  <div className="task-progress-row">
-                    <span>Task Progress</span>
-                    <progress
-                      value={
-                        submitStatus[idx] === "Reflection submitted!" ? 100 : 0
-                      }
-                      max="100"
-                      className="task-progress-bar"
-                    />
-                  </div>
-                  <button
-                    className="activity-submit-button"
-                    disabled={
-                      !isEventDay ||
-                      !journalReflections[idx] ||
-                      !journalReflections[idx].trim()
-                    }
-                    onClick={() => handleJournalSubmit(idx, activity)}
-                  >
-                    {!isEventDay ? "LOCKED" : "SUBMIT"}
-                  </button>
-
-                  {submitStatus[idx] && (
-                    <div
-                      className={`submit-status ${submitStatus[idx] === "Reflection submitted!"
-                        ? "submit-status-success"
-                        : "submit-status-error"
-                        }`}
-                    >
-                      {submitStatus[idx]}
                     </div>
                   )}
                 </div>
@@ -1829,22 +1816,47 @@ return (
         {/*REQUIREMENTS SECTION (UNDER ALL TASKS)*/}
         <div className="event-activities-panel">
           <h3 className="event-activities-title">Requirements</h3>
-          <div className="requirements-status">
-            Status: <span className={`status-text ${volunteerProgress?.preSurvey === 'submitted' &&
+
+          {/* Step progress indicator */}
+          {(() => {
+            const steps = [
+              { key: 'preSurvey',  label: 'Pre-Survey',  check: volunteerProgress?.preSurvey === 'submitted' },
+              { key: 'consent',    label: 'Consent',     check: volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified' },
+              { key: 'attendance', label: 'Attendance',  check: volunteerProgress?.attendance === 'present' },
+              { key: 'postSurvey', label: 'Post-Survey', check: volunteerProgress?.postSurvey === 'submitted' },
+            ];
+            const completedCount = steps.filter(s => s.check).length;
+            return (
+              <div className="ea-steps-container">
+                {steps.map((step, i) => (
+                  <React.Fragment key={step.key}>
+                    <div className={`ea-step${step.check ? ' done' : ''}`}>
+                      <div className="ea-step-circle">{step.check ? '✓' : i + 1}</div>
+                      <div className="ea-step-label">{step.label}</div>
+                    </div>
+                    {i < steps.length - 1 && <div className={`ea-step-line${steps[i + 1].check ? ' done' : ''}`} />}
+                  </React.Fragment>
+                ))}
+              </div>
+            );
+          })()}
+
+          <div className="requirements-status" style={{ marginTop: 12 }}>
+            Status: <span className={`status-text ${
+              volunteerProgress?.preSurvey === 'submitted' &&
               volunteerProgress?.consent === 'submitted' &&
               volunteerProgress?.attendance === 'present' &&
               volunteerProgress?.postSurvey === 'submitted'
-              ? 'complete'
-              : 'incomplete'
-              }`}>
+                ? 'complete' : 'incomplete'
+            }`}>
               {volunteerProgress?.preSurvey === 'submitted' &&
-                volunteerProgress?.consent === 'submitted' &&
-                volunteerProgress?.attendance === 'present' &&
-                volunteerProgress?.postSurvey === 'submitted'
-                ? 'Complete'
-                : 'Incomplete'}
+               volunteerProgress?.consent === 'submitted' &&
+               volunteerProgress?.attendance === 'present' &&
+               volunteerProgress?.postSurvey === 'submitted'
+                ? '✓ Complete' : 'Incomplete'}
             </span>
           </div>
+
           <h4 className="requirements-subtitle">Before Event</h4>
           <div className="activity-card">
             <RequirementItem
@@ -1873,9 +1885,7 @@ return (
             />
           </div>
 
-
           <h4 className="requirements-subtitle">After Event</h4>
-
           <RequirementItem
             label="Post-Activity Survey"
             status={volunteerProgress?.postSurvey}
@@ -1886,7 +1896,6 @@ return (
             }
             onOpen={isAfterEvent ? () => setShowPostSurveyModal(true) : null}
           />
-
         </div>
       </div>
 
@@ -1894,10 +1903,12 @@ return (
 
     {/* QR Modal - at root level to prevent flickering */}
     {showQRModal && (
-      <div className="qr-modal-overlay" onClick={(e) => e.stopPropagation()}>
-        <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
-          <button className="qr-modal-close" onClick={() => setShowQRModal(false)}>X</button>
-          <h3 className="qr-modal-title">Scan or Upload QR Code</h3>
+      <div className="ea-modal-overlay" onClick={(e) => e.stopPropagation()}>
+        <div className="ea-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="ea-modal-header">
+            <h3 className="ea-modal-title">📷 Scan Attendance QR</h3>
+            <button className="ea-modal-close" onClick={() => setShowQRModal(false)} aria-label="Close">✕</button>
+          </div>
           <QRScanner key={scannerKey} onScan={handleQRScan} />
           {qrStatus && (
             <div>
@@ -1905,7 +1916,7 @@ return (
               {!scanSuccess && (
                 <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                   <button
-                    style={{ padding: '8px 12px', background: '#eef', border: '1px solid #ccd', borderRadius: 6 }}
+                    className="ea-retry-btn"
                     onClick={() => {
                       setQRStatus("");
                       setScannedLocation(null);
@@ -1913,7 +1924,7 @@ return (
                       setScannerKey(k => k + 1);
                     }}
                   >
-                    Retry
+                    🔄 Retry
                   </button>
                 </div>
               )}
@@ -1927,24 +1938,20 @@ return (
     {/* Pre-Activity Survey Modal */}
     {showPreSurveyModal && (
       <div
-        className="qr-modal-overlay"
+        className="ea-modal-overlay"
         onClick={(e) => {
           if (e.target === e.currentTarget) setShowPreSurveyModal(false);
         }}
       >
         <div
-          className="qr-modal-content modal-scrollable"
+          className="ea-modal-card modal-scrollable"
           style={{ maxHeight: "90vh", overflowY: "auto", minWidth: 340 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            className="qr-modal-close"
-            onClick={() => setShowPreSurveyModal(false)}
-          >
-            X
-          </button>
-
-          <h3 className="qr-modal-title">Pre-Activity Survey</h3>
+          <div className="ea-modal-header">
+            <h3 className="ea-modal-title">📋 Pre-Activity Survey</h3>
+            <button className="ea-modal-close" onClick={() => setShowPreSurveyModal(false)} aria-label="Close">✕</button>
+          </div>
 
           <PreActivitySurvey
             // auto-fill of information already provided beforehand
@@ -2023,10 +2030,12 @@ return (
 
     {/* Post-Activity Survey Modal */}
     {showPostSurveyModal && (
-      <div className="qr-modal-overlay" onClick={e => e.stopPropagation()}>
-        <div className="qr-modal-content modal-scrollable" style={{ maxHeight: '90vh', overflowY: 'auto', minWidth: 340 }} onClick={e => e.stopPropagation()}>
-          <button className="qr-modal-close" onClick={() => setShowPostSurveyModal(false)}>X</button>
-          <h3 className="qr-modal-title">Post-Activity Survey</h3>
+      <div className="ea-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowPostSurveyModal(false); }}>
+        <div className="ea-modal-card modal-scrollable" style={{ maxHeight: '90vh', overflowY: 'auto', minWidth: 340 }} onClick={e => e.stopPropagation()}>
+          <div className="ea-modal-header">
+            <h3 className="ea-modal-title">📋 Post-Activity Survey</h3>
+            <button className="ea-modal-close" onClick={() => setShowPostSurveyModal(false)} aria-label="Close">✕</button>
+          </div>
 
           <PostActivitySurvey
             //Auto fill with information already given from preSurvey
@@ -2103,44 +2112,22 @@ return (
       </div>
     )}
 
-    {/* Global Announcements Toggle Button */}
-    <GlobalNotificationButton
-      unreadCount={announcementUnreadCount}
-      onClick={() => setOpen(!open)}
-    />
-
-    {/* SLIDE-IN PANEL */}
-    <aside className={`global-feed ${open ? 'open' : ''}`}
-      style={{
-        position: 'fixed',
-        top: 80,
-        right: 0,
-        height: 'calc(100vh - 80px)',
-        width: 380,
-        background: '#fff',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        borderLeft: '2px solid #30bdb7',
-        zIndex: 999,
-        transition: 'transform 0.3s',
-        transform: open ? 'translateX(0)' : 'translateX(100%)'
-      }}>
-      <GlobalAnnouncements />
-    </aside>
-
     {/* Consent Modal*/}
     {showConsentModal && (
       <div
-        className="qr-modal-overlay"
+        className="ea-modal-overlay"
         onClick={e => {
           if (e.target === e.currentTarget) setShowConsentModal(false);
         }}
       >
         <div
-          className="qr-modal-content"
+          className="ea-modal-card"
           style={{ minHeight: 180, minWidth: 340, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
         >
-          <button className="qr-modal-close" onClick={() => setShowConsentModal(false)} style={{ alignSelf: 'flex-end' }}>X</button>
-          <h3 className="qr-modal-title">Activity Consent Form</h3>
+          <div className="ea-modal-header" style={{ width: '100%' }}>
+            <h3 className="ea-modal-title">📄 Activity Consent Form</h3>
+            <button className="ea-modal-close" onClick={() => setShowConsentModal(false)} aria-label="Close">✕</button>
+          </div>
           <div className="qr-modal-note">
             <strong>Note:</strong><br />
             If there is no submitted consent form, students will not be allowed to join the event.<br /><br />

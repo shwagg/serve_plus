@@ -952,14 +952,23 @@ const GlobalAnnouncements = () => {
 
 export default GlobalAnnouncements;
 
-export const GlobalNotificationButton = ({ unreadCount, onClick }) => (
-  <button
-    className="global-feed-toggle"
-    onClick={onClick}
-  >
-    📢 Update
-    {unreadCount > 0 && (
-      <span className="global-feed-badge">{unreadCount}</span>
-    )}
-  </button>
-);
+export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const handleClick = () => {
+    setCollapsed(!collapsed);
+    onClick();
+  };
+
+  return (
+    <button
+      className="global-feed-toggle"
+      onClick={handleClick}
+    >
+      📢 {collapsed ? '' : 'Update'}
+      {unreadCount > 0 && (
+        <span className="global-feed-badge">{unreadCount}</span>
+      )}
+    </button>
+  );
+};

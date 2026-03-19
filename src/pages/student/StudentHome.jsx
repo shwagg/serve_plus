@@ -9,8 +9,6 @@ import GlobalAnnouncements from "../../components/GlobalAnnouncements";
 import "../../styles/student.css";
 import "../../styles/ui.css";
 import { WestIcon, EastIcon } from "../../components/icons";
-import { GlobalNotificationButton } from "../../components/GlobalAnnouncements";
-
 import mission1 from '../../assets/mission1.jpg';
 import podium2 from '../../assets/user2.png';
 import banner from '../../assets/banner.jpg';
@@ -45,22 +43,7 @@ const landingPromos = [
 const StudentHome = () => {
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [activeTab, setActiveTab] = useState("all");
-
-  // Update unread count from GlobalAnnouncements
-  useEffect(() => {
-    const checkCount = () => {
-      if (window.announcementActions?.getUnreadCount) {
-        setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
-      }
-    };
-
-    checkCount();
-    const interval = setInterval(checkCount, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
   const [level, setLevel] = useState(1);
   const [currentPoints, setCurrentPoints] = useState(0);
@@ -561,15 +544,6 @@ const StudentHome = () => {
         </section>
 
       </div>
-      {/* TOGGLE BUTTON */}
-      <GlobalNotificationButton
-        unreadCount={announcementUnreadCount}
-        onClick={() => setOpen(!open)}
-      />
-      {/* SLIDE-IN PANEL */}
-      <aside className={`global-feed ${open ? 'open' : ''}`}>
-        <GlobalAnnouncements />
-      </aside>
     </div>
   );
 }

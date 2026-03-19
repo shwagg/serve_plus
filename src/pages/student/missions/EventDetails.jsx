@@ -6,14 +6,10 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { createNotification } from '../../../utils/notificationUtils';
 
 import Header from '../../../components/Header';
-import GlobalAnnouncements from '../../../components/GlobalAnnouncements';
 import '../../../styles/student.css';
-import { GlobalNotificationButton } from "../../../components/GlobalAnnouncements";
 import PreActivitySurvey from '../../../forms/PreActivitySurvey';
 
 export default function EventDetails() {
-  const [open, setOpen] = useState(false);
-  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const { id } = useParams();
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
@@ -28,18 +24,6 @@ export default function EventDetails() {
   const [surveyError, setSurveyError] = useState('');
   const [userName, setUserName] = useState('');
 
-
-  useEffect(() => {
-    const checkCount = () => {
-      if (window.announcementActions?.getUnreadCount) {
-        setAnnouncementUnreadCount(window.announcementActions.getUnreadCount());
-      }
-    };
-
-    checkCount();
-    const interval = setInterval(checkCount, 500);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     async function fetchMission() {
@@ -437,34 +421,6 @@ export default function EventDetails() {
           </div>
         )}
       </div>
-      {/* TOGGLE BUTTON */}
-      <GlobalNotificationButton
-        unreadCount={announcementUnreadCount}
-        onClick={() => setOpen(!open)}
-      />
-      <aside className={`global-feed ${open ? 'open' : ''}`}
-        style={{
-          position: 'fixed',
-          top: 80,
-          right: 0,
-          height: 'calc(100vh - 80px)',
-          width: 380,
-          background: '#fff',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          borderLeft: '2px solid #30bdb7',
-          zIndex: 999,
-          transition: 'transform 0.3s',
-          transform: open ? 'translateX(0)' : 'translateX(100%)',
-          pointerEvents: open ? 'auto' : 'none'
-        }}>
-        <div className="global-feed-header">
-          <h3 className="global-feed-title">Community Updates</h3>
-          <p className="global-feed-subtitle">What's happening this week</p>
-        </div>
-        <div className="global-feed-list">
-          <GlobalAnnouncements />
-        </div>
-      </aside>
     </div>
   );
 }
