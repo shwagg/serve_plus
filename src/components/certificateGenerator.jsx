@@ -111,9 +111,9 @@ export default function CertificateGenerator() {
     const pages = pdfDoc.getPages();
     const page = pages[0];
     
-    const qrX = 397; // Most precise centering
-    const qrY = 70;  // Move QR code even further upwards
-    const qrSize = 60;
+    const qrX = 382; // Adjusted for 90x90 size
+    const qrY = 55;  // Adjusted for 90x90 size
+    const qrSize = 90; // Set QR code size to 90x90
     page.drawImage(pngImage, {
       x: qrX,
       y: qrY,

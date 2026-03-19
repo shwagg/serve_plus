@@ -61,8 +61,18 @@ export default function VerifyCertificatePage() {
   // For QR scan
   const handleQRScan = async (result) => {
     setScanResult(result);
-    if (result) {
-      await fetchCertificateInfo(result);
+    let certIdToSearch = result;
+    // Try to parse as JSON and extract certificateId
+    try {
+      const parsed = JSON.parse(result);
+      if (parsed && parsed.certificateId) {
+        certIdToSearch = parsed.certificateId;
+      }
+    } catch (e) {
+      // Not JSON, use as is
+    }
+    if (certIdToSearch) {
+      await fetchCertificateInfo(certIdToSearch);
     }
   };
 
@@ -175,12 +185,6 @@ export default function VerifyCertificatePage() {
                 <div style={{ width: 280, maxWidth: '100%' }}>
                   <QRScanner onScan={handleQRScan} />
                 </div>
-                {scanResult && (
-                  <div style={{ marginTop: 18, color: '#1a3764', wordBreak: 'break-all', background: '#e3f6f9', borderRadius: 6, padding: 12, fontSize: 15, border: '1px solid #3ec6e0' }}>
-                    <strong>Scanned Result:</strong>
-                    <div>{scanResult}</div>
-                  </div>
-                )}
                 {certInfo && (
                   <div style={{ marginTop: 18, color: '#1a3764', background: '#e3f6f9', borderRadius: 6, padding: 16, border: '1px solid #3ec6e0', fontSize: 16 }}>
                     <div><strong>UID:</strong> {certInfo.uid}</div>
