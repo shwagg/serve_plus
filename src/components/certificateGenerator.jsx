@@ -3,7 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { useLocation, useNavigate } from "react-router-dom";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { app, db } from "../firebaseConfig";
-import { doc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { doc, collection, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import QRCode from 'qrcode';
 import "./certificateGenerator.css";
@@ -47,8 +47,19 @@ export default function CertificateGenerator() {
   // Modal state for PDF preview
   const [showModal, setShowModal] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(null);
+  // Certificate ID state
+  const [certificateId, setCertificateId] = useState(null);
 
-  const fillCertificatePdfBlob = async () => {
+  // Helper: Generate a unique certificate ID (UUID v4)
+  function generateCertificateId() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0,
+        v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  const fillCertificatePdfBlob = async (customCertId) => {
     let existingPdfBytes;
     try {
       const response = await fetch('/assets/SERVE+ Certificate.pdf');
@@ -76,6 +87,8 @@ export default function CertificateGenerator() {
       form.getTextField('text_5nqbl').setText(day || '');
       form.getTextField('text_6iyng').setText(month || '');
       form.getTextField('text_7dgil').setText(year || '');
+      // Fill the certificate ID field
+      form.getTextField('text_10gqgh').setText(customCertId || '');
       form.flatten();
     } catch (err) {
       alert('Error filling certificate fields. Please check the field names in the PDF template.');
@@ -83,7 +96,7 @@ export default function CertificateGenerator() {
     }
 
     // Generate QR code (encode certificate info or a verification URL)
-    const qrValue = JSON.stringify({ recipient, course, date, loc, day, month, year });
+    const qrValue = JSON.stringify({ recipient, course, date, loc, day, month, year, certificateId: customCertId });
     const qrDataUrl = await QRCode.toDataURL(qrValue, {
       margin: 1,
       width: 120,
@@ -113,13 +126,16 @@ export default function CertificateGenerator() {
   };
 
   // Helper: Fill PDF and return URL for preview
-  const fillCertificatePdf = async () => {
-    const blob = await fillCertificatePdfBlob();
+  const fillCertificatePdf = async (customCertId) => {
+    const blob = await fillCertificatePdfBlob(customCertId);
     return URL.createObjectURL(blob);
   };
 
   const handleDownload = async () => {
-    const url = await fillCertificatePdf();
+    // Generate a certificate ID for preview (not saved)
+    const tempCertId = generateCertificateId();
+    setCertificateId(tempCertId);
+    const url = await fillCertificatePdf(tempCertId);
     setPdfUrl(url);
     setShowModal(true);
   };
@@ -132,22 +148,16 @@ export default function CertificateGenerator() {
         alert("No student selected. Please select a student.");
         return;
       }
-      // Generate the PDF Blob
-      const blob = await fillCertificatePdfBlob();
+      // Generate a unique certificate ID
+      const certId = generateCertificateId();
+      setCertificateId(certId);
       // Compose file name: volunteername_eventname.pdf
       const safeRecipient = (recipient || "recipient").replace(/[^a-zA-Z0-9_\-]/g, "_");
       const safeCourse = (course || "event").replace(/[^a-zA-Z0-9_\-]/g, "_");
       const fileName = `${safeRecipient}_${safeCourse}.pdf`;
-      // Get Firebase Storage instance (emulator)
-      const storage = getStorage(app);
-      const storageRef = ref(storage, `event-certificates/${userID}/${fileName}`);
-      await uploadBytes(storageRef, blob);
-      // Get download URL
-      const downloadURL = await getDownloadURL(storageRef);
-      // Save certificate metadata to Firestore under users/{userID}/certificates
+      // Prepare certificate metadata for Firestore
       const certData = {
         fileName,
-        downloadURL,
         recipient,
         course,
         date,
@@ -155,9 +165,21 @@ export default function CertificateGenerator() {
         day,
         month,
         year,
+        certificateId: certId,
         releasedAt: serverTimestamp(),
       };
-      await addDoc(collection(doc(db, "users", userID), "certificates"), certData);
+      // Save certificate metadata to Firestore under users/{userID}/certificates and get the doc ref
+      const certDocRef = await addDoc(collection(doc(db, "users", userID), "certificates"), certData);
+      // Generate the PDF Blob with the Firestore certificate ID (use certDocRef.id if you want Firestore's auto ID, or certId if you want your generated one)
+      const blob = await fillCertificatePdfBlob(certId);
+      // Get Firebase Storage instance (emulator)
+      const storage = getStorage(app);
+      const storageRef = ref(storage, `event-certificates/${userID}/${fileName}`);
+      await uploadBytes(storageRef, blob);
+      // Get download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      // Update Firestore doc with downloadURL
+      await updateDoc(certDocRef, { downloadURL });
 
       // Create notification for the student
       await addDoc(collection(doc(db, "users", userID), "notifications"), {

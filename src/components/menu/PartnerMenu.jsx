@@ -110,6 +110,16 @@ export default function PartnerMenu({
         </button>
       </div>
       <div className="menu-divider"></div>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onClose();
+          navigate("/verify-certificate");
+        }}
+      >
+        <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
+        Verify Certificate
+      </button>
       <button className="logout-btn" onClick={onLogout}>
         Log Out
       </button>

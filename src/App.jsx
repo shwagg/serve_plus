@@ -43,6 +43,7 @@ import ReviewProposal from "./pages/global/proposal/ReviewProposal";
 import PartnerHome from "./pages/partner/PartnerHome";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import StudentHome from "./pages/student/StudentHome";
+import VerifyCertificatePage from "./pages/VerifyCertificatePage";
 
 function App() {
             {/* Route for admin current event tile click (member approval UI) - must be nested under /admin */}
@@ -56,6 +57,7 @@ function App() {
     <SessionProvider>
       <Router>
         <Routes>
+                    <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/oauth-callback" element={<OAuthCallback />} />
           <Route path="/reset-password" element={<ForgotPass />} />

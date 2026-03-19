@@ -97,7 +97,7 @@ export default function StudentMenu({
         className="menu-item"
         onClick={() => {
           onClose();
-          if (onOpenCertificateQR) onOpenCertificateQR();
+          navigate("/verify-certificate");
         }}
       >
         <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
