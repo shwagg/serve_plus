@@ -384,7 +384,7 @@ export default function EventDetails() {
                 <h2 style={{ color: '#23235b', fontWeight: 700, fontSize: 22, marginBottom: 18 }}>Before Joining: Pre-Activity Survey & Consent</h2>
                 <PreActivitySurvey
                   initialName={userName}
-                  initialInitiativeTitle={mission?.title || ''}
+                  initialTitle={mission?.title || ''}
                   onSubmit={async (form) => {
                     // Validate consent file
                     if (!consentFile) {

@@ -105,10 +105,16 @@
   font-size: 0.95rem;
   transition: all 0.2s ease;
   text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 999px;
 }
 .menu-item:hover {
   background-color: #555;
   color: #00BCD4;
+}
+.menu-item:hover .menu-icon {
+  filter: brightness(0) saturate(100%) invert(62%) sepia(97%) saturate(747%) hue-rotate(138deg) brightness(97%) contrast(101%);
 }
 .menu-item:active {
   background-color: #505050;

@@ -12,28 +12,23 @@ export default function QRScanner({ onScan }) {
 
   useEffect(() => {
     if (!scannerRef.current || runningRef.current || initializingRef.current) return;
-    
     const qrCodeRegionId = "qr-reader-region";
-    
     // Small delay to ensure DOM is ready
     const timer = setTimeout(async () => {
       if (initializingRef.current) return;
-      
       try {
         initializingRef.current = true;
         setCameraStatus("Requesting camera permission...");
         html5QrCodeRef.current = new Html5Qrcode(qrCodeRegionId);
-
         await html5QrCodeRef.current.start(
           { facingMode: "environment" },
           {
             fps: 10,
             qrbox: { width: 250, height: 250 },
-            aspectRatio: 0.75, // Portrait ratio (3:4)
+            aspectRatio: 0.75,
           },
           (decodedText, decodedResult) => {
             (async () => {
-              // Try to obtain geolocation (best-effort)
               let position = null;
               try {
                 position = await new Promise((resolve, reject) => {
@@ -54,9 +49,7 @@ export default function QRScanner({ onScan }) {
               } catch (e) {
                 position = null;
               }
-
               if (onScan) onScan(decodedText, position);
-
               if (runningRef.current && html5QrCodeRef.current) {
                 html5QrCodeRef.current.stop();
                 runningRef.current = false;
@@ -67,7 +60,6 @@ export default function QRScanner({ onScan }) {
             // Optionally handle scan errors
           }
         );
-        
         runningRef.current = true;
         setCameraStatus("Camera active");
         setError(null);
@@ -75,7 +67,6 @@ export default function QRScanner({ onScan }) {
         console.error("Camera error:", err);
         setError(err.message || "Failed to access camera");
         setCameraStatus("Camera failed");
-        
         if (err.message?.includes("Permission") || err.message?.includes("NotAllowedError")) {
           setError("Camera permission denied. Please allow camera access in your browser settings.");
         } else if (err.message?.includes("NotFound") || err.message?.includes("OverconstrainedError")) {
@@ -85,7 +76,6 @@ export default function QRScanner({ onScan }) {
         }
       }
     }, 100);
-
     return () => {
       clearTimeout(timer);
       if (html5QrCodeRef.current && runningRef.current) {
@@ -103,7 +93,7 @@ export default function QRScanner({ onScan }) {
           });
       }
     };
-  }, [onScan]);
+  }, []);
 
   // Add file input handler
   const handleFileChange = async (e) => {

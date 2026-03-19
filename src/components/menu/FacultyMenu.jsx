@@ -15,6 +15,7 @@ export default function FacultyMenu({
   onLogout,
   onClose,
   onCreateProposal,
+  onOpenCertificateQR,
 }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -99,6 +100,16 @@ export default function FacultyMenu({
         </button>
       </div>
       <div className="menu-divider"></div>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onClose();
+          if (onOpenCertificateQR) onOpenCertificateQR();
+        }}
+      >
+        <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
+        Verify Certificate
+      </button>
       <button className="logout-btn" onClick={onLogout}>
         Log Out
       </button>

@@ -47,7 +47,9 @@ const PreActivitySurvey = ({
   initialName = "",
   initialEngagementType = "",
   initialTitle = "",
-  onSubmit }) => {
+  onSubmit,
+  children
+}) => {
 
   const [form, setForm] = useState({
     name: initialName,
@@ -56,8 +58,6 @@ const PreActivitySurvey = ({
     college: '',
     program: '',
     nonAcademicOrg: '',
-    engagementType: '',
-    initiativeTitle: initialInitiativeTitle,
     participation: [],
     participationOther: '',
     prevService: '',

@@ -13,6 +13,7 @@ import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
 import PartnerMenu from './menu/PartnerMenu';
+import CertificateQRScannerModal from './CertificateQRScannerModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
 import ChatModal from './ChatModal';
 
@@ -66,6 +67,7 @@ export default function Header() {
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [selectedProjectType, setSelectedProjectType] = useState('');
   const [showChatModal, setShowChatModal] = useState(false);
+  const [showCertificateQRModal, setShowCertificateQRModal] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -148,11 +150,11 @@ export default function Header() {
   const renderMenu = () => {
     switch (userRole) {
       case 'student':
-        return <StudentMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
+        return <StudentMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} onOpenCertificateQR={() => setShowCertificateQRModal(true)} />;
       case 'faculty':
-        return <FacultyMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
+        return <FacultyMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} onOpenCertificateQR={() => setShowCertificateQRModal(true)} />;
       case 'admin':
-        return <AdminMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} />;
+        return <AdminMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} onOpenCertificateQR={() => setShowCertificateQRModal(true)} />;
       case 'partner':
         return <PartnerMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
       default:
@@ -211,6 +213,10 @@ export default function Header() {
           onClose={handleCloseProposalForm}
         />
       )}
+      <CertificateQRScannerModal
+        isOpen={showCertificateQRModal}
+        onClose={() => setShowCertificateQRModal(false)}
+      />
     </>
   );
 }

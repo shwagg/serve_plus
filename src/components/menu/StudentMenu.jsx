@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import createIcon from "../../assets/menuassets/Create.svg";
+import viewIcon from "../../assets/menuassets/View.svg";
 import infoIcon from "../../assets/menuassets/Info.svg";
 import leaderboardIcon from "../../assets/menuassets/Leaderboard.svg";
 import privacyPol from "../../assets/menuassets/PrivacyPolicy.svg";
@@ -14,6 +15,7 @@ export default function StudentMenu({
   onLogout,
   onClose,
   onCreateProposal,
+  onOpenCertificateQR,
 }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -91,6 +93,16 @@ export default function StudentMenu({
         </button>
       </div>
       <div className="menu-divider"></div>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onClose();
+          if (onOpenCertificateQR) onOpenCertificateQR();
+        }}
+      >
+        <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
+        Verify Certificate
+      </button>
       <button className="logout-btn" onClick={onLogout}>
         Log Out
       </button>
