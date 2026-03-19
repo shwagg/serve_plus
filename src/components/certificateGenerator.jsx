@@ -5,6 +5,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { app, db } from "../firebaseConfig";
 import { doc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import QRCode from 'qrcode';
 import "./certificateGenerator.css";
 
 const today = new Date();
@@ -47,19 +48,66 @@ export default function CertificateGenerator() {
   const [showModal, setShowModal] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(null);
 
-  // Helper: Fill PDF with form data and return Blob
   const fillCertificatePdfBlob = async () => {
-    const existingPdfBytes = await fetch('/assets/SERVE+ Certificate (1).pdf').then(res => res.arrayBuffer());
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    let existingPdfBytes;
+    try {
+      const response = await fetch('/assets/SERVE+ Certificate.pdf');
+      if (!response.ok) {
+        throw new Error('Failed to fetch certificate template PDF.');
+      }
+      existingPdfBytes = await response.arrayBuffer();
+    } catch (err) {
+      alert('Error loading certificate template PDF. Please check the file path and try a hard refresh.');
+      throw err;
+    }
+    let pdfDoc;
+    try {
+      pdfDoc = await PDFDocument.load(existingPdfBytes);
+    } catch (err) {
+      alert('Error parsing certificate template PDF. The file may be corrupted or not a valid PDF.');
+      throw err;
+    }
     const form = pdfDoc.getForm();
-    form.getTextField('text_4lt').setText(recipient || '');
-    form.getTextField('text_5ablb').setText(course || '');
-    form.getTextField('text_6sfji').setText(date || '');
-    form.getTextField('text_7mfui').setText(loc || '');
-    form.getTextField('text_8bhoi').setText(day || '');
-    form.getTextField('text_9gtoh').setText(month || '');
-    form.getTextField('text_10fuuc').setText(year || '');
-    form.flatten();
+    try {
+      form.getTextField('text_1jfkq').setText(recipient || '');
+      form.getTextField('text_2rpme').setText(course || '');
+      form.getTextField('text_3ptnr').setText(date || '');
+      form.getTextField('text_4kyth').setText(loc || '');
+      form.getTextField('text_5nqbl').setText(day || '');
+      form.getTextField('text_6iyng').setText(month || '');
+      form.getTextField('text_7dgil').setText(year || '');
+      form.flatten();
+    } catch (err) {
+      alert('Error filling certificate fields. Please check the field names in the PDF template.');
+      throw err;
+    }
+
+    // Generate QR code (encode certificate info or a verification URL)
+    const qrValue = JSON.stringify({ recipient, course, date, loc, day, month, year });
+    const qrDataUrl = await QRCode.toDataURL(qrValue, {
+      margin: 1,
+      width: 120,
+      color: {
+        dark: '#000', // QR code color (black)
+        light: '#0000' // Transparent background
+      }
+    });
+    const pngImageBytes = await fetch(qrDataUrl).then(res => res.arrayBuffer());
+    const pngImage = await pdfDoc.embedPng(pngImageBytes);
+
+    const pages = pdfDoc.getPages();
+    const page = pages[0];
+    
+    const qrX = 397; // Most precise centering
+    const qrY = 70;  // Move QR code even further upwards
+    const qrSize = 60;
+    page.drawImage(pngImage, {
+      x: qrX,
+      y: qrY,
+      width: qrSize,
+      height: qrSize,
+    });
+
     const pdfBytes = await pdfDoc.save();
     return new Blob([pdfBytes], { type: 'application/pdf' });
   };
