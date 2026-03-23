@@ -10,6 +10,7 @@ import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
 import { useSession } from '../../../context/SessionContext';
 import ChooseGroup from './ChooseGroup';
+import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
@@ -311,7 +312,35 @@ const handleJournalSubmit = async (activityIdx, activity) => {
       user.uid
     );
 
-    const pointsToAward = activity.points || 0;
+    let pointsToAward = activity.points || 0;
+    if (activity?.type !== "grouped") {
+      const participantsRef = collection(
+        db,
+        "missions",
+        id,
+        "task",
+        activity.id,
+        "participants"
+      );
+      const [participantSnap, participantsSnap] = await Promise.all([
+        getDoc(participantRef),
+        getDocs(participantsRef),
+      ]);
+      const participantCount = participantsSnap.size;
+      const enrollmentOrder = participantSnap.exists()
+        ? participantSnap.data().enrollmentOrder
+        : null;
+      const position =
+        Number.isFinite(enrollmentOrder) && enrollmentOrder > 0
+          ? enrollmentOrder
+          : participantCount;
+
+      pointsToAward = calculateWeightedTaskPoints(
+        activity.points || 0,
+        position,
+        participantCount
+      );
+    }
 
     await updateDoc(participantRef, {
       reflection: journalReflections[activityIdx],
@@ -571,12 +600,24 @@ const handleJoinActivity = async (taskId, task) => {
       return;
     }
 
+    const participantsRef = collection(
+      db,
+      "missions",
+      id,
+      "task",
+      taskId,
+      "participants"
+    );
+    const participantsSnap = await getDocs(participantsRef);
+    const enrollmentOrder = participantsSnap.size + 1;
+
     // Create participant document with user UID as document ID
     await setDoc(participantRef, {
       status: "todo",
       role: "",
       proof: "",
       reflection: "",
+      enrollmentOrder,
       joinedAt: new Date().toISOString(),
     });
 
@@ -1193,7 +1234,7 @@ if (id === "placeholder") {
 //add journal, scan attendance, and answer post-survey
 const [event, setEvent] = useState(null);
 const today = new Date().toLocaleDateString("en-CA");
-const eventDate = event?.targetDates;
+const eventDate = event?.targetDate;
 const isEventDay = eventDate === today;
 const isAfterEvent = today > eventDate;
 const [tasks, setTasks] = useState([]);
