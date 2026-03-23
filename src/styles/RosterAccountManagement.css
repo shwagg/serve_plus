@@ -199,7 +199,7 @@
 }
 
 .view-account-btn:hover {
-  background-color: #2DBABA;
+  background-color: #2dbaba;
 }
 
 .view-account-btn img {
@@ -319,4 +319,37 @@
   padding: 2rem;
   text-align: center;
   color: #94a3b8;
+}
+
+.account-created-cell {
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.pagination-btn {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-status {
+  font-size: 0.85rem;
+  color: #64748b;
 }

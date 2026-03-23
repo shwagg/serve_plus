@@ -1,9 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { db } from "../../firebaseConfig";
-import { collection, getDocs, doc, updateDoc, deleteField } from "firebase/firestore";
-import "../../styles/RosterAccountManagement.css";
-import ViewAccountIcon from "../../components/icons/ViewAccount.svg";
+import {
+  collection,
+  deleteField,
+  doc,
+  getDocs,
+  updateDoc,
+} from "firebase/firestore";
+import { useEffect, useState } from "react";
 import ChangeIcon from "../../components/icons/Change.svg";
+import { db } from "../../firebaseConfig";
+import "../../styles/RosterAccountManagement.css";
 
 export default function RosterAccountManagement() {
   const [users, setUsers] = useState([]);
@@ -14,19 +19,21 @@ export default function RosterAccountManagement() {
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
-    // Department options for faculty
-    const departments = [
-      "College of Arts and Science (CAS)",
-      "College of Computer and Information Science (CCIS)",
-      "College of Health Sciences (CHS)",
-      "College of Nursing (CN)",
-      "College of Maritime Education and Training (CMET)",
-      "E.T. Yuchengco College of Business (ETYCB)",
-      "Mapua-Laguna Institute of Aviation (MIA)",
-      "Mapua Institute of Technology at Laguna (MITL)",
-      "Mapua MCL Senior High School (SHS)"
-    ];
-  
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  // Department options for faculty
+  const departments = [
+    "College of Arts and Science (CAS)",
+    "College of Computer and Information Science (CCIS)",
+    "College of Health Sciences (CHS)",
+    "College of Nursing (CN)",
+    "College of Maritime Education and Training (CMET)",
+    "E.T. Yuchengco College of Business (ETYCB)",
+    "Mapua-Laguna Institute of Aviation (MIA)",
+    "Mapua Institute of Technology at Laguna (MITL)",
+    "Mapua MCL Senior High School (SHS)",
+  ];
+
   // Filter states
   const [statusFilter, setStatusFilter] = useState("overall");
   const [roleFilter, setRoleFilter] = useState("overall");
@@ -42,13 +49,10 @@ export default function RosterAccountManagement() {
       "college dean",
       "shs principal",
       "sao director",
-      "department head"
+      "department head",
     ],
-    admin: [
-      "director",
-      "regular"
-    ]
-  }; 
+    admin: ["director", "regular"],
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -57,6 +61,10 @@ export default function RosterAccountManagement() {
   useEffect(() => {
     applyFilters();
   }, [users, searchTerm, statusFilter, roleFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, roleFilter]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -81,26 +89,26 @@ export default function RosterAccountManagement() {
     // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter((user) =>
-        user.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        user.name?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // Apply status filter
     if (statusFilter === "active") {
-      filtered = filtered.filter((user) => user.status?.toLowerCase() === "active");
+      filtered = filtered.filter(
+        (user) => user.status?.toLowerCase() === "active",
+      );
     } else if (statusFilter === "inactive") {
-      filtered = filtered.filter((user) => user.status?.toLowerCase() === "inactive");
+      filtered = filtered.filter(
+        (user) => user.status?.toLowerCase() === "inactive",
+      );
     }
 
     // Apply role filter
     if (roleFilter !== "overall") {
-      if (roleFilter === "points") {
-        filtered = filtered.filter((user) => user.points && user.points > 0);
-      } else {
-        filtered = filtered.filter(
-          (user) => user.role?.toLowerCase() === roleFilter.replace("-", " ")
-        );
-      }
+      filtered = filtered.filter(
+        (user) => user.role?.toLowerCase() === roleFilter.replace("-", " "),
+      );
     }
 
     setFilteredUsers(filtered);
@@ -114,7 +122,12 @@ export default function RosterAccountManagement() {
     setRoleFilter(filter);
   };
 
-  const handleChangeRoleClick = (userId, currentRole, currentPosition, currentDepartment) => {
+  const handleChangeRoleClick = (
+    userId,
+    currentRole,
+    currentPosition,
+    currentDepartment,
+  ) => {
     setEditingRoleUserId(userId);
     setSelectedRole(currentRole || "");
     setSelectedPosition(currentPosition || "");
@@ -125,7 +138,10 @@ export default function RosterAccountManagement() {
     if (!selectedRole) return;
 
     // Check if position is required but not selected
-    if ((selectedRole === "faculty" || selectedRole === "admin") && !selectedPosition) {
+    if (
+      (selectedRole === "faculty" || selectedRole === "admin") &&
+      !selectedPosition
+    ) {
       alert("Please select a position for this role.");
       return;
     }
@@ -138,7 +154,7 @@ export default function RosterAccountManagement() {
     try {
       const userRef = doc(db, "users", userId);
       // Find the current user object
-      const currentUser = users.find(u => u.id === userId) || {};
+      const currentUser = users.find((u) => u.id === userId) || {};
       let updateData = { role: selectedRole };
 
       // Student role: delete position, add student fields
@@ -151,7 +167,7 @@ export default function RosterAccountManagement() {
           eventHistory: currentUser.eventHistory || [],
           interests: currentUser.interests || [],
           level: currentUser.level || 1,
-          levelprogress: currentUser.levelprogress || 0
+          levelprogress: currentUser.levelprogress || 0,
         };
       } else if (selectedRole === "faculty") {
         // Faculty: set position and department, delete student fields
@@ -163,7 +179,7 @@ export default function RosterAccountManagement() {
           eventHistory: deleteField(),
           interests: deleteField(),
           level: deleteField(),
-          levelProgress: deleteField()
+          levelProgress: deleteField(),
         };
       } else if (selectedRole === "admin") {
         // Admin: set position, delete department and student fields
@@ -175,7 +191,7 @@ export default function RosterAccountManagement() {
           eventHistory: deleteField(),
           interests: deleteField(),
           level: deleteField(),
-          levelProgress: deleteField()
+          levelProgress: deleteField(),
         };
       } else {
         // Partner or other roles: delete both position, department, and student fields
@@ -187,63 +203,65 @@ export default function RosterAccountManagement() {
           eventHistory: deleteField(),
           interests: deleteField(),
           level: deleteField(),
-          levelProgress: deleteField()
+          levelProgress: deleteField(),
         };
       }
 
       await updateDoc(userRef, updateData);
 
       // Update local state
-      setUsers(users.map(user => {
-        if (user.id !== userId) return user;
-        let updatedUser = { ...user, role: selectedRole };
-        if (selectedRole === "student") {
-          updatedUser = {
-            ...updatedUser,
-            position: undefined,
-            department: undefined,
-            skills: user.skills || [],
-            eventHistory: user.eventHistory || [],
-            interests: user.interests || [],
-            level: user.level || 1,
-            levelprogress: user.levelprogress || 0
-          };
-        } else if (selectedRole === "faculty") {
-          updatedUser = {
-            ...updatedUser,
-            position: selectedPosition,
-            department: selectedDepartment
-          };
-          delete updatedUser.skills;
-          delete updatedUser.eventHistory;
-          delete updatedUser.interests;
-          delete updatedUser.level;
-          delete updatedUser.levelprogress;
-        } else if (selectedRole === "admin") {
-          updatedUser = {
-            ...updatedUser,
-            position: selectedPosition
-          };
-          delete updatedUser.department;
-          delete updatedUser.skills;
-          delete updatedUser.eventHistory;
-          delete updatedUser.interests;
-          delete updatedUser.level;
-          delete updatedUser.levelprogress;
-        } else {
-          updatedUser = {
-            ...updatedUser
-          };
-          delete updatedUser.position;
-          delete updatedUser.department;
-          delete updatedUser.skills;
-          delete updatedUser.eventHistory;
-          delete updatedUser.interests;
-          delete updatedUser.level;
-          delete updatedUser.levelprogress;
-        }
-        return updatedUser;
-      }));
+      setUsers(
+        users.map((user) => {
+          if (user.id !== userId) return user;
+          let updatedUser = { ...user, role: selectedRole };
+          if (selectedRole === "student") {
+            updatedUser = {
+              ...updatedUser,
+              position: undefined,
+              department: undefined,
+              skills: user.skills || [],
+              eventHistory: user.eventHistory || [],
+              interests: user.interests || [],
+              level: user.level || 1,
+              levelprogress: user.levelprogress || 0,
+            };
+          } else if (selectedRole === "faculty") {
+            updatedUser = {
+              ...updatedUser,
+              position: selectedPosition,
+              department: selectedDepartment,
+            };
+            delete updatedUser.skills;
+            delete updatedUser.eventHistory;
+            delete updatedUser.interests;
+            delete updatedUser.level;
+            delete updatedUser.levelprogress;
+          } else if (selectedRole === "admin") {
+            updatedUser = {
+              ...updatedUser,
+              position: selectedPosition,
+            };
+            delete updatedUser.department;
+            delete updatedUser.skills;
+            delete updatedUser.eventHistory;
+            delete updatedUser.interests;
+            delete updatedUser.level;
+            delete updatedUser.levelprogress;
+          } else {
+            updatedUser = {
+              ...updatedUser,
+            };
+            delete updatedUser.position;
+            delete updatedUser.department;
+            delete updatedUser.skills;
+            delete updatedUser.eventHistory;
+            delete updatedUser.interests;
+            delete updatedUser.level;
+            delete updatedUser.levelprogress;
+          }
+          return updatedUser;
+        }),
+      );
 
       setEditingRoleUserId(null);
       setSelectedRole("");
@@ -262,48 +280,27 @@ export default function RosterAccountManagement() {
     setSelectedDepartment("");
   };
 
+  const formatCreatedAt = (createdAt) => {
+    if (!createdAt) return "N/A";
+    const dateValue = createdAt.toDate ? createdAt.toDate() : createdAt;
+    if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
+      return "N/A";
+    }
+    return dateValue.toLocaleDateString();
+  };
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
   return (
     <div className="roster-container">
       <div className="roster-wrapper">
         {/* Header */}
         <div className="roster-header">
-          <h1 className="roster-title">
-            Roster Account Management
-          </h1>
-          
-          {/* Status Filters */}
-          <div className="status-filters">
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="status"
-                checked={statusFilter === "overall"}
-                onChange={() => handleStatusFilterChange("overall")}
-                className="filter-overall"
-              />
-              <span>Overall</span>
-            </label>
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="status"
-                checked={statusFilter === "active"}
-                onChange={() => handleStatusFilterChange("active")}
-                className="filter-active"
-              />
-              <span>Active</span>
-            </label>
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="status"
-                checked={statusFilter === "inactive"}
-                onChange={() => handleStatusFilterChange("inactive")}
-                className="filter-inactive"
-              />
-              <span>Inactive</span>
-            </label>
-          </div>
+          <h1 className="roster-title">Roster Account Management</h1>
         </div>
 
         {/* Search and Role Filters */}
@@ -317,13 +314,18 @@ export default function RosterAccountManagement() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
             />
-            <svg 
+            <svg
               className="search-icon"
-              fill="none" 
-              stroke="currentColor" 
+              fill="none"
+              stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
           </div>
 
@@ -337,27 +339,17 @@ export default function RosterAccountManagement() {
                 onChange={() => handleRoleFilterChange("overall")}
                 className="filter-role"
               />
-              <span>Overall</span>
+              <span>All Users</span>
             </label>
             <label className="filter-label">
               <input
                 type="radio"
                 name="role"
-                checked={roleFilter === "volunteer"}
-                onChange={() => handleRoleFilterChange("volunteer")}
+                checked={roleFilter === "student"}
+                onChange={() => handleRoleFilterChange("student")}
                 className="filter-role"
               />
-              <span>Volunteer</span>
-            </label>
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="role"
-                checked={roleFilter === "student-leader"}
-                onChange={() => handleRoleFilterChange("student-leader")}
-                className="filter-role"
-              />
-              <span>Student Leader</span>
+              <span>Student</span>
             </label>
             <label className="filter-label">
               <input
@@ -383,11 +375,11 @@ export default function RosterAccountManagement() {
               <input
                 type="radio"
                 name="role"
-                checked={roleFilter === "points"}
-                onChange={() => handleRoleFilterChange("points")}
+                checked={roleFilter === "admin"}
+                onChange={() => handleRoleFilterChange("admin")}
                 className="filter-role"
               />
-              <span>Points</span>
+              <span>Admin</span>
             </label>
           </div>
         </div>
@@ -397,44 +389,36 @@ export default function RosterAccountManagement() {
         {/* Table */}
         <div className="table-container">
           {loading ? (
-            <div className="loading-message">
-              Loading users...
-            </div>
+            <div className="loading-message">Loading users...</div>
           ) : (
             <table className="roster-table">
               <thead>
                 <tr>
                   <th className="text-left"> </th>
                   <th className="text-left">Name</th>
-                  <th className="text-center">Points</th>
                   <th className="text-center">Role</th>
-                  <th className="text-center">Status</th>
+                  <th className="text-center">Account Created</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="no-users-message">
+                    <td colSpan="4" className="no-users-message">
                       No users found
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((user, index) => (
+                  paginatedUsers.map((user, index) => (
                     <tr key={user.id}>
                       <td className="row-number">
-                        {index + 1}
+                        {(currentPage - 1) * pageSize + index + 1}
                       </td>
-                      <td className="user-name">
-                        {user.name || "N/A"}
-                      </td>
-                      <td className="text-center points-cell">
-                        {user.points ? `${user.points} PTS` : "/"}
-                      </td>
+                      <td className="user-name">{user.email || "N/A"}</td>
                       <td className="text-center role-cell">
                         {editingRoleUserId === user.id ? (
                           <div className="role-edit-container">
-                            <select 
-                              value={selectedRole} 
+                            <select
+                              value={selectedRole}
                               onChange={(e) => {
                                 setSelectedRole(e.target.value);
                                 setSelectedPosition(""); // Reset position when role changes
@@ -448,42 +432,51 @@ export default function RosterAccountManagement() {
                               <option value="admin">Admin</option>
                             </select>
 
-                            {(selectedRole === "faculty" || selectedRole === "admin") && (
-                              <select 
-                                value={selectedPosition} 
-                                onChange={(e) => setSelectedPosition(e.target.value)}
+                            {(selectedRole === "faculty" ||
+                              selectedRole === "admin") && (
+                              <select
+                                value={selectedPosition}
+                                onChange={(e) =>
+                                  setSelectedPosition(e.target.value)
+                                }
                                 className="role-select"
                               >
                                 <option value="">Select Position</option>
-                                {positionsByRole[selectedRole]?.map((position) => (
-                                  <option key={position} value={position}>
-                                    {position}
-                                  </option>
-                                ))}
+                                {positionsByRole[selectedRole]?.map(
+                                  (position) => (
+                                    <option key={position} value={position}>
+                                      {position}
+                                    </option>
+                                  ),
+                                )}
                               </select>
                             )}
 
                             {selectedRole === "faculty" && (
                               <select
                                 value={selectedDepartment}
-                                onChange={(e) => setSelectedDepartment(e.target.value)}
+                                onChange={(e) =>
+                                  setSelectedDepartment(e.target.value)
+                                }
                                 className="role-select"
                               >
                                 <option value="">Select Department</option>
                                 {departments.map((dept) => (
-                                  <option key={dept} value={dept}>{dept}</option>
+                                  <option key={dept} value={dept}>
+                                    {dept}
+                                  </option>
                                 ))}
                               </select>
                             )}
 
                             <div className="role-edit-actions">
-                              <button 
+                              <button
                                 onClick={() => handleRoleChange(user.id)}
                                 className="role-save-btn"
                               >
                                 Save
                               </button>
-                              <button 
+                              <button
                                 onClick={handleCancelRoleChange}
                                 className="role-cancel-btn"
                               >
@@ -495,7 +488,14 @@ export default function RosterAccountManagement() {
                           <div className="role-display">
                             <span>{user.role || "N/A"}</span>
                             <button
-                              onClick={() => handleChangeRoleClick(user.id, user.role, user.position, user.department)}
+                              onClick={() =>
+                                handleChangeRoleClick(
+                                  user.id,
+                                  user.role,
+                                  user.position,
+                                  user.department,
+                                )
+                              }
                               className="change-role-btn"
                             >
                               <img src={ChangeIcon} alt="Change Role" />
@@ -503,10 +503,8 @@ export default function RosterAccountManagement() {
                           </div>
                         )}
                       </td>
-                      <td className="text-center">
-                        <span className={`status-badge ${user.status?.toLowerCase() === "active" ? "active" : "inactive"}`}>
-                          {user.status || "N/A"}
-                        </span>
+                      <td className="text-center account-created-cell">
+                        {formatCreatedAt(user.createdAt)}
                       </td>
                     </tr>
                   ))
@@ -515,6 +513,31 @@ export default function RosterAccountManagement() {
             </table>
           )}
         </div>
+        {filteredUsers.length > pageSize && (
+          <div className="pagination-controls">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              className="pagination-btn"
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+            <span className="pagination-status">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setCurrentPage((page) => Math.min(totalPages, page + 1))
+              }
+              className="pagination-btn"
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
