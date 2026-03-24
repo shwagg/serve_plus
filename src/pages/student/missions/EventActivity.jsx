@@ -574,6 +574,22 @@ const handleJoinActivity = async (taskId, task) => {
     return;
   }
 
+  if (event?.targetDate && task?.enrollmentDeadline) {
+    const today = new Date().toLocaleDateString("en-CA");
+    if (today !== event.targetDate) {
+      alert("Enrollment is only open on the task due date.");
+      return;
+    }
+    const nowTime = new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    if (nowTime > task.enrollmentDeadline) {
+      alert("Enrollment deadline has passed for this task.");
+      return;
+    }
+  }
+
   // Check if task is grouped
   if (task?.type === "grouped") {
     // Show group selection modal

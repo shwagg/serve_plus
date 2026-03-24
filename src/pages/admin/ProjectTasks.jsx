@@ -19,7 +19,7 @@ export default function ProjectTasks() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    dueDate: "",
+    enrollmentDeadline: "",
     points: 0,
     type: "individual",
     maxParticipants: 5,
@@ -80,6 +80,10 @@ export default function ProjectTasks() {
       alert("Task title is required.");
       return;
     }
+    if (formData.enrollmentDeadline && !project?.targetDate) {
+      alert("Set a target date before adding an enrollment deadline time.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -93,7 +97,7 @@ export default function ProjectTasks() {
       const taskData = {
         title: formData.title,
         description: formData.description,
-        dueDate: formData.dueDate,
+        enrollmentDeadline: formData.enrollmentDeadline,
         points: parseInt(formData.points) || 0,
         type: formData.type || "individual",
         createdAt: new Date().toISOString(),
@@ -110,7 +114,7 @@ export default function ProjectTasks() {
       setFormData({
         title: "",
         description: "",
-        dueDate: "",
+        enrollmentDeadline: "",
         points: 0,
         type: "individual",
         maxParticipants: 5,
@@ -131,6 +135,10 @@ export default function ProjectTasks() {
       alert("Task title is required.");
       return;
     }
+    if (formData.enrollmentDeadline && !project?.targetDate) {
+      alert("Set a target date before adding an enrollment deadline time.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -138,7 +146,7 @@ export default function ProjectTasks() {
       const updateData = {
         title: formData.title,
         description: formData.description,
-        dueDate: formData.dueDate,
+        enrollmentDeadline: formData.enrollmentDeadline,
         points: parseInt(formData.points) || 0,
         type: formData.type || "individual",
       };
@@ -154,7 +162,7 @@ export default function ProjectTasks() {
       setFormData({
         title: "",
         description: "",
-        dueDate: "",
+        enrollmentDeadline: "",
         points: 0,
         type: "individual",
         maxParticipants: 5,
@@ -191,7 +199,7 @@ export default function ProjectTasks() {
     setFormData({
       title: task.title || "",
       description: task.description || "",
-      dueDate: task.dueDate || "",
+      enrollmentDeadline: task.enrollmentDeadline || "",
       points: task.points || 0,
       type: task.type || "individual",
       maxParticipants: task.maxParticipants || 5,
@@ -205,7 +213,7 @@ export default function ProjectTasks() {
     setFormData({
       title: "",
       description: "",
-      dueDate: "",
+      enrollmentDeadline: "",
       points: 0,
       type: "individual",
       maxParticipants: 5,
@@ -306,12 +314,12 @@ export default function ProjectTasks() {
                     color: "#111",
                   }}
                 >
-                  Due Date
+                  Enrollment Deadline Time
                 </label>
                 <input
-                  type="date"
-                  name="dueDate"
-                  value={formData.dueDate}
+                  type="time"
+                  name="enrollmentDeadline"
+                  value={formData.enrollmentDeadline}
                   onChange={handleInputChange}
                   style={{ width: "100%", padding: 8, fontSize: 14 }}
                 />
@@ -499,9 +507,9 @@ export default function ProjectTasks() {
                         <strong>Points:</strong> {task.points}
                       </div>
                     )}
-                    {task.dueDate && (
+                    {task.enrollmentDeadline && (
                       <div style={{ color: "#111" }}>
-                        <strong>Due:</strong> {task.dueDate}
+                        <strong>Enrollment Deadline:</strong> {task.enrollmentDeadline}
                       </div>
                     )}
                     {task.createdAt && (
