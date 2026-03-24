@@ -24,7 +24,6 @@ function SummaryPanel({
    */
   const handleSubmit = async () => {
     setLoading(true);
-
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -32,8 +31,47 @@ function SummaryPanel({
         setLoading(false);
         return;
       }
-
       const now = serverTimestamp();
+
+      // --- Approval Flow Logic ---
+      // 1. Query Firestore for program chair and dean of selected department
+      // 2. Add admin/regular and admin/director (hardcoded names from README)
+      // 3. Store approvalFlow: [chair, dean, admin, director] (full names)
+      // 4. Auto-fill reviewedBy if proponent is program chair
+      let approvalFlow = [];
+      let reviewedBy = '';
+      let recommendedBy = '';
+      let endorsedBy = '';
+      let approvedBy = '';
+      try {
+        const { getDocs, collection, query, where } = await import('firebase/firestore');
+        const dept = formData.affiliatedDepartment;
+        // Query for program chair
+        const chairSnap = await getDocs(query(collection(db, 'users'), where('department', '==', dept), where('position', '==', 'program chair')));
+        const deanSnap = await getDocs(query(collection(db, 'users'), where('department', '==', dept), where('position', '==', 'college dean')));
+        const chairName = chairSnap.docs.length > 0 ? (chairSnap.docs[0].data().name || '') : '';
+        const deanName = deanSnap.docs.length > 0 ? (deanSnap.docs[0].data().name || '') : '';
+        // Admin names from README
+        const adminRegular = 'Admin Regular';
+        const adminDirector = 'Admin Director';
+        approvalFlow = [chairName, deanName, adminRegular, adminDirector];
+
+        // Determine proponent's position
+        let proponentPosition = '';
+        // Try to get the proponent's position from Firestore
+        const proponentSnap = await getDocs(query(collection(db, 'users'), where('name', '==', formData.preparedBy)));
+        if (proponentSnap.docs.length > 0) {
+          proponentPosition = proponentSnap.docs[0].data().position || '';
+        }
+
+        // Auto-fill logic
+        if (proponentPosition === 'program chair') {
+          reviewedBy = formData.preparedBy;
+        }
+        // If the proponent is the dean, all steps are manual (no auto-fill)
+      } catch (e) {
+        approvalFlow = [];
+      }
 
       // Create mission document with unified schema
       const missionData = {
@@ -66,10 +104,10 @@ function SummaryPanel({
         proponents: [formData.preparedBy],
         preparedBy: formData.preparedBy,
         createdBy: user.uid,
-        reviewedBy: '',
-        recommendedBy: '',
-        endorsedBy: '',
-        approvedBy: '',
+        reviewedBy,
+        recommendedBy,
+        endorsedBy,
+        approvedBy,
 
         // Affiliation
         affiliation: formData.affiliation || '',
@@ -80,12 +118,15 @@ function SummaryPanel({
         // Activities
         activities: [],
 
-        //Feeback from Community
+        // Feedback from Community
         feedback: {
           isActive: false,
           openedAt: null,
           closedAt: null
-        }
+        },
+
+        // --- Add approval flow ---
+        approvalFlow,
       };
 
       // Add type-specific fields
