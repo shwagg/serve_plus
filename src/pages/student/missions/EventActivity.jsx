@@ -1299,6 +1299,7 @@ useEffect(() => {
         // Check enrollment status for each task and get volunteer points
         const user = auth.currentUser;
         if (user) {
+          // Fetch pre-activity survey
           const preSurveyRef = doc(
             db,
             "missions",
@@ -1308,31 +1309,37 @@ useEffect(() => {
             "preSurvey",
             "response"
           );
-
           const preSurveySnap = await getDoc(preSurveyRef);
-
+          let preSurveySubmitted = false;
           if (preSurveySnap.exists()) {
             const data = preSurveySnap.data();
             setPreSurveyData(data.respondent);
+            preSurveySubmitted = true;
           }
 
+          // Fetch consent submission
           const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
-          unsubscribe = onSnapshot(volunteerRef, (snap) => {
-            if (!snap.exists()) {
-              navigate(`/event/${id}`);
-              return;
+          const volunteerSnap = await getDoc(volunteerRef);
+          let consentSubmitted = false;
+          let progress = {};
+          let pointsEarned = 0;
+          if (volunteerSnap.exists()) {
+            const data = volunteerSnap.data();
+            progress = data.progress || {};
+            pointsEarned = data.pointsEarned || 0;
+            // Check for consentSubmission field
+            if (data.consentSubmission && data.consentSubmission.fileUrl) {
+              consentSubmitted = true;
             }
+          }
 
-            const data = snap.data();
-
-            if (data.registrationStatus !== "approved") {
-              navigate(`/event/${id}`);
-              return;
-            }
-
-            setVolunteerProgress(data.progress || {});
-            setTotalPointsEarned(data.pointsEarned || 0);
-          });
+          // Set volunteerProgress state based on Firestore records
+          setVolunteerProgress((prev) => ({
+            ...progress,
+            preSurvey: preSurveySubmitted ? "submitted" : progress.preSurvey,
+            consent: consentSubmitted ? "submitted" : progress.consent,
+          }));
+          setTotalPointsEarned(pointsEarned);
 
           // Enrollment status for each task
           const enrollmentStatus = {};
@@ -1934,7 +1941,6 @@ return (
             <RequirementItem
               label="Pre-Activity Survey"
               status={volunteerProgress?.preSurvey}
-              onOpen={() => { console.log("Pre-activity clicked"); setShowPreSurveyModal(true) }}
             />
           </div>
           <div className="activity-card">
@@ -1943,7 +1949,6 @@ return (
               status={volunteerProgress?.consent === "open"
                 ? "pending"
                 : volunteerProgress?.consent}
-              onOpen={() => setShowConsentModal(true)}
             />
           </div>
           <div className="activity-card">
