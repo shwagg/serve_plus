@@ -264,6 +264,17 @@ const [volunteerProgress, setVolunteerProgress] = useState(null);
 const [expandedTasks, setExpandedTasks] = useState({});
 const canJoinActivities = true;
 const toggleTaskExpand = (taskId) => setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
+const isEnrollmentClosed = (task) => {
+  if (!event?.targetDate || !task?.enrollmentDeadline) return false;
+  const todayDate = new Date().toLocaleDateString("en-CA");
+  if (todayDate > event.targetDate) return true;
+  if (todayDate < event.targetDate) return false;
+  const nowTime = new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return nowTime > task.enrollmentDeadline;
+};
 // Handler for adding a skill to a level (for placeholder)
 const handleAddSkill = (skill, level) => {
   if (level === "easy")
@@ -342,10 +353,12 @@ const handleJournalSubmit = async (activityIdx, activity) => {
       );
     }
 
+    const eligibleForPoints = isEnrollmentClosed(activity);
+
     await updateDoc(participantRef, {
       reflection: journalReflections[activityIdx],
       status: "completed",
-      pointsEarned: pointsToAward,
+      pointsEarned: eligibleForPoints ? pointsToAward : 0,
       completedAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString(),
     });
@@ -353,7 +366,7 @@ const handleJournalSubmit = async (activityIdx, activity) => {
     // Update volunteer's total points in the event
     const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
     const volunteerSnap = await getDoc(volunteerRef);
-    if (volunteerSnap.exists()) {
+    if (eligibleForPoints && volunteerSnap.exists()) {
       const currentTotal = volunteerSnap.data().pointsEarned || 0;
       const newTotal = currentTotal + pointsToAward;
       await updateDoc(volunteerRef, {
@@ -392,12 +405,14 @@ const handleJournalSubmit = async (activityIdx, activity) => {
 
     setSubmitStatus((prev) => ({
       ...prev,
-      [activityIdx]: `Reflection submitted! +${pointsToAward} points earned!`,
+      [activityIdx]: eligibleForPoints
+        ? `Reflection submitted! +${pointsToAward} points earned!`
+        : "Reflection submitted! Points will be awarded after enrollment closes.",
     }));
     setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
 
     // Send points earned notification
-    if (pointsToAward > 0) {
+    if (eligibleForPoints && pointsToAward > 0) {
       await createNotification(user.uid, {
         type: "points_earned",
         title: "Points Earned!",
