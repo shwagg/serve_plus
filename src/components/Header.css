@@ -25,7 +25,7 @@
   gap: 0.5rem;
   flex: 1 1 auto;
   min-width: 0;
-  max-width: calc(100% - 130px);
+  overflow: hidden;
   background: none;
   border: none;
   cursor: pointer;
@@ -74,8 +74,8 @@
   align-items: center;
   gap: 2px;
   flex: 0 0 auto;
+  flex-shrink: 0;
   flex-wrap: nowrap;
-  min-width: 100px;
   overflow: visible;
 }
 .notification-bell-container {

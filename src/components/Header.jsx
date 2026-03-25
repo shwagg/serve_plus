@@ -7,7 +7,7 @@ import { httpsCallable } from 'firebase/functions';
 import './Header.css';
 import chatIcon from '../assets/headassets/Chat Icon.svg';
 import NotificationBell from './NotificationBell';
-import menuIcon from '../assets/headassets/Menu Icon.svg';
+import { MenuRoundedIcon } from './icons';
 import serveIcon from '../assets/serve_plus_logo.svg';
 import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
@@ -202,7 +202,7 @@ export default function Header() {
                 className="icon-button menu-button"
                 aria-label="Menu"
                 onClick={() => setShowMenu(!showMenu)}>
-                <img src={menuIcon} alt="Menu" width="24" height="24" />
+                <MenuRoundedIcon sx={{ color: 'black' }} />
               </button>
               {showMenu && renderMenu()}
             </div>

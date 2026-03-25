@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import ReactDOM from "react-dom";
 import {
   collection,
@@ -952,18 +952,64 @@ const GlobalAnnouncements = () => {
 
 export default GlobalAnnouncements;
 
-export const GlobalNotificationButton = ({ unreadCount, onClick }) => (
-  <button
-    className="global-feed-toggle"
-    onClick={onClick}
-    aria-label="Open announcements"
-  >
-    <span className="global-feed-toggle-emoji">📢</span>
-    {unreadCount > 0 && (
-      <span className="global-feed-badge">{unreadCount}</span>
-    )}
-  </button>
-);
+export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
+  const [top, setTop] = useState(140);
+  const didDragRef = useRef(false);
+
+  const handleMouseDown = (e) => {
+    const startY = e.clientY;
+    const startTop = top;
+    didDragRef.current = false;
+
+    const onMouseMove = (e) => {
+      const delta = e.clientY - startY;
+      if (Math.abs(delta) > 4) didDragRef.current = true;
+      setTop(Math.min(Math.max(60, startTop + delta), window.innerHeight - 48));
+    };
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      if (!didDragRef.current) onClick?.();
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    e.preventDefault();
+  };
+
+  const handleTouchStart = (e) => {
+    const startY = e.touches[0].clientY;
+    const startTop = top;
+    didDragRef.current = false;
+
+    const onTouchMove = (e) => {
+      const delta = e.touches[0].clientY - startY;
+      if (Math.abs(delta) > 4) didDragRef.current = true;
+      setTop(Math.min(Math.max(60, startTop + delta), window.innerHeight - 48));
+    };
+    const onTouchEnd = () => {
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      if (!didDragRef.current) onClick?.();
+    };
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+  };
+
+  return (
+    <button
+      className="global-feed-toggle"
+      style={{ top, cursor: 'grab' }}
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
+      aria-label="Open announcements"
+    >
+      <span className="global-feed-toggle-emoji">📢</span>
+      {unreadCount > 0 && (
+        <span className="global-feed-badge">{unreadCount}</span>
+      )}
+    </button>
+  );
+};
 export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
   const [collapsed, setCollapsed] = useState(false);
 

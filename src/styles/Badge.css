@@ -1,43 +1,675 @@
-/*PAPALITAN NG REAL IMAGE. MAGDESIGN PA AKO*/
-.badge-container {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+/* ═══════════════════════════════════════════
+   BADGE SYSTEM STYLES
+   ═══════════════════════════════════════════ */
+
+/* ── BadgeIcon ─────────────────────────────── */
+.badge-icon-wrapper {
+  display: inline-block;
+  position: relative;
+  flex-shrink: 0;
 }
 
-.badge-circle {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
+.badge-icon-clickable {
+  cursor: pointer;
+}
+
+.badge-icon-clickable:hover img {
+  transform: scale(1.08);
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.18)) !important;
+}
+
+.badge-icon-clickable:focus-visible {
+  outline: 2px solid #0D9488;
+  border-radius: 4px;
+}
+
+.badge-new-pill {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+  animation: badge-pulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.12); }
+}
+
+/* ── BadgeShelf ────────────────────────────── */
+.badge-shelf {
+  width: 100%;
+}
+
+.badge-shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.badge-shelf-progress {
+  font-size: 0.82rem;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-weight: 500;
+}
+
+.badge-shelf-group {
+  margin-bottom: 24px;
+}
+
+.badge-shelf-group-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+  padding-left: 2px;
+}
+
+.badge-shelf-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.badge-shelf-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 80px;
+}
+
+.badge-shelf-name {
+  font-size: 0.68rem;
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.badge-shelf-name.earned {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.badge-shelf-name.locked {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+/* ── BadgeEarnedModal ──────────────────────── */
+.badge-earned-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.badge-earned-overlay.badge-earned-visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.badge-earned-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 36px 32px 32px;
+  max-width: 340px;
+  width: 90%;
   text-align: center;
+  position: relative;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  transform: scale(0.88) translateY(24px);
+  transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease;
+  opacity: 0;
+}
+
+.badge-earned-card.badge-earned-card-visible {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+.badge-earned-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  z-index: 1;
+}
+
+.badge-earned-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.badge-earned-sparkles {
+  font-size: 18px;
+  color: #fbbf24;
+  letter-spacing: 8px;
+  margin-bottom: 4px;
+  animation: sparkle-dance 1.4s ease-in-out infinite;
+}
+
+@keyframes sparkle-dance {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+
+.badge-earned-subtitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+  margin: 0 0 16px;
+}
+
+.badge-earned-icon-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  animation: badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+}
+
+@keyframes badge-pop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.badge-earned-name {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+  line-height: 1.2;
+}
+
+.badge-earned-desc {
+  font-size: 0.88rem;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.badge-earned-more {
   font-size: 0.8rem;
-  font-weight: bold;
-  color: white;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
-  transition: transform 0.2s ease;
+  color: #94a3b8;
+  margin: -12px 0 16px;
 }
 
-.badge-circle:hover {
-  transform: scale(1.05);
+.badge-earned-btn {
+  display: inline-block;
+  padding: 10px 36px;
+  border-radius: 99px;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: filter 0.15s;
 }
 
-/* Category colors */
-
-.badge-commitment {
-  background: linear-gradient(145deg, #3B82F6, #2563EB);
+.badge-earned-btn:hover {
+  filter: brightness(1.1);
 }
 
-.badge-performance {
-  background: linear-gradient(145deg, #FFD700, #F59E0B);
+/* ── Admin BadgeManage page ────────────────── */
+.bm-page {
+  padding: 8px 0 40px;
 }
 
-.badge-leadership {
-  background: linear-gradient(145deg, #8B5CF6, #6D28D9);
+.bm-header {
+  margin-bottom: 20px;
 }
 
-.badge-institutional {
-  background: linear-gradient(145deg, #991B1B, #7F1D1D);
+.bm-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 6px;
+}
+
+.bm-subtitle {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.bm-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 24px;
+}
+
+.bm-tab {
+  padding: 9px 22px;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.bm-tab.active {
+  color: #0f766e;
+  border-bottom-color: #0f766e;
+}
+
+.bm-tab:hover:not(.active) {
+  color: #0f766e;
+}
+
+/* Catalog */
+.bm-catalog-group {
+  margin-bottom: 28px;
+}
+
+.bm-catalog-group-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 12px;
+}
+
+.bm-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.bm-catalog-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.bm-catalog-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.bm-catalog-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.bm-catalog-criteria {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.bm-catalog-type {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.bm-type-auto_mission  { background: #dcfce7; color: #166534; }
+.bm-type-auto_signup   { background: #e0f2fe; color: #0369a1; }
+.bm-type-manual        { background: #fee2e2; color: #991b1b; }
+
+/* Award badges layout */
+.bm-award-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  min-height: 400px;
+  position: relative;
+}
+
+.bm-student-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.bm-search-wrap {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.bm-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.bm-search:focus {
+  border-color: #0D9488;
+}
+
+.bm-student-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 520px;
+}
+
+.bm-student-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+}
+
+.bm-student-row:hover,
+.bm-student-row.selected {
+  background: #f0fdf9;
+}
+
+.bm-student-row.selected {
+  border-left: 3px solid #0D9488;
+}
+
+.bm-student-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #1f3b73;
+  flex-shrink: 0;
+}
+
+.bm-student-avatar.large {
+  width: 52px;
+  height: 52px;
+  font-size: 1.2rem;
+}
+
+.bm-student-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bm-student-info {
+  min-width: 0;
+}
+
+.bm-student-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bm-student-email {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right panel */
+.bm-badge-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.bm-no-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.bm-student-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.bm-selected-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.bm-selected-email {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.bm-selected-count {
+  font-size: 0.8rem;
+  color: #0D9488;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.bm-earned-section {
+  margin-bottom: 28px;
+}
+
+.bm-earned-section h4,
+.bm-institutional-section h4 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bm-earned-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bm-earned-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.4;
+  width: 60px;
+}
+
+.bm-earned-slot.earned {
+  opacity: 1;
+}
+
+.bm-earned-slot span {
+  font-size: 0.64rem;
+  text-align: center;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+/* Institutional */
+.bm-institutional-section {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 20px;
+}
+
+.bm-institutional-note {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: -8px 0 16px;
+  line-height: 1.5;
+}
+
+.bm-institutional-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bm-institutional-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.bm-institutional-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.bm-institutional-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.bm-institutional-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.bm-award-btn {
+  padding: 7px 20px;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bm-award-btn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.bm-award-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bm-already-awarded {
+  font-size: 0.82rem;
+  color: #16a34a;
+  font-weight: 600;
+  background: #dcfce7;
+  padding: 4px 12px;
+  border-radius: 99px;
+}
+
+.bm-loading {
+  padding: 20px;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.bm-empty {
+  padding: 20px;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+/* Toast */
+.bm-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  animation: toast-in 0.25s ease;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .bm-award-layout {
+    grid-template-columns: 1fr;
+  }
+  .badge-shelf-row {
+    gap: 10px;
+  }
+  .badge-shelf-slot {
+    width: 64px;
+  }
 }

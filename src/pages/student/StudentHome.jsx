@@ -1,8 +1,8 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { auth, functions, db } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
 import { collection, getDocs, doc, getDoc, query, orderBy, limit } from "firebase/firestore";
 import Header from "../../components/Header";
 import GlobalAnnouncements from "../../components/GlobalAnnouncements";
@@ -119,6 +119,25 @@ const StudentHome = () => {
   }, []);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const missionsSectionRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (location.state?.scrollTo === 'missions' && missionsSectionRef.current) {
+      const scrollContainer = missionsSectionRef.current.closest('.content-page');
+      if (!scrollContainer) return;
+
+      const playerStrip = scrollContainer.querySelector('.player-strip');
+      const playerStripHeight = playerStrip ? playerStrip.getBoundingClientRect().height : 0;
+      const missionRect = missionsSectionRef.current.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
+
+      // Scroll so the mission section top sits right below the sticky player-strip
+      scrollContainer.scrollTop = (missionRect.top - containerRect.top) - playerStripHeight;
+
+      window.history.replaceState({}, '');
+    }
+  }, []);
 
   useEffect(() => {
     // use firebase auth state
@@ -263,6 +282,13 @@ const StudentHome = () => {
     });
   }, []);
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   //for the ranking of the user logged in for label
   const getOrdinal = (rank) => {
     if (!rank) return "";
@@ -388,7 +414,7 @@ const StudentHome = () => {
           </div>
         </section>
         {/* MISSION */}
-        <section className="mission-section" aria-label="Missions" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat' }}>
+        <section ref={missionsSectionRef} className="mission-section" aria-label="Missions" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat' }}>
           <div className="mission-section-header">
             <h2 className="mission-section-title">Find Your Next Mission</h2>
             <div className="mission-tabs" role="tablist">
@@ -423,7 +449,7 @@ const StudentHome = () => {
                   className={`mission-card ${enrolledMissions[mission.id] === 'approved' ? 'enrolled' : enrolledMissions[mission.id] === 'pending' ? 'requesting' : ''}`}
                   onClick={() => {
                     if (enrolledMissions[mission.id] === "approved") {
-                      navigate(`/event/${mission.id}/activity?mode=preview`);
+                      navigate(`/event/${mission.id}/activity`);
                     } else {
                       setSelectedMissionId(mission.id);
                     }
@@ -434,7 +460,7 @@ const StudentHome = () => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       if (enrolledMissions[mission.id] === "approved") {
-                        navigate(`/event/${mission.id}/activity?mode=preview`);
+                        navigate(`/event/${mission.id}/activity`);
                       } else {
                         setSelectedMissionId(mission.id);
                       }
@@ -454,7 +480,7 @@ const StudentHome = () => {
                     <h3 className="mission-card-title">{mission.title}</h3>
                     <div className="mission-card-meta">
                       <span className="mission-card-date">
-                        📅 {mission.targetDate || mission.date || "Date TBA"}
+                        📅 {formatDate(mission.targetDate || mission.date) || "Date TBA"}
                       </span>
                     </div>
                   </div>
