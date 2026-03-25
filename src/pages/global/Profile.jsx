@@ -244,10 +244,12 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
 }
 import { SessionContext } from "../../context/SessionContext.jsx";
 import Header from "../../components/Header.jsx";
+import BadgeShelf from "../../components/badges/BadgeShelf";
 import "../../styles/Profile.css";
+import "../../styles/Badge.css";
 import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
-const PROFILE_TABS = ["Overview", "Portfolio"];
+const PROFILE_TABS = ["Overview", "Badges", "Portfolio"];
 
 const SDG_LABELS = {
   1: "No Poverty", 2: "Zero Hunger", 3: "Good Health & Well-being",
@@ -303,6 +305,7 @@ const mockProfile = {
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [rewards, setRewards] = useState([]);
+  const [earnedBadges, setEarnedBadges] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
   const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
@@ -506,6 +509,22 @@ export default function Profile() {
           }))
         );
 
+        // Fetch earned badges — and auto-award SERVE Ready if missing
+        const badgesSnap = await getDocs(
+          collection(db, "users", user.uid, "badges")
+        );
+        const badgeList = badgesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const hasServeReady = badgeList.some(b => (b.badgeId ?? b.id) === "serve-ready");
+        if (!hasServeReady) {
+          const { awardServeReadyBadge } = await import("../../hooks/badgeSystem");
+          await awardServeReadyBadge(user.uid);
+          // Re-fetch so shelf shows it immediately
+          const refreshed = await getDocs(collection(db, "users", user.uid, "badges"));
+          setEarnedBadges(refreshed.docs.map(d => ({ id: d.id, ...d.data() })));
+        } else {
+          setEarnedBadges(badgeList);
+        }
+
         // Fetch certificates for the logged-in user
         const fetchCertificates = async () => {
           try {
@@ -672,10 +691,10 @@ export default function Profile() {
                 onKeyDown={e => {
                   const idx = PROFILE_TABS.indexOf(tab);
                   if (e.key === 'ArrowRight') { e.preventDefault(); setActiveTab(PROFILE_TABS[(idx + 1) % PROFILE_TABS.length]); }
-                  if (e.key === 'ArrowLeft')  { e.preventDefault(); setActiveTab(PROFILE_TABS[(idx - 1 + PROFILE_TABS.length) % PROFILE_TABS.length]); }
+                  if (e.key === 'ArrowLeft') { e.preventDefault(); setActiveTab(PROFILE_TABS[(idx - 1 + PROFILE_TABS.length) % PROFILE_TABS.length]); }
                 }}
               >
-                {tab === 'Overview' ? '📋 Overview' : '🗂️ Portfolio'}
+                {tab === 'Overview' ? '📋 Overview' : tab === 'Badges' ? '🏅 Badges' : '🗂️ Portfolio'}
               </button>
             ))}
           </div>
@@ -704,6 +723,12 @@ export default function Profile() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === "Badges" && (
+            <div role="tabpanel" id="profile-tabpanel-Badges" aria-labelledby="profile-tab-Badges" className="profile-tab-panel">
+              <BadgeShelf earnedBadges={earnedBadges} />
             </div>
           )}
 
@@ -913,19 +938,19 @@ export default function Profile() {
                   {/* SDG Contributions */}
                   <div>
                     <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>SDG Contributions</div>
-                      {allSdgs.length === 0 ? (
-                        <p style={{ color: '#bbb', fontSize: 12 }}>No SDG contributions yet.</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                          {allSdgs.sort((a, b) => a - b).map(sdg => (
-                            <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontWeight: 800, color: '#fff' }}>#{sdg}</span>
-                              <span style={{ flex: '1 1 auto', color: '#fff' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
-                              <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 800, fontSize: 11 }}>{sdgCounts[sdg]}×</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    {allSdgs.length === 0 ? (
+                      <p style={{ color: '#bbb', fontSize: 12 }}>No SDG contributions yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {allSdgs.sort((a, b) => a - b).map(sdg => (
+                          <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 800, color: '#fff' }}>#{sdg}</span>
+                            <span style={{ flex: '1 1 auto', color: '#fff' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                            <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 800, fontSize: 11 }}>{sdgCounts[sdg]}×</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Divider */}

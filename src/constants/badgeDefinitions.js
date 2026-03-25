@@ -1,0 +1,166 @@
+// Static badge catalog — all 12 badges + their metadata
+// SVG files are in src/assets/badges/
+
+export const BADGE_DEFINITIONS = [
+  {
+    id: "serve-ready",
+    name: "SERVE Ready",
+    category: "default",
+    colorTheme: "gray",
+    description: "Welcome to SERVE+! Your journey begins here.",
+    criteria: "Create and verify your SERVE+ account.",
+    svgFilename: "00-serve-ready.svg",
+    triggerType: "auto_signup",
+  },
+  {
+    id: "first-step",
+    name: "First Step",
+    category: "milestone",
+    colorTheme: "teal",
+    description: "You completed your very first mission. Every great journey starts with one step.",
+    criteria: "Complete 1 mission (Verified Active or Partial).",
+    svgFilename: "01-first-step.svg",
+    triggerType: "auto_mission",
+    statField: "totalCompleted",
+    threshold: 1,
+  },
+  {
+    id: "active-volunteer",
+    name: "Active Volunteer",
+    category: "milestone",
+    colorTheme: "teal",
+    description: "You have shown consistent commitment to service through 5 completed missions.",
+    criteria: "Complete 5 missions (Verified Active or Partial).",
+    svgFilename: "02-active-volunteer.svg",
+    triggerType: "auto_mission",
+    statField: "totalCompleted",
+    threshold: 5,
+  },
+  {
+    id: "community-advocate",
+    name: "Community Advocate",
+    category: "milestone",
+    colorTheme: "teal",
+    description: "10 missions in — you are a true advocate for community service.",
+    criteria: "Complete 10 missions (Verified Active or Partial).",
+    svgFilename: "03-community-advocate.svg",
+    triggerType: "auto_mission",
+    statField: "totalCompleted",
+    threshold: 10,
+  },
+  {
+    id: "service-champion",
+    name: "Service Champion",
+    category: "milestone",
+    colorTheme: "teal",
+    description: "20 missions completed. You are a champion of service-learning.",
+    criteria: "Complete 20 missions (Verified Active or Partial).",
+    svgFilename: "04-service-champion.svg",
+    triggerType: "auto_mission",
+    statField: "totalCompleted",
+    threshold: 20,
+  },
+  {
+    id: "consistent-contributor",
+    name: "Consistent Contributor",
+    category: "performance",
+    colorTheme: "gold",
+    description: "Full dedication, 5 times over. Your quality of participation stands out.",
+    criteria: "Receive Verified Active status in 5 missions.",
+    svgFilename: "05-consistent-contributor.svg",
+    triggerType: "auto_mission",
+    statField: "totalVerifiedActive",
+    threshold: 5,
+  },
+  {
+    id: "excellence-in-service",
+    name: "Excellence in Service",
+    category: "performance",
+    colorTheme: "gold",
+    description: "15 fully verified missions — an exceptional standard of service.",
+    criteria: "Receive Verified Active status in 15 missions.",
+    svgFilename: "06-excellence-in-service.svg",
+    triggerType: "auto_mission",
+    statField: "totalVerifiedActive",
+    threshold: 15,
+  },
+  {
+    id: "organizer",
+    name: "Organizer",
+    category: "leadership",
+    colorTheme: "purple",
+    description: "You stepped up to organize a mission for your community.",
+    criteria: "Complete 1 mission in the Organizer role.",
+    svgFilename: "07-organizer.svg",
+    triggerType: "auto_mission",
+    statField: "organizerCount",
+    threshold: 1,
+  },
+  {
+    id: "lead-organizer",
+    name: "Lead Organizer",
+    category: "leadership",
+    colorTheme: "purple",
+    description: "You led the charge as Lead Organizer in a mission.",
+    criteria: "Complete 1 mission in the Lead Organizer role.",
+    svgFilename: "08-lead-organizer.svg",
+    triggerType: "auto_mission",
+    statField: "leadOrganizerCount",
+    threshold: 1,
+  },
+  {
+    id: "program-builder",
+    name: "Program Builder",
+    category: "leadership",
+    colorTheme: "purple",
+    description: "Three organizing roles — you are building the backbone of SERVE+.",
+    criteria: "Complete 3+ missions as Organizer or Lead Organizer.",
+    svgFilename: "09-program-builder.svg",
+    triggerType: "auto_mission",
+    statField: "organizerCount",
+    threshold: 3,
+  },
+  {
+    id: "csce-recognition-award",
+    name: "CSCE Recognition Award",
+    category: "institutional",
+    colorTheme: "red",
+    description: "Formally recognized by CSCE for outstanding contributions to community engagement.",
+    criteria: "Awarded manually by admin — CSCE recognition.",
+    svgFilename: "10-csce-recognition-award.svg",
+    triggerType: "manual",
+  },
+  {
+    id: "outstanding-volunteer",
+    name: "Outstanding Volunteer",
+    category: "institutional",
+    colorTheme: "red",
+    description: "The highest honor for a SERVE+ volunteer — truly outstanding.",
+    criteria: "Awarded manually by admin — exceptional service beyond expectations.",
+    svgFilename: "11-outstanding-volunteer.svg",
+    triggerType: "manual",
+  },
+];
+
+// Keyed lookup for fast access
+export const BADGE_BY_ID = Object.fromEntries(
+  BADGE_DEFINITIONS.map((b) => [b.id, b])
+);
+
+// Grouped by category for shelf display
+export const BADGE_CATEGORIES = [
+  { key: "default",       label: "Welcome",       color: "#9CA3AF" },
+  { key: "milestone",     label: "Milestones",    color: "#0D9488" },
+  { key: "performance",   label: "Performance",   color: "#D97706" },
+  { key: "leadership",    label: "Leadership",    color: "#7C3AED" },
+  { key: "institutional", label: "Institutional", color: "#DC2626" },
+];
+
+// Only auto-evaluatable badge rules (used by badgeSystem.js)
+export const AUTO_BADGE_RULES = BADGE_DEFINITIONS
+  .filter((b) => b.triggerType === "auto_mission")
+  .map((b) => ({
+    badgeId: b.id,
+    statField: b.statField,
+    threshold: b.threshold,
+  }));

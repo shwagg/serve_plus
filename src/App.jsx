@@ -4,7 +4,8 @@ import {
   BrowserRouter as Router,
   Routes,
 } from "react-router-dom";
-import { SessionProvider } from "./context/SessionContext";
+import { SessionProvider, SessionContext } from "./context/SessionContext";
+import { useContext } from "react";
 import { useOverdueReflectionNotifications } from "./hooks/useOverdueReflectionNotifications";
 import { useUpcomingEventNotifications } from "./hooks/useUpcomingEventNotifications";
 import PrivacyPolicy from "./pages/global/agreement/PrivacyPolicy";
@@ -34,7 +35,9 @@ import Chat from "./pages/global/Chat";
 import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
 import EventActivity from "./pages/student/missions/EventActivity";
 import EventDetails from "./pages/student/missions/EventDetails";
-//import BadgeManage from "./pages/admin/BadgeManage";
+import BadgeManage from "./pages/admin/BadgeManage";
+import BadgeEarnedModal from "./components/badges/BadgeEarnedModal";
+import { useBadgeEarnedPopup } from "./hooks/useBadgeEarnedPopup";
 import Profile from "./pages/global/Profile";
 import ProjectList from "./pages/global/ProjectList";
 import ProposeProject from "./pages/global/ProposeProject";
@@ -47,8 +50,14 @@ import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import StudentHome from "./pages/student/StudentHome";
 import VerifyCertificatePage from "./pages/VerifyCertificatePage";
 
+/** Renders the badge earned popup; must live inside SessionProvider to access context */
+function BadgePopupManager() {
+  const { user } = useContext(SessionContext);
+  const { badgeQueue, dismissBadge } = useBadgeEarnedPopup(user?.uid);
+  return <BadgeEarnedModal badgeQueue={badgeQueue} onDismiss={dismissBadge} />;
+}
+
 function App() {
-            {/* Route for admin current event tile click (member approval UI) - must be nested under /admin */}
   // Check for upcoming events and create notifications
   useUpcomingEventNotifications();
 
@@ -57,6 +66,7 @@ function App() {
 
   return (
     <SessionProvider>
+      <BadgePopupManager />
       <Router>
         <Routes>
                     <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
@@ -96,9 +106,7 @@ function App() {
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="system/agreements" element={<AgreementEditor />} />
-            {/* current-event route moved to top-level below */}
-                    {/* Allow both admin and partner to access event monitoring - must be outside all nested routes */}
-            {/*<Route path="system/badges" element={<BadgeManage />} /> */}
+            <Route path="system/badges" element={<BadgeManage />} />
           </Route>
 
           <Route

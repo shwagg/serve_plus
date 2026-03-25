@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 132" width="120" height="132">
+  <path d="M60 6L108 28V72C108 96 84 114 60 124C36 114 12 96 12 72V28Z" fill="#F59E0B" stroke="#B45309" stroke-width="2.5"/>
+  <path d="M60 16L98 34V70C98 90 78 104 60 112C42 104 22 90 22 70V34Z" fill="#FBBF24" stroke="#D97706" stroke-width="1"/>
+  <path d="M60 26L88 40V68C88 82 74 94 60 100C46 94 32 82 32 68V40Z" fill="#FCD34D" stroke="#FBBF24" stroke-width="0.5"/>
+  <path d="M60 30L68 48H86L72 58L76 76L60 66L44 76L48 58L34 48H52Z" fill="#FDE68A" stroke="#F59E0B" stroke-width="1" opacity=".5"/>
+  <path d="M60 38L65 50H76L67 56L70 68L60 62L50 68L53 56L44 50H55Z" fill="#FEF3C7" stroke="#FBBF24" stroke-width="0.5" opacity=".8"/>
+  <path d="M60 46L62 52H68L63 56L65 62L60 58L55 62L57 56L52 52H58Z" fill="#FFFBEB" opacity=".9"/>
+  <path d="M42 86L52 82L60 86L68 82L78 86" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="44" cy="96" r="2.5" fill="#D97706"/>
+  <circle cx="52" cy="96" r="2.5" fill="#D97706"/>
+  <circle cx="60" cy="96" r="2.5" fill="#D97706"/>
+  <circle cx="68" cy="96" r="2.5" fill="#D97706"/>
+  <circle cx="76" cy="96" r="2.5" fill="#D97706"/>
+</svg>

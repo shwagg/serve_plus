@@ -3,8 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { auth, db } from "../../firebaseConfig";
 import Header from "../../components/Header";
+import BadgeShelf from "../../components/badges/BadgeShelf";
 import "../../styles/Profile.css";
 import "../../styles/PublicProfile.css";
+import "../../styles/Badge.css";
 
 const DEFAULT_AVATAR = "/assets/headassets/default-avatar.png";
 
@@ -66,9 +68,9 @@ export default function PublicProfile() {
         setProfile(profileData);
         setEvents(registeredEvents);
 
-        // Fetch rewards from users/{uid}/rewards subcollection
-        const rewardsSnap = await getDocs(collection(db, "users", uid, "rewards"));
-        const rewardsList = rewardsSnap.docs.map(r => ({ id: r.id, ...r.data() }));
+        // Fetch earned badges from users/{uid}/badges subcollection
+        const badgesSnap = await getDocs(collection(db, "users", uid, "badges"));
+        const rewardsList = badgesSnap.docs.map(r => ({ id: r.id, ...r.data() }));
         setRewards(rewardsList);
       } catch (err) {
         console.error("PublicProfile fetch error:", err);
@@ -179,7 +181,7 @@ export default function PublicProfile() {
                 <span className="pub-tab-badge">{events.length}</span>
               )}
               {tab === 'Rewards & Badges' && rewards.length > 0 && (
-                <span className="pub-tab-badge">{rewards.length}</span>
+                <span className="pub-tab-badge">{rewards.length} badges</span>
               )}
             </button>
           ))}
@@ -248,28 +250,7 @@ export default function PublicProfile() {
 
           {activeTab === "Rewards & Badges" && (
             <div className="pub-profile-section pub-tab-panel" role="tabpanel" id="pub-tabpanel-Rewards & Badges" aria-labelledby="pub-tab-Rewards & Badges">
-              <h3>Rewards & Badges ({rewards.length})</h3>
-              {rewards.length === 0 ? (
-                <p className="pub-empty-msg">No rewards or badges earned yet.</p>
-              ) : (
-                <div className="pub-rewards-grid">
-                  {rewards.map((reward, idx) => (
-                    <div key={reward.id || idx} className="pub-reward-card">
-                      <div className="pub-reward-icon">
-                        {reward.icon ? (
-                          <img src={reward.icon} alt={reward.name || "reward"} />
-                        ) : (
-                          <span className="pub-reward-default-icon">🏅</span>
-                        )}
-                      </div>
-                      <div className="pub-reward-name">{reward.name || reward.id}</div>
-                      {reward.description && (
-                        <div className="pub-reward-desc">{reward.description}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <BadgeShelf earnedBadges={rewards} />
             </div>
           )}
         </div>
