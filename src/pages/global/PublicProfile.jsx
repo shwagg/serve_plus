@@ -57,7 +57,7 @@ export default function PublicProfile() {
             registeredEvents.push({
               id: eventId,
               title: eventData.title || eventId,
-              date: eventData.date || eventData.startDate || null,
+              date: eventData.targetDate || eventData.startDate || null,
               status: eventData.status || "unknown",
               role: vData.role || "participant",
               pointsEarned: vData.pointsEarned || 0,

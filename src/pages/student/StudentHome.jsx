@@ -480,7 +480,7 @@ const StudentHome = () => {
                     <h3 className="mission-card-title">{mission.title}</h3>
                     <div className="mission-card-meta">
                       <span className="mission-card-date">
-                        📅 {formatDate(mission.targetDate || mission.date) || "Date TBA"}
+                        📅 {formatDate(mission.targetDate || mission.targetDates) || "Date TBA"}
                       </span>
                     </div>
                   </div>

@@ -86,9 +86,9 @@ export default function ProjectList({ mode = "admin" }) {
     const getPoints = (p) => (typeof p.points === "number" ? p.points : Number(p.points) || 0);
 
     const getDateObj = (p) => {
-        if (p.dateAt?.toDate) return p.dateAt.toDate();
-        if (!p.date) return null;
-        const d = new Date(p.date);
+        const td = p.targetDate || p.targetDates;
+        if (!td) return null;
+        const d = new Date(td);
         return isNaN(d.getTime()) ? null : d;
     };
     //for approval
@@ -448,7 +448,7 @@ function ProjectCard({ project: p, mode, onPartnerApprove, onPartnerReject, navi
             <div className="project-title">{p.title || "Untitled Project"}</div>
 
             <div className="project-meta">
-                <span>{p.date || "No date"}</span>
+                <span>{p.targetDate || p.targetDates || "No date"}</span>
                 <span>{p.nature || "—"}</span>
                 <span>{p.volunteerHours || 0} hrs</span>
             </div>

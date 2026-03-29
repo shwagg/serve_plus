@@ -21,6 +21,9 @@ import '../../styles/Chat.css';
 import attachIcon from '../../assets/chatassets/attach.svg';
 import sendIcon from '../../assets/chatassets/send.svg';
 
+// Module-level cache — persists for the entire browser session, not just one render
+const _avatarCache = {};
+
 export default function Chat() {
   const { missionId } = useParams();
   const navigate = useNavigate();
@@ -34,6 +37,7 @@ export default function Chat() {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [participants, setParticipants] = useState([]);
+  const [avatarCache, setAvatarCache] = useState({});
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const fileInputRef = useRef(null);
@@ -96,7 +100,7 @@ export default function Chat() {
               id: mId,
               title: missionData.title || 'Untitled Mission',
               description: missionData.description || '',
-              date: missionData.date || '',
+              date: missionData.targetDate || '',
               role: userRoleInMission || 'admin'
             });
           }
@@ -199,6 +203,20 @@ export default function Chat() {
     return () => unsubscribe();
   }, [selectedMission]);
 
+  // Fetch avatars for any sender not yet in cache
+  useEffect(() => {
+    const missingIds = [...new Set(messages.map(m => m.senderId))]
+      .filter(uid => uid && !(uid in avatarCache));
+    if (missingIds.length === 0) return;
+    missingIds.forEach(async (uid) => {
+      try {
+        const snap = await getDoc(doc(db, 'users', uid));
+        const avatar = snap.exists() ? (snap.data().avatar || snap.data().photoURL || '') : '';
+        setAvatarCache(prev => ({ ...prev, [uid]: avatar }));
+      } catch { setAvatarCache(prev => ({ ...prev, [uid]: '' })); }
+    });
+  }, [messages]);
+
   const handleSendMessage = async () => {
     if (pendingAttachment) {
       const uploadFile = pendingAttachment.type.startsWith('image/')
@@ -218,12 +236,12 @@ export default function Chat() {
       await addDoc(
         collection(db, 'missions', selectedMission.id, 'chat'),
         {
-          senderId: user.uid,
+          senderId:   user.uid,
           senderName: userData.name || user.displayName || 'User',
           senderRole: selectedMission.role,
-          text: messageInput.trim(),
-          timestamp: serverTimestamp(),
-          type: 'text'
+          text:       messageInput.trim(),
+          timestamp:  serverTimestamp(),
+          type:       'text'
         }
       );
 
@@ -307,15 +325,15 @@ export default function Chat() {
       const downloadURL = await getDownloadURL(storageRef);
 
       await addDoc(collection(db, 'missions', selectedMission.id, 'chat'), {
-        senderId: user.uid,
+        senderId:   user.uid,
         senderName: userData.name || user.displayName || 'User',
         senderRole: selectedMission.role,
-        type: 'attachment',
-        fileUrl: downloadURL,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        timestamp: serverTimestamp()
+        type:       'attachment',
+        fileUrl:    downloadURL,
+        fileName:   file.name,
+        fileSize:   file.size,
+        fileType:   file.type,
+        timestamp:  serverTimestamp()
       });
 
       setPendingAttachment(null);
@@ -366,6 +384,14 @@ export default function Chat() {
     setHasMoreMessages(true);
     navigate(`/chat/${mission.id}`);
   };
+
+  // Chat is read-only 1 week after the mission's target date
+  const isChatLocked = (() => {
+    if (!selectedMission?.date) return false;
+    const missionEnd = new Date(selectedMission.date);
+    if (isNaN(missionEnd.getTime())) return false;
+    return Date.now() > missionEnd.getTime() + 7 * 24 * 60 * 60 * 1000;
+  })();
 
   if (loading) {
     return (
@@ -461,7 +487,11 @@ export default function Chat() {
                       >
                         {message.senderId !== auth.currentUser?.uid && (
                           <div className="chat-message-avatar">
-                            {message.senderName?.charAt(0).toUpperCase() || 'U'}
+                            {avatarCache[message.senderId] ? (
+                              <img src={avatarCache[message.senderId]} alt={message.senderName} className="chat-message-avatar-img" />
+                            ) : (
+                              message.senderName?.charAt(0).toUpperCase() || 'U'
+                            )}
                           </div>
                         )}
                         <div className="chat-message-content">
@@ -508,7 +538,7 @@ export default function Chat() {
                 )}
               </div>
 
-              {pendingAttachment && (
+              {!isChatLocked && pendingAttachment && (
                 <div className="chat-attachment-preview">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {pendingAttachment.type.startsWith('image/') ? (
@@ -535,45 +565,51 @@ export default function Chat() {
                 </div>
               )}
 
-              <div className="chat-input-area">
-                <button
-                  type="button"
-                  className="chat-input-icon"
-                  onClick={handleAttachmentClick}
-                  disabled={uploadingAttachment}
-                >
-                  <img src={attachIcon} alt="Attach" width="20" height="20" />
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".jpeg,.jpg,.png,.pdf,.xls,.xlsx"
-                  style={{ display: 'none' }}
-                  onChange={handleAttachmentChange}
-                />
+              {isChatLocked ? (
+                <div className="chat-locked-notice">
+                  <span>This chat is closed</span>
+                </div>
+              ) : (
+                <div className="chat-input-area">
+                  <button
+                    type="button"
+                    className="chat-input-icon"
+                    onClick={handleAttachmentClick}
+                    disabled={uploadingAttachment}
+                  >
+                    <img src={attachIcon} alt="Attach" width="20" height="20" />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpeg,.jpg,.png,.pdf,.xls,.xlsx"
+                    style={{ display: 'none' }}
+                    onChange={handleAttachmentChange}
+                  />
 
-                <input
-                  type="text"
-                  placeholder="Aa"
-                  className="chat-input"
-                  value={messageInput}
-                  onChange={e => setMessageInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                />
+                  <input
+                    type="text"
+                    placeholder="Aa"
+                    className="chat-input"
+                    value={messageInput}
+                    onChange={e => setMessageInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                  />
 
-                <button
-                  className="chat-send-button"
-                  onClick={handleSendMessage}
-                  disabled={uploadingAttachment || (!messageInput.trim() && !pendingAttachment)}
-                >
-                  <img src={sendIcon} alt="Send" width="20" height="20" />
-                </button>
-              </div>
+                  <button
+                    className="chat-send-button"
+                    onClick={handleSendMessage}
+                    disabled={uploadingAttachment || (!messageInput.trim() && !pendingAttachment)}
+                  >
+                    <img src={sendIcon} alt="Send" width="20" height="20" />
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="chat-empty-state">

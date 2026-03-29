@@ -1,4 +1,66 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+function CustomSelect({ value, onChange, options, placeholder, required }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          border: `1.5px solid ${open ? '#30bdb7' : '#e0e4ea'}`,
+          borderRadius: 12, padding: '10px 12px', fontSize: '1rem',
+          background: '#fafbfc', color: selected ? '#222' : '#9ca3af',
+          cursor: 'pointer', textAlign: 'left', transition: 'border 0.2s',
+        }}
+      >
+        <span>{selected ? selected.label : placeholder}</span>
+        <span style={{ fontSize: 12, color: '#9ca3af', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+      </button>
+      {required && (
+        <input tabIndex={-1} required value={value} onChange={() => {}}
+          style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
+      )}
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+          background: '#fff', border: '1.5px solid #e0e4ea', borderRadius: 12,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.10)', overflow: 'hidden', maxHeight: 220, overflowY: 'auto',
+        }}>
+          {options.map((o) => (
+            <div
+              key={o.value}
+              onMouseDown={() => { onChange(o.value); setOpen(false); }}
+              style={{
+                padding: '10px 14px', fontSize: '0.95rem', cursor: 'pointer',
+                background: o.value === value ? '#f0fdfb' : '#fff',
+                color: o.value === value ? '#30bdb7' : '#222',
+                fontWeight: o.value === value ? 600 : 400,
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={(e) => { if (o.value !== value) e.currentTarget.style.background = '#f9fafb'; }}
+              onMouseLeave={(e) => { if (o.value !== value) e.currentTarget.style.background = '#fff'; }}
+            >
+              {o.value === value && <span style={{ marginRight: 8, color: '#30bdb7' }}>✓</span>}
+              {o.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const colleges = [
   {
@@ -48,12 +110,14 @@ const PreActivitySurvey = ({
   initialEngagementType = "",
   initialTitle = "",
   onSubmit,
+  onProgressChange,
   children
 }) => {
 
   const [form, setForm] = useState({
     name: initialName,
     engagementType: initialEngagementType,
+    initiativeTitle: initialTitle,
     college: '',
     program: '',
     nonAcademicOrg: '',
@@ -105,6 +169,27 @@ const PreActivitySurvey = ({
 
   const selectedCollege = colleges.find((c) => c.name === form.college);
 
+  const progressFields = [
+    form.name,
+    form.college,
+    form.prevService,
+    form.frequency,
+    form.participation.length > 0 ? 'filled' : '',
+    form.likert_0,
+    form.likert_1,
+    form.likert_2,
+    form.likert_3,
+    form.likert_4,
+    form.likert_5,
+    form.likert_6,
+    form.likert_7,
+  ];
+  const progressPct = Math.round((progressFields.filter(Boolean).length / progressFields.length) * 100);
+
+  useEffect(() => {
+    if (onProgressChange) onProgressChange(progressPct);
+  }, [progressPct, onProgressChange]);
+
   return (
     <form onSubmit={handleSubmit} className="pre-activity-survey-form">
       <style>{`
@@ -144,7 +229,8 @@ const PreActivitySurvey = ({
         .pre-activity-survey-form input,
         .pre-activity-survey-form textarea {
           border: 1.5px solid #e0e4ea;
-          border-radius: 7px;
+          border-radius: 12px;
+          accent-color: #30bdb7;
           padding: 10px 12px;
           font-size: 1rem;
           background: #fafbfc;
@@ -157,7 +243,8 @@ const PreActivitySurvey = ({
         .pre-activity-survey-form input:focus,
         .pre-activity-survey-form select:focus,
         .pre-activity-survey-form textarea:focus {
-          border: 1.5px solid #5b6ee1;
+          border: 1.5px solid #30bdb7;
+          outline: none;
         }
         .pre-activity-survey-form input:disabled,
         .pre-activity-survey-form select:disabled {
@@ -172,19 +259,53 @@ const PreActivitySurvey = ({
         }
         .pre-activity-survey-form legend {
           font-weight: 600;
-          color: #23235b;
+          color: #222;
           margin-bottom: 8px;
         }
-        .pre-activity-survey-form .checkbox-group {
+        .pre-activity-survey-form .pill-group {
           display: flex;
-          gap: 24px;
-          margin-top: 6px;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 8px;
         }
-        .pre-activity-survey-form .checkbox-group label {
-          flex-direction: row;
+        .pre-activity-survey-form .pill-btn {
+          display: inline-flex;
           align-items: center;
-          font-weight: 400;
           gap: 6px;
+          padding: 8px 18px;
+          border-radius: 99px;
+          border: 1.5px solid #d1d5db;
+          background: #fff;
+          color: #374151;
+          font-size: 0.95rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          user-select: none;
+        }
+        .pre-activity-survey-form .pill-btn:hover {
+          border-color: #30bdb7;
+          color: #30bdb7;
+        }
+        .pre-activity-survey-form .pill-btn.selected {
+          background: #30bdb7;
+          border-color: #30bdb7;
+          color: #fff;
+        }
+        .pre-activity-survey-form .pill-btn.selected .pill-check {
+          display: inline-flex;
+        }
+        .pre-activity-survey-form .pill-check {
+          display: none;
+          align-items: center;
+          justify-content: center;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.3);
+          font-size: 10px;
+          font-weight: 700;
+          flex-shrink: 0;
         }
         .pre-activity-survey-form button[type="submit"] {
           background: #30bdb7;
@@ -215,13 +336,12 @@ const PreActivitySurvey = ({
           margin-bottom: 0;
         }
       `}</style>
-      <h2>Pre-Activity Survey</h2>
       <label>
-        Name *
+        Complete Name *
         <input name="name" type='text' value={form.name} onChange={handleChange} required autoComplete="on" />
       </label>
       <label>
-        Title of Service-Learning / Community Engagement Initiative *
+        Title of Initiative *
         <input name="initiativeTitle" value={form.initiativeTitle} disabled required placeholder="e.g., Feeding Program for Barangay 123" autoComplete="off" />
       </label>
       <label>
@@ -234,12 +354,13 @@ const PreActivitySurvey = ({
       </label>
       <label>
         College/Department/Organization *
-        <select name="college" value={form.college} onChange={handleChange} required>
-          <option value="">Select College/Department/Org</option>
-          {colleges.map((c) => (
-            <option key={c.name} value={c.name}>{c.name}</option>
-          ))}
-        </select>
+        <CustomSelect
+          value={form.college}
+          onChange={(val) => setForm((prev) => ({ ...prev, college: val, program: '' }))}
+          placeholder="Select College/Department/Org"
+          required
+          options={colleges.map((c) => ({ value: c.name, label: c.name }))}
+        />
       </label>
       {form.college === 'Non-Academic Organization' ? (
         <label>
@@ -250,101 +371,191 @@ const PreActivitySurvey = ({
         selectedCollege && selectedCollege.programs.length > 0 && (
           <label>
             Program *
-            <select name="program" value={form.program} onChange={handleChange} required>
-              <option value="">Select Program</option>
-              {selectedCollege.programs.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
+            <CustomSelect
+              value={form.program}
+              onChange={(val) => setForm((prev) => ({ ...prev, program: val }))}
+              placeholder="Select Program"
+              required
+              options={selectedCollege.programs.map((p) => ({ value: p, label: p }))}
+            />
           </label>
         )
       )}
 
       <fieldset>
         <legend>Type/Level of Participation <span style={{ fontWeight: 400, color: '#888', fontSize: 13 }}>(Select all that apply)</span></legend>
-        <div className="checkbox-group">
-          <label><input type="checkbox" value="Organizer" checked={form.participation.includes('Organizer')} onChange={handleParticipationChange} /> Organizer</label>
-          <label><input type="checkbox" value="Donor" checked={form.participation.includes('Donor')} onChange={handleParticipationChange} /> Donor</label>
-          <label><input type="checkbox" value="Participant" checked={form.participation.includes('Participant')} onChange={handleParticipationChange} /> Participant</label>
-          <label>
-            <input type="checkbox" value="Other" checked={form.participation.includes('Other')} onChange={handleParticipationChange} /> Other
-            {form.participation.includes('Other') && (
-              <input name="participationOther" value={form.participationOther} onChange={handleChange} placeholder="Please specify" style={{ marginLeft: 8, minWidth: 120 }} />
-            )}
-          </label>
+        <div className="pill-group">
+          {['Organizer', 'Donor', 'Participant', 'Other'].map((opt) => {
+            const selected = form.participation.includes(opt);
+            return (
+              <button
+                key={opt}
+                type="button"
+                className={`pill-btn${selected ? ' selected' : ''}`}
+                onClick={() => {
+                  const e = { target: { value: opt, checked: !selected } };
+                  handleParticipationChange(e);
+                }}
+              >
+                <span className="pill-check">✓</span>
+                {opt}
+              </button>
+            );
+          })}
         </div>
+        {form.participation.includes('Other') && (
+          <input
+            name="participationOther"
+            value={form.participationOther}
+            onChange={handleChange}
+            placeholder="Please specify"
+            style={{ marginTop: 10, width: '100%' }}
+          />
+        )}
+      </fieldset>
+      <fieldset>
+        <legend>Previous Community Service Experience *</legend>
+        <div className="pill-group">
+          {['Yes', 'No'].map((opt) => {
+            const selected = form.prevService === opt;
+            return (
+              <button
+                key={opt}
+                type="button"
+                className={`pill-btn${selected ? ' selected' : ''}`}
+                onClick={() => setForm((prev) => ({ ...prev, prevService: opt }))}
+              >
+                <span className="pill-check">✓</span>
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+        {/* hidden required input for validation */}
+        <input type="text" name="prevService" value={form.prevService} required onChange={() => {}} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }} />
       </fieldset>
       <label>
-        Previous Community Service Experience *
-        <select name="prevService" value={form.prevService} onChange={handleChange} required>
-          <option value="">Select</option>
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-        </select>
-      </label>
-      <label>
         Frequency of Community Service *
-        <select name="frequency" value={form.frequency} onChange={handleChange} required>
-          <option value="">Select Frequency</option>
-          <option value="Once a year">Once a year</option>
-          <option value="2-4 times a year">2-4 times a year</option>
-          <option value="Monthly">Monthly</option>
-          <option value="Weekly">Weekly</option>
-          <option value="Several times a week">Several times a week</option>
-          <option value="Not Applicable">Not Applicable</option>
-        </select>
+        <CustomSelect
+          value={form.frequency}
+          onChange={(val) => setForm((prev) => ({ ...prev, frequency: val }))}
+          placeholder="Select Frequency"
+          required
+          options={[
+            { value: 'Once a year', label: 'Once a year' },
+            { value: '2-4 times a year', label: '2-4 times a year' },
+            { value: 'Monthly', label: 'Monthly' },
+            { value: 'Weekly', label: 'Weekly' },
+            { value: 'Several times a week', label: 'Several times a week' },
+            { value: 'Not Applicable', label: 'Not Applicable' },
+          ]}
+        />
       </label>
       {/* Likert Scale Section */}
-      <div style={{ marginTop: 18 }}>
-        <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.08rem', marginBottom: 8 }}>Please indicate how much you agree with each statement with 1 being that you strongly disagree and 5 being that you strongly agree.</h3>
-        <div style={{ fontSize: 14, color: '#555', marginBottom: 12 }}>
-          <strong>LEGEND</strong><br />
-          <span style={{ display: 'inline-block', minWidth: 180 }}><b>5</b> – Strongly Agree</span>
-          <span style={{ display: 'inline-block', minWidth: 180 }}><b>2</b> – Disagree</span><br />
-          <span style={{ display: 'inline-block', minWidth: 180 }}><b>4</b> – Agree</span>
-          <span style={{ display: 'inline-block', minWidth: 180 }}><b>1</b> – Strongly Disagree</span><br />
-          <span style={{ display: 'inline-block', minWidth: 180 }}><b>3</b> – Neutral</span>
-          <span style={{ display: 'inline-block', minWidth: 180 }}><b>0</b> – No Basis for this evaluation</span>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fafbfc', borderRadius: 8, overflow: 'hidden', marginBottom: 18 }}>
-          <thead>
-            <tr style={{ background: '#f3f4f8' }}>
-              <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: '#23235b', fontSize: 15 }}>Statement</th>
-              {[5, 4, 3, 2, 1, 0].map(val => (
-                <th key={val} style={{ textAlign: 'center', padding: '8px 0', fontWeight: 600, color: '#23235b', fontSize: 15 }}>{val}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              'There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.',
-              'Volunteer work along with teamwork would somehow help solve social problems.',
-              'People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.',
-              'I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.',
-              'Contributing and improving skills I’ve learned from my degree program or affiliation would somehow solve social problems.',
-              'I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.',
-              'I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.',
-              'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.'
-            ].map((statement, idx) => (
-              <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f6f7fa' }}>
-                <td style={{ padding: '10px 12px', fontSize: 15, color: '#222', fontWeight: 500 }}>{statement}</td>
-                {[5, 4, 3, 2, 1, 0].map(val => (
-                  <td key={val} style={{ textAlign: 'center', padding: '10px 0' }}>
-                    <input
-                      type="radio"
-                      name={`likert_${idx}`}
-                      value={val}
-                      checked={form[`likert_${idx}`] === String(val)}
-                      onChange={e => setForm(prev => ({ ...prev, [`likert_${idx}`]: e.target.value }))}
-                      style={{ accentColor: '#30bdb7' }}
-                      required={val === 5}
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ marginTop: 8 }}>
+        <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.05rem', marginBottom: 4 }}>
+          How much do you agree with each statement? 🤔
+        </h3>
+        <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+          Tap a number to rate — <b>1</b> = Strongly Disagree, <b>5</b> = Strongly Agree, <b>0</b> = No basis
+        </p>
+        {[
+          { text: 'There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.', emoji: '💡' },
+          { text: 'Volunteer work along with teamwork would somehow help solve social problems.', emoji: '🤝' },
+          { text: 'People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.', emoji: '🌍' },
+          { text: 'I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.', emoji: '💪' },
+          { text: "Contributing and improving skills I've learned from my degree program or affiliation would somehow solve social problems.", emoji: '🎓' },
+          { text: 'I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.', emoji: '📋' },
+          { text: 'I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.', emoji: '🌐' },
+          { text: 'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.', emoji: '⏰' },
+        ].map((item, idx) => {
+          const selected = form[`likert_${idx}`];
+          const SCALE = [
+            { val: 1, label: 'Strongly Disagree', color: '#ef4444', light: '#fee2e2' },
+            { val: 2, label: 'Disagree',          color: '#f97316', light: '#ffedd5' },
+            { val: 3, label: 'Neutral',            color: '#eab308', light: '#fef9c3' },
+            { val: 4, label: 'Agree',              color: '#22c55e', light: '#dcfce7' },
+            { val: 5, label: 'Strongly Agree',     color: '#30bdb7', light: '#ccfbf1' },
+            { val: 0, label: 'No Basis',           color: '#9ca3af', light: '#f3f4f6' },
+          ];
+          const selectedMeta = SCALE.find(s => String(s.val) === selected);
+          return (
+            <div key={idx} style={{
+              background: selectedMeta ? selectedMeta.light : '#fafbfc',
+              border: `1.5px solid ${selectedMeta ? selectedMeta.color : '#e5e7eb'}`,
+              borderRadius: 14,
+              padding: '16px 18px',
+              marginBottom: 12,
+              transition: 'all 0.2s ease',
+            }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: 14, color: '#1f2937', fontWeight: 500, lineHeight: 1.5 }}>
+                <span style={{ marginRight: 8 }}>{item.emoji}</span>{item.text}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {SCALE.map(({ val, label, color }) => {
+                    const isSelected = selected === String(val);
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        title={label}
+                        onClick={() => setForm(prev => ({ ...prev, [`likert_${idx}`]: String(val) }))}
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          border: `2px solid ${isSelected ? color : '#e5e7eb'}`,
+                          background: isSelected ? color : '#fff',
+                          color: isSelected ? '#fff' : '#6b7280',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? `0 2px 8px ${color}55` : 'none',
+                          flexShrink: 0,
+                          padding: 0,
+                          boxSizing: 'border-box',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {val}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ minWidth: 110 }}>
+                  {selectedMeta && (
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: selectedMeta.color,
+                      background: selectedMeta.light,
+                      padding: '3px 10px',
+                      borderRadius: 20,
+                      border: `1px solid ${selectedMeta.color}44`,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {selectedMeta.label}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {/* hidden required radio to trigger browser validation */}
+              <input
+                type="radio"
+                name={`likert_${idx}`}
+                value={selected || ''}
+                checked={!!selected}
+                onChange={() => {}}
+                required
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+              />
+            </div>
+          );
+        })}
       </div>
       {children}
       <button type="submit">Submit</button>

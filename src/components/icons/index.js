@@ -29,6 +29,10 @@ import ConnectWithoutContactOutlinedIcon from '@mui/icons-material/ConnectWithou
 import ViewKanbanOutlinedIcon from '@mui/icons-material/ViewKanbanOutlined';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
+import ModeRoundedIcon from '@mui/icons-material/ModeRounded';
+import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 
 
 export {
@@ -59,4 +63,8 @@ export {
     HomeRoundedIcon,
     Face6RoundedIcon,
     MenuRoundedIcon,
+    ModeRoundedIcon,
+    DeleteRoundedIcon,
+    ExpandMoreRoundedIcon,
+    ExpandLessRoundedIcon,
 };

@@ -96,6 +96,8 @@
   cursor: pointer;
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0;
   border-radius: 50%;
   display: flex;
@@ -103,6 +105,7 @@
   justify-content: center;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 .icon-button:hover {
   background-color: rgba(0, 188, 212, 0.1);
@@ -121,7 +124,10 @@
     height: 32px;
   }
   .notification-bell-button {
-    padding: 4px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
   }
 }
 @media (max-width: 480px) {
@@ -133,7 +139,10 @@
     height: 28px;
   }
   .notification-bell-button {
-    padding: 2px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
   }
 }
 

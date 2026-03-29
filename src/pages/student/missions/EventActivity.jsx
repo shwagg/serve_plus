@@ -1,11 +1,11 @@
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, serverTimestamp, Timestamp, onSnapshot } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
-import { Face6RoundedIcon, WestIcon } from "../../../components/icons";
+import { Face6RoundedIcon, WestIcon, ModeRoundedIcon, DeleteRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
 import cloudsBg from '../../../assets/clouds-bg.jpg';
 import mission1 from '../../../assets/mission1.jpg';
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
@@ -13,6 +13,7 @@ import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
 import { useSession } from '../../../context/SessionContext';
 import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
+import { computeFinalPoints } from "../../../hooks/rewardSystem";
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
@@ -43,11 +44,12 @@ export default function EventActivity() {
     );
   };
 
-  const [uploadedConsentFile, setUploadedConsentFile] = useState(null);
   const [selectedConsentFile, setSelectedConsentFile] = useState(null);
+  const [consentSubmitted, setConsentSubmitted] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
   // State for pre-activity survey modal (existing)
   const [showPreSurveyModal, setShowPreSurveyModal] = useState(false);
+  const [surveyProgress, setSurveyProgress] = useState(0);
   // State for post-activity survey modal
   const [showPostSurveyModal, setShowPostSurveyModal] = useState(false);
   const { id } = useParams();
@@ -55,7 +57,21 @@ export default function EventActivity() {
   const auth = getAuth();
   const location = useLocation();
   const [isLeaving, setIsLeaving] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Redirect to login if not authenticated — wait for Firebase to restore session first
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        navigate("/auth", { replace: true });
+      } else {
+        setAuthChecked(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [auth, navigate]);
   const [showProgressDetails, setShowProgressDetails] = useState(false);
+  const [showPointsDetails, setShowPointsDetails] = useState(false);
   const mode = "active";
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrStatus, setQRStatus] = useState("");
@@ -198,8 +214,7 @@ export default function EventActivity() {
         },
         { merge: true }
       );
-      setUploadedConsentFile(selectedConsentFile);
-      setSelectedConsentFile(null);
+      setConsentSubmitted(true);
       alert("Consent uploaded successfully!");
     } catch (error) {
       console.error("Upload error:", error);
@@ -262,6 +277,8 @@ export default function EventActivity() {
   const [editingJournalText, setEditingJournalText] = useState("");
   const [enrolledTasks, setEnrolledTasks] = useState({});
   const [volunteerProgress, setVolunteerProgress] = useState(null);
+  const [volunteerCount, setVolunteerCount] = useState(null);
+  const [volunteerAvatars, setVolunteerAvatars] = useState([]);
   const [expandedTasks, setExpandedTasks] = useState({});
   const [taskParticipantCounts, setTaskParticipantCounts] = useState({});
   const canJoinActivities = true;
@@ -487,6 +504,7 @@ export default function EventActivity() {
   };
 
   useEffect(() => {
+    if (!authChecked) return;
     async function fetchEventAndJournals() {
       try {
         const eventRef = doc(db, "missions", id);
@@ -506,7 +524,7 @@ export default function EventActivity() {
       }
     }
     fetchEventAndJournals();
-  }, [id, auth.currentUser]);
+  }, [id, authChecked]);
 
   // Edit journal handler
   const handleEditJournal = (journal) => {
@@ -1226,7 +1244,14 @@ export default function EventActivity() {
 
   const [event, setEvent] = useState(null);
   const today = new Date().toLocaleDateString("en-CA");
-  const eventDate = event?.targetDate;
+  // Normalize targetDate to YYYY-MM-DD string — falls back to targetDates for older missions
+  const eventDate = (() => {
+    const td = event?.targetDate || event?.targetDates;
+    if (!td) return null;
+    if (typeof td === 'string') return td;
+    if (td?.toDate) return td.toDate().toLocaleDateString("en-CA");
+    return null;
+  })();
   const isEventDay = eventDate === today;
   const isAfterEvent = today > eventDate;
 
@@ -1249,6 +1274,10 @@ export default function EventActivity() {
   })();
   const [tasks, setTasks] = useState([]);
   const [preSurveyData, setPreSurveyData] = useState(null);
+  const [preSurveyFullData, setPreSurveyFullData] = useState(null);
+  const [consentFileUrl, setConsentFileUrl] = useState(null);
+  const [showPreSurveyPreview, setShowPreSurveyPreview] = useState(false);
+  const [volunteerRole, setVolunteerRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [totalPointsEarned, setTotalPointsEarned] = useState(0);
   const [completedMissions, setCompletedMissions] = useState(0);
@@ -1259,6 +1288,7 @@ export default function EventActivity() {
   const hasLeaderboardLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (!authChecked) return;
     let unsubscribe = null;
     async function fetchEvent() {
       try {
@@ -1266,6 +1296,21 @@ export default function EventActivity() {
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
           setEvent(eventSnap.data());
+
+          // Fetch volunteer count + first 3 avatars
+          const volunteerSnap = await getDocs(collection(db, "missions", id, "volunteer"));
+          setVolunteerCount(volunteerSnap.size);
+          const first3 = volunteerSnap.docs.slice(0, 3);
+          const avatars = await Promise.all(
+            first3.map(async (vDoc) => {
+              const userSnap = await getDoc(doc(db, "users", vDoc.id));
+              const name = userSnap.exists() ? (userSnap.data().name || "User") : "User";
+              return userSnap.exists() && userSnap.data().avatar
+                ? userSnap.data().avatar
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=30bdb7&color=fff&size=64`;
+            })
+          );
+          setVolunteerAvatars(avatars);
 
           // Fetch tasks from tasks subcollection
           const tasksRef = collection(db, "missions", id, "task");
@@ -1306,6 +1351,12 @@ export default function EventActivity() {
             if (preSurveySnap.exists()) {
               const data = preSurveySnap.data();
               setPreSurveyData(data.respondent);
+              setPreSurveyFullData(data);
+              const rawRole = data.engagement?.participation;
+              if (rawRole) {
+                const roles = Array.isArray(rawRole) ? rawRole : [rawRole];
+                setVolunteerRole(roles.map(r => r.trim().toLowerCase().replace(/\s+/g, "_")));
+              }
               preSurveySubmitted = true;
             }
 
@@ -1322,6 +1373,7 @@ export default function EventActivity() {
               // Check for consentSubmission field
               if (data.consentSubmission && data.consentSubmission.fileUrl) {
                 consentSubmitted = true;
+                setConsentFileUrl(data.consentSubmission.fileUrl);
               }
             }
 
@@ -1364,7 +1416,7 @@ export default function EventActivity() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [id]);
+  }, [id, authChecked]);
 
   useEffect(() => {
     const fetchCompleted = async () => {
@@ -1661,7 +1713,7 @@ export default function EventActivity() {
     <div className="full-page">
       <Header />
       <div className="header-spacer"></div>
-      <div className="content-page">
+      <div className="content-page" style={{ overflow: 'hidden' }}>
 
         {/* PLAYER STRIP — persistent, no animation */}
         <section className="player-strip" aria-label="Player stats">
@@ -1688,11 +1740,8 @@ export default function EventActivity() {
           </div>
         </section>
 
-        {/* Only the content below slides in/out */}
-        <div className={isLeaving ? 'ea-slide-out' : 'ea-slide-in'} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-
-          {/* STICKY PROGRESS STRIP */}
-          {(() => {
+        {/* STICKY PROGRESS STRIP — outside animation so it never gets clipped */}
+        {(() => {
             const enrolledTaskIds = Object.keys(enrolledTasks).filter(tid => enrolledTasks[tid]);
             const totalItems = 4 + enrolledTaskIds.length;
             let done = 0;
@@ -1708,13 +1757,25 @@ export default function EventActivity() {
             return (
               <div className="ea-progress-strip">
                 <div className="ea-progress-strip__main">
+                  <button
+                    className="ea-progress-back-btn"
+                    onClick={() => {
+                      setIsLeaving(true);
+                      setTimeout(() => navigate('/student/home', { state: { scrollTo: 'missions' } }), 380);
+                    }}
+                  >
+                    <span className="ea-progress-back-circle"><WestIcon sx={{ fontSize: 16 }} /></span>
+                    <span className="ea-progress-back-label">Back</span>
+                  </button>
                   <span className="ea-progress-card__title">Progress</span>
                   <div className="ea-progress-bar-wrap">
                     <div className="ea-progress-bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                   <span className="ea-progress-card__pct">{pct}%</span>
-                  <button className="ea-progress-toggle" onClick={() => setShowProgressDetails(v => !v)}>
-                    {showProgressDetails ? '▲' : '▼'}
+                  <button className="ea-progress-toggle" onClick={() => setShowProgressDetails(v => !v)} aria-label={showProgressDetails ? 'Collapse progress' : 'Expand progress'}>
+                    {showProgressDetails
+                      ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} />
+                      : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
                   </button>
                 </div>
                 {showProgressDetails && (
@@ -1740,28 +1801,29 @@ export default function EventActivity() {
             );
           })()}
 
-          {/* BLUE BACKGROUND WRAPPER */}
-          <div className="event-activity-bg" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat', backgroundColor: '#d1efff', flex: 1 }}>
+        {/* Only the content below slides in/out */}
+        <div className={isLeaving ? 'ea-slide-out' : 'ea-slide-in'} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+
+          {/* SCROLLABLE BODY */}
+          <div className="ea-scrollable-body" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat', backgroundColor: '#d1efff' }}>
+          <div className="event-activity-bg">
+
+            {isAfterEvent && (
+              <div className="ea-past-event-banner">
+                This event has already ended. Task joining and attendance are no longer available.
+              </div>
+            )}
 
             <div className="event-activity-container">
               {/* Left Side: Event Summary */}
               <div className="event-left-panel">
                 <div className="event-summary-card">
-                  {/* Banner image with floating back button */}
+                  {/* Banner image */}
                   <div className="event-summary-image">
                     <img
                       src={event.img && event.img.trim() !== "" ? event.img : mission1}
                       alt={event.alt || "Event"}
                     />
-                    <button
-                      className="event-summary-back-btn"
-                      onClick={() => {
-                        setIsLeaving(true);
-                        setTimeout(() => navigate('/student/home', { state: { scrollTo: 'missions' } }), 380);
-                      }}
-                    >
-                      <WestIcon fontSize="small" /> Back
-                    </button>
                   </div>
 
                   <div className="event-summary-body">
@@ -1781,8 +1843,38 @@ export default function EventActivity() {
                         </div>
                       )}
                       <div className="event-points-col">
-                        <span className="event-points-big">{event.points} <span className="event-points-unit">PTS</span></span>
-                        <span className="event-points-label">Points can be earned</span>
+                        {(() => {
+                          // Mission pts: role × best multiplier (1.3 = ≥4.5 rating) × verified (1.0)
+                          const role = volunteerRole || ['participant'];
+                          const { finalPoints: missionPts } = computeFinalPoints(role, 4.5, 'verified');
+                          const taskPts = tasks.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
+                          const totalPts = Number((missionPts + taskPts).toFixed(2));
+                          const roleLabel = volunteerRole
+                            ? (Array.isArray(volunteerRole) ? volunteerRole : [volunteerRole])
+                                .map(r => r.replace(/_/g, ' ')).join(', ')
+                            : null;
+                          return (
+                            <>
+                              <span className="event-points-big">{totalPts} <span className="event-points-unit">PTS</span></span>
+                              <span className="event-points-label">Potential points to earn</span>
+                              <button className="event-points-see-details" onClick={() => setShowPointsDetails(v => !v)}>
+                                {showPointsDetails ? 'hide' : 'see details'}
+                              </button>
+                              {showPointsDetails && (
+                                <span className="event-points-note">
+                                  <span className="event-points-note-row">
+                                    <span className="event-points-note-pill">{missionPts} {roleLabel || 'participant'} pts</span>
+                                    <span className="event-points-note-op">+</span>
+                                    <span className="event-points-note-pill">{taskPts} task pts</span>
+                                  </span>
+                                  <span className="event-points-note-sub">
+                                    Role pts × your post-event rating (×1.0 – ×1.3)
+                                  </span>
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -1791,8 +1883,21 @@ export default function EventActivity() {
                       {event.location && (
                         <span className="event-info-tag">📍 {event.location}</span>
                       )}
-                      {event.date && (
-                        <span className="event-info-tag">📅 {formatDate(event.date) || event.date}{event.time ? ` · ${event.time}` : ""}</span>
+                      {eventDate && (
+                        <span className="event-info-tag">📅 {formatDate(eventDate) || eventDate}{event.time ? ` · ${event.time}` : ""}</span>
+                      )}
+                      {volunteerCount !== null && volunteerCount > 0 && (
+                        <div className="event-info-tag event-volunteer-tag">
+                          <div className="event-volunteer-stack">
+                            {volunteerAvatars.map((src, i) => (
+                              <img key={i} src={src} alt="" className="event-volunteer-avatar" style={{ zIndex: volunteerAvatars.length - i }} />
+                            ))}
+                            {volunteerCount > 3 && (
+                              <div className="event-volunteer-extra" style={{ zIndex: 0 }}>+{volunteerCount - 3}</div>
+                            )}
+                          </div>
+                          <span className="event-volunteer-label">joined</span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1825,7 +1930,12 @@ export default function EventActivity() {
                             }}
                           >
                             <span className="ea-rank-num">{rank}</span>
-                            <img src={user.avatar} alt={user.name} className="ea-rank-avatar" />
+                            {user.avatar
+                              ? <img src={user.avatar} alt={user.name} className="ea-rank-avatar" />
+                              : <span className="ea-rank-avatar ea-rank-initials">
+                                  {(user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                                </span>
+                            }
                             <span className="ea-rank-name">{user.name}</span>
                             <span className="ea-rank-pts">{user.points} PTS</span>
                           </div>
@@ -1840,7 +1950,7 @@ export default function EventActivity() {
               <div className="event-right-panel">
 
 
-                <div className="event-activities-panel">
+                <div className={`event-activities-panel${isAfterEvent ? ' event-activities-panel--ended' : ''}`}>
                   <h2 className="event-activities-title">Task Assignment</h2>
                   <p className="event-activities-desc">Pick an extra role you want to take on for this event</p>
                   <p className="event-activities-subtitle">
@@ -1848,134 +1958,158 @@ export default function EventActivity() {
                   </p>
                   {/*TASKS AVAILABLE FOR THIS SPECIFIC EVENT*/}
                   <div className="task-list-scroll">
-                    {tasks && tasks.map((activity, idx) => {
-                      const isEnrolled = !!enrolledTasks[activity.id];
-                      const isGrouped = activity.type === 'grouped';
-                      const filledSlots = taskParticipantCounts[activity.id] || 0;
-                      const maxSlots = isGrouped ? (activity.maxParticipants || null) : null;
-                      const isFull = maxSlots !== null && filledSlots >= maxSlots;
-                      const slotPct = maxSlots ? Math.min((filledSlots / maxSlots) * 100, 100) : 0;
-                      const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
-                      const hasSubmittedJournal = journalsForActivity.length > 0;
+                    {tasks && (() => {
+                      const withIdx = tasks.map((t, i) => [t, i]);
+                      const joinedList = withIdx.filter(([t]) => !!enrolledTasks[t.id]);
+                      const unjoinedList = withIdx.filter(([t]) => !enrolledTasks[t.id]);
 
-                      // Once event starts: gray out tasks not joined, show only title
-                      if (isEventDay && !isEnrolled) {
+                      const renderTaskCard = (activity, idx) => {
+                        const isEnrolled = !!enrolledTasks[activity.id];
+                        const isGrouped = activity.type === 'grouped';
+                        const filledSlots = taskParticipantCounts[activity.id] || 0;
+                        const maxSlots = isGrouped ? (activity.maxParticipants || null) : null;
+                        const isFull = maxSlots !== null && filledSlots >= maxSlots;
+                        const slotPct = maxSlots ? Math.min((filledSlots / maxSlots) * 100, 100) : 0;
+                        const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
+                        const hasSubmittedJournal = journalsForActivity.length > 0;
+
+                        if (isEventDay && !isEnrolled) {
+                          return (
+                            <div key={idx} className="task-card task-card--locked">
+                              <span className="task-card__title-only">{activity.title}</span>
+                            </div>
+                          );
+                        }
+
+                        const isExpanded = expandedTasks[activity.id] !== false; // default open
+                        const isEndedEnrolled = isAfterEvent && isEnrolled;
+
                         return (
-                          <div key={idx} className="task-card task-card--locked">
-                            <span className="task-card__title-only">{activity.title}</span>
+                          <div key={idx} className={`task-card${isEnrolled ? ' task-card--enrolled' : ''}${isEndedEnrolled ? ' task-card--ended' : ''}`}>
+                            <div className="task-card__row" style={isEnrolled && !isEndedEnrolled ? { cursor: 'pointer' } : {}} onClick={isEnrolled && !isEndedEnrolled ? () => toggleTaskExpand(activity.id) : undefined}>
+                              <span className="task-card__emoji">{activity.emoji || '🎯'}</span>
+                              <div className="task-card__info">
+                                <span className="task-card__title">{activity.title}</span>
+                                {isGrouped && maxSlots && (
+                                  <div className="task-slot-wrap">
+                                    <div className="task-slot-bar">
+                                      <div className="task-slot-fill" style={{ width: `${slotPct}%`, background: isFull ? '#ef4444' : '#30bdb7' }} />
+                                    </div>
+                                    <span className="task-slot-label">{filledSlots}/{maxSlots} members{isFull ? ' · Full' : ''}</span>
+                                  </div>
+                                )}
+                                <span className="task-card__pts">{activity.points} PTS</span>
+                              </div>
+                              <div className="task-card__action">
+                                {isEnrolled ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span className="task-enrolled-badge">Joined</span>
+                                    {!isEndedEnrolled && (
+                                      <button
+                                        className="task-collapse-btn"
+                                        onClick={(e) => { e.stopPropagation(); toggleTaskExpand(activity.id); }}
+                                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                                      >
+                                        {isExpanded
+                                          ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} />
+                                          : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : isFull ? (
+                                  <span className="task-slot-full-badge">Full</span>
+                                ) : isAfterEvent ? (
+                                  <span className="req-status locked">Ended</span>
+                                ) : canJoinActivities ? (
+                                  <button className="task-join-btn" onClick={() => handleJoinActivity(activity.id, activity)}>Join</button>
+                                ) : (
+                                  <span className="req-status locked">Closed</span>
+                                )}
+                              </div>
+                            </div>
+                            {isEnrolled && isExpanded && !isEndedEnrolled && (
+                              <div className="task-journal-section">
+                                {/* Journal text / edit textarea */}
+                                {journalsForActivity.map((journal) => (
+                                  <div key={journal.id} className="journal-card">
+                                    {editingJournalId === journal.taskId ? (
+                                      <>
+                                        <textarea value={editingJournalText} onChange={(e) => setEditingJournalText(e.target.value)} className="journal-edit-textarea" />
+                                        <div className="journal-card-actions">
+                                          <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
+                                          <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="journal-text">{journal.reflection}</div>
+                                    )}
+                                  </div>
+                                ))}
+
+                                {/* Bottom action row — same position as the submit button */}
+                                {hasSubmittedJournal ? (
+                                  <div className="journal-submit-row">
+                                    <span className="journal-submitted-badge">Submitted</span>
+                                    <button
+                                      onClick={() => handleEditJournal(journalsForActivity[0])}
+                                      className="journal-edit-icon-btn"
+                                      title="Edit reflection"
+                                    >
+                                      <ModeRoundedIcon sx={{ fontSize: 15 }} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)}
+                                      className="journal-edit-icon-btn journal-delete-icon-btn"
+                                      title="Delete reflection"
+                                    >
+                                      <DeleteRoundedIcon sx={{ fontSize: 15 }} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <textarea
+                                      placeholder={!isHalfwayDone ? 'Journal will unlock once the event has started' : 'Write your reflection for this task…'}
+                                      className="journal-textarea"
+                                      value={journalReflections[idx] || ''}
+                                      onChange={(e) => handleJournalChange(idx, e.target.value)}
+                                      disabled={!isHalfwayDone}
+                                    />
+                                    <div className="journal-submit-row">
+                                      {submitStatus[idx] && (
+                                        <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
+                                      )}
+                                      <button className="activity-submit-button journal-submit-compact" disabled={!isHalfwayDone || !journalReflections[idx]?.trim()} onClick={() => handleJournalSubmit(idx, activity)}>
+                                        {!isHalfwayDone ? 'LOCKED' : 'SUBMIT'}
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
-                      }
+                      };
 
                       return (
-                        <div key={idx} className={`task-card${isEnrolled ? ' task-card--enrolled' : ''}`}>
-                          {/* Main row: emoji | info stack | join button */}
-                          <div className="task-card__row">
-                            {/* Emoji / icon */}
-                            <span className="task-card__emoji">
-                              {activity.emoji || '🎯'}
-                            </span>
-
-                            {/* Stacked info: name → progress bar → points */}
-                            <div className="task-card__info">
-                              <span className="task-card__title">{activity.title}</span>
-
-                              {/* Slot progress bar — grouped tasks only */}
-                              {isGrouped && maxSlots && (
-                                <div className="task-slot-wrap">
-                                  <div className="task-slot-bar">
-                                    <div
-                                      className="task-slot-fill"
-                                      style={{ width: `${slotPct}%`, background: isFull ? '#ef4444' : '#30bdb7' }}
-                                    />
-                                  </div>
-                                  <span className="task-slot-label">
-                                    {filledSlots}/{maxSlots}{isFull ? ' · Full' : ''}
-                                  </span>
-                                </div>
-                              )}
-
-                              <span className="task-card__pts">{activity.points} PTS</span>
-                            </div>
-
-                            {/* Join / Enrolled button on the far right */}
-                            <div className="task-card__action">
-                              {isEnrolled ? (
-                                <span className="task-enrolled-badge">Joined</span>
-                              ) : isFull ? (
-                                <span className="task-slot-full-badge">Full</span>
-                              ) : canJoinActivities ? (
-                                <button
-                                  className="task-join-btn"
-                                  onClick={() => handleJoinActivity(activity.id, activity)}
-                                >
-                                  Join
-                                </button>
-                              ) : (
-                                <span className="req-status locked">Closed</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Journal — only for enrolled, only when halfway done */}
-                          {isEnrolled && (
-                            <div className="task-journal-section">
-                              {/* Existing submitted journals */}
-                              {journalsForActivity.map((journal) => (
-                                <div key={journal.id} className="journal-card">
-                                  {editingJournalId === journal.taskId ? (
-                                    <>
-                                      <textarea
-                                        value={editingJournalText}
-                                        onChange={(e) => setEditingJournalText(e.target.value)}
-                                        className="journal-edit-textarea"
-                                      />
-                                      <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
-                                      <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="journal-text">{journal.reflection}</div>
-                                      <button onClick={() => handleEditJournal(journal)} className="journal-button journal-button-edit">Edit</button>
-                                      <button onClick={() => handleDeleteJournal(journal.taskId)} className="journal-button journal-button-delete">Delete</button>
-                                    </>
-                                  )}
-                                </div>
-                              ))}
-
-                              {/* New journal input — only when halfway done and no submitted entry yet */}
-                              {!hasSubmittedJournal && (
-                                <>
-                                  <textarea
-                                    placeholder={
-                                      !isHalfwayDone
-                                        ? 'Journal will unlock once the event has started'
-                                        : 'Write your reflection for this task…'
-                                    }
-                                    className="journal-textarea"
-                                    value={journalReflections[idx] || ''}
-                                    onChange={(e) => handleJournalChange(idx, e.target.value)}
-                                    disabled={!isHalfwayDone}
-                                  />
-                                  <button
-                                    className="activity-submit-button"
-                                    disabled={!isHalfwayDone || !journalReflections[idx]?.trim()}
-                                    onClick={() => handleJournalSubmit(idx, activity)}
-                                  >
-                                    {!isHalfwayDone ? 'LOCKED' : 'SUBMIT'}
-                                  </button>
-                                  {submitStatus[idx] && (
-                                    <div className={`submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>
-                                      {submitStatus[idx]}
-                                    </div>
-                                  )}
-                                </>
-                              )}
+                        <>
+                          {joinedList.length > 0 && (
+                            <div className="task-section">
+                              <span className="task-section-label">Joined</span>
+                              {joinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
                             </div>
                           )}
-                        </div>
+                          {joinedList.length > 0 && unjoinedList.length > 0 && (
+                            <div className="task-section-divider" />
+                          )}
+                          {unjoinedList.length > 0 && (
+                            <div className="task-section">
+                              {joinedList.length > 0 && <span className="task-section-label">Available</span>}
+                              {unjoinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
+                            </div>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
                 {/*REQUIREMENTS SECTION (UNDER ALL TASKS)*/}
@@ -1996,6 +2130,8 @@ export default function EventActivity() {
                         locked: false,
                         onOpen: () => setShowPreSurveyModal(true),
                         type: 'survey',
+                        previewable: preSurveyDone && !!preSurveyFullData,
+                        onPreview: () => setShowPreSurveyPreview(true),
                       },
                       {
                         label: 'Parent Consent Form',
@@ -2004,54 +2140,70 @@ export default function EventActivity() {
                         locked: false,
                         onOpen: () => setShowConsentModal(true),
                         type: 'upload',
+                        previewable: consentDone && !!consentFileUrl,
+                        onPreview: () => window.open(consentFileUrl, '_blank'),
                       },
                       {
                         label: 'Attendance',
-                        desc: 'Scan QR code on event day',
+                        desc: isAfterEvent ? 'Event has ended' : 'Scan QR code on event day',
                         done: attendanceDone,
-                        locked: !isEventDay,
-                        onOpen: isEventDay ? () => setShowQRModal(true) : null,
+                        locked: !isEventDay || isAfterEvent,
+                        onOpen: isEventDay && !isAfterEvent ? () => setShowQRModal(true) : null,
                         type: 'qr',
+                        previewable: false,
                       },
                       {
                         label: 'Post-Activity Survey',
-                        desc: 'Fill out after the event',
+                        desc: isAfterEvent ? 'Event has ended' : 'Fill out after the event',
                         done: postSurveyDone,
-                        locked: postLocked || !isAfterEvent,
-                        onOpen: (!postLocked && isAfterEvent) ? () => setShowPostSurveyModal(true) : null,
+                        locked: isAfterEvent || postLocked || !isAfterEvent,
+                        onOpen: null,
                         type: 'survey',
+                        previewable: false,
                       },
                     ];
 
+                    const activeIndex = steps.findIndex(s => !s.done);
+
                     return (
                       <div className="req-timeline">
-                        {steps.map((step, i) => (
-                          <div key={i} className={`req-timeline-item${step.done ? ' done' : step.locked ? ' locked' : ''}`}>
-                            <div className="req-timeline-left">
-                              <div className="req-timeline-dot">
-                                {step.done ? '✓' : i + 1}
+                        {steps.map((step, i) => {
+                          const isActive = i === activeIndex;
+                          const lineTeal = i === activeIndex - 1;
+                          return (
+                            <div key={i} className={`req-timeline-item${step.done ? ' done' : isActive ? ' active' : step.locked ? ' locked' : ''}`}>
+                              <div className="req-timeline-left">
+                                <div className={`req-timeline-dot${isActive ? ' req-timeline-dot--active' : ''}`}>
+                                  {i + 1}
+                                </div>
+                                {i < steps.length - 1 && (
+                                  <div className={`req-timeline-line${lineTeal ? ' req-timeline-line--teal' : ''}`} />
+                                )}
                               </div>
-                              {i < steps.length - 1 && <div className="req-timeline-line" />}
+                              <div className="req-timeline-body">
+                                <span className="req-timeline-label">{step.label}</span>
+                                <span className="req-timeline-desc">{step.desc}</span>
+                              </div>
+                              <div className="req-timeline-action">
+                                {step.done ? (
+                                  step.previewable ? (
+                                    <button className="req-view-btn" onClick={step.onPreview}>View</button>
+                                  ) : (
+                                    <span className="req-done-badge">Done</span>
+                                  )
+                                ) : (
+                                  <button
+                                    className={`req-action-btn${step.locked ? ' req-action-btn--locked' : ''}`}
+                                    disabled={step.locked}
+                                    onClick={step.locked ? undefined : step.onOpen}
+                                  >
+                                    {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : 'Start'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <div className="req-timeline-body">
-                              <span className="req-timeline-label">{step.label}</span>
-                              <span className="req-timeline-desc">{step.desc}</span>
-                            </div>
-                            <div className="req-timeline-action">
-                              {step.done ? (
-                                <span className="req-done-badge">✓ Done</span>
-                              ) : (
-                                <button
-                                  className={`req-action-btn${step.locked ? ' req-action-btn--locked' : ''}`}
-                                  disabled={step.locked}
-                                  onClick={step.locked ? undefined : step.onOpen}
-                                >
-                                  {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : 'Start'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })()}
@@ -2060,6 +2212,7 @@ export default function EventActivity() {
 
             </div>
           </div>{/* closes event-activity-bg */}
+          </div>{/* closes ea-scrollable-body */}
         </div>{/* closes ea-slide-in */}
       </div>{/* closes content-page */}
 
@@ -2071,27 +2224,29 @@ export default function EventActivity() {
               <h3 className="ea-modal-title">📷 Scan Attendance QR</h3>
               <button className="ea-modal-close" onClick={() => setShowQRModal(false)} aria-label="Close">✕</button>
             </div>
-            <QRScanner key={scannerKey} onScan={handleQRScan} />
-            {qrStatus && (
-              <div>
-                <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>
-                {!scanSuccess && (
-                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                    <button
-                      className="ea-retry-btn"
-                      onClick={() => {
-                        setQRStatus("");
-                        setScannedLocation(null);
-                        setScanSuccess(false);
-                        setScannerKey(k => k + 1);
-                      }}
-                    >
-                      🔄 Retry
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="ea-qr-modal-body">
+              <QRScanner key={scannerKey} onScan={handleQRScan} />
+              {qrStatus && (
+                <div>
+                  <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>
+                  {!scanSuccess && (
+                    <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                      <button
+                        className="ea-retry-btn"
+                        onClick={() => {
+                          setQRStatus("");
+                          setScannedLocation(null);
+                          setScanSuccess(false);
+                          setScannerKey(k => k + 1);
+                        }}
+                      >
+                        🔄 Retry
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2106,20 +2261,24 @@ export default function EventActivity() {
           }}
         >
           <div
-            className="ea-modal-card modal-scrollable"
-            style={{ maxHeight: "90vh", overflowY: "auto", minWidth: 340 }}
+            className="ea-modal-card"
+            style={{ minWidth: 340 }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="ea-modal-header">
               <h3 className="ea-modal-title">📋 Pre-Activity Survey</h3>
               <button className="ea-modal-close" onClick={() => setShowPreSurveyModal(false)} aria-label="Close">✕</button>
             </div>
-
+            <div style={{ height: 6, background: '#e5e7eb' }}>
+              <div style={{ height: '100%', width: `${surveyProgress}%`, background: '#30bdb7', transition: 'width 0.4s ease' }} />
+            </div>
+            <div className="modal-scrollable">
             <PreActivitySurvey
               // auto-fill of information already provided beforehand
               initialName={userData?.name || ''}
               initialEngagementType={event?.projectType || ""}
               initialTitle={event?.title || ""}
+              onProgressChange={setSurveyProgress}
 
               onSubmit={async (form) => {
                 const user = auth.currentUser;
@@ -2185,6 +2344,7 @@ export default function EventActivity() {
                 window.location.reload();
               }}
             />
+            </div>
           </div>
         </div>
       )}
@@ -2283,64 +2443,187 @@ export default function EventActivity() {
           }}
         >
           <div
-            className="ea-modal-card"
-            style={{ minHeight: 180, minWidth: 340, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
+            className="ea-modal-card consent-modal-card"
+            onClick={e => e.stopPropagation()}
           >
-            <div className="ea-modal-header" style={{ width: '100%' }}>
+            <div className="ea-modal-header">
               <h3 className="ea-modal-title">📄 Activity Consent Form</h3>
               <button className="ea-modal-close" onClick={() => setShowConsentModal(false)} aria-label="Close">✕</button>
             </div>
-            <div className="qr-modal-note">
-              <strong>Note:</strong><br />
-              If there is no submitted consent form, students will not be allowed to join the event.<br /><br />
-              Please download the PDF file and fill up the necessary fields and have your parent/guardian sign it. And then upload it to the submission bin for checking.
-            </div>
-            <p style={{ margin: '16px 0', textAlign: 'center' }}>Please download and fill out the consent form below.</p>
-            <a
-              href="/assets/Activity%20Consent%20Form%20Fillable.pdf"
-              download
-              className="consent-btn"
-            >
-              Download Consent Form (PDF)
-            </a>
 
-            {/* Submission Bin for PDF or Image Upload */}
-            <div className="consent-details">
-              <input
-                type="file"
-                accept="application/pdf"
-                style={{ marginBottom: 8 }}
-                onChange={(e) => setSelectedConsentFile(e.target.files[0])}
-              />
+            {/* Teal accent line — matches pre-survey style exactly */}
+            <div style={{ height: 4, background: '#e5e7eb' }}>
+              <div style={{ height: '100%', width: '100%', background: '#30bdb7' }} />
+            </div>
+
+            <div className="consent-modal-body">
+              {/* Unified note + download card */}
+              <div className="consent-info-card">
+                <div className="consent-note-row">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  <ul className="consent-note-list">
+                    <li>Students without a submitted consent form will <strong>not</strong> be allowed to join the event.</li>
+                    <li>Download the form, fill it out, have your parent/guardian sign it, then upload the signed copy below.</li>
+                  </ul>
+                </div>
+
+                <div className="consent-divider" />
+
+                <div className="consent-pdf-row">
+                  <div className="consent-pdf-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </div>
+                  <div className="consent-pdf-text">
+                    <p className="consent-pdf-name">Activity Information and Consent Form</p>
+                    <p className="consent-pdf-meta">PDF · CSCE-FORM-040AB-01</p>
+                  </div>
+                  <a
+                    href="/assets/Activity%20Information%20and%20Consent%20Form.pdf"
+                    download="Activity Information and Consent Form.pdf"
+                    className="consent-download-btn"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download
+                  </a>
+                </div>
+              </div>
+
+              {/* Drag-and-drop upload area */}
+              <div
+                className={`consent-dropzone${selectedConsentFile ? ' consent-dropzone--filled' : ''}`}
+                onClick={() => document.getElementById('consent-file-input').click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file) setSelectedConsentFile(file);
+                }}
+              >
+                <input
+                  id="consent-file-input"
+                  type="file"
+                  accept="application/pdf"
+                  style={{ display: 'none' }}
+                  onChange={e => setSelectedConsentFile(e.target.files[0] || null)}
+                />
+                {selectedConsentFile ? (
+                  <div className="consent-file-row">
+                    <div className="consent-file-badge">PDF</div>
+                    <div className="consent-file-info">
+                      <span className="consent-file-name">{selectedConsentFile.name}</span>
+                      <span className="consent-file-size">{(selectedConsentFile.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                    <button
+                      className="consent-file-remove"
+                      onClick={e => { e.stopPropagation(); setSelectedConsentFile(null); }}
+                      title="Remove file"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="consent-dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#30bdb7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="16 16 12 12 8 16"/>
+                      <line x1="12" y1="12" x2="12" y2="21"/>
+                      <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                    </svg>
+                    <p className="consent-dropzone-text">Drop your file here or <span>browse</span></p>
+                    <p className="consent-dropzone-hint">PDF files only</p>
+                  </>
+                )}
+              </div>
+
+              {/* Submit button */}
               <button
-                disabled={!selectedConsentFile}
+                className={`consent-submit-btn${selectedConsentFile && !consentSubmitted ? '' : ' consent-submit-btn--disabled'}`}
+                disabled={!selectedConsentFile || consentSubmitted}
                 onClick={handleConsentSubmit}
               >
                 Submit
               </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {uploadedConsentFile && (
-                <div style={{ marginTop: 8, color: '#234e7b', fontWeight: 500 }}>
-                  Selected file: {uploadedConsentFile.name}
-                  <button
-                    style={{
-                      marginLeft: 12,
-                      background: '#d32f2f',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '2px 10px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => setUploadedConsentFile(null)}
-                    title="Remove file"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-
+      {/* Pre-Survey Preview Modal */}
+      {showPreSurveyPreview && preSurveyFullData && (
+        <div className="ea-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowPreSurveyPreview(false); }}>
+          <div className="survey-preview-card" onClick={e => e.stopPropagation()}>
+            <div className="ea-modal-header">
+              <h3 className="ea-modal-title">Pre-Activity Survey</h3>
+              <button className="ea-modal-close" onClick={() => setShowPreSurveyPreview(false)}>✕</button>
+            </div>
+            <div className="survey-preview-body">
+              <div className="survey-preview-section">
+                <div className="survey-preview-section-title">Respondent</div>
+                <div className="survey-preview-row"><span className="survey-preview-label">Name</span><span className="survey-preview-value">{preSurveyFullData.respondent?.name || '—'}</span></div>
+                <div className="survey-preview-row"><span className="survey-preview-label">College</span><span className="survey-preview-value">{preSurveyFullData.respondent?.college || '—'}</span></div>
+                <div className="survey-preview-row"><span className="survey-preview-label">Program</span><span className="survey-preview-value">{preSurveyFullData.respondent?.program || '—'}</span></div>
+                {preSurveyFullData.respondent?.nonAcademicOrg && (
+                  <div className="survey-preview-row"><span className="survey-preview-label">Org</span><span className="survey-preview-value">{preSurveyFullData.respondent.nonAcademicOrg}</span></div>
+                )}
+              </div>
+              <div className="survey-preview-section">
+                <div className="survey-preview-section-title">Engagement</div>
+                <div className="survey-preview-row"><span className="survey-preview-label">Type</span><span className="survey-preview-value">{preSurveyFullData.engagement?.type || '—'}</span></div>
+                <div className="survey-preview-row"><span className="survey-preview-label">Initiative</span><span className="survey-preview-value">{preSurveyFullData.engagement?.initiativeTitle || '—'}</span></div>
+                <div className="survey-preview-row"><span className="survey-preview-label">Role(s)</span><span className="survey-preview-value">{(preSurveyFullData.engagement?.participation || []).join(', ') || '—'}</span></div>
+                {preSurveyFullData.engagement?.participationOther && (
+                  <div className="survey-preview-row"><span className="survey-preview-label">Other role</span><span className="survey-preview-value">{preSurveyFullData.engagement.participationOther}</span></div>
+                )}
+              </div>
+              <div className="survey-preview-section">
+                <div className="survey-preview-section-title">Background</div>
+                <div className="survey-preview-row"><span className="survey-preview-label">Prev. service</span><span className="survey-preview-value">{preSurveyFullData.background?.previousService || '—'}</span></div>
+                <div className="survey-preview-row"><span className="survey-preview-label">Frequency</span><span className="survey-preview-value">{preSurveyFullData.background?.frequency || '—'}</span></div>
+              </div>
+              <div className="survey-preview-section">
+                <div className="survey-preview-section-title">Likert Responses</div>
+                {[
+                  { emoji: '💡', short: 'I can come up with ideas to address community problems' },
+                  { emoji: '🤝', short: 'Volunteer work and teamwork helps solve social problems' },
+                  { emoji: '🌍', short: 'Understanding diverse backgrounds is key to helping' },
+                  { emoji: '💪', short: 'I feel a social obligation to make a difference' },
+                  { emoji: '🎓', short: 'My skills from school can help solve social problems' },
+                  { emoji: '📋', short: 'Community work is last priority given other responsibilities' },
+                  { emoji: '🌐', short: 'My contribution alone feels insignificant' },
+                  { emoji: '⏰', short: 'With time management I can participate in initiatives' },
+                ].map((q, i) => {
+                  const val = preSurveyFullData.likert?.[`q${i + 1}`];
+                  const SCALE = {
+                    0: { label: 'No Basis', color: '#9ca3af', bg: '#f3f4f6' },
+                    1: { label: 'Strongly Disagree', color: '#ef4444', bg: '#fee2e2' },
+                    2: { label: 'Disagree', color: '#f97316', bg: '#ffedd5' },
+                    3: { label: 'Neutral', color: '#ca8a04', bg: '#fef9c3' },
+                    4: { label: 'Agree', color: '#16a34a', bg: '#dcfce7' },
+                    5: { label: 'Strongly Agree', color: '#30bdb7', bg: '#ccfbf1' },
+                  };
+                  const meta = SCALE[val];
+                  return (
+                    <div key={i} className="survey-preview-likert-row">
+                      <span className="survey-preview-likert-q">{q.emoji} {q.short}</span>
+                      {meta ? (
+                        <span className="survey-preview-likert-val" style={{ background: meta.bg, color: meta.color }}>{val}</span>
+                      ) : (
+                        <span className="survey-preview-likert-val" style={{ background: '#f3f4f6', color: '#9ca3af' }}>—</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

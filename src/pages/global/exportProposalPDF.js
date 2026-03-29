@@ -31,7 +31,7 @@ export async function exportCommunityEngagementProposalPDF(formData, formUrl = '
     }
     // Fill each field with the correct form value
     form.getTextField('text_50ryuo').setText(formData.title || '');
-    form.getTextField('text_2unkt').setText(formData.date || '');
+    form.getTextField('text_2unkt').setText(formData.dateProposed || '');
     form.getTextField('text_3xesj').setText(formData.proponent || '');
     form.getTextField('textarea_48tipb').setText(formData.studentOutcomes || '');
 

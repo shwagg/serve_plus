@@ -95,7 +95,7 @@ export default function ProposeProject() {
         if (saved) return JSON.parse(saved);
       } catch { }
       return {
-        title: '', date: '', faculty: '', sections: '', courseTitle: '', courseCode: '', stakeholders: '', targetDates: '', targetLocation: '', volunteerHours: '', sdgs: [], description: '', objectives: '', indicators: '', budget: '',
+        title: '', dateProposed: '', faculty: '', sections: '', courseTitle: '', courseCode: '', stakeholders: '', targetDates: '', targetLocation: '', volunteerHours: '', sdgs: [], description: '', objectives: '', indicators: '', budget: '',
       };
     };
     const getInitialActivities = () => {
@@ -146,7 +146,7 @@ export default function ProposeProject() {
           budget: formData.budget || "",
           courseCode: formData.courseCode || "",
           courseTitle: formData.courseTitle || "",
-          date: formData.date || "",
+          dateProposed: formData.dateProposed || "",
           description: formData.description || "",
           objectives: formData.objectives || "",
           participatingSection: formData.sections || formData.participatingSection || "",
@@ -196,7 +196,7 @@ export default function ProposeProject() {
         form.getTextField('text_4opji').setText(formData.courseTitle || formData.coursetitle || ''); // Course Title
         form.getTextField('text_5fdvm').setText(formData.stakeholders || ''); // Stakeholders
         form.getTextField('text_6avjw').setText(formData.targetLocation || formData.targetlocation || ''); // Target Location
-        form.getTextField('text_7cxg').setText(formData.date || formData.dateproposed || ''); // Date Proposed
+        form.getTextField('text_7cxg').setText(formData.dateProposed || ''); // Date Proposed
         form.getTextField('text_8ylsk').setText(formData.sections || ''); // Participating Section/s
         form.getTextField('text_9nnpw').setText(formData.courseCode || formData.coursecode || ''); // Course Code
         form.getTextField('text_10dky').setText(formData.targetDates || formData.targetdates || ''); // Target Dates
@@ -302,7 +302,7 @@ export default function ProposeProject() {
               </div>
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>Date Proposed</label>
-                <input style={inputStyle} type="date" name="date" value={formData.date} onChange={handleChange} />
+                <input style={inputStyle} type="date" name="dateProposed" value={formData.dateProposed} onChange={handleChange} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
@@ -390,7 +390,7 @@ export default function ProposeProject() {
             <h3 style={{ margin: '32px 0 16px 0' }}>Review & Export</h3>
             <div style={{ marginBottom: 16 }}>
               <strong>Title:</strong> {formData.title}<br />
-              <strong>Date Proposed:</strong> {formData.date}<br />
+              <strong>Date Proposed:</strong> {formData.dateProposed}<br />
               <strong>Faculty-In-Charge:</strong> {formData.faculty}<br />
               <strong>Sections:</strong> {formData.sections}<br />
               <strong>Course Title:</strong> {formData.courseTitle}<br />

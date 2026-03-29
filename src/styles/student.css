@@ -738,7 +738,7 @@
 .global-feed-toggle {
   position: fixed;
   right: 0;
-  z-index: 1200;
+  z-index: 900;
 
   width: 40px;
   height: 40px;
@@ -1212,7 +1212,7 @@
 }
 
 .activity-submit-button {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  background: linear-gradient(135deg, #ea6c00, #c85a00);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -1223,13 +1223,13 @@
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 4px 15px rgba(234, 108, 0, 0.35);
 }
 
 .activity-submit-button:hover {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  background: linear-gradient(135deg, #c85a00, #a84900);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+  box-shadow: 0 6px 20px rgba(234, 108, 0, 0.45);
 }
 
 .activity-submit-button:disabled {

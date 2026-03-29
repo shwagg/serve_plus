@@ -5,9 +5,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import './Header.css';
-import chatIcon from '../assets/headassets/Chat Icon.svg';
+import menuIcon from '../assets/headassets/Menu Icon.svg';
 import NotificationBell from './NotificationBell';
-import { MenuRoundedIcon } from './icons';
 import serveIcon from '../assets/serve_plus_logo.svg';
 import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
@@ -67,7 +66,6 @@ export default function Header() {
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [selectedProjectType, setSelectedProjectType] = useState('');
-  const [showChatModal, setShowChatModal] = useState(false);
   const [showCertificateQRModal, setShowCertificateQRModal] = useState(false);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
@@ -186,12 +184,7 @@ export default function Header() {
           </button>
           {/* Right Side Icons */}
           <div className="header-actions">
-            <button
-              className="icon-button"
-              aria-label="Chat"
-              onClick={() => setShowChatModal(true)}>
-              <img src={chatIcon} alt="Chat" width="24" height="24" />
-            </button>
+            <ChatModal />
             <NotificationBell />
             <GlobalNotificationButton
               unreadCount={announcementUnreadCount}
@@ -202,7 +195,7 @@ export default function Header() {
                 className="icon-button menu-button"
                 aria-label="Menu"
                 onClick={() => setShowMenu(!showMenu)}>
-                <MenuRoundedIcon sx={{ color: 'black' }} />
+                <img src={menuIcon} alt="Menu" width="24" height="24" />
               </button>
               {showMenu && renderMenu()}
             </div>
@@ -228,14 +221,6 @@ export default function Header() {
       >
         <GlobalAnnouncements />
       </aside>
-      <ChatModal
-        isOpen={showChatModal}
-        onClose={() => setShowChatModal(false)}
-        onSelectMission={(missionId) => {
-          setShowChatModal(false);
-          navigate(`/chat/${missionId}`);
-        }}
-      />
 
       <CreateProposalModal
         isOpen={showProposalModal}

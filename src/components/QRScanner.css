@@ -1,0 +1,175 @@
+/* ── QR Scanner ─────────────────────────────────────── */
+.qrs-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Status row ──────────────────────────────────────── */
+.qrs-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+
+.qrs-status-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: #d1d5db;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.qrs-status-dot.active  { background: #10b981; animation: qrsPulse 1.8s ease-in-out infinite; }
+.qrs-status-dot.loading { background: #f59e0b; }
+.qrs-status-dot.error   { background: #ef4444; }
+
+@keyframes qrsPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.qrs-status-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.qrs-status-text {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+/* ── Error card ──────────────────────────────────────── */
+.qrs-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.qrs-error-icon { font-size: 16px; flex-shrink: 0; }
+.qrs-error-text { font-size: 12px; color: #991b1b; line-height: 1.4; }
+
+/* ── Viewfinder — square ─────────────────────────────── */
+.qrs-viewfinder {
+  position: relative;
+  width: min(100%, min(260px, 42vh));
+  aspect-ratio: 1 / 1;
+  align-self: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f172a;
+  border: 2px solid #111827;
+  flex-shrink: 0;
+}
+
+.qrs-viewfinder #qr-reader-region {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.qrs-viewfinder #qr-reader-region video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 0 !important;
+}
+
+/* Hide html5-qrcode injected UI */
+.qrs-viewfinder #qr-reader-region__dashboard,
+.qrs-viewfinder #qr-reader-region__header_message,
+.qrs-viewfinder #qr-shaded-region {
+  display: none !important;
+}
+
+/* ── Corner brackets ─────────────────────────────────── */
+.qrs-corners {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.qrs-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: rgba(255, 255, 255, 0.9);
+  border-style: solid;
+}
+
+.qrs-corner--tl { top: 14px;    left: 14px;    border-width: 2.5px 0 0 2.5px;  border-radius: 2px 0 0 0; }
+.qrs-corner--tr { top: 14px;    right: 14px;   border-width: 2.5px 2.5px 0 0;  border-radius: 0 2px 0 0; }
+.qrs-corner--br { bottom: 14px; right: 14px;   border-width: 0 2.5px 2.5px 0;  border-radius: 0 0 2px 0; }
+.qrs-corner--bl { bottom: 14px; left: 14px;    border-width: 0 0 2.5px 2.5px;  border-radius: 0 0 0 2px; }
+
+/* ── Hint ────────────────────────────────────────────── */
+.qrs-hint {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #9ca3af;
+  padding: 10px 0 8px;
+  margin: 0;
+}
+
+/* ── Divider ─────────────────────────────────────────── */
+.qrs-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #d1d5db;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.qrs-divider::before,
+.qrs-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+/* ── Upload button ───────────────────────────────────── */
+.qrs-upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #374151;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  box-sizing: border-box;
+}
+.qrs-upload-btn:hover {
+  background: #f0fdf9;
+  border-color: #30bdb7;
+  color: #0f766e;
+}
+.qrs-upload-input { display: none; }

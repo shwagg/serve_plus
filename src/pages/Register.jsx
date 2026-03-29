@@ -47,15 +47,12 @@ function Register() {
 
                 missionsSnap.docs.forEach(doc => {
                     const data = doc.data();
-                    console.log('Event:', data.title, 'Date:', data.date, 'Status:', data.status);
+                    console.log('Event:', data.title, 'Date:', data.targetDate, 'Status:', data.status);
 
-                    if (data.date && (data.status === 'published' || !data.status)) {
+                    if (data.targetDate && (data.status === 'published' || !data.status)) {
                         let eventDate;
-                        if (data.dateAt?.toDate) {
-                            eventDate = data.dateAt.toDate();
-                        } else if (data.date) {
-                            // Try parsing the date string
-                            eventDate = new Date(data.date);
+                        if (data.targetDate) {
+                            eventDate = new Date(data.targetDate);
                         }
 
                         console.log('Parsed date:', eventDate, 'Is future:', eventDate > now);

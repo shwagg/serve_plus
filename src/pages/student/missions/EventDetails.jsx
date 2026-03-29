@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
 
 import Header from '../../../components/Header';
@@ -86,6 +86,7 @@ export default function EventDetails() {
     if (!user) return;
     try {
       await deleteDoc(doc(db, "missions", id, "volunteer", user.uid));
+      await deleteDoc(doc(db, "userMissions", user.uid, "missions", id));
       setVolunteer(null);
     } catch (err) {
       console.error("Failed to cancel request:", err);
@@ -118,50 +119,15 @@ export default function EventDetails() {
         },
       });
 
+      // Keep a reverse index so the chat dropdown can load instantly
+      await setDoc(doc(db, "userMissions", user.uid, "missions", id), {
+        missionId: id,
+        title: mission?.title || "Untitled Mission",
+        role: "volunteer",
+        joinedAt: serverTimestamp(),
+      });
+
       setVolunteer({ registrationStatus: "pending" });
-<<<<<<< HEAD
-
-
-      await setDoc(volunteerRef, {
-        joinedAt: new Date().toISOString(),
-
-        registrationStatus: "pending", //for admin approval
-        completionStatus: "pending_approval", // event completion requirements
-        pointsEarned: 0,
-
-        progress: {
-          preSurvey: "locked",
-          consent: "locked",
-          attendance: "not_checked_in",
-          postSurvey: "locked"
-        },
-
-      });
-      //updates the UI button to 'pending'
-      setVolunteer({
-        registrationStatus: "pending"
-      });
-
-
-      await setDoc(volunteerRef, {
-        joinedAt: new Date().toISOString(),
-
-        registrationStatus: "pending", //for admin approval
-        completionStatus: "pending_approval", // event completion requirements
-        pointsEarned: 0,
-
-        progress: {
-          preSurvey: "locked",
-          consent: "locked",
-          attendance: "not_checked_in",
-          postSurvey: "locked"
-        },
-
-      });
-      //updates the UI button to 'pending'
-      setVolunteer({
-        registrationStatus: "pending"
-      });
 
       // Create a registration notification (once per event)
       try {
@@ -185,8 +151,6 @@ export default function EventDetails() {
         console.error("Failed to create registration notification:", e);
       }
       setShowSurveyModal(false);
-=======
->>>>>>> 1704ac3 (fix join event button)
     } catch (err) {
       setSurveyError('Failed to upload consent form or submit survey. Please try again.');
     } finally {
@@ -392,7 +356,6 @@ export default function EventDetails() {
             </div>
           </div>
         </div>
-<<<<<<< HEAD
   {/* Modal for Pre-Activity Survey and Consent Upload */ }
   {
     showSurveyModal && (
