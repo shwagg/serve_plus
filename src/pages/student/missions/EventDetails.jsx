@@ -7,20 +7,25 @@ import { createNotification } from '../../../utils/notificationUtils';
 import Header from '../../../components/Header';
 import '../../../styles/student.css';
 import PreActivitySurvey from '../../../forms/PreActivitySurvey';
+import mission1 from '../../../assets/mission1.jpg';
 
-export default function EventDetails() {
+export default function EventDetails({ onClose = null }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
   const [volunteer, setVolunteer] = useState(null);
+  const [volunteerCount, setVolunteerCount] = useState(0);
+  const [volunteerAvatars, setVolunteerAvatars] = useState([]);
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyData, setSurveyData] = useState(null);
   const [consentFile, setConsentFile] = useState(null);
   const [consentUploading, setConsentUploading] = useState(false);
   const [surveyError, setSurveyError] = useState('');
   const [userName, setUserName] = useState('');
+  const defaultBanner = mission1;
 
 
   useEffect(() => {
@@ -182,6 +187,16 @@ export default function EventDetails() {
     }
   };
 
+  const handleSurveyAndConsentSubmit = async (form) => {
+    setSurveyData(form);
+    setConsentUploading(true);
+    try {
+      await handleJoinEvent();
+    } finally {
+      setConsentUploading(false);
+    }
+  };
+
   if (loading) {
     if (onClose) return <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>Loading...</div>;
     return <div className="full-page"><Header /><div className="content-page" style={{ padding: 32 }}>Loading...</div></div>;
@@ -300,59 +315,61 @@ export default function EventDetails() {
               </div>
 
               {/* Right: join / pending button */}
-              {volunteer?.registrationStatus === "pending" ? (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'stretch',
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)',
-                }}>
-                  <span style={{
-                    padding: '12px 20px',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: '1rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'default',
-                    whiteSpace: 'nowrap',
+              <div className="event-details-action">
+                {volunteer?.registrationStatus === "pending" ? (
+                  <div className="event-details-pending-wrap" style={{
+                    display: 'inline-flex',
+                    alignItems: 'stretch',
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)',
                   }}>
-                    Pending Request
-                  </span>
-                  <div style={{ width: 1, background: 'rgba(255,255,255,0.4)' }} />
-                  <button
-                    onClick={handleCancelRequest}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
+                    <span style={{
+                      padding: '12px 20px',
                       color: '#fff',
-                      padding: '12px 14px',
-                      fontSize: '1rem',
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                    }}
-                    title="Cancel request"
+                      cursor: 'default',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      Pending Request
+                    </span>
+                    <div style={{ width: 1, background: 'rgba(255,255,255,0.4)' }} />
+                    <button
+                      onClick={handleCancelRequest}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fff',
+                        padding: '12px 14px',
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title="Cancel request"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="event-details-join-btn"
+                    disabled={joining}
+                    onClick={handleJoinEvent}
                   >
-                    ✕
+                    {joining ? "JOINING..." : "JOIN EVENT"}
                   </button>
-                </div>
-              ) : (
-                <button
-                  className="event-details-join-btn"
-                  disabled={joining}
-                  onClick={handleJoinEvent}
-                >
-                  {joining ? "JOINING..." : "JOIN EVENT"}
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

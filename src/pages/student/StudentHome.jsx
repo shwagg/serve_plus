@@ -451,7 +451,7 @@ const StudentHome = () => {
                     if (enrolledMissions[mission.id] === "approved") {
                       navigate(`/event/${mission.id}/activity`);
                     } else {
-                      setSelectedMissionId(mission.id);
+                      navigate(`/event/${mission.id}`);
                     }
                   }}
                   role="button"
@@ -462,7 +462,7 @@ const StudentHome = () => {
                       if (enrolledMissions[mission.id] === "approved") {
                         navigate(`/event/${mission.id}/activity`);
                       } else {
-                        setSelectedMissionId(mission.id);
+                        navigate(`/event/${mission.id}`);
                       }
                     }
                   }}
