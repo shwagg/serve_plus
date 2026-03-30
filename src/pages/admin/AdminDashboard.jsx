@@ -6,6 +6,36 @@ import { db } from "../../firebaseConfig";
 import "../../styles/AdminDashboard.css";
 
 export default function AdminDashboard() {
+  // New: State for summary cards
+  const [totalStudents, setTotalStudents] = useState(null);
+  const [totalTasks, setTotalTasks] = useState(null);
+    // Fetch total registered students
+    useEffect(() => {
+      const fetchTotalStudents = async () => {
+        try {
+          const snap = await getDocs(collection(db, "users"));
+          setTotalStudents(snap.size);
+        } catch (err) {
+          setTotalStudents("-");
+        }
+      };
+      fetchTotalStudents();
+    }, []);
+
+    // Fetch total completed tasks (assumes a 'tasks' collection with a 'status' field)
+    useEffect(() => {
+      const fetchTotalTasks = async () => {
+        try {
+          const snap = await getDocs(collection(db, "tasks"));
+          // If tasks have a 'status' field, count only completed
+          const completed = snap.docs.filter(doc => (doc.data().status || "") === "completed").length;
+          setTotalTasks(completed);
+        } catch (err) {
+          setTotalTasks("-");
+        }
+      };
+      fetchTotalTasks();
+    }, []);
   const navigate = useNavigate();
   //Filled from firestore under 'Missons'
   const [eventsToday, setEventsToday] = useState([]);
@@ -212,79 +242,219 @@ export default function AdminDashboard() {
   return (
     <div className="admin-outlet">
       <h1 className="page-title">Dashboard</h1>
+
+      {/* Summary cards row */}
+      <div style={{ display: 'flex', gap: 18, marginBottom: 18, flexWrap: 'wrap' }}>
+                <div style={{
+                  background: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
+                  minWidth: 220,
+                  flex: '1 1 220px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '18px 22px',
+                  gap: 16
+                }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%', background: 'rgba(76, 72, 255, 0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10
+                  }}>
+                    <svg width="26" height="26" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M7 7h10v2H7V7Zm0 4h10v2H7v-2Zm0 4h7v2H7v-2Zm-2-9.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-13ZM6.5 5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-13a.5.5 0 0 0-.5-.5h-11Z" fill="#4C48FF"/></g></svg>
+                  </div>
+                  <div>
+                    <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total Proposed Projects</div>
+                    <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{typeof totalProjects === 'number' ? totalProjects : '...'}</div>
+                  </div>
+                </div>
+        <div style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
+          minWidth: 220,
+          flex: '1 1 220px',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '18px 22px',
+          gap: 16
+        }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%', background: 'rgba(76, 72, 255, 0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10
+          }}>
+            <svg width="26" height="26" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" fill="#4C48FF"/></g></svg>
+          </div>
+          <div>
+            <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total registered students</div>
+            <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{totalStudents === null ? '...' : totalStudents}</div>
+          </div>
+        </div>
+        <div style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
+          minWidth: 220,
+          flex: '1 1 220px',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '18px 22px',
+          gap: 16
+        }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%', background: 'rgba(48, 189, 183, 0.10)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10
+          }}>
+            <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M17.5 10.5l-5 5-2.5-2.5" stroke="#30bdb7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="10" stroke="#30bdb7" strokeWidth="2"/></g></svg>
+          </div>
+          <div>
+            <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total tasks completed</div>
+            <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{totalTasks === null ? '...' : totalTasks}</div>
+          </div>
+        </div>
+      </div>
+
       <div className="dashboard-grid">
         {/* LEFT column cards */}
         <section className="left-col">
-          <div className="panel">
-            <div className="panel-header panel-header-analytics">
-              <span>Students Engagement</span>
+          {/* Students Engagement - Modern Styled */}
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
+            marginBottom: 24,
+            padding: 0,
+            border: 'none',
+            overflow: 'visible',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '24px 32px 0 32px',
+              background: 'transparent',
+              borderRadius: '16px 16px 0 0',
+            }}>
+              <span style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 38, height: 38, borderRadius: '50%', background: '#e6eaff',
+              }}>
+                <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" fill="#4C48FF"/></g></svg>
+              </span>
+              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Students Engagement</span>
             </div>
-
-            <div className="panel-body">
-              <div className="bar-list">
+            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 60 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 8 }}>
                 {engagement.map((x) => (
                   <div
-                    className="bar-row"
                     key={x.label}
-                    style={{ cursor: 'pointer' }}
+                    style={{ marginBottom: 2, cursor: 'pointer' }}
                     onClick={() => x.id && navigate(`/admin/events/${x.id}`)}
                     title="View Event Monitoring"
                   >
-                    <div className="bar-label">{x.label}</div>
-                    <div className="bar-track">
-                      <div
-                        className="bar-fill"
-                        style={{ width: `${x.value}%` }}
-                      />
-                      <div className="bar-value">{x.value}%</div>
+                    <div style={{ fontWeight: 600, color: '#1f3b73', fontSize: 15, marginBottom: 6 }}>{x.label}</div>
+                    <div style={{ background: '#e6eaf3', borderRadius: 8, height: 22, position: 'relative', overflow: 'hidden', width: '100%' }}>
+                      <div style={{
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #4C48FF 60%, #30bdb7 100%)',
+                        width: `${x.value}%`,
+                        borderRadius: 8,
+                        transition: 'width 0.3s',
+                      }} />
+                      <div style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: 13,
+                        color: '#fff',
+                        fontWeight: 700,
+                        background: '#4C48FF',
+                        padding: '1px 10px',
+                        borderRadius: 12,
+                        minWidth: 36,
+                        textAlign: 'center',
+                      }}>{x.value}%</div>
                     </div>
                   </div>
                 ))}
               </div>
-
-              <p className="card-note">
+              <p style={{ margin: '14px 0 0 0', fontSize: 12, color: '#8A94A6' }}>
                 *Sample only for demo. Replace with real metrics later.
               </p>
             </div>
           </div>
 
-          <div className="panel">
-            <div className="panel-header panel-header-analytics">
-              <span>Satisfaction Ratings</span>
+          {/* Satisfaction Ratings - Modern Styled */}
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
+            marginBottom: 24,
+            padding: 0,
+            border: 'none',
+            overflow: 'visible',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '24px 32px 0 32px',
+              background: 'transparent',
+              borderRadius: '16px 16px 0 0',
+            }}>
+              <span style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 38, height: 38, borderRadius: '50%', background: '#e6eaff',
+              }}>
+                <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 2a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 19.93 11H21a1 1 0 1 1 0 2h-1.07A7.002 7.002 0 0 1 13 19.93V21a1 1 0 1 1-2 0v-1.07A7.002 7.002 0 0 1 4.07 13H3a1 1 0 1 1 0-2h1.07A7.002 7.002 0 0 1 11 4.07V3a1 1 0 0 1 1-1Z" fill="#4C48FF"/></g></svg>
+              </span>
+              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Satisfaction Ratings</span>
             </div>
-
-            <div className="panel-body">
-              <div className="ratings">
-                <div className="rating-row">
+            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 60 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#1f3b73', fontWeight: 500 }}>
                   <span>Volunteer Satisfaction</span>
-                  <strong>—</strong>
+                  <span style={{ color: '#8A94A6', fontWeight: 700 }}>—</span>
                 </div>
-                <div className="rating-row">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#1f3b73', fontWeight: 500 }}>
                   <span>Faculty/SI Satisfaction</span>
-                  <strong>—</strong>
+                  <span style={{ color: '#8A94A6', fontWeight: 700 }}>—</span>
                 </div>
-                <div className="rating-row">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#1f3b73', fontWeight: 500 }}>
                   <span>Community Partner Feedback</span>
-                  <strong>—</strong>
+                  <span style={{ color: '#8A94A6', fontWeight: 700 }}>—</span>
                 </div>
               </div>
-
-              <p className="card-note">
+              <p style={{ margin: '14px 0 0 0', fontSize: 12, color: '#8A94A6' }}>
                 *Leave blank for now. You can compute later from surveys.
               </p>
             </div>
           </div>
-          <div className="panel">
-            <div className="panel-header panel-header-analytics">
-              <span>SDG Distribution</span>
+          {/* SDG Distribution - Modern Styled */}
+          <div style={{
+            background: '#fff',
+            borderRadius: 24,
+            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
+            marginBottom: 24,
+            padding: 0,
+            border: 'none',
+            overflow: 'visible',
+            textAlign: 'center',
+          }}>
+            <div style={{ padding: '32px 0 0 0', textAlign: 'center' }}>
+              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 28, letterSpacing: 0.5 }}>SDG Distribution</span>
             </div>
-
-            <div className="panel-body" style={{ textAlign: "center" }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, padding: '0 0 0 0' }}>
               {pieSlices.length === 0 ? (
-                <p className="card-note">No SDG data available yet.</p>
+                <p style={{ color: '#8A94A6', fontSize: 16, marginTop: 40 }}>No SDG data available yet.</p>
               ) : (
-                <svg width={CHART_SIZE} height={CHART_SIZE}>
+                <svg width={CHART_SIZE} height={CHART_SIZE} style={{ margin: '32px 0 0 0' }}>
                   {pieSlices.map((slice, index) => {
+                    // Use a simple color palette for clarity
+                    const palette = ['#e6f0fa', '#ff5c5c', '#7cff7c', '#ffe066', '#6ec6ff', '#b388ff', '#ffb3b3'];
                     const path = describeArc(
                       CENTER,
                       CENTER,
@@ -292,17 +462,15 @@ export default function AdminDashboard() {
                       slice.startAngle,
                       slice.endAngle
                     );
-
                     const labelX =
                       CENTER + (RADIUS * 0.6) * Math.cos(slice.midAngle - Math.PI / 2);
                     const labelY =
                       CENTER + (RADIUS * 0.6) * Math.sin(slice.midAngle - Math.PI / 2);
-
                     return (
                       <g key={slice.sdgId}>
                         <path
                           d={path}
-                          fill={`hsl(${index * 45}, 70%, 55%)`}
+                          fill={palette[index % palette.length]}
                         />
                         {slice.percentage >= 5 && (
                           <text
@@ -310,16 +478,12 @@ export default function AdminDashboard() {
                             y={labelY}
                             textAnchor="middle"
                             dominantBaseline="middle"
-                            fill="#fff"
-                            fontSize="12"
-                            fontWeight="600"
+                            fill={index === 1 ? '#fff' : '#1f3b73'}
+                            fontSize="13"
+                            fontWeight="700"
                           >
-                            <tspan x={labelX} dy="-2">
-                              SDG {slice.sdgId}
-                            </tspan>
-                            <tspan x={labelX} dy="14">
-                              {slice.percentage}%
-                            </tspan>
+                            <tspan x={labelX} dy="-2">SDG {slice.sdgId}</tspan>
+                            <tspan x={labelX} dy="15">{slice.percentage}%</tspan>
                           </text>
                         )}
                       </g>
@@ -327,24 +491,21 @@ export default function AdminDashboard() {
                   })}
                 </svg>
               )}
-
-              {/* Description text */}
-              {chartData.length > 0 && (
-                <p className="card-note" style={{ marginTop: "12px" }}>
-                  <strong>
-                    {chartData
-                      .filter((x) => x.sdgId !== "Others")
-                      .slice(0, 2)
-                      .map((x) => `SDG ${x.sdgId}`)
-                      .join(" & ")}
-                  </strong>{" "}
-                  account for the largest share of SDG engagements, with the remaining
-                  contributions grouped under <strong>Others</strong>.
-                </p>
-              )}
-
-
             </div>
+            {/* Description text */}
+            {chartData.length > 0 && (
+              <p style={{ margin: '32px 0 0 0', fontSize: 16, color: '#8A94A6', fontWeight: 500, padding: '0 32px 32px 32px', lineHeight: 1.5 }}>
+                <span style={{ color: '#1f3b73', fontWeight: 700 }}>
+                  {chartData
+                    .filter((x) => x.sdgId !== "Others")
+                    .slice(0, 2)
+                    .map((x) => `SDG ${x.sdgId}`)
+                    .join(" & ")}
+                </span>
+                {` account for the largest share of SDG engagements, with the remaining contributions grouped under `}
+                <span style={{ color: '#1f3b73', fontWeight: 700 }}>Others</span>.
+              </p>
+            )}
           </div>
 
 
@@ -352,54 +513,82 @@ export default function AdminDashboard() {
 
         {/* RIGHT column panels */}
         <section className="right-col">
-          {/* Events Today */}
-          <div className="panel">
-            <div className="panel-header">
-              <span>Events Today</span>
+          {/* Events Today - Custom Styled */}
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
+            marginBottom: 24,
+            padding: 0,
+            border: 'none',
+            overflow: 'visible',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '24px 32px 0 32px',
+              background: 'transparent',
+              borderRadius: '16px 16px 0 0',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <span style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 38, height: 38, borderRadius: '50%', background: '#ffe6e6',
+                }}>
+                  <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 2a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 19.93 11H21a1 1 0 1 1 0 2h-1.07A7.002 7.002 0 0 1 13 19.93V21a1 1 0 1 1-2 0v-1.07A7.002 7.002 0 0 1 4.07 13H3a1 1 0 1 1 0-2h1.07A7.002 7.002 0 0 1 11 4.07V3a1 1 0 0 1 1-1Zm0 4a5 5 0 1 0 0 10A5 5 0 0 0 12 6Z" fill="#ff5c5c"/></g></svg>
+                </span>
+                <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Events Today</span>
+              </div>
               <button
-                className="panel-link"
+                style={{
+                  background: '#4C48FF', color: '#fff', border: 'none', borderRadius: 18,
+                  fontWeight: 700, fontSize: 15, padding: '8px 24px', cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(76,72,255,0.08)',
+                  transition: 'background 0.2s',
+                }}
                 type="button"
                 onClick={() => navigate("/admin/projects")}
               >
-                View all Events
+                View All Events
               </button>
             </div>
-
-            <div className="panel-body">
+            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 90 }}>
               {eventsToday.length === 0 ? (
-                <div className="empty-state">
-                  <p className="empty-title">No events today yet</p>
-                  <p className="empty-desc">
-                    Once you create projects/events (with today’s date + active
-                    status), they will appear here automatically.
+                <div style={{ border: '1px dashed #e5e7eb', borderRadius: 12, background: '#fff', padding: 24, marginTop: 8 }}>
+                  <p style={{ fontWeight: 700, color: '#1f3b73', fontSize: 18, margin: 0 }}>No Events today yet!</p>
+                  <p style={{ color: '#8A94A6', fontSize: 15, margin: '8px 0 0 0' }}>
+                    Once you create project/events (with today’s date + active status), they will appear here automatically.
                   </p>
                 </div>
               ) : (
-                <div className="event-grid">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 8 }}>
                   {eventsToday.map((e) => (
                     <div
-                      className="event-card"
                       key={e.id}
                       onClick={() => e.id && navigate(`/admin/events/${e.id}`)}
-                      style={{ cursor: "pointer" }}
+                      style={{
+                        background: '#fff',
+                        borderRadius: 14,
+                        boxShadow: '0 2px 8px rgba(31,59,115,0.04)',
+                        padding: '18px 22px',
+                        display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer',
+                        border: '1px solid #f0f1f7',
+                        transition: 'box-shadow 0.2s',
+                      }}
                     >
-                      <div className="event-title">
-                        {e.title || e.alt || "Untitled Event"}
+                      <div style={{ fontWeight: 700, color: '#1f3b73', fontSize: 17 }}>{e.title || e.alt || 'Untitled Event'}</div>
+                      <div style={{ color: '#8A94A6', fontSize: 14, marginBottom: 6 }}>
+                        {e.proponent ? `proposed by: (${e.proponent})` : ''}
                       </div>
-                      <div className="event-footer">
-                        <span className="event-date">
-                          {e.targetDate ? new Date(e.targetDate).toLocaleDateString() : "No date"}
-                        </span>
-                        <button
-                          className="event-details"
-                          type="button"
-                          onClick={(evt) => {
-                            evt.stopPropagation();
-                            e.id && navigate(`/admin/events/${e.id}`);
-                          }}
-                        >
-                          Details
-                        </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
+                        {/* Placeholder avatars */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: -8 }}>
+                          {[1,2,3,4].map((_, idx) => (
+                            <img key={idx} src={`https://randomuser.me/api/portraits/men/${idx+10}.jpg`} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid #fff', marginLeft: idx === 0 ? 0 : -12, boxShadow: '0 1px 4px rgba(31,59,115,0.08)' }} />
+                          ))}
+                          <span style={{ marginLeft: 6, background: '#4C48FF', color: '#fff', borderRadius: 12, fontSize: 13, fontWeight: 700, padding: '2px 10px' }}>18+</span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -408,46 +597,70 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Upcoming Events */}
-          <div className="panel">
-            <div className="panel-header panel-header-accent">
-              <span>Upcoming Events</span>
+          {/* Upcoming Events - Custom Styled */}
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
+            marginBottom: 24,
+            padding: 0,
+            border: 'none',
+            overflow: 'visible',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '24px 32px 0 32px',
+              background: 'transparent',
+              borderRadius: '16px 16px 0 0',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <span style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 38, height: 38, borderRadius: '50%', background: '#e6f7ff',
+                }}>
+                  <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0Zm-5-9a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 19.93 11H21a1 1 0 1 1 0 2h-1.07A7.002 7.002 0 0 1 13 19.93V21a1 1 0 1 1-2 0v-1.07A7.002 7.002 0 0 1 4.07 13H3a1 1 0 1 1 0-2h1.07A7.002 7.002 0 0 1 11 4.07V3a1 1 0 0 1 1-1Z" fill="#30bdb7"/></g></svg>
+                </span>
+                <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Upcoming Events</span>
+              </div>
             </div>
-
-            <div className="panel-body">
+            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 90 }}>
               {upcomingEvents.length === 0 ? (
-                <div className="empty-state">
-                  <p className="empty-title">No upcoming events yet</p>
-                  <p className="empty-desc">
+                <div style={{ border: '1px dashed #e5e7eb', borderRadius: 12, background: '#fff', padding: 24, marginTop: 8 }}>
+                  <p style={{ fontWeight: 700, color: '#1f3b73', fontSize: 18, margin: 0 }}>No upcoming events yet</p>
+                  <p style={{ color: '#8A94A6', fontSize: 15, margin: '8px 0 0 0' }}>
                     Future-dated projects will be listed here once added.
                   </p>
                 </div>
               ) : (
-                <div className="event-grid">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 8 }}>
                   {upcomingEvents.map((e) => (
                     <div
-                      className="event-card"
                       key={e.id}
                       onClick={() => e.id && navigate(`/admin/events/${e.id}`)}
-                      style={{ cursor: "pointer" }}
+                      style={{
+                        background: '#fff',
+                        borderRadius: 14,
+                        boxShadow: '0 2px 8px rgba(31,59,115,0.04)',
+                        padding: '18px 22px',
+                        display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer',
+                        border: '1px solid #f0f1f7',
+                        transition: 'box-shadow 0.2s',
+                      }}
                     >
-                      <div className="event-title">
-                        {e.title || e.alt || e.name || "Untitled Event"}
+                      <div style={{ fontWeight: 700, color: '#1f3b73', fontSize: 17 }}>{e.title || e.alt || e.name || 'Untitled Event'}</div>
+                      <div style={{ color: '#8A94A6', fontSize: 14, marginBottom: 6 }}>
+                        {e.proponent ? `proposed by: (${e.proponent})` : ''}
                       </div>
-                      <div className="event-footer">
-                        <span className="event-date">
-                          {e.targetDate ? new Date(e.targetDate).toLocaleDateString() : "No date"}
-                        </span>
-                        <button
-                          className="event-details"
-                          type="button"
-                          onClick={(evt) => {
-                            evt.stopPropagation();
-                            e.id && navigate(`/admin/events/${e.id}`);
-                          }}
-                        >
-                          Details
-                        </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
+                        {/* Placeholder avatars */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: -8 }}>
+                          {[1,2,3,4].map((_, idx) => (
+                            <img key={idx} src={`https://randomuser.me/api/portraits/men/${idx+20}.jpg`} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid #fff', marginLeft: idx === 0 ? 0 : -12, boxShadow: '0 1px 4px rgba(31,59,115,0.08)' }} />
+                          ))}
+                          <span style={{ marginLeft: 6, background: '#30bdb7', color: '#fff', borderRadius: 12, fontSize: 13, fontWeight: 700, padding: '2px 10px' }}>18+</span>
+                        </div>
                       </div>
                     </div>
                   ))}
