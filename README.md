@@ -40,6 +40,9 @@ then run npm dev again.
 for QR naginstall ako na pang-react,
 install: npm install qrcode.react
 
+for text editor in agreement,
+install: npm install @tiptap/react @tiptap/starter-kit dompurify
+
 
 
 users w/ positions:

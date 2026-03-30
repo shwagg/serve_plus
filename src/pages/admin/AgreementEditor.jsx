@@ -1,3 +1,5 @@
+import StarterKit from "@tiptap/starter-kit";
+import { EditorContent, useEditor } from "@tiptap/react";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
 import { db } from "../../firebaseConfig";
@@ -73,6 +75,68 @@ const DEFAULT_PRIVACY_INTRO =
   "Your privacy is important to us. This Privacy Policy explains how Serve Plus collects, uses, and protects your information when you use our platform.";
 
 const AGREEMENT_DOC = doc(db, "settings", "agreements");
+
+function RichTextBodyEditor({ value, onChange }) {
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: value || "",
+    editorProps: {
+      attributes: {
+        class: "ae-rich-editor-input",
+      },
+    },
+    onUpdate: ({ editor: activeEditor }) => {
+      onChange(activeEditor.getHTML());
+    },
+  });
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const incomingValue = value || "";
+    if (editor.getHTML() !== incomingValue) {
+      editor.commands.setContent(incomingValue || "<p></p>", false);
+    }
+  }, [editor, value]);
+
+  if (!editor) {
+    return <div className="ae-rich-editor-loading">Loading editor...</div>;
+  }
+
+  return (
+    <div className="ae-rich-editor-wrapper">
+      <div className="ae-rich-editor-toolbar">
+        <button
+          type="button"
+          className={`ae-rich-editor-btn ${editor.isActive("paragraph") ? "active" : ""}`}
+          onClick={() => editor.chain().focus().setParagraph().run()}
+        >
+          Paragraph
+        </button>
+        <button
+          type="button"
+          className={`ae-rich-editor-btn ${editor.isActive("bulletList") ? "active" : ""}`}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+        >
+          Bullets
+        </button>
+        <button
+          type="button"
+          className={`ae-rich-editor-btn ${editor.isActive("orderedList") ? "active" : ""}`}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        >
+          Numbering
+        </button>
+      </div>
+
+      <EditorContent editor={editor} />
+
+      <p className="ae-rich-editor-hint">
+        Tip: type * then space for bullets, or 1. then space for numbered lists.
+      </p>
+    </div>
+  );
+}
 
 export default function AgreementEditor() {
   const [loading, setLoading] = useState(true);
@@ -262,14 +326,9 @@ export default function AgreementEditor() {
               updateSection(activeTab, idx, "heading", e.target.value)
             }
           />
-          <textarea
-            className="ae-textarea"
-            placeholder="Body content (use new lines for list items)"
+          <RichTextBodyEditor
             value={section.body}
-            onChange={(e) =>
-              updateSection(activeTab, idx, "body", e.target.value)
-            }
-            rows={4}
+            onChange={(value) => updateSection(activeTab, idx, "body", value)}
           />
         </div>
       ))}

@@ -101,6 +101,15 @@
   margin: 1.2rem 0 0.4rem;
 }
 
+.agreement-section-block {
+  margin-bottom: 0.75rem;
+}
+
+.agreement-intro-text {
+  white-space: pre-wrap;
+  margin: 0 0 0.9rem;
+}
+
 .agreement-modal-text p,
 .agreement-modal-text li {
   font-size: 0.92rem;
@@ -111,6 +120,32 @@
 .agreement-modal-text ul {
   padding-left: 1.4rem;
   margin-bottom: 0.5rem;
+}
+
+.agreement-modal-text ol {
+  padding-left: 1.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.agreement-rich-body p,
+.agreement-rich-body li {
+  font-size: 0.92rem;
+  color: #444;
+  line-height: 1.7;
+}
+
+.agreement-rich-body ul,
+.agreement-rich-body ol {
+  padding-left: 1.4rem;
+  margin: 0.35rem 0 0.65rem;
+}
+
+.agreement-rich-body p {
+  margin: 0.55rem 0;
+}
+
+.agreement-rich-body p:empty {
+  min-height: 1.1rem;
 }
 
 .agreement-modal-text .agreement-divider {

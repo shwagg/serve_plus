@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db } from "../firebaseConfig";
@@ -15,6 +16,10 @@ export async function fetchCurrentAgreementVersion() {
     console.warn("Could not fetch agreement version:", err);
   }
   return FALLBACK_VERSION;
+}
+
+function hasHtmlTags(text) {
+  return /<\/?[a-z][\s\S]*>/i.test(text || "");
 }
 
 export default function AgreementModal({ uid, onAccepted }) {
@@ -73,9 +78,34 @@ export default function AgreementModal({ uid, onAccepted }) {
     }
   };
 
-  // Render a section's body — multi-line becomes a list
+  // Render rich HTML content (new format) or plain text (legacy format)
   const renderBody = (body) => {
     if (!body) return null;
+
+    if (hasHtmlTags(body)) {
+      const safeHtml = DOMPurify.sanitize(body, {
+        ALLOWED_TAGS: [
+          "p",
+          "br",
+          "ul",
+          "ol",
+          "li",
+          "strong",
+          "em",
+          "b",
+          "i",
+          "u",
+        ],
+      });
+
+      return (
+        <div
+          className="agreement-rich-body"
+          dangerouslySetInnerHTML={{ __html: safeHtml }}
+        />
+      );
+    }
+
     const lines = body.split("\n").filter((l) => l.trim());
     if (lines.length > 1) {
       return (
@@ -87,6 +117,37 @@ export default function AgreementModal({ uid, onAccepted }) {
       );
     }
     return <p>{body}</p>;
+  };
+
+  const renderIntro = (intro) => {
+    if (!intro) return null;
+
+    if (hasHtmlTags(intro)) {
+      const safeHtml = DOMPurify.sanitize(intro, {
+        ALLOWED_TAGS: [
+          "p",
+          "br",
+          "ul",
+          "ol",
+          "li",
+          "strong",
+          "em",
+          "b",
+          "i",
+          "u",
+        ],
+      });
+
+      return (
+        <div
+          className="agreement-rich-body agreement-intro-rich"
+          dangerouslySetInnerHTML={{ __html: safeHtml }}
+        />
+      );
+    }
+
+    // Preserve newline spacing from plain-text intro content.
+    return <p className="agreement-intro-text">{intro}</p>;
   };
 
   return (
@@ -123,10 +184,10 @@ export default function AgreementModal({ uid, onAccepted }) {
             <p style={{ textAlign: "center", color: "#94a3b8" }}>Loading...</p>
           ) : activeTab === "terms" ? (
             <div className="agreement-modal-text">
-              {termsIntro && <p>{termsIntro}</p>}
+              {renderIntro(termsIntro)}
               <hr className="agreement-divider" />
               {termsSections.map((s, i) => (
-                <div key={i}>
+                <div className="agreement-section-block" key={i}>
                   <h3>{s.heading}</h3>
                   {renderBody(s.body)}
                 </div>
@@ -134,10 +195,10 @@ export default function AgreementModal({ uid, onAccepted }) {
             </div>
           ) : (
             <div className="agreement-modal-text">
-              {privacyIntro && <p>{privacyIntro}</p>}
+              {renderIntro(privacyIntro)}
               <hr className="agreement-divider" />
               {privacySections.map((s, i) => (
-                <div key={i}>
+                <div className="agreement-section-block" key={i}>
                   <h3>{s.heading}</h3>
                   {renderBody(s.body)}
                 </div>
