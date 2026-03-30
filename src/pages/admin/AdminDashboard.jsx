@@ -216,22 +216,36 @@ export default function AdminDashboard() {
   }, []);
 
 
-  // Engagement metrics: only published missions, blank value for now
+  // Real-time Student Engagement metrics for each mission
   const [engagement, setEngagement] = useState([]);
-
   useEffect(() => {
     const fetchEngagement = async () => {
       try {
         const snap = await getDocs(collection(db, "missions"));
-        const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const published = rows.filter((m) => (m.status || "draft") === "published");
-        setEngagement(
-          published.map((m) => ({
-            id: m.id,
-            label: m.title || m.alt || m.name || "Untitled Mission",
-            value: ""
-          }))
-        );
+        const missions = snap.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((doc) => doc.status === "published");
+
+        const engagementArr = [];
+        for (const mission of missions) {
+          const volSnap = await getDocs(collection(db, "missions", mission.id, "volunteer"));
+          const volunteers = volSnap.docs.map(d => d.data());
+          const total = volunteers.length;
+          const count = (key, value) => volunteers.filter(v => v.progress?.[key] === value).length;
+          const completed =
+            count("preSurvey", "submitted") +
+            count("consent", "submitted") +
+            count("attendance", "present") +
+            count("postSurvey", "submitted");
+          const maxPossible = total * 4;
+          const percent = maxPossible === 0 ? 0 : Math.round((completed / maxPossible) * 100);
+          engagementArr.push({
+            id: mission.id,
+            label: mission.title || mission.alt || mission.name || "Untitled Mission",
+            value: percent
+          });
+        }
+        setEngagement(engagementArr);
       } catch (err) {
         setEngagement([]);
       }
@@ -264,7 +278,7 @@ export default function AdminDashboard() {
                     <svg width="26" height="26" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M7 7h10v2H7V7Zm0 4h10v2H7v-2Zm0 4h7v2H7v-2Zm-2-9.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-13ZM6.5 5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-13a.5.5 0 0 0-.5-.5h-11Z" fill="#4C48FF"/></g></svg>
                   </div>
                   <div>
-                    <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total Proposed Projects</div>
+                    <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total Published Events</div>
                     <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{typeof totalProjects === 'number' ? totalProjects : '...'}</div>
                   </div>
                 </div>
@@ -319,7 +333,7 @@ export default function AdminDashboard() {
       <div className="dashboard-grid">
         {/* LEFT column cards */}
         <section className="left-col">
-          {/* Students Engagement - Modern Styled */}
+          {/* Students Engagement - Real-Time Metrics Styled */}
           <div style={{
             background: '#fff',
             borderRadius: 16,
@@ -346,7 +360,7 @@ export default function AdminDashboard() {
               <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Students Engagement</span>
             </div>
             <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 60 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 8 }}>
                 {engagement.map((x) => (
                   <div
                     key={x.label}
@@ -355,7 +369,7 @@ export default function AdminDashboard() {
                     title="View Event Monitoring"
                   >
                     <div style={{ fontWeight: 600, color: '#1f3b73', fontSize: 15, marginBottom: 6 }}>{x.label}</div>
-                    <div style={{ background: '#e6eaf3', borderRadius: 8, height: 22, position: 'relative', overflow: 'hidden', width: '100%' }}>
+                    <div style={{ background: '#e6eaf3', borderRadius: 8, height: 18, position: 'relative', overflow: 'hidden', width: '100%' }}>
                       <div style={{
                         height: '100%',
                         background: 'linear-gradient(90deg, #4C48FF 60%, #30bdb7 100%)',
@@ -365,17 +379,18 @@ export default function AdminDashboard() {
                       }} />
                       <div style={{
                         position: 'absolute',
-                        right: 8,
+                        right: 6,
                         top: '50%',
                         transform: 'translateY(-50%)',
                         fontSize: 13,
                         color: '#fff',
                         fontWeight: 700,
-                        background: '#4C48FF',
-                        padding: '1px 10px',
+                        background: 'linear-gradient(90deg, #4C48FF 60%, #30bdb7 100%)',
+                        padding: '1px 14px',
                         borderRadius: 12,
                         minWidth: 36,
                         textAlign: 'center',
+                        boxShadow: '0 1px 4px rgba(31,59,115,0.08)',
                       }}>{x.value}%</div>
                     </div>
                   </div>
