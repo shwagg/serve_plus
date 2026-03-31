@@ -5,6 +5,7 @@ import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
+import { showToast } from "../../utils/toast";
 import "../../styles/DocumentLibrary.css";
 
 function toTitleCase(str) {
@@ -61,7 +62,7 @@ export default function DocumentLibrary() {
         }
       }
     }
-    alert(`Done. Updated ${updated} volunteer document(s).`);
+    showToast(`Done. Updated ${updated} volunteer document(s).`);
   };
 
   const fetchApprovedProposals = async () => {
@@ -116,7 +117,7 @@ export default function DocumentLibrary() {
 
     } catch (err) {
       console.error("Error updating participation:", err);
-      alert("Failed to update participation status.");
+      showToast("Failed to update participation status.");
     }
   };
 
@@ -731,7 +732,7 @@ export default function DocumentLibrary() {
                                   );
 
                                 } catch (err) {
-                                  alert(err.message);
+                                  showToast(err.message);
                                 }
                               }}
                             >

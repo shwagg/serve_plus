@@ -33,6 +33,9 @@ import ModeRoundedIcon from '@mui/icons-material/ModeRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
+//under proposal type selection icons
+import VolunteerActivismOutlinedIcon from '@mui/icons-material/VolunteerActivismOutlined';
+import LocalLibraryOutlinedIcon from '@mui/icons-material/LocalLibraryOutlined';
 
 
 export {
@@ -67,4 +70,6 @@ export {
     DeleteRoundedIcon,
     ExpandMoreRoundedIcon,
     ExpandLessRoundedIcon,
+    VolunteerActivismOutlinedIcon,
+    LocalLibraryOutlinedIcon,
 };

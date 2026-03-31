@@ -6,6 +6,7 @@ import { app, db } from "../firebaseConfig";
 import { doc, collection, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import QRCode from 'qrcode';
+import { showToast } from "../utils/toast";
 import "./certificateGenerator.css";
 
 const today = new Date();
@@ -68,14 +69,14 @@ export default function CertificateGenerator() {
       }
       existingPdfBytes = await response.arrayBuffer();
     } catch (err) {
-      alert('Error loading certificate template PDF. Please check the file path and try a hard refresh.');
+      showToast('Error loading certificate template PDF. Please check the file path and try a hard refresh.');
       throw err;
     }
     let pdfDoc;
     try {
       pdfDoc = await PDFDocument.load(existingPdfBytes);
     } catch (err) {
-      alert('Error parsing certificate template PDF. The file may be corrupted or not a valid PDF.');
+      showToast('Error parsing certificate template PDF. The file may be corrupted or not a valid PDF.');
       throw err;
     }
     const form = pdfDoc.getForm();
@@ -91,7 +92,7 @@ export default function CertificateGenerator() {
       form.getTextField('text_10gqgh').setText(customCertId || '');
       form.flatten();
     } catch (err) {
-      alert('Error filling certificate fields. Please check the field names in the PDF template.');
+      showToast('Error filling certificate fields. Please check the field names in the PDF template.');
       throw err;
     }
 
@@ -145,7 +146,7 @@ export default function CertificateGenerator() {
     try {
       // Use userID from navigation state (admin flow)
       if (!userID) {
-        alert("No student selected. Please select a student.");
+        showToast("No student selected. Please select a student.");
         return;
       }
       // Generate a unique certificate ID
@@ -190,9 +191,9 @@ export default function CertificateGenerator() {
         read: false
       });
 
-      alert("Certificate released to student, saved to Storage, and recorded in Firestore!");
+      showToast("Certificate released to student, saved to Storage, and recorded in Firestore!");
     } catch (err) {
-      alert("Failed to release certificate: " + err.message);
+      showToast("Failed to release certificate: " + err.message);
     }
   };
   const handleCloseModal = () => {

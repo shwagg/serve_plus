@@ -26,7 +26,7 @@ export async function exportCommunityEngagementProposalPDF(formData, formUrl = '
     try {
       form = pdfDoc.getForm();
     } catch {
-      alert('No form fields found in this PDF.');
+      window.showToast('No form fields found in this PDF.');
       return;
     }
     // Fill each field with the correct form value
@@ -194,7 +194,7 @@ export async function exportCommunityEngagementProposalPDF(formData, formUrl = '
       URL.revokeObjectURL(url);
     }, 100);
   } catch (err) {
-    alert('PDF Export Error: ' + err);
+    window.showToast('PDF Export Error: ' + err);
     console.error('PDF Export Error:', err);
   }
 }
@@ -210,7 +210,7 @@ import { PDFDocument } from 'pdf-lib';
 // =============================
 // Service Learning (SL) Export
 // =============================
-export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
+export async function exportSLProposalPDF({ formData, slFields, sdgOptions, returnUrl = false }) {
       // Debug: Log missing or undefined fields
       const requiredFields = [
         'proposalTitle',
@@ -242,7 +242,7 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
     try {
       form = pdfDoc.getForm();
     } catch {
-      alert('No form fields found in this PDF.');
+      window.showToast('No form fields found in this PDF.');
       return;
     }
     // Fill each field with the correct form value (NEW MAPPING)
@@ -300,6 +300,7 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
+    if (returnUrl) return url;
     const a = document.createElement('a');
     a.href = url;
     a.download = `${formData.proposalTitle || 'proposal'}.pdf`;
@@ -310,7 +311,8 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
       URL.revokeObjectURL(url);
     }, 100);
   } catch (err) {
-    alert('PDF Export Error: ' + err);
+    if (returnUrl) throw err;
+    window.showToast('PDF Export Error: ' + err);
     console.error('PDF Export Error:', err);
   }
 }
@@ -318,7 +320,7 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions }) {
 // =============================
 // Community Engagement (CE) Export
 // =============================
-export async function exportCEProposalPDF({ formData, ceFields, sdgOptions }) {
+export async function exportCEProposalPDF({ formData, ceFields, sdgOptions, returnUrl = false }) {
       // Learning Outcomes (robust mapping, only mark selected, clear others)
       const loMap = {
         'intellectual development': 'text_26ucos',
@@ -351,7 +353,7 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions }) {
     try {
       form = pdfDoc.getForm();
     } catch {
-      alert('No form fields found in this PDF.');
+      window.showToast('No form fields found in this PDF.');
       return;
     }
     // Fill each field with the correct form value (NEW MAPPING)
@@ -484,6 +486,7 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions }) {
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
+    if (returnUrl) return url;
     const a = document.createElement('a');
     a.href = url;
     a.download = `${formData.communityEngagementTitle || 'community_engagement_proposal'}.pdf`;
@@ -494,7 +497,8 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions }) {
       URL.revokeObjectURL(url);
     }, 100);
   } catch (err) {
-    alert('PDF Export Error: ' + err);
+    if (returnUrl) throw err;
+    window.showToast('PDF Export Error: ' + err);
     console.error('PDF Export Error:', err);
   }
 }
@@ -502,10 +506,10 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions }) {
 // =============================
 // Unified Export Handler
 // =============================
-export async function exportProposalPDF({ projectType, formData, slFields, ceFields, sdgOptions }) {
+export async function exportProposalPDF({ projectType, formData, slFields, ceFields, sdgOptions, returnUrl = false }) {
   if (projectType === 'service-learning') {
-    await exportSLProposalPDF({ formData, slFields, sdgOptions });
+    return await exportSLProposalPDF({ formData, slFields, sdgOptions, returnUrl });
   } else {
-    await exportCEProposalPDF({ formData, ceFields, sdgOptions });
+    return await exportCEProposalPDF({ formData, ceFields, sdgOptions, returnUrl });
   }
 }

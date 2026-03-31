@@ -1127,7 +1127,7 @@
     align-items: center;
     justify-content: center;
     box-shadow: -2px 2px 8px rgba(0,0,0,0.25);
-    z-index: 900;
+    z-index: 2050;
 }
 .qr-modal-note{
     margin: 16px 0;
@@ -1432,6 +1432,27 @@
   background: #f1f5f9;
   border-radius: 999px;
   padding: 5px 12px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/*Unjoin*/
+/* default state */
+.task-enrolled-badge .remove-text {
+  display: none;
+}
+
+/* hover effect */
+.task-enrolled-badge:hover .joined-text {
+  display: none;
+}
+
+.task-enrolled-badge:hover .remove-text {
+  display: inline;
+  /*color: #d32f2f;*/
+  color: black;
+  font-weight: bold;
 }
 .task-collapse-btn {
   display: flex;

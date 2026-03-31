@@ -44,18 +44,32 @@ export default function StudentMenu({
         {userAvatar && !userAvatar.includes('ui-avatars.com') ? (
           <img src={userAvatar} alt="avatar" className="user-avatar-img" />
         ) : (
-          <Face6RoundedIcon sx={{ width: 40, height: 40, color: '#ffffff' }} />
+          <Face6RoundedIcon sx={{ width: 40, height: 40, color: '#30bdb7' }} />
         )}
         <div className="user-info">
           <p className="user-name">{displayUsername}</p>
           <p className="user-email">{userEmail}</p>
         </div>
+        <span className="user-role">Volunteer</span>
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/global/menu/leaderboard")}
+          onClick={() => {
+            navigate("/student/home");
+            onClose();
+            setTimeout(() => {
+              const el = document.getElementById("leaderboard-section");
+              if (!el) return;
+              const scrollContainer = el.closest(".content-page");
+              if (!scrollContainer) return;
+              const playerStrip = scrollContainer.querySelector(".player-strip");
+              const playerStripHeight = playerStrip ? playerStrip.getBoundingClientRect().height : 0;
+              const targetScrollTop = el.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop - playerStripHeight;
+              scrollContainer.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+            }, 300);
+          }}
         >
           <img src={leaderboardIcon} alt="Leaderboard" className="menu-icon" />
           Leaderboard

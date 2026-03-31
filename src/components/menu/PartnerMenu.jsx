@@ -43,6 +43,7 @@ export default function PartnerMenu({
           <p className="user-name">{displayUsername}</p>
           <p className="user-email">{userEmail}</p>
         </div>
+        <span className="user-role">Partner</span>
       </button>
       <div className="menu-divider"></div>
 

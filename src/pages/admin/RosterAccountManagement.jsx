@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import ChangeIcon from "../../components/icons/Change.svg";
 import { db } from "../../firebaseConfig";
+import { showToast } from "../../utils/toast";
 import "../../styles/RosterAccountManagement.css";
 
 export default function RosterAccountManagement() {
@@ -142,12 +143,12 @@ export default function RosterAccountManagement() {
       (selectedRole === "faculty" || selectedRole === "admin") &&
       !selectedPosition
     ) {
-      alert("Please select a position for this role.");
+      showToast("Please select a position for this role.");
       return;
     }
     // Check if department is required but not selected (faculty only)
     if (selectedRole === "faculty" && !selectedDepartment) {
-      alert("Please select a department for faculty role.");
+      showToast("Please select a department for faculty role.");
       return;
     }
 
@@ -269,7 +270,7 @@ export default function RosterAccountManagement() {
       setSelectedDepartment("");
     } catch (err) {
       console.error("Error updating role:", err);
-      alert("Failed to update role. Please try again.");
+      showToast("Failed to update role. Please try again.");
     }
   };
 

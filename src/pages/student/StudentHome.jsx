@@ -121,6 +121,7 @@ const StudentHome = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const missionsSectionRef = useRef(null);
+  const leaderboardSectionRef = useRef(null);
 
   useLayoutEffect(() => {
     if (location.state?.scrollTo === 'missions' && missionsSectionRef.current) {
@@ -137,7 +138,8 @@ const StudentHome = () => {
 
       window.history.replaceState({}, '');
     }
-  }, []);
+  }, [location.state?.scrollTo]);
+
 
   useEffect(() => {
     // use firebase auth state
@@ -490,7 +492,7 @@ const StudentHome = () => {
           </div>
         </section>
         {/* LEADERBOARD */}
-        <section className="leaderboard-section" aria-label="Leaderboard" style={{ backgroundImage: `linear-gradient(to bottom, #d1efff 10%, transparent 10%), url(${cloudsBg})`, backgroundSize: '100% 100%, 100% auto', backgroundPosition: '0 0, center top', backgroundRepeat: 'no-repeat, no-repeat', backgroundColor: '#d1efff' }}>
+        <section id="leaderboard-section" ref={leaderboardSectionRef} className="leaderboard-section" aria-label="Leaderboard" style={{ backgroundImage: `linear-gradient(to bottom, #d1efff 10%, transparent 10%), url(${cloudsBg})`, backgroundSize: '100% 100%, 100% auto', backgroundPosition: '0 0, center top', backgroundRepeat: 'no-repeat, no-repeat', backgroundColor: '#d1efff' }}>
           <div className="leaderboard-body">
             <div className="leaderboard-podium-col">
               <h2 className="mission-section-title">Leaderboard</h2>

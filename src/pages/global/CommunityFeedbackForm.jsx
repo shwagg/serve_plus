@@ -5,6 +5,7 @@ import { doc, getDoc, getDocs, collection, addDoc, serverTimestamp, updateDoc } 
 import "../../styles/CommunityFeedbackForm.css";
 import serveIcon from "../../assets/serve_plus_logo.svg";
 import { computeAverageRating, getProgramMultiplier } from "../../hooks/rewardSystem";
+import { showToast } from "../../utils/toast";
 
 
 export default function PublicFeedback() {
@@ -76,7 +77,7 @@ export default function PublicFeedback() {
 
         try {
             if (Object.values(ratings).includes(0)) {
-                alert("Please rate all items before submitting.");
+                showToast("Please rate all items before submitting.");
                 return;
             }
             await addDoc(
@@ -117,7 +118,7 @@ export default function PublicFeedback() {
 
         } catch (err) {
             console.error("Error saving response:", err);
-            alert("Failed to submit feedback.");
+            showToast("Failed to submit feedback.");
         }
     };
 

@@ -48,6 +48,7 @@ export default function AdminMenu({
           <p className="user-name">{displayUsername}</p>
           <p className="user-email">{userEmail}</p>
         </div>
+        <span className="user-role">Admin</span>
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">

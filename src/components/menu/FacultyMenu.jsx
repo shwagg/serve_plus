@@ -49,6 +49,7 @@ export default function FacultyMenu({
           <p className="user-name">{displayUsername}</p>
           <p className="user-email">{userEmail}</p>
         </div>
+        <span className="user-role">Faculty</span>
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">

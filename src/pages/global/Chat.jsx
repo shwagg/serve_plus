@@ -6,6 +6,7 @@ import {
   doc,
   getDoc,
   addDoc,
+  setDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -16,32 +17,57 @@ import {
 import { auth, db, storage } from '../../firebaseConfig';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getChatParticipants } from '../../utils/chatUtils';
+import { showToast } from '../../utils/toast';
 import Header from '../../components/Header';
 import '../../styles/Chat.css';
 import attachIcon from '../../assets/chatassets/attach.svg';
 import sendIcon from '../../assets/chatassets/send.svg';
 
-// Module-level cache — persists for the entire browser session, not just one render
 const _avatarCache = {};
+
+const isMissionLocked = (date) => {
+  if (!date) return false;
+  const end = new Date(date);
+  if (isNaN(end.getTime())) return false;
+  return Date.now() > end.getTime() + 7 * 24 * 60 * 60 * 1000;
+};
+
+const getLastMessage = async (missionId) => {
+  try {
+    const q = query(
+      collection(db, 'missions', missionId, 'chat'),
+      orderBy('timestamp', 'desc'),
+      limit(2)
+    );
+    const snap = await getDocs(q);
+    const msgDoc = snap.docs.find(d => d.id !== '_meta');
+    if (!msgDoc) return { text: '', at: null };
+    const msg = msgDoc.data();
+    return {
+      text: msg.text || msg.fileName || 'Attachment',
+      at:   msg.timestamp?.toDate?.() || null,
+    };
+  } catch { return { text: '', at: null }; }
+};
 
 export default function Chat() {
   const { missionId } = useParams();
   const navigate = useNavigate();
 
   const [missions, setMissions] = useState([]);
+  const [filter, setFilter] = useState('active');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedMission, setSelectedMission] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
   const [loading, setLoading] = useState(true);
-  const [lastMessages, setLastMessages] = useState({});
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [participants, setParticipants] = useState([]);
   const [avatarCache, setAvatarCache] = useState({});
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const fileInputRef = useRef(null);
-  const MESSAGES_PER_PAGE = 20; //pwede ichange to para ma-adjust yung messages per load
+  const MESSAGES_PER_PAGE = 20;
   const ALLOWED_MIME_TYPES = new Set([
     'image/jpeg',
     'image/png',
@@ -52,115 +78,100 @@ export default function Chat() {
   const MAX_IMAGE_DIMENSION = 1280;
   const IMAGE_QUALITY = 0.7;
 
-  // Fetch all missions for the user
+  // Fetch missions using userMissions reverse index (fast)
   useEffect(() => {
     const fetchMissions = async () => {
       try {
         const user = auth.currentUser;
         if (!user) return;
 
-        const missionsArray = [];
-        const missionsRef = collection(db, 'missions');
-        const allMissionsSnap = await getDocs(missionsRef);
+        const buildMission = async (id, data) => {
+          const last = await getLastMessage(id);
+          return {
+            id,
+            title:         data.title || 'Untitled Mission',
+            description:   data.description || '',
+            date:          data.date || data.targetDate || '',
+            role:          data.role || 'volunteer',
+            lastMessage:   last.text,
+            lastMessageAt: last.at,
+          };
+        };
 
-        for (const missionDoc of allMissionsSnap.docs) {
-          const mId = missionDoc.id;
-          const missionData = missionDoc.data();
-          let userRoleInMission = null;
+        // Fast path
+        const userMissionsSnap = await getDocs(
+          collection(db, 'userMissions', user.uid, 'missions')
+        );
 
-          // Volunteer
-          const volunteerSnap = await getDoc(
-            doc(db, 'missions', mId, 'volunteer', user.uid)
+        if (!userMissionsSnap.empty) {
+          const arr = await Promise.all(
+            userMissionsSnap.docs.map(d => buildMission(d.id, d.data()))
           );
-          if (volunteerSnap.exists()) userRoleInMission = 'volunteer';
-
-          // Faculty
-          if (!userRoleInMission) {
-            const facultySnap = await getDoc(
-              doc(db, 'missions', mId, 'faculty', user.uid)
-            );
-            if (facultySnap.exists()) userRoleInMission = 'faculty';
-          }
-
-          // Partner
-          if (!userRoleInMission) {
-            const partnerSnap = await getDoc(
-              doc(db, 'missions', mId, 'partner', user.uid)
-            );
-            if (partnerSnap.exists()) userRoleInMission = 'partner';
-          }
-
-          // Admin
-          const userSnap = await getDoc(doc(db, 'users', user.uid));
-          const isAdmin =
-            userSnap.exists() && userSnap.data().role === 'admin';
-
-          if (userRoleInMission || isAdmin) {
-            missionsArray.push({
-              id: mId,
-              title: missionData.title || 'Untitled Mission',
-              description: missionData.description || '',
-              date: missionData.targetDate || '',
-              role: userRoleInMission || 'admin'
-            });
-          }
+          finalize(arr);
+          return;
         }
 
-        setMissions(missionsArray);
+        // Fallback + self-heal for existing users
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        const isAdmin = userSnap.exists() && userSnap.data().role === 'admin';
+        const allSnap = await getDocs(collection(db, 'missions'));
+        const found = [];
 
-        if (missionId) {
-          const found = missionsArray.find(m => m.id === missionId);
-          if (found) setSelectedMission(found);
-        } else if (missionsArray.length > 0) {
-          setSelectedMission(missionsArray[0]);
-        }
+        await Promise.all(allSnap.docs.map(async (mDoc) => {
+          const mId   = mDoc.id;
+          const mData = mDoc.data();
+          let role    = isAdmin ? 'admin' : null;
 
-        setLoading(false);
+          if (!role) {
+            const [vS, fS, pS] = await Promise.all([
+              getDoc(doc(db, 'missions', mId, 'volunteer', user.uid)),
+              getDoc(doc(db, 'missions', mId, 'faculty',   user.uid)),
+              getDoc(doc(db, 'missions', mId, 'partner',   user.uid)),
+            ]);
+            if (vS.exists()) role = 'volunteer';
+            else if (fS.exists()) role = 'faculty';
+            else if (pS.exists()) role = 'partner';
+          }
+
+          if (role) {
+            found.push({ id: mId, data: { ...mData, role, date: mData.targetDate || '' } });
+            setDoc(doc(db, 'userMissions', user.uid, 'missions', mId), {
+              missionId: mId, title: mData.title || 'Untitled Mission',
+              role, date: mData.targetDate || '',
+            }).catch(() => {});
+          }
+        }));
+
+        const arr = await Promise.all(found.map(m => buildMission(m.id, m.data)));
+        finalize(arr);
       } catch (err) {
         console.error('Error fetching missions:', err);
         setLoading(false);
       }
     };
 
-    fetchMissions();
-  }, [missionId]);
-
-  // Fetch last message per mission
-  useEffect(() => {
-    const fetchLastMessages = async () => {
-      const lastMsgs = {};
-
-      for (const mission of missions) {
-        try {
-          const q = query(
-            collection(db, 'missions', mission.id, 'chat'),
-            orderBy('timestamp', 'desc')
-          );
-
-          const snapshot = await getDocs(q);
-          const lastMsg = snapshot.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .find(msg => msg.id !== '_meta');
-
-          if (lastMsg) {
-            lastMsgs[mission.id] =
-              lastMsg.text || lastMsg.fileName || 'Attachment';
-          }
-        } catch (err) {
-          console.error('Error fetching last message:', err);
-        }
+    const finalize = (arr) => {
+      arr.sort((a, b) => {
+        if (!a.lastMessageAt && !b.lastMessageAt) return 0;
+        if (!a.lastMessageAt) return 1;
+        if (!b.lastMessageAt) return -1;
+        return b.lastMessageAt - a.lastMessageAt;
+      });
+      setMissions(arr);
+      if (missionId) {
+        const found = arr.find(m => m.id === missionId);
+        if (found) setSelectedMission(found);
       }
-
-      setLastMessages(lastMsgs);
+      setLoading(false);
     };
 
-    if (missions.length > 0) fetchLastMessages();
-  }, [missions]);
+    fetchMissions();
+  }, [missionId]);
 
   // Real-time messages with pagination
   useEffect(() => {
     if (!selectedMission) return;
-// Fetch participants
+
     const fetchParticipants = async () => {
       try {
         const participantsData = await getChatParticipants(selectedMission.id);
@@ -170,7 +181,6 @@ export default function Chat() {
           ...participantsData.partners,
           ...participantsData.admins
         ];
-        setParticipants(allParticipants);
       } catch (err) {
         console.error('Error fetching participants:', err);
       }
@@ -178,7 +188,6 @@ export default function Chat() {
 
     fetchParticipants();
 
-    
     const q = query(
       collection(db, 'missions', selectedMission.id, 'chat'),
       orderBy('timestamp', 'desc'),
@@ -260,7 +269,7 @@ export default function Chat() {
     if (!file) return;
 
     if (!ALLOWED_MIME_TYPES.has(file.type)) {
-      alert('Only JPEG, PNG, PDF, and Excel files are allowed.');
+      showToast('Only JPEG, PNG, PDF, and Excel files are allowed.');
       e.target.value = '';
       return;
     }
@@ -339,7 +348,7 @@ export default function Chat() {
       setPendingAttachment(null);
     } catch (err) {
       console.error('Error sending attachment:', err);
-      alert('Failed to upload attachment. Please try again.');
+      showToast('Failed to upload attachment. Please try again.');
     } finally {
       setUploadingAttachment(false);
     }
@@ -385,13 +394,31 @@ export default function Chat() {
     navigate(`/chat/${mission.id}`);
   };
 
-  // Chat is read-only 1 week after the mission's target date
-  const isChatLocked = (() => {
-    if (!selectedMission?.date) return false;
-    const missionEnd = new Date(selectedMission.date);
-    if (isNaN(missionEnd.getTime())) return false;
-    return Date.now() > missionEnd.getTime() + 7 * 24 * 60 * 60 * 1000;
-  })();
+  const handleBack = () => {
+    setSelectedMission(null);
+    setMessages([]);
+    setHasMoreMessages(true);
+    navigate('/chat');
+  };
+
+  const isChatLocked = isMissionLocked(selectedMission?.date);
+
+  const displayedMissions = missions
+    .filter(m => filter === 'active' ? !isMissionLocked(m.date) : isMissionLocked(m.date))
+    .filter(m => !searchQuery.trim() || m.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const formatRelativeTime = (date) => {
+    if (!date) return '';
+    const diff = Date.now() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)   return 'now';
+    if (mins < 60)  return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)   return `${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7)   return `${days}d`;
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
 
   if (loading) {
     return (
@@ -408,38 +435,52 @@ export default function Chat() {
     <>
       <Header />
       <div className="chat-page">
-        {/* Sidebar */}
-        <div className="chat-sidebar">
-          <div className="chat-sidebar-header">
-            <h2>Chats</h2>
+
+        {/* ── LEFT: Conversation list ── */}
+        <div className={`chat-list-panel${selectedMission ? ' chat-mobile-hidden' : ''}`}>
+          <div className="chat-list-header">
+            <button className="chat-list-back-btn" onClick={() => navigate(-1)} aria-label="Go back">‹</button>
+            <h2>Messages</h2>
           </div>
 
-          <div className="chat-sidebar-search">
+          <div className="chat-list-search-wrap">
             <input
               type="text"
-              placeholder="Search"
-              className="chat-search-input"
+              placeholder="Search conversations…"
+              className="chat-list-search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <div className="chat-sidebar-list">
-            {missions.length === 0 ? (
-              <div className="chat-no-missions">No chats yet</div>
+          <div className="chat-filter-tabs">
+            <button className={`chat-filter-tab ${filter === 'active' ? 'active' : ''}`} onClick={() => setFilter('active')}>Active</button>
+            <button className={`chat-filter-tab ${filter === 'closed' ? 'active' : ''}`} onClick={() => setFilter('closed')}>Closed</button>
+          </div>
+
+          <div className="chat-list-items">
+            {displayedMissions.length === 0 ? (
+              <div className="chat-list-empty">
+                {filter === 'active' ? 'No active chats' : 'No closed chats'}
+              </div>
             ) : (
-              missions.map(mission => (
+              displayedMissions.map(mission => (
                 <button
                   key={mission.id}
-                  className={`chat-sidebar-item ${
-                    selectedMission?.id === mission.id ? 'active' : ''
-                  }`}
+                  className={`chat-list-item${selectedMission?.id === mission.id ? ' chat-list-item--active' : ''}`}
                   onClick={() => handleSelectMission(mission)}
                 >
-                  <div className="chat-sidebar-avatar">
+                  <div className="chat-list-avatar">
                     {mission.title.charAt(0).toUpperCase()}
                   </div>
-                  <div className="chat-sidebar-item-content">
-                    <h3>{mission.title}</h3>
-                    <p>{lastMessages[mission.id] || 'No messages yet'}</p>
+                  <div className="chat-list-content">
+                    <div className="chat-list-row">
+                      <span className="chat-list-title">{mission.title}</span>
+                      <span className="chat-list-time">{formatRelativeTime(mission.lastMessageAt)}</span>
+                    </div>
+                    <p className="chat-list-preview">
+                      {isMissionLocked(mission.date) ? '🔒 Closed' : (mission.lastMessage || 'No messages yet')}
+                    </p>
                   </div>
                 </button>
               ))
@@ -447,44 +488,34 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Chat Area */}
-        <div className="chat-main">
-          {selectedMission ? (
+        {/* ── RIGHT: Chat conversation ── */}
+        <div className={`chat-convo-panel${!selectedMission ? ' chat-mobile-hidden' : ''}`}>
+          {!selectedMission ? (
+            <div className="chat-no-convo">
+              <p>Select a conversation to start messaging</p>
+            </div>
+          ) : (
             <>
-              <div className="chat-header">
-                <div className="chat-header-avatar">
-                  {selectedMission.title.charAt(0).toUpperCase()}
-                </div>
-                <div className="chat-header-content">
-                  <h2>{selectedMission.title}</h2>
-                </div>
+              {/* Topbar: back button + mission title */}
+              <div className="chat-convo-topbar">
+                <button className="chat-back-btn" onClick={handleBack} aria-label="Back">‹</button>
+                <span className="chat-convo-topbar-title">{selectedMission.title}</span>
+                {isChatLocked && <span className="chat-convo-topbar-closed">Closed</span>}
               </div>
 
+              {/* Messages */}
               <div className="chat-messages">
                 {messages.length === 0 ? (
-                  <div className="chat-empty">
-                    <p>No messages yet. Start the conversation!</p>
-                  </div>
+                  <div className="chat-empty"><p>No messages yet. Start the conversation!</p></div>
                 ) : (
                   <>
                     {hasMoreMessages && (
-                      <button
-                        onClick={handleLoadMore}
-                        disabled={loadingMore}
-                        className="chat-load-more-btn"
-                      >
+                      <button onClick={handleLoadMore} disabled={loadingMore} className="chat-load-more-btn">
                         {loadingMore ? 'Loading...' : 'Load earlier messages'}
                       </button>
                     )}
                     {messages.map(message => (
-                      <div
-                        key={message.id}
-                        className={`chat-message ${
-                          message.senderId === auth.currentUser?.uid
-                            ? 'sent'
-                            : 'received'
-                        }`}
-                      >
+                      <div key={message.id} className={`chat-message ${message.senderId === auth.currentUser?.uid ? 'sent' : 'received'}`}>
                         {message.senderId !== auth.currentUser?.uid && (
                           <div className="chat-message-avatar">
                             {avatarCache[message.senderId] ? (
@@ -496,40 +527,22 @@ export default function Chat() {
                         )}
                         <div className="chat-message-content">
                           {message.senderId !== auth.currentUser?.uid && (
-                            <div className="chat-message-sender">
-                              {message.senderName}
-                            </div>
+                            <div className="chat-message-sender">{message.senderName}</div>
                           )}
                           <div className="chat-message-bubble">
-                              {message.type === 'attachment' ? (
-                                <div className="chat-message-text">
-                                  {message.fileType?.startsWith('image/') ? (
-                                    <a
-                                      href={message.fileUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      <img
-                                        src={message.fileUrl}
-                                        alt={message.fileName || 'Attachment'}
-                                        style={{ maxWidth: 220, borderRadius: 8 }}
-                                      />
-                                    </a>
-                                  ) : (
-                                    <a
-                                      href={message.fileUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      {message.fileName || 'Attachment'}
-                                    </a>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="chat-message-text">
-                                  {message.text}
-                                </div>
-                              )}
+                            {message.type === 'attachment' ? (
+                              <div className="chat-message-text">
+                                {message.fileType?.startsWith('image/') ? (
+                                  <a href={message.fileUrl} target="_blank" rel="noreferrer">
+                                    <img src={message.fileUrl} alt={message.fileName || 'Attachment'} style={{ maxWidth: 220, borderRadius: 8 }} />
+                                  </a>
+                                ) : (
+                                  <a href={message.fileUrl} target="_blank" rel="noreferrer">{message.fileName || 'Attachment'}</a>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="chat-message-text">{message.text}</div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -538,15 +551,12 @@ export default function Chat() {
                 )}
               </div>
 
+              {/* Attachment preview */}
               {!isChatLocked && pendingAttachment && (
                 <div className="chat-attachment-preview">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {pendingAttachment.type.startsWith('image/') ? (
-                      <img
-                        src={URL.createObjectURL(pendingAttachment)}
-                        alt="preview"
-                        style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
-                      />
+                      <img src={URL.createObjectURL(pendingAttachment)} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '40px', height: '40px', backgroundColor: '#ddd', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📄</div>
                     )}
@@ -555,68 +565,36 @@ export default function Chat() {
                       <div style={{ fontSize: '12px', color: '#666' }}>{(pendingAttachment.size / 1024).toFixed(2)} KB</div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveAttachment}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
-                  >
-                    ✕
-                  </button>
+                  <button type="button" onClick={handleRemoveAttachment} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}>✕</button>
                 </div>
               )}
 
+              {/* Input or locked notice */}
               {isChatLocked ? (
-                <div className="chat-locked-notice">
-                  <span>This chat is closed</span>
-                </div>
+                <div className="chat-locked-notice"><span>This chat is closed</span></div>
               ) : (
                 <div className="chat-input-area">
-                  <button
-                    type="button"
-                    className="chat-input-icon"
-                    onClick={handleAttachmentClick}
-                    disabled={uploadingAttachment}
-                  >
+                  <button type="button" className="chat-input-icon" onClick={handleAttachmentClick} disabled={uploadingAttachment}>
                     <img src={attachIcon} alt="Attach" width="20" height="20" />
                   </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".jpeg,.jpg,.png,.pdf,.xls,.xlsx"
-                    style={{ display: 'none' }}
-                    onChange={handleAttachmentChange}
-                  />
-
+                  <input ref={fileInputRef} type="file" accept=".jpeg,.jpg,.png,.pdf,.xls,.xlsx" style={{ display: 'none' }} onChange={handleAttachmentChange} />
                   <input
                     type="text"
                     placeholder="Aa"
                     className="chat-input"
                     value={messageInput}
                     onChange={e => setMessageInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                   />
-
-                  <button
-                    className="chat-send-button"
-                    onClick={handleSendMessage}
-                    disabled={uploadingAttachment || (!messageInput.trim() && !pendingAttachment)}
-                  >
+                  <button className="chat-send-button" onClick={handleSendMessage} disabled={uploadingAttachment || (!messageInput.trim() && !pendingAttachment)}>
                     <img src={sendIcon} alt="Send" width="20" height="20" />
                   </button>
                 </div>
               )}
             </>
-          ) : (
-            <div className="chat-empty-state">
-              <p>Select a conversation to start chatting</p>
-            </div>
           )}
         </div>
+
       </div>
     </>
   );

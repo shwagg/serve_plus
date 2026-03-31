@@ -192,6 +192,7 @@ export default function ChatModal() {
             missionId: mId,
             title:     mData.title || 'Untitled Mission',
             role,
+            date:      mData.targetDate || '',
           }).catch(() => {});
         }
       }));
@@ -337,29 +338,34 @@ export default function ChatModal() {
           {activeConvo && (
             <>
               <div className="chat-convo-header">
-                <button
-                  className="chat-convo-back-btn"
-                  onClick={() => { setActiveConvo(null); setMessages([]); setMessageInput(''); }}
-                  aria-label="Back to chats"
-                >
-                  ‹
-                </button>
-                <div className="chat-convo-avatar">
-                  {activeConvo.title.charAt(0).toUpperCase()}
-                </div>
-                <div className="chat-convo-title-wrap">
-                  <span className="chat-convo-title">{activeConvo.title}</span>
-                </div>
-                <div className="chat-convo-header-actions">
-                  <Link
-                    to={`/chat/${activeConvo.id}`}
-                    className="chat-view-all"
-                    onClick={closeAll}
-                    title="Open full chat"
+                <div className="chat-convo-header-toprow">
+                  <button
+                    className="chat-convo-back-btn"
+                    onClick={() => { setActiveConvo(null); setMessages([]); setMessageInput(''); }}
+                    aria-label="Back to chats"
                   >
-                    ↗
-                  </Link>
-                  <button className="chat-close-btn" onClick={closeAll} aria-label="Close">×</button>
+                    ‹
+                  </button>
+                  <div className="chat-convo-avatar">
+                    {activeConvo.title.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="chat-convo-title-wrap">
+                    <span className="chat-convo-title">{activeConvo.title}</span>
+                  </div>
+                  <div className="chat-convo-header-actions">
+                    <Link
+                      to={`/chat/${activeConvo.id}`}
+                      className="chat-view-all"
+                      onClick={closeAll}
+                      title="Open full chat"
+                    >
+                      ↗
+                    </Link>
+                    <button className="chat-close-btn" onClick={closeAll} aria-label="Close">×</button>
+                  </div>
+                </div>
+                <div className="chat-convo-mission-label" title={activeConvo.title}>
+                  {activeConvo.title}
                 </div>
               </div>
 

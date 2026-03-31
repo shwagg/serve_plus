@@ -239,9 +239,8 @@ function ProjectProposal({ projectType, onClose }) {
   // Submission logic is now handled in SummaryPanel
 
   return (
-    <div className="project-proposal-container">
-      <div className="proposal-content-wrapper">
-        {!showSummary ? (
+    <div className="proposal-content-wrapper">
+      {!showSummary ? (
           <form className="proposal-form" onSubmit={(e) => e.preventDefault()}>
             {/* Basic Information */}
             <div className="form-section">
@@ -696,8 +695,7 @@ function ProjectProposal({ projectType, onClose }) {
             sdgOptions={sdgOptions}
             setLoading={setLoading}
           />
-        )}
-      </div>
+      )}
     </div>
   );
 }

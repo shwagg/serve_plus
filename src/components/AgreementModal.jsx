@@ -2,6 +2,7 @@ import DOMPurify from "dompurify";
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db } from "../firebaseConfig";
+import { showToast } from "../utils/toast";
 import "./styles/AgreementModal.css";
 
 // Fallback version if Firestore doc doesn't exist yet
@@ -72,7 +73,7 @@ export default function AgreementModal({ uid, onAccepted }) {
       onAccepted();
     } catch (err) {
       console.error("Failed to save agreement acceptance:", err);
-      alert("Something went wrong. Please try again.");
+      showToast("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }

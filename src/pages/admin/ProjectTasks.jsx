@@ -2,6 +2,7 @@ import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, } from 
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
+import { showToast } from "../../utils/toast";
 
 import "../../styles/admin.css";
 
@@ -77,11 +78,11 @@ export default function ProjectTasks() {
   const handleCreateTask = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      alert("Task title is required.");
+      showToast("Task title is required.");
       return;
     }
     if (formData.enrollmentDeadline && !project?.targetDate) {
-      alert("Set a target date before adding an enrollment deadline time.");
+      showToast("Set a target date before adding an enrollment deadline time.");
       return;
     }
 
@@ -123,7 +124,7 @@ export default function ProjectTasks() {
       await loadTasks();
     } catch (e) {
       console.error("Error creating task:", e);
-      alert("Failed to create task.");
+      showToast("Failed to create task.");
     } finally {
       setSaving(false);
     }
@@ -132,11 +133,11 @@ export default function ProjectTasks() {
   const handleEditTask = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      alert("Task title is required.");
+      showToast("Task title is required.");
       return;
     }
     if (formData.enrollmentDeadline && !project?.targetDate) {
-      alert("Set a target date before adding an enrollment deadline time.");
+      showToast("Set a target date before adding an enrollment deadline time.");
       return;
     }
 
@@ -172,7 +173,7 @@ export default function ProjectTasks() {
       await loadTasks();
     } catch (e) {
       console.error("Error updating task:", e);
-      alert("Failed to update task.");
+      showToast("Failed to update task.");
     } finally {
       setSaving(false);
     }
@@ -188,7 +189,7 @@ export default function ProjectTasks() {
       await loadTasks();
     } catch (e) {
       console.error("Error deleting task:", e);
-      alert("Failed to delete task.");
+      showToast("Failed to delete task.");
     } finally {
       setSaving(false);
     }

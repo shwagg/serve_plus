@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import jsQR from "jsqr";
+import { showToast } from "../utils/toast";
 import "./QRScanner.css";
 
 export default function QRScanner({ onScan }) {
@@ -100,7 +101,7 @@ export default function QRScanner({ onScan }) {
           } catch { position = null; }
           if (onScan) onScan(code.data, position);
         } else {
-          alert("No QR code found in image.");
+          showToast("No QR code found in image.");
         }
       };
       img.src = ev.target.result;

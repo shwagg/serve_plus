@@ -961,19 +961,17 @@ export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
     const startTop = top;
     didDragRef.current = false;
 
-    const onMouseMove = (e) => {
-      const delta = e.clientY - startY;
+    const onMouseMove = (ev) => {
+      const delta = ev.clientY - startY;
       if (Math.abs(delta) > 4) didDragRef.current = true;
       setTop(Math.min(Math.max(60, startTop + delta), window.innerHeight - 48));
     };
     const onMouseUp = () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
-      if (!didDragRef.current) onClick?.();
     };
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-    e.preventDefault();
   };
 
   const handleTouchStart = (e) => {
@@ -981,8 +979,8 @@ export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
     const startTop = top;
     didDragRef.current = false;
 
-    const onTouchMove = (e) => {
-      const delta = e.touches[0].clientY - startY;
+    const onTouchMove = (ev) => {
+      const delta = ev.touches[0].clientY - startY;
       if (Math.abs(delta) > 4) didDragRef.current = true;
       setTop(Math.min(Math.max(60, startTop + delta), window.innerHeight - 48));
     };
@@ -995,12 +993,17 @@ export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
     window.addEventListener('touchend', onTouchEnd);
   };
 
+  const handleClick = () => {
+    if (!didDragRef.current) onClick?.();
+  };
+
   return (
     <button
       className="global-feed-toggle"
       style={{ top, cursor: 'grab' }}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
+      onClick={handleClick}
       aria-label="Open announcements"
     >
       <span className="global-feed-toggle-emoji">📢</span>

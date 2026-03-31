@@ -3,6 +3,7 @@ import { auth, functions, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
+import { showToast } from "../utils/toast";
 
 export const SessionContext = createContext();
 
@@ -144,7 +145,7 @@ export function SessionProvider({ children }) {
             // ensure there's a history entry to stay on a
             window.history.pushState(null, null, window.location.href);
             window.onpopstate = () => {
-              alert("You were automatically logged out. Please sign in again.");
+              showToast("You were automatically logged out. Please sign in again.");
               // keep user on login page
               window.history.pushState(null, null, "/");
               window.location.href = "/";

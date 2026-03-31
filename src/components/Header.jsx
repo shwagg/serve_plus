@@ -14,6 +14,7 @@ import AdminMenu from './menu/AdminMenu';
 import PartnerMenu from './menu/PartnerMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
+import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon } from './icons';
 import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 
@@ -27,9 +28,15 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h2>Create Project Proposal</h2>
+    <div className="cp-overlay" onClick={onClose}>
+      <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cp-header">
+          <h3>📝 Create Project Proposal</h3>
+          <button className="cp-close-btn" onClick={onClose}>
+            <CloseIcon fontSize="small" />
+          </button>
+        </div>
+        <div className="cp-body">
         <p>Select the type of project you want to propose:</p>
 
         <div className="proposal-type-buttons">
@@ -37,6 +44,7 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
             className="proposal-type-btn service-learning"
             onClick={() => handleSelection('service-learning')}
           >
+            <VolunteerActivismOutlinedIcon className="proposal-type-icon" />
             <h3>Service Learning</h3>
             <p>Academic-based community service projects</p>
           </button>
@@ -45,14 +53,15 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
             className="proposal-type-btn community-engagement"
             onClick={() => handleSelection('community-engagement')}
           >
+            <LocalLibraryOutlinedIcon className="proposal-type-icon" />
             <h3>Community Engagement</h3>
             <p>Direct community partnership initiatives</p>
           </button>
         </div>
-
-        <button className="modal-close-btn" onClick={onClose}>Cancel</button>
+        </div>
       </div>
     </div>
+
   );
 };
 
@@ -186,10 +195,6 @@ export default function Header() {
           <div className="header-actions">
             <ChatModal />
             <NotificationBell />
-            <GlobalNotificationButton
-              unreadCount={announcementUnreadCount}
-              onClick={() => setAnnouncementsOpen(!announcementsOpen)}
-            />
             <div className="menu-container" ref={menuRef}>
               <button
                 className="icon-button menu-button"
@@ -202,6 +207,10 @@ export default function Header() {
           </div>
         </div>
       </header>
+      <GlobalNotificationButton
+        unreadCount={announcementUnreadCount}
+        onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+      />
       <aside
         className={`global-feed ${announcementsOpen ? 'open' : ''}`}
         style={{
@@ -213,7 +222,7 @@ export default function Header() {
           background: '#fff',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           borderLeft: '2px solid #30bdb7',
-          zIndex: 999,
+          zIndex: 2100,
           transition: 'transform 0.3s',
           transform: announcementsOpen ? 'translateX(0)' : 'translateX(100%)',
           pointerEvents: announcementsOpen ? 'auto' : 'none'
@@ -229,10 +238,22 @@ export default function Header() {
       />
 
       {showProposalForm && (
-        <ProjectProposal
-          projectType={selectedProjectType}
-          onClose={handleCloseProposalForm}
-        />
+        <div className="ea-modal-overlay" onClick={handleCloseProposalForm}>
+          <div className="ea-modal-card" style={{ maxWidth: 700 }} onClick={(e) => e.stopPropagation()}>
+            <div className="ea-modal-header">
+              <h3 className="ea-modal-title">
+                {selectedProjectType === 'service-learning' ? '📝 Service Learning Proposal' : '📝 Community Engagement Proposal'}
+              </h3>
+              <button className="ea-modal-close" onClick={handleCloseProposalForm}>✕</button>
+            </div>
+            <div className="modal-scrollable">
+              <ProjectProposal
+                projectType={selectedProjectType}
+                onClose={handleCloseProposalForm}
+              />
+            </div>
+          </div>
+        </div>
       )}
       <CertificateQRScannerModal
         isOpen={showCertificateQRModal}

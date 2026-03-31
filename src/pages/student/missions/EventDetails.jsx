@@ -129,6 +129,7 @@ export default function EventDetails({ onClose = null }) {
         missionId: id,
         title: mission?.title || "Untitled Mission",
         role: "volunteer",
+        date: mission?.targetDate || '',
         joinedAt: serverTimestamp(),
       });
 

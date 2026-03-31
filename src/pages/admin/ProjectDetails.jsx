@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
 import { createNotification } from "../../utils/notificationUtils";
+import { showToast } from "../../utils/toast";
 
 import "../../styles/ProjectDetails.css";
 
@@ -178,7 +179,7 @@ export default function ProjectDetails({ projectId, onClose }) {
       await load();
     } catch (e) {
       console.error(e);
-      alert("Failed to update status.");
+      showToast("Failed to update status.");
     } finally {
       setSaving(false);
     }
@@ -198,7 +199,7 @@ export default function ProjectDetails({ projectId, onClose }) {
       await load();
     } catch (e) {
       console.error(e);
-      alert("Failed to update approval.");
+      showToast("Failed to update approval.");
     } finally {
       setSaving(false);
     }
@@ -251,7 +252,7 @@ export default function ProjectDetails({ projectId, onClose }) {
       navigate("/admin/projects");
     } catch (e) {
       console.error(e);
-      alert("Failed to archive.");
+      showToast("Failed to archive.");
     } finally {
       setSaving(false);
     }
@@ -270,7 +271,7 @@ export default function ProjectDetails({ projectId, onClose }) {
       await load();
     } catch (e) {
       console.error(e);
-      alert("Failed to restore.");
+      showToast("Failed to restore.");
     } finally {
       setSaving(false);
     }
@@ -290,7 +291,7 @@ export default function ProjectDetails({ projectId, onClose }) {
       navigate("/admin/projects");
     } catch (e) {
       console.error(e);
-      alert("Failed to delete.");
+      showToast("Failed to delete.");
     } finally {
       setSaving(false);
     }

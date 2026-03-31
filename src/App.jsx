@@ -14,6 +14,8 @@ import { ProtectedRoute } from "./router/ProtectedRoute";
 import CertificateGenerator from "./components/certificateGenerator";
 
 import "./App.css";
+import ToastContainer from "./components/Toast";
+import "./utils/toast";
 import Auth from "./pages/Auth"; //changed login to authorization page
 import ForgotPass from "./pages/ForgotPass";
 import OAuthCallback from "./pages/OAuthCallback";
@@ -66,6 +68,7 @@ function App() {
 
   return (
     <SessionProvider>
+      <ToastContainer />
       <BadgePopupManager />
       <Router>
         <Routes>
