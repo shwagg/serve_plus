@@ -228,23 +228,10 @@ export default function Header() {
       <GlobalNotificationButton
         unreadCount={announcementUnreadCount}
         onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+        isOpen={announcementsOpen}
       />
       <aside
         className={`global-feed ${announcementsOpen ? 'open' : ''}`}
-        style={{
-          position: 'fixed',
-          top: 80,
-          right: 0,
-          height: 'calc(100vh - 80px)',
-          width: 380,
-          background: '#fff',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          borderLeft: '2px solid #30bdb7',
-          zIndex: 2100,
-          transition: 'transform 0.3s',
-          transform: announcementsOpen ? 'translateX(0)' : 'translateX(100%)',
-          pointerEvents: announcementsOpen ? 'auto' : 'none'
-        }}
       >
         <GlobalAnnouncements />
       </aside>

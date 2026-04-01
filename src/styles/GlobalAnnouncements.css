@@ -21,10 +21,10 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  padding: 0 12px 12px;
+  padding: 0 14px 14px;
   padding-top: 0;
   scrollbar-width: thin;
-  scrollbar-color: #ddd transparent;
+  scrollbar-color: #c5d4e0 transparent;
 }
 
 .global-announcements-container::-webkit-scrollbar {
@@ -39,12 +39,8 @@
 /* ── Header ─────────────────────────────────────────── */
 .global-feed-header {
   margin-bottom: 10px;
-  position: sticky;
-  top: 0;
-  background: inherit;
-  z-index: 10;
-  padding: 12px 0 10px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 0 12px;
+  border-bottom: 1px solid #e8edf2;
 }
 
 .global-feed-header + div {
@@ -60,15 +56,16 @@
 }
 
 .global-feed-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  color: #234e7b;
+  color: #1a3a5c;
   margin: 0 0 2px;
+  letter-spacing: 0.01em;
 }
 
 .global-feed-subtitle {
-  font-size: 12px;
-  color: #999;
+  font-size: 11px;
+  color: #8fa3b8;
   margin: 0;
 }
 
@@ -81,9 +78,9 @@
   padding: 5px 10px;
   font-size: 11px;
   font-weight: 600;
-  color: #234e7b;
+  color: #30bdb7;
   background: white;
-  border: 1.5px solid #234e7b;
+  border: 1.5px solid #30bdb7;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.18s, color 0.18s;
@@ -91,24 +88,24 @@
 }
 
 .mark-all-btn:hover {
-  background: #234e7b;
+  background: #30bdb7;
   color: white;
 }
 
 .mark-all-btn:focus-visible {
-  outline: 2px solid #234e7b;
+  outline: 2px solid #30bdb7;
   outline-offset: 2px;
 }
 
 .mark-all-btn.secondary {
-  color: #888;
-  border-color: #ccc;
+  color: #a0aec0;
+  border-color: #d1dbe6;
 }
 
 .mark-all-btn.secondary:hover {
-  background: #eee;
-  color: #444;
-  border-color: #aaa;
+  background: #eef2f7;
+  color: #555;
+  border-color: #a0aec0;
 }
 
 /* ── Unread badge ────────────────────────────────────── */
@@ -183,7 +180,7 @@
 
 .global-feed-item:hover,
 .global-feed-item:focus-visible {
-  background: #e6f2ff !important;
+  background: #ddf4f3 !important;
 }
 
 /* ── Unseen / Seen states ───────────────────────────── */
@@ -197,37 +194,37 @@
 
 /* ── Milestone ──────────────────────────────────────── */
 .global-feed-item.milestone {
-  background: #e9fbe9;
-  border-color: #a8d5a8;
+  background: #edfaf3;
+  border-color: #7dd4a8;
 }
 
 /* ── New event ──────────────────────────────────────── */
 .global-feed-item.new {
-  background: #f8f8f8;
-  border-color: #e0e0e0;
+  background: #f0f9ff;
+  border-color: #bee3f8;
 }
 
 .global-feed-item.new.unseen {
-  background: #f8f8f8;
-  border-color: #ccc;
+  background: #e8f5fe;
+  border-color: #90cdf4;
 }
 
 /* ── Closing soon ───────────────────────────────────── */
 .global-feed-item.closing-soon {
-  background: #fff2f2;
-  border-color: #ffb3b3;
+  background: #fff8f0;
+  border-color: #f6ad55;
 }
 
 /* ── SDG info ───────────────────────────────────────── */
 .global-feed-item.info {
-  background: #e8f5ff;
-  border-color: #b3d8f7;
+  background: #f0f4ff;
+  border-color: #a3b8f5;
 }
 
 /* ── Fully booked ───────────────────────────────────── */
 .global-feed-item.full {
-  background: #f5f5f5;
-  border-color: #ccc;
+  background: #f7f8fa;
+  border-color: #cbd5e0;
 }
 
 /* ── Icon ───────────────────────────────────────────── */
@@ -258,7 +255,7 @@
 
 .feed-title {
   font-weight: 700;
-  color: #234e7b;
+  color: #1a3a5c;
   margin: 0 0 3px;
   font-size: 13px;
 }

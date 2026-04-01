@@ -952,7 +952,7 @@ const GlobalAnnouncements = () => {
 
 export default GlobalAnnouncements;
 
-export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
+export const GlobalNotificationButton = ({ unreadCount, onClick, isOpen }) => {
   const [top, setTop] = useState(140);
   const didDragRef = useRef(false);
 
@@ -1000,11 +1000,11 @@ export const GlobalNotificationButton = ({ unreadCount, onClick }) => {
   return (
     <button
       className="global-feed-toggle"
-      style={{ top, cursor: 'grab' }}
+      style={{ top, right: isOpen ? 320 : 0, cursor: 'grab', transition: 'right 0.3s ease' }}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
       onClick={handleClick}
-      aria-label="Open announcements"
+      aria-label={isOpen ? 'Close announcements' : 'Open announcements'}
     >
       <span className="global-feed-toggle-emoji">📢</span>
       {unreadCount > 0 && (
