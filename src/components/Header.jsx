@@ -17,6 +17,7 @@ import ProjectProposal from '../pages/global/proposal/ProjectProposal';
 import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon } from './icons';
 import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
+import OnboardingTutorial from './OnboardingTutorial';
 
 
 const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
@@ -183,6 +184,7 @@ export default function Header() {
   };
   return (
     <>
+      <OnboardingTutorial />
       <header className="serve-header">
         <div className="header-container">
           {/* Logo */}
@@ -195,6 +197,22 @@ export default function Header() {
           <div className="header-actions">
             <ChatModal />
             <NotificationBell />
+            {userRole && (
+              <button
+                className="icon-button profile-btn"
+                onClick={() => navigate('/profile')}
+                aria-label="My Profile"
+                title={userName || 'Profile'}
+              >
+                {userAvatar ? (
+                  <img src={userAvatar} alt="Profile" className="header-avatar" />
+                ) : (
+                  <div className="header-avatar-initials">
+                    {(userName?.charAt(0) || '?').toUpperCase()}
+                  </div>
+                )}
+              </button>
+            )}
             <div className="menu-container" ref={menuRef}>
               <button
                 className="icon-button menu-button"

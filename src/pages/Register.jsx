@@ -28,7 +28,23 @@ function Register() {
             return;
         }
 
+        // Password strength validation
+        const pwRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+        if (!pwRegex.test(password)) {
+            setError("Password must be at least 8 characters and include an uppercase letter, a number, and a symbol (e.g., !@#$).");
+            setLoading(false);
+            return;
+        }
+
         try {
+            // Check username uniqueness
+            const usernameSnap = await getDocs(query(collection(db, "users"), where("username", "==", username.trim())));
+            if (!usernameSnap.empty) {
+                setError("Username is already taken. Please choose another.");
+                setLoading(false);
+                return;
+            }
+
             // 1. Create user in Firebase Auth
             const userCred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = userCred.user.uid;
@@ -114,7 +130,7 @@ function Register() {
             });
 
             // 5. Redirect to login
-            alert("Account created successfully! Please log in.");
+            alert("Account created! You can now log in.");
             navigate("/", { replace: true });
         } catch (err) {
             console.error(err);
