@@ -291,18 +291,76 @@ export default function EventActivity() {
   const [volunteerAvatars, setVolunteerAvatars] = useState([]);
   const [expandedTasks, setExpandedTasks] = useState({});
   const [taskParticipantCounts, setTaskParticipantCounts] = useState({});
+  const [timerNow, setTimerNow] = useState(Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setTimerNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const canJoinActivities = true;
   const toggleTaskExpand = (taskId) => setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
+
+  const getTaskEnrollmentDeadline = (task) => {
+    if (!event?.targetDate || !task?.enrollmentDeadline) return null;
+
+    const [year, month, day] = event.targetDate
+      .split("-")
+      .map((part) => Number(part));
+    const [rawHour, rawMinute] = task.enrollmentDeadline.split(":");
+    const hour = Number(rawHour);
+    const minute = Number(rawMinute);
+
+    if (
+      !Number.isFinite(year) ||
+      !Number.isFinite(month) ||
+      !Number.isFinite(day) ||
+      !Number.isFinite(hour) ||
+      !Number.isFinite(minute)
+    ) {
+      return null;
+    }
+
+    return new Date(year, month - 1, day, hour, minute, 0, 0);
+  };
+
+  const getEnrollmentCountdown = (task) => {
+    const deadline = getTaskEnrollmentDeadline(task);
+    if (!deadline) return null;
+
+    const remainingMs = deadline.getTime() - timerNow;
+    if (remainingMs <= 0) {
+      return {
+        isClosed: true,
+        label: "Enrollment closed",
+      };
+    }
+
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad2 = (value) => String(value).padStart(2, "0");
+
+    const label =
+      days > 0
+        ? `Closes in ${days}d ${pad2(hours)}h ${pad2(minutes)}m ${pad2(seconds)}s`
+        : `Closes in ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+
+    return {
+      isClosed: false,
+      label,
+    };
+  };
+
   const isEnrollmentClosed = (task) => {
-    if (!event?.targetDate || !task?.enrollmentDeadline) return false;
-    const todayDate = new Date().toLocaleDateString("en-CA");
-    if (todayDate > event.targetDate) return true;
-    if (todayDate < event.targetDate) return false;
-    const nowTime = new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    return nowTime > task.enrollmentDeadline;
+    const deadline = getTaskEnrollmentDeadline(task);
+    if (!deadline) return false;
+    return Date.now() > deadline.getTime();
   };
   // Handler for adding a skill to a level (for placeholder)
   const handleAddSkill = (skill, level) => {
@@ -619,17 +677,24 @@ export default function EventActivity() {
       return;
     }
 
-    if (event?.targetDate && task?.enrollmentDeadline) {
-      const today = new Date().toLocaleDateString("en-CA");
-      if (today !== event.targetDate) {
-        alert("Enrollment is only open on the task due date.");
+    if (task?.enrollmentDeadline) {
+      const deadline = getTaskEnrollmentDeadline(task);
+      if (!deadline) {
+        alert("This task has an invalid enrollment deadline.");
         return;
       }
-      const nowTime = new Date().toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      if (nowTime > task.enrollmentDeadline) {
+
+      const today = new Date().toLocaleDateString("en-CA");
+      if (event?.targetDate && today !== event.targetDate) {
+        if (today < event.targetDate) {
+          alert("Enrollment opens on the event date.");
+        } else {
+          alert("Enrollment deadline has passed for this task.");
+        }
+        return;
+      }
+
+      if (Date.now() > deadline.getTime()) {
         alert("Enrollment deadline has passed for this task.");
         return;
       }
@@ -2021,9 +2086,11 @@ export default function EventActivity() {
                           const filledSlots = taskParticipantCounts[activity.id] || 0;
                           const maxSlots = isGrouped ? (activity.maxParticipants || null) : null;
                           const isFull = maxSlots !== null && filledSlots >= maxSlots;
+                          const isDeadlineClosed = isEnrollmentClosed(activity);
                           const slotPct = maxSlots ? Math.min((filledSlots / maxSlots) * 100, 100) : 0;
                           const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
                           const hasSubmittedJournal = journalsForActivity.length > 0;
+                          const enrollmentCountdown = getEnrollmentCountdown(activity);
 
                           if (!isEventDay && !isEnrolled) {
                             return (
@@ -2051,6 +2118,11 @@ export default function EventActivity() {
                                     </div>
                                   )}
                                   <span className="task-card__pts">{activity.points} PTS</span>
+                                  {enrollmentCountdown && (
+                                    <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
+                                      {enrollmentCountdown.label}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="task-card__action">
                                   {isEnrolled ? (
@@ -2081,6 +2153,8 @@ export default function EventActivity() {
                                     </div>
                                   ) : isFull ? (
                                     <span className="task-slot-full-badge">Full</span>
+                                  ) : isDeadlineClosed ? (
+                                    <span className="req-status locked">Closed</span>
                                   ) : !isEditable ? (
                                     <span className="req-status locked">Ended</span>
                                   ) : canJoinActivities ? (
