@@ -18,6 +18,7 @@ import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
 import PostActivitySurvey from "../../../forms/PostActivitySurvey.jsx";
+import ParticipantModal from "./ParticipantModal.jsx";
 
 export default function EventActivity() {
   const isEventEditable = (eventDate) => {
@@ -291,6 +292,7 @@ export default function EventActivity() {
   const [volunteerAvatars, setVolunteerAvatars] = useState([]);
   const [expandedTasks, setExpandedTasks] = useState({});
   const [taskParticipantCounts, setTaskParticipantCounts] = useState({});
+  const [selectedTaskForParticipants, setSelectedTaskForParticipants] = useState(null);
   const [timerNow, setTimerNow] = useState(Date.now());
 
   useEffect(() => {
@@ -736,11 +738,16 @@ export default function EventActivity() {
         role: "",
         proof: "",
         reflection: "",
+        enrollmentOrder,
         joinedAt: new Date().toISOString(),
       });
 
       // Update local state
       setEnrolledTasks((prev) => ({ ...prev, [taskId]: true }));
+      setTaskParticipantCounts((prev) => ({
+        ...prev,
+        [taskId]: (prev[taskId] || 0) + 1,
+      }));
       alert("Successfully enrolled in the activity!");
     } catch (err) {
       console.error("Error enrolling in activity:", err);
@@ -777,6 +784,10 @@ export default function EventActivity() {
       setEnrolledTasks((prev) => ({
         ...prev,
         [taskId]: false,
+      }));
+      setTaskParticipantCounts((prev) => ({
+        ...prev,
+        [taskId]: Math.max((prev[taskId] || 0) - 1, 0),
       }));
 
       window.showToast?.("Removed from task", "success");
@@ -2084,6 +2095,7 @@ export default function EventActivity() {
                           const isEnrolled = !!enrolledTasks[activity.id];
                           const isGrouped = activity.type === 'grouped';
                           const filledSlots = taskParticipantCounts[activity.id] || 0;
+                          const participantsText = `${filledSlots} participant${filledSlots === 1 ? '' : 's'}`;
                           const maxSlots = isGrouped ? (activity.maxParticipants || null) : null;
                           const isFull = maxSlots !== null && filledSlots >= maxSlots;
                           const isDeadlineClosed = isEnrollmentClosed(activity);
@@ -2117,12 +2129,26 @@ export default function EventActivity() {
                                       <span className="task-slot-label">{filledSlots}/{maxSlots} members{isFull ? ' · Full' : ''}</span>
                                     </div>
                                   )}
-                                  <span className="task-card__pts">{activity.points} PTS</span>
-                                  {enrollmentCountdown && (
-                                    <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
-                                      {enrollmentCountdown.label}
-                                    </span>
-                                  )}
+                                  <div className="task-card__meta">
+                                    <span className="task-card__pts">{activity.points} PTS</span>
+                                    {isEventDay && (
+                                      <button
+                                        className="task-participants-indicator"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedTaskForParticipants(activity);
+                                        }}
+                                        aria-label={`View participants for ${activity.title}`}
+                                      >
+                                        👥 {participantsText}
+                                      </button>
+                                    )}
+                                    {enrollmentCountdown && (
+                                      <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
+                                        {enrollmentCountdown.label}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="task-card__action">
                                   {isEnrolled ? (
@@ -2387,6 +2413,13 @@ export default function EventActivity() {
           </div>
         </div>
       )}
+
+      <ParticipantModal
+        open={!!selectedTaskForParticipants}
+        onClose={() => setSelectedTaskForParticipants(null)}
+        missionId={id}
+        task={selectedTaskForParticipants}
+      />
 
 
       {/* Pre-Activity Survey Modal */}

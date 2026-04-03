@@ -1355,6 +1355,25 @@
   font-weight: 600;
   color: #9ca3af;
 }
+.task-participants-indicator {
+  width: fit-content;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: #eff6ff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.task-participants-indicator:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+.task-participants-indicator--locked {
+  margin-top: 8px;
+}
 
 /* Main horizontal row */
 .task-card__row {
@@ -1373,6 +1392,13 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+.task-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .task-card__title {
   font-size: 14px;
@@ -1515,6 +1541,55 @@
   border-top: 1px solid #e2e8f0;
   margin-top: 12px;
   padding-top: 12px;
+}
+
+.task-participants-modal {
+  max-width: 460px;
+}
+
+.task-participants-modal__body {
+  padding: 16px 20px 20px;
+  max-height: 58vh;
+  overflow-y: auto;
+}
+
+.task-participants-modal__state {
+  font-size: 14px;
+  color: #6b7280;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.task-participants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-participants-list__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: #f8fafc;
+}
+
+.task-participants-list__index {
+  min-width: 34px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.task-participants-list__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── PROGRESS STRIP (no longer sticky — scrollable body handles scroll) ── */
