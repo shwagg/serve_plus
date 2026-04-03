@@ -1553,6 +1553,29 @@
   overflow-y: auto;
 }
 
+.task-participants-modal__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+}
+
+.task-participants-modal__summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.task-participants-modal__summary-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
 .task-participants-modal__state {
   font-size: 14px;
   color: #6b7280;
@@ -1576,6 +1599,11 @@
   background: #f8fafc;
 }
 
+.task-participants-list__item--current {
+  background: #f3f7ff;
+  border-color: #c7d7ff;
+}
+
 .task-participants-list__index {
   min-width: 34px;
   font-size: 12px;
@@ -1584,12 +1612,31 @@
 }
 
 .task-participants-list__name {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   font-weight: 500;
   color: #111827;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.task-participants-list__you {
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.task-participants-list__points {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 4px 9px;
 }
 
 /* ── PROGRESS STRIP (no longer sticky — scrollable body handles scroll) ── */

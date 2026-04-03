@@ -1,40 +1,44 @@
 import React, { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { db } from "../../../firebaseConfig";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../../../firebaseConfig";
+import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
+
+function resolveParticipantPosition(participant, index) {
+  const enrollmentOrder = Number(participant?.enrollmentOrder);
+  if (Number.isFinite(enrollmentOrder) && enrollmentOrder > 0) {
+    return enrollmentOrder;
+  }
+
+  return index + 1;
+}
 
 export default function ParticipantModal({ open, onClose, missionId, task }) {
-  const [loading, setLoading] = useState(false);
   const [participants, setParticipants] = useState([]);
+  const [activeTaskId, setActiveTaskId] = useState("");
+  const currentTaskId = task?.id || "";
 
   useEffect(() => {
     let isMounted = true;
 
-    async function fetchParticipants() {
-      if (!open || !missionId || !task?.id) {
-        if (isMounted) {
-          setParticipants([]);
-          setLoading(false);
-        }
-        return;
-      }
+    if (!open || !missionId || !currentTaskId) {
+      return () => {
+        isMounted = false;
+      };
+    }
 
-      if (isMounted) {
-        setLoading(true);
-        setParticipants([]);
-      }
+    const participantsRef = collection(
+      db,
+      "missions",
+      missionId,
+      "task",
+      currentTaskId,
+      "participants",
+    );
 
-      try {
-        const participantsRef = collection(
-          db,
-          "missions",
-          missionId,
-          "task",
-          task.id,
-          "participants",
-        );
-        const participantsSnap = await getDocs(participantsRef);
-
-        const list = await Promise.all(
+    const unsubscribe = onSnapshot(
+      participantsRef,
+      (participantsSnap) => {
+        Promise.all(
           participantsSnap.docs.map(async (participantDoc) => {
             const participantData = participantDoc.data();
             const userSnap = await getDoc(doc(db, "users", participantDoc.id));
@@ -52,43 +56,55 @@ export default function ParticipantModal({ open, onClose, missionId, task }) {
               joinedAt: participantData.joinedAt || "",
             };
           }),
-        );
+        )
+          .then((list) => {
+            list.sort((a, b) => {
+              const aOrder = Number(a.enrollmentOrder);
+              const bOrder = Number(b.enrollmentOrder);
+              const aHasOrder = Number.isFinite(aOrder) && aOrder > 0;
+              const bHasOrder = Number.isFinite(bOrder) && bOrder > 0;
 
-        list.sort((a, b) => {
-          const aOrder = Number(a.enrollmentOrder);
-          const bOrder = Number(b.enrollmentOrder);
-          const aHasOrder = Number.isFinite(aOrder) && aOrder > 0;
-          const bHasOrder = Number.isFinite(bOrder) && bOrder > 0;
+              if (aHasOrder && bHasOrder) return aOrder - bOrder;
+              if (aHasOrder) return -1;
+              if (bHasOrder) return 1;
+              return String(a.joinedAt).localeCompare(String(b.joinedAt));
+            });
 
-          if (aHasOrder && bHasOrder) return aOrder - bOrder;
-          if (aHasOrder) return -1;
-          if (bHasOrder) return 1;
-          return String(a.joinedAt).localeCompare(String(b.joinedAt));
-        });
-
-        if (isMounted) {
-          setParticipants(list);
-        }
-      } catch (err) {
-        console.error("Failed to load task participants:", err);
+            if (isMounted) {
+              setParticipants(list);
+              setActiveTaskId(currentTaskId);
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to load task participants:", err);
+            if (isMounted) {
+              setParticipants([]);
+              setActiveTaskId(currentTaskId);
+            }
+          });
+      },
+      (err) => {
+        console.error("Failed to subscribe task participants:", err);
         if (isMounted) {
           setParticipants([]);
+          setActiveTaskId(currentTaskId);
         }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchParticipants();
+      },
+    );
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
-  }, [open, missionId, task?.id]);
+  }, [open, missionId, currentTaskId]);
 
   if (!open || !task) return null;
+
+  const isLoading = Boolean(missionId && currentTaskId && activeTaskId !== currentTaskId);
+  const visibleParticipants = activeTaskId === currentTaskId ? participants : [];
+  const participantCount = visibleParticipants.length;
+  const baseTaskPoints = Number(task.points) || 0;
+  const currentUserUid = auth.currentUser?.uid || "";
 
   return (
     <div
@@ -115,11 +131,20 @@ export default function ParticipantModal({ open, onClose, missionId, task }) {
         </div>
 
         <div className="task-participants-modal__body">
-          {loading ? (
+          <div className="task-participants-modal__summary">
+            <span className="task-participants-modal__summary-label">
+              Base score:
+            </span>
+            <span className="task-participants-modal__summary-value">
+              {baseTaskPoints} pts
+            </span>
+          </div>
+
+          {isLoading ? (
             <div className="task-participants-modal__state">
               Loading participants...
             </div>
-          ) : participants.length === 0 ? (
+          ) : visibleParticipants.length === 0 ? (
             <div className="task-participants-modal__state">
               No participants yet.
             </div>
@@ -129,20 +154,38 @@ export default function ParticipantModal({ open, onClose, missionId, task }) {
               role="list"
               aria-label="Task participants"
             >
-              {participants.map((participant, index) => (
-                <div
-                  key={participant.uid}
-                  className="task-participants-list__item"
-                  role="listitem"
-                >
-                  <span className="task-participants-list__index">
-                    #{index + 1}
-                  </span>
-                  <span className="task-participants-list__name">
-                    {participant.name}
-                  </span>
-                </div>
-              ))}
+              {visibleParticipants.map((participant, index) => {
+                const position = resolveParticipantPosition(participant, index);
+                const predictedPoints = calculateWeightedTaskPoints(
+                  baseTaskPoints,
+                  position,
+                  participantCount,
+                );
+                const isCurrentUser = participant.uid === currentUserUid;
+
+                return (
+                  <div
+                    key={participant.uid}
+                    className={`task-participants-list__item ${
+                      isCurrentUser ? "task-participants-list__item--current" : ""
+                    }`}
+                    role="listitem"
+                  >
+                    <span className="task-participants-list__index">
+                      #{position}
+                    </span>
+                    <span className="task-participants-list__name">
+                      {participant.name}
+                      {isCurrentUser ? (
+                        <span className="task-participants-list__you"> (You)</span>
+                      ) : null}
+                    </span>
+                    <span className="task-participants-list__points">
+                      {predictedPoints.toFixed(2)} pts
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
