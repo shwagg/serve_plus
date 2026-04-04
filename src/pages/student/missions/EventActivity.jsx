@@ -138,46 +138,43 @@ export default function EventActivity() {
         "progress.attendance": "present"
       });
 
+      // Show quick feedback while geocoding runs
       setQRStatus(
         `Attendance recorded — scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`
       );
 
+      // Reverse geocode BEFORE closing so the name appears in the status
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(locData.lat)},${encodeURIComponent(locData.lng)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const json = await resp.json();
+          const locationName = (json.results && json.results[0]?.formatted_address) || null;
+          if (locationName) {
+            await updateDoc(volunteerRef, { "scanAttendance.locationName": locationName });
+            locData.name = locationName;
+          }
+        }
+      } catch (e) {
+        console.warn('Reverse geocoding failed:', e);
+      }
+
+      // Final status — show location name on a new line if available
+      const coordStr = `${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`;
+      const nameStr = locData.name ? `\n📍 ${locData.name}` : "";
+      setQRStatus(`Attendance recorded — scanned at ${coordStr}${nameStr}`);
+
+      setVolunteerProgress((prev) => ({ ...prev, attendance: "present" }));
+      setScanSuccess(true);
+      setScannedLocation(locData);
+
+      // Close modal after user has time to read the location
       setTimeout(() => {
         setShowQRModal(false);
-      }, 2000); // when succeed close scanner after 2 seconds
+      }, 3000);
 
-      // If we have coordinates, attempt reverse geocoding via Google Maps Geocoding API (best-effort)
-      if (locData) {
-        try {
-          const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(locData.lat)},${encodeURIComponent(locData.lng)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
-          const resp = await fetch(url);
-          if (resp.ok) {
-            const json = await resp.json();
-            const locationName = (json.results && json.results[0]?.formatted_address) || null;
-            if (locationName) {
-              // save the resolved name to Firestore
-              await updateDoc(volunteerRef, { "scanAttendance.locationName": locationName });
-              locData.name = locationName;
-            }
-          }
-        } catch (e) {
-          console.warn('Reverse geocoding failed:', e);
-        }
-      }
     } catch (e) {
       console.warn("Failed to save scan location or mark attendance:", e);
-    }
-
-    // Update local state to reflect attendance as present
-    setVolunteerProgress((prev) => ({ ...prev, attendance: "present" }));
-    setScanSuccess(true);
-
-    // Show a status message including coordinates if available (user will choose to Continue)
-    setScannedLocation(locData);
-    if (locData) {
-      setQRStatus(`Attendance recorded — scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`);
-    } else {
-      setQRStatus("Location not detected. Please allow GPS access and try again."); setScanSuccess(false);
     }
   };
   //For saving consent file to be reviewed
@@ -2391,7 +2388,7 @@ export default function EventActivity() {
               <QRScanner key={scannerKey} onScan={handleQRScan} />
               {qrStatus && (
                 <div>
-                  <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`}>{qrStatus}</div>
+                  <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`} style={{ whiteSpace: "pre-line" }}>{qrStatus}</div>
                   {!scanSuccess && (
                     <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                       <button
