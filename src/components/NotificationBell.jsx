@@ -81,6 +81,8 @@ export default function NotificationBell() {
       case "proposal_status":    return "📌";
       case "deadline_approaching": return "⚠️";
       case "certificate_ready":  return "📜";
+      case "attendance_flag":       return "🚩";
+      case "attendance_flag_admin": return "🚩";
       default:                   return "🔔";
     }
   };

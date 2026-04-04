@@ -25,8 +25,35 @@ export default function EventDetails({ onClose = null }) {
   const [consentUploading, setConsentUploading] = useState(false);
   const [surveyError, setSurveyError] = useState('');
   const [userName, setUserName] = useState('');
+  const [attendanceFlag, setAttendanceFlag] = useState(null); // { flagged: bool, expiry: Date, missionTitle: string }
   const defaultBanner = mission1;
 
+
+  // Fetch user's attendance flag status
+  useEffect(() => {
+    async function fetchFlagStatus() {
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          if (data.attendanceFlagged) {
+            const expiry = data.attendanceFlagExpiry?.toDate
+              ? data.attendanceFlagExpiry.toDate()
+              : new Date(data.attendanceFlagExpiry);
+            setAttendanceFlag({
+              flagged: true,
+              expiry,
+              missionTitle: data.attendanceFlaggedMissionTitle || 'a previous mission',
+              expired: expiry <= new Date(),
+            });
+          }
+        }
+      } catch (_) {}
+    }
+    fetchFlagStatus();
+  }, []);
 
   useEffect(() => {
     async function fetchMission() {
@@ -113,8 +140,8 @@ export default function EventDetails({ onClose = null }) {
       await setDoc(volunteerRef, {
         userId: user.uid,
         joinedAt: new Date().toISOString(),
-        registrationStatus: "pending",
-        completionStatus: "pending_approval",
+        registrationStatus: "approved",
+        completionStatus: "in_progress",
         pointsEarned: 0,
         progress: {
           preSurvey: "locked",
@@ -133,9 +160,9 @@ export default function EventDetails({ onClose = null }) {
         joinedAt: serverTimestamp(),
       });
 
-      setVolunteer({ registrationStatus: "pending" });
+      setVolunteer({ registrationStatus: "approved" });
 
-      // Create a registration notification (once per event)
+      // Notify volunteer of auto-enrollment
       try {
         const notificationsRef = collection(db, "users", user.uid, "notifications");
         const existingQuery = query(
@@ -147,9 +174,9 @@ export default function EventDetails({ onClose = null }) {
         if (existing.empty) {
           await createNotification(user.uid, {
             type: "event_registration",
-            title: "Registration Submitted",
-            message: `Your registration for "${mission?.title || "this event"}" is submitted.`,
-            link: `/event/${id}`,
+            title: "Enrolled Successfully",
+            message: `You have been enrolled in "${mission?.title || "this event"}".`,
+            link: `/event/${id}/activity?mode=active`,
             eventId: id,
           });
         }
@@ -163,29 +190,6 @@ export default function EventDetails({ onClose = null }) {
       setJoining(false);
     }
 
-    // Create a registration notification (once per event)
-    try {
-      const notificationsRef = collection(db, "users", user.uid, "notifications");
-      const existingQuery = query(
-        notificationsRef,
-        where("type", "==", "event_registration"),
-        where("eventId", "==", id)
-      );
-      const existing = await getDocs(existingQuery);
-
-      if (existing.empty) {
-        await createNotification(user.uid, {
-          type: "event_registration",
-          title: "Registration Submitted",
-          message: `Your registration for "${mission?.title || "this event"}" is submitted.`,
-          link: `/event/${id}`,
-          eventId: id,
-        });
-      }
-    } catch (e) {
-      // Non-blocking: joining the event should still succeed even if notification fails.
-      console.error("Failed to create registration notification:", e);
-    }
   };
 
   const handleSurveyAndConsentSubmit = async (form) => {
@@ -315,52 +319,41 @@ export default function EventDetails({ onClose = null }) {
                 )}
               </div>
 
-              {/* Right: join / pending button */}
+              {/* Right: join / flagged / already enrolled button */}
               <div className="event-details-action">
-                {volunteer?.registrationStatus === "pending" ? (
-                  <div className="event-details-pending-wrap" style={{
-                    display: 'inline-flex',
-                    alignItems: 'stretch',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)',
-                  }}>
-                    <span style={{
-                      padding: '12px 20px',
-                      color: '#fff',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'default',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      Pending Request
-                    </span>
-                    <div style={{ width: 1, background: 'rgba(255,255,255,0.4)' }} />
+                {/* Attendance flag check — active flag blocks joining */}
+                {attendanceFlag?.flagged && !attendanceFlag?.expired ? (
+                  <div style={{ textAlign: 'center' }}>
                     <button
-                      onClick={handleCancelRequest}
+                      className="event-details-join-btn"
+                      disabled
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#fff',
-                        padding: '12px 14px',
-                        fontSize: '1rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+                        cursor: 'not-allowed',
+                        opacity: 0.9,
                       }}
-                      title="Cancel request"
                     >
-                      ✕
+                      🚩 FLAGGED – CANNOT JOIN
                     </button>
+                    <p style={{
+                      marginTop: 8,
+                      fontSize: 12,
+                      color: '#b91c1c',
+                      fontWeight: 500,
+                      maxWidth: 260,
+                    }}>
+                      You missed attendance for &ldquo;{attendanceFlag.missionTitle}&rdquo;.
+                      Restriction lifts on {attendanceFlag.expiry?.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.
+                    </p>
                   </div>
+                ) : volunteer?.registrationStatus === "approved" ? (
+                  <button
+                    className="event-details-join-btn"
+                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)', cursor: 'pointer' }}
+                    onClick={() => navigate(`/event/${id}/activity?mode=active`)}
+                  >
+                    View Event
+                  </button>
                 ) : (
                   <button
                     className="event-details-join-btn"

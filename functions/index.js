@@ -67,3 +67,11 @@ exports.restoreBackup = onCall(
 exports.listBackups = onCall({ region: "asia-southeast1" }, listBackups);
 exports.deleteBackup = onCall({ region: "asia-southeast1" }, deleteBackup);
 exports.scheduledBackup = scheduledBackup;
+
+// Attendance flagging
+const { scheduledFlagAbsentVolunteers, manualFlagAbsentVolunteers } = require("./src/attendance/flagAbsentVolunteers");
+exports.scheduledFlagAbsentVolunteers = scheduledFlagAbsentVolunteers;
+exports.manualFlagAbsentVolunteers = onCall(
+  { region: "asia-southeast1" },
+  manualFlagAbsentVolunteers
+);
