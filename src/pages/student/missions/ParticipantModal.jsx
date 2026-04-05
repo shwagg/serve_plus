@@ -3,15 +3,6 @@ import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../../firebaseConfig";
 import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
 
-function resolveParticipantPosition(participant, index) {
-  const enrollmentOrder = Number(participant?.enrollmentOrder);
-  if (Number.isFinite(enrollmentOrder) && enrollmentOrder > 0) {
-    return enrollmentOrder;
-  }
-
-  return index + 1;
-}
-
 export default function ParticipantModal({ open, onClose, missionId, task }) {
   const [participants, setParticipants] = useState([]);
   const [activeTaskId, setActiveTaskId] = useState("");
@@ -155,7 +146,7 @@ export default function ParticipantModal({ open, onClose, missionId, task }) {
               aria-label="Task participants"
             >
               {visibleParticipants.map((participant, index) => {
-                const position = resolveParticipantPosition(participant, index);
+                const position = index + 1;
                 const predictedPoints = calculateWeightedTaskPoints(
                   baseTaskPoints,
                   position,

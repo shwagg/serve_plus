@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -292,6 +292,31 @@ export default function EventActivity() {
   const [selectedTaskForParticipants, setSelectedTaskForParticipants] = useState(null);
   const [timerNow, setTimerNow] = useState(Date.now());
 
+  const compareParticipantsByEnrollment = useCallback((a, b) => {
+    const aData = a?.data ? a.data() : a;
+    const bData = b?.data ? b.data() : b;
+    const aOrder = Number(aData?.enrollmentOrder);
+    const bOrder = Number(bData?.enrollmentOrder);
+    const aHasOrder = Number.isFinite(aOrder) && aOrder > 0;
+    const bHasOrder = Number.isFinite(bOrder) && bOrder > 0;
+
+    if (aHasOrder && bHasOrder) {
+      if (aOrder !== bOrder) return aOrder - bOrder;
+    } else if (aHasOrder) {
+      return -1;
+    } else if (bHasOrder) {
+      return 1;
+    }
+
+    const aJoined = String(aData?.joinedAt || "");
+    const bJoined = String(bData?.joinedAt || "");
+    if (aJoined !== bJoined) return aJoined.localeCompare(bJoined);
+
+    return String(a?.id || aData?.uid || "").localeCompare(
+      String(b?.id || bData?.uid || ""),
+    );
+  }, []);
+
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setTimerNow(Date.now());
@@ -419,18 +444,15 @@ export default function EventActivity() {
           activity.id,
           "participants"
         );
-        const [participantSnap, participantsSnap] = await Promise.all([
-          getDoc(participantRef),
-          getDocs(participantsRef),
-        ]);
-        const participantCount = participantsSnap.size;
-        const enrollmentOrder = participantSnap.exists()
-          ? participantSnap.data().enrollmentOrder
-          : null;
-        const position =
-          Number.isFinite(enrollmentOrder) && enrollmentOrder > 0
-            ? enrollmentOrder
-            : participantCount;
+        const participantsSnap = await getDocs(participantsRef);
+        const sortedParticipants = [...participantsSnap.docs].sort(
+          compareParticipantsByEnrollment,
+        );
+        const participantCount = sortedParticipants.length;
+        const positionIndex = sortedParticipants.findIndex(
+          (participantDoc) => participantDoc.id === user.uid,
+        );
+        const position = positionIndex >= 0 ? positionIndex + 1 : participantCount;
 
         pointsToAward = calculateWeightedTaskPoints(
           activity.points || 0,
@@ -727,7 +749,14 @@ export default function EventActivity() {
         "participants"
       );
       const participantsSnap = await getDocs(participantsRef);
-      const enrollmentOrder = participantsSnap.size + 1;
+      const highestOrder = participantsSnap.docs.reduce((maxOrder, participantDoc) => {
+        const order = Number(participantDoc.data()?.enrollmentOrder);
+        if (Number.isFinite(order) && order > maxOrder) {
+          return order;
+        }
+        return maxOrder;
+      }, 0);
+      const enrollmentOrder = highestOrder + 1;
 
       // Create participant document with user UID as document ID
       await setDoc(participantRef, {
@@ -743,7 +772,7 @@ export default function EventActivity() {
       setEnrolledTasks((prev) => ({ ...prev, [taskId]: true }));
       setTaskParticipantCounts((prev) => ({
         ...prev,
-        [taskId]: (prev[taskId] || 0) + 1,
+        [taskId]: participantsSnap.size + 1,
       }));
       alert("Successfully enrolled in the activity!");
     } catch (err) {
@@ -775,7 +804,59 @@ export default function EventActivity() {
         user.uid
       );
 
+      const participantsRef = collection(
+        db,
+        "missions",
+        id,
+        "task",
+        taskId,
+        "participants"
+      );
+
+      const participantsSnap = await getDocs(participantsRef);
+      const participantDocs = participantsSnap.docs;
+      const userParticipantExists = participantDocs.some(
+        (participantDoc) => participantDoc.id === user.uid,
+      );
+
+      if (!userParticipantExists) {
+        setEnrolledTasks((prev) => ({
+          ...prev,
+          [taskId]: false,
+        }));
+        setTaskParticipantCounts((prev) => ({
+          ...prev,
+          [taskId]: participantDocs.length,
+        }));
+        window.showToast?.("Removed from task", "success");
+        return;
+      }
+
+      const remainingParticipantDocs = participantDocs
+        .filter((participantDoc) => participantDoc.id !== user.uid)
+        .sort(compareParticipantsByEnrollment);
+
       await deleteDoc(participantRef);
+
+      const batch = writeBatch(db);
+      let hasReorderUpdates = false;
+
+      remainingParticipantDocs.forEach((participantDoc, index) => {
+        const expectedOrder = index + 1;
+        const currentOrder = Number(participantDoc.data()?.enrollmentOrder);
+        if (currentOrder !== expectedOrder) {
+          batch.update(participantDoc.ref, { enrollmentOrder: expectedOrder });
+          hasReorderUpdates = true;
+        }
+      });
+
+      if (hasReorderUpdates) {
+        try {
+          await batch.commit();
+        } catch (reorderError) {
+          console.warn("Task leave succeeded, but participant reindex was skipped:", reorderError);
+        }
+      }
 
       // update UI
       setEnrolledTasks((prev) => ({
@@ -784,7 +865,7 @@ export default function EventActivity() {
       }));
       setTaskParticipantCounts((prev) => ({
         ...prev,
-        [taskId]: Math.max((prev[taskId] || 0) - 1, 0),
+        [taskId]: remainingParticipantDocs.length,
       }));
 
       window.showToast?.("Removed from task", "success");
