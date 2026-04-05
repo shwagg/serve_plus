@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db, functions } from '../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import './Header.css';
@@ -18,6 +18,7 @@ import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon } fr
 import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 import OnboardingTutorial from './OnboardingTutorial';
+import { showToast } from '../utils/toast';
 
 
 const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
@@ -76,6 +77,7 @@ export default function Header() {
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [selectedProjectType, setSelectedProjectType] = useState('');
+  const [isCheckingPendingProposal, setIsCheckingPendingProposal] = useState(false);
   const [showCertificateQRModal, setShowCertificateQRModal] = useState(false);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
@@ -154,8 +156,37 @@ export default function Header() {
     }
   };
 
-  const handleOpenProposalModal = () => {
-    setShowProposalModal(true);
+  const handleOpenProposalModal = async () => {
+    if (isCheckingPendingProposal) return;
+
+    const user = auth.currentUser;
+    if (!user?.uid) {
+      showToast('You must be logged in to create a proposal', 'error');
+      return;
+    }
+
+    setIsCheckingPendingProposal(true);
+    try {
+      const blockedStatuses = new Set(['for_approval', 'for-approval', 'pending']);
+      const missionsQuery = query(collection(db, 'missions'), where('createdBy', '==', user.uid));
+      const missionsSnap = await getDocs(missionsQuery);
+      const hasPendingProposal = missionsSnap.docs.some((docSnap) => {
+        const status = String(docSnap.data()?.status || '').toLowerCase();
+        return blockedStatuses.has(status);
+      });
+
+      if (hasPendingProposal) {
+        showToast('You cannot propose an activity if you have a pending proposal.', 'error');
+        return;
+      }
+
+      setShowProposalModal(true);
+    } catch (error) {
+      console.error('Error checking pending proposals before opening modal:', error);
+      showToast('Unable to verify proposal status. Please try again.', 'error');
+    } finally {
+      setIsCheckingPendingProposal(false);
+    }
   };
 
   const handleSelectProjectType = (type) => {
