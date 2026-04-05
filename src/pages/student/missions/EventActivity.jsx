@@ -290,6 +290,7 @@ export default function EventActivity() {
   const [volunteerAvatars, setVolunteerAvatars] = useState([]);
   const [expandedTasks, setExpandedTasks] = useState({});
   const [taskParticipantCounts, setTaskParticipantCounts] = useState({});
+  const [taskGroupCounts, setTaskGroupCounts] = useState({});
   const [selectedTaskForParticipants, setSelectedTaskForParticipants] = useState(null);
   const [selectedTaskForGroups, setSelectedTaskForGroups] = useState(null);
   const [groupModalMode, setGroupModalMode] = useState("view");
@@ -1093,7 +1094,7 @@ export default function EventActivity() {
     return hasParticipantUpdates;
   };
 
-  const handleGroupedTaskSelection = async ({ groupId }) => {
+  const handleGroupedTaskSelection = async ({ groupId, isNew = false }) => {
     const user = auth.currentUser;
     const groupedTask = selectedTaskForGroups;
 
@@ -1138,6 +1139,12 @@ export default function EventActivity() {
           ...prev,
           [groupedTask.id]: participantsSnap.size,
         }));
+        if (isNew) {
+          setTaskGroupCounts((prev) => ({
+            ...prev,
+            [groupedTask.id]: (prev[groupedTask.id] || 0) + 1,
+          }));
+        }
         window.showToast?.("Joined grouped task successfully", "success");
         setSelectedTaskForGroups(null);
         return;
@@ -1159,6 +1166,12 @@ export default function EventActivity() {
         ...prev,
         [groupedTask.id]: participantsSnap.size + 1,
       }));
+      if (isNew) {
+        setTaskGroupCounts((prev) => ({
+          ...prev,
+          [groupedTask.id]: (prev[groupedTask.id] || 0) + 1,
+        }));
+      }
       window.showToast?.("Joined grouped task successfully", "success");
       setSelectedTaskForGroups(null);
     } catch (error) {
@@ -2088,12 +2101,14 @@ export default function EventActivity() {
 
           // Fetch participant count per task for slot progress display
           const counts = {};
+          const groupCounts = {};
           await Promise.all(
             tasksData.map(async (task) => {
               if (task.type === "grouped") {
                 const groupsSnap = await getDocs(
                   collection(db, "missions", id, "task", task.id, "group"),
                 );
+                groupCounts[task.id] = groupsSnap.size;
 
                 let groupedCount = 0;
                 for (const groupDoc of groupsSnap.docs) {
@@ -2116,6 +2131,7 @@ export default function EventActivity() {
             })
           );
           setTaskParticipantCounts(counts);
+          setTaskGroupCounts(groupCounts);
 
           // Check enrollment status for each task and get volunteer points
           const user = auth.currentUser;
@@ -2782,9 +2798,10 @@ export default function EventActivity() {
                           const isEnrolled = !!enrolledTasks[activity.id];
                           const isGrouped = activity.type === 'grouped';
                           const filledSlots = taskParticipantCounts[activity.id] || 0;
+                          const groupedSlots = taskGroupCounts[activity.id] || 0;
                           const participantsText = isGrouped
-                            ? `${filledSlots} member${filledSlots === 1 ? '' : 's'}`
-                            : `${filledSlots} participant${filledSlots === 1 ? '' : 's'}`;
+                            ? `${groupedSlots}`
+                            : `${filledSlots}`;
                           const maxSlots = Number.isFinite(Number(activity.maxParticipants))
                             ? Number(activity.maxParticipants)
                             : null;
@@ -2902,7 +2919,6 @@ export default function EventActivity() {
                                       <span className="journal-submitted-badge">Submitted</span>
                                       {isGrouped ? (
                                         <>
-                                          <span className="journal-group-note">Group reflection submitted by your team.</span>
                                           <button
                                             onClick={() => handleEditJournal(journalsForActivity[0])}
                                             className="journal-edit-icon-btn"
