@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction, increment } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction, increment, deleteField } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -484,24 +484,83 @@ export default function EventActivity() {
         });
         const groupPoints = Number(activity.points) || 0;
 
-        await updateDoc(participantRef, {
-          status: "completed",
-          reflection: reflectionText,
-          pointsEarned: groupPoints,
-          completedAt: submittedAt,
-          lastUpdated: submittedAt,
-          groupId,
-        });
-
-        await setDoc(
-          doc(db, "missions", id, "volunteer", user.uid),
-          {
-            pointsEarned: increment(groupPoints),
-          },
-          { merge: true },
+        const groupParticipantsRef = collection(
+          db,
+          "missions",
+          id,
+          "task",
+          activity.id,
+          "participants",
         );
+        const groupParticipantsQuery = query(
+          groupParticipantsRef,
+          where("groupId", "==", groupId),
+        );
+        const groupParticipantsSnap = await getDocs(groupParticipantsQuery);
+        let didUpdateCurrentUser = false;
+        let currentUserPointsAdded = 0;
 
-        setTotalPointsEarned((prev) => prev + groupPoints);
+        for (const groupParticipantDoc of groupParticipantsSnap.docs) {
+          const targetParticipantRef = groupParticipantDoc.ref;
+          const targetParticipantData = groupParticipantDoc.data() || {};
+          const currentPoints = Number(targetParticipantData.pointsEarned) || 0;
+          const pointsToAdd = Math.max(groupPoints - currentPoints, 0);
+
+          try {
+            await updateDoc(targetParticipantRef, {
+              status: "completed",
+              reflection: reflectionText,
+              pointsEarned: groupPoints,
+              completedAt: targetParticipantData.completedAt || submittedAt,
+              lastUpdated: submittedAt,
+              groupId,
+            });
+
+            if (pointsToAdd > 0) {
+              await setDoc(
+                doc(db, "missions", id, "volunteer", groupParticipantDoc.id),
+                {
+                  pointsEarned: increment(pointsToAdd),
+                },
+                { merge: true },
+              );
+            }
+
+            if (groupParticipantDoc.id === user.uid) {
+              didUpdateCurrentUser = true;
+              currentUserPointsAdded = pointsToAdd;
+            }
+          } catch (groupParticipantSyncError) {
+            console.warn(
+              `Failed to sync grouped reflection to participant ${groupParticipantDoc.id}:`,
+              groupParticipantSyncError,
+            );
+          }
+        }
+
+        if (!didUpdateCurrentUser) {
+          await updateDoc(participantRef, {
+            status: "completed",
+            reflection: reflectionText,
+            pointsEarned: groupPoints,
+            completedAt: submittedAt,
+            lastUpdated: submittedAt,
+            groupId,
+          });
+
+          await setDoc(
+            doc(db, "missions", id, "volunteer", user.uid),
+            {
+              pointsEarned: increment(groupPoints),
+            },
+            { merge: true },
+          );
+          currentUserPointsAdded = groupPoints;
+        }
+
+        if (currentUserPointsAdded > 0) {
+          setTotalPointsEarned((prev) => prev + currentUserPointsAdded);
+        }
 
         setSubmitStatus((prev) => ({
           ...prev,
@@ -725,7 +784,14 @@ export default function EventActivity() {
     const user = auth.currentUser;
     if (!user) return;
 
+    const updatedReflection = editingJournalText.trim();
+    if (!updatedReflection) {
+      alert("Reflection cannot be empty.");
+      return;
+    }
+
     try {
+      const taskDetails = tasks.find((task) => task.id === journal.taskId);
       const participantRef = doc(
         db,
         "missions",
@@ -735,8 +801,73 @@ export default function EventActivity() {
         "participants",
         user.uid
       );
+
+      if (taskDetails?.type === "grouped") {
+        const participantSnap = await getDoc(participantRef);
+        if (!participantSnap.exists()) {
+          alert("You must join a group before editing this reflection.");
+          return;
+        }
+
+        const participantData = participantSnap.data() || {};
+        const groupId = participantData.groupId || journal.groupId;
+        if (!groupId) {
+          alert("Group assignment missing. Rejoin the grouped task.");
+          return;
+        }
+
+        const editedAt = new Date().toISOString();
+        const groupRef = doc(db, "missions", id, "task", journal.taskId, "group", groupId);
+        await updateDoc(groupRef, {
+          reflection: updatedReflection,
+          reflectionEditedBy: user.uid,
+          reflectionEditedAt: editedAt,
+          status: "completed",
+          lastUpdated: editedAt,
+        });
+
+        const groupedParticipantsRef = collection(
+          db,
+          "missions",
+          id,
+          "task",
+          journal.taskId,
+          "participants",
+        );
+        const groupedParticipantsQuery = query(
+          groupedParticipantsRef,
+          where("groupId", "==", groupId),
+        );
+        const groupedParticipantsSnap = await getDocs(groupedParticipantsQuery);
+
+        for (const groupedParticipantDoc of groupedParticipantsSnap.docs) {
+          const groupedParticipantData = groupedParticipantDoc.data() || {};
+          try {
+            await updateDoc(groupedParticipantDoc.ref, {
+              reflection: updatedReflection,
+              status: "completed",
+              pointsEarned: Number(groupedParticipantData.pointsEarned) || Number(taskDetails.points) || 0,
+              completedAt: groupedParticipantData.completedAt || editedAt,
+              lastUpdated: editedAt,
+              groupId,
+            });
+          } catch (groupParticipantEditError) {
+            console.warn(
+              `Failed to sync edited group reflection to participant ${groupedParticipantDoc.id}:`,
+              groupParticipantEditError,
+            );
+          }
+        }
+
+        setEditingJournalId(null);
+        setEditingJournalText("");
+        await fetchUserJournals();
+        window.showToast?.("Group reflection updated", "success");
+        return;
+      }
+
       await updateDoc(participantRef, {
-        reflection: editingJournalText,
+        reflection: updatedReflection,
         lastUpdated: new Date().toISOString(),
       });
       setEditingJournalId(null);
@@ -752,6 +883,7 @@ export default function EventActivity() {
     if (!user) return;
 
     try {
+      const taskDetails = tasks.find((task) => task.id === taskId);
       // Clear the reflection field instead of deleting the participant document
       const participantRef = doc(
         db,
@@ -763,6 +895,57 @@ export default function EventActivity() {
         user.uid
       );
       const participantSnap = await getDoc(participantRef);
+      if (!participantSnap.exists()) {
+        return;
+      }
+
+      const participantData = participantSnap.data() || {};
+
+      if (taskDetails?.type === "grouped") {
+        const groupId = participantData.groupId;
+        if (!groupId) {
+          alert("Group assignment missing. Rejoin the grouped task.");
+          return;
+        }
+
+        const clearedAt = new Date().toISOString();
+        const groupRef = doc(db, "missions", id, "task", taskId, "group", groupId);
+        await updateDoc(groupRef, {
+          reflection: "",
+          status: "in_progress",
+          reflectionSubmittedBy: deleteField(),
+          reflectionSubmittedAt: deleteField(),
+          reflectionEditedBy: deleteField(),
+          reflectionEditedAt: deleteField(),
+          lastUpdated: clearedAt,
+        });
+
+        const pointsToRemove = Number(participantData.pointsEarned) || 0;
+        await updateDoc(participantRef, {
+          reflection: "",
+          status: "todo",
+          pointsEarned: 0,
+          completedAt: deleteField(),
+          lastUpdated: clearedAt,
+          groupId,
+        });
+
+        if (pointsToRemove > 0) {
+          const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+          const volunteerSnap = await getDoc(volunteerRef);
+          if (volunteerSnap.exists()) {
+            const currentTotal = volunteerSnap.data().pointsEarned || 0;
+            const newTotal = Math.max(0, currentTotal - pointsToRemove);
+            await updateDoc(volunteerRef, { pointsEarned: newTotal });
+            setTotalPointsEarned(newTotal);
+          }
+        }
+
+        setUserJournals((prev) => prev.filter((j) => j.taskId !== taskId));
+        window.showToast?.("Group reflection removed", "success");
+        return;
+      }
+
       const pointsToRemove = participantSnap.exists()
         ? participantSnap.data().pointsEarned || 0
         : 0;
@@ -796,7 +979,7 @@ export default function EventActivity() {
       return false;
     }
 
-    let totalAddedPoints = 0;
+    let totalPointsDelta = 0;
     let hasParticipantUpdates = false;
 
     for (const task of tasksData) {
@@ -833,6 +1016,35 @@ export default function EventActivity() {
       const groupData = groupSnap.data() || {};
       const groupReflection = String(groupData.reflection || "").trim();
       if (!groupReflection) {
+        const participantPoints = Number(participantData.pointsEarned) || 0;
+        const hasReflection = String(participantData.reflection || "").trim().length > 0;
+        const isCompleted = participantData.status === "completed";
+
+        if (!participantPoints && !hasReflection && !isCompleted) {
+          continue;
+        }
+
+        await updateDoc(participantRef, {
+          status: "todo",
+          reflection: "",
+          pointsEarned: 0,
+          completedAt: deleteField(),
+          lastUpdated: new Date().toISOString(),
+          groupId,
+        });
+
+        if (participantPoints > 0) {
+          const volunteerRef = doc(db, "missions", id, "volunteer", userId);
+          const volunteerSnap = await getDoc(volunteerRef);
+          if (volunteerSnap.exists()) {
+            const currentTotal = volunteerSnap.data().pointsEarned || 0;
+            const newTotal = Math.max(0, currentTotal - participantPoints);
+            await updateDoc(volunteerRef, { pointsEarned: newTotal });
+            totalPointsDelta -= participantPoints;
+          }
+        }
+
+        hasParticipantUpdates = true;
         continue;
       }
 
@@ -867,15 +1079,15 @@ export default function EventActivity() {
             },
             { merge: true },
           );
-          totalAddedPoints += pointsToAdd;
+          totalPointsDelta += pointsToAdd;
         }
 
         hasParticipantUpdates = true;
       }
     }
 
-    if (totalAddedPoints > 0) {
-      setTotalPointsEarned((prev) => prev + totalAddedPoints);
+    if (totalPointsDelta !== 0) {
+      setTotalPointsEarned((prev) => Math.max(0, prev + totalPointsDelta));
     }
 
     return hasParticipantUpdates;
@@ -917,6 +1129,7 @@ export default function EventActivity() {
       if (participantSnap.exists()) {
         await updateDoc(participantRef, {
           groupId,
+          enrollmentOrder: deleteField(),
           lastUpdated: new Date().toISOString(),
         });
 
@@ -930,21 +1143,12 @@ export default function EventActivity() {
         return;
       }
 
-      const highestOrder = participantsSnap.docs.reduce((maxOrder, participantDoc) => {
-        const order = Number(participantDoc.data()?.enrollmentOrder);
-        if (Number.isFinite(order) && order > maxOrder) {
-          return order;
-        }
-        return maxOrder;
-      }, 0);
-
       await setDoc(participantRef, {
         status: "todo",
         role: "",
         proof: "",
         reflection: "",
         pointsEarned: 0,
-        enrollmentOrder: highestOrder + 1,
         groupId,
         joinedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
@@ -1149,28 +1353,32 @@ export default function EventActivity() {
       }
 
       const remainingParticipantDocs = participantDocs
-        .filter((participantDoc) => participantDoc.id !== user.uid)
-        .sort(compareParticipantsByEnrollment);
+        .filter((participantDoc) => participantDoc.id !== user.uid);
 
       await deleteDoc(participantRef);
 
-      const batch = writeBatch(db);
-      let hasReorderUpdates = false;
+      if (task?.type !== "grouped") {
+        const sortedRemainingParticipantDocs = [...remainingParticipantDocs].sort(
+          compareParticipantsByEnrollment,
+        );
+        const batch = writeBatch(db);
+        let hasReorderUpdates = false;
 
-      remainingParticipantDocs.forEach((participantDoc, index) => {
-        const expectedOrder = index + 1;
-        const currentOrder = Number(participantDoc.data()?.enrollmentOrder);
-        if (currentOrder !== expectedOrder) {
-          batch.update(participantDoc.ref, { enrollmentOrder: expectedOrder });
-          hasReorderUpdates = true;
-        }
-      });
+        sortedRemainingParticipantDocs.forEach((participantDoc, index) => {
+          const expectedOrder = index + 1;
+          const currentOrder = Number(participantDoc.data()?.enrollmentOrder);
+          if (currentOrder !== expectedOrder) {
+            batch.update(participantDoc.ref, { enrollmentOrder: expectedOrder });
+            hasReorderUpdates = true;
+          }
+        });
 
-      if (hasReorderUpdates) {
-        try {
-          await batch.commit();
-        } catch (reorderError) {
-          console.warn("Task leave succeeded, but participant reindex was skipped:", reorderError);
+        if (hasReorderUpdates) {
+          try {
+            await batch.commit();
+          } catch (reorderError) {
+            console.warn("Task leave succeeded, but participant reindex was skipped:", reorderError);
+          }
         }
       }
 
@@ -2693,7 +2901,23 @@ export default function EventActivity() {
                                     <div className="journal-submit-row">
                                       <span className="journal-submitted-badge">Submitted</span>
                                       {isGrouped ? (
-                                        <span className="journal-group-note">Group reflection submitted by your team.</span>
+                                        <>
+                                          <span className="journal-group-note">Group reflection submitted by your team.</span>
+                                          <button
+                                            onClick={() => handleEditJournal(journalsForActivity[0])}
+                                            className="journal-edit-icon-btn"
+                                            title="Edit group reflection"
+                                          >
+                                            <ModeRoundedIcon sx={{ fontSize: 15 }} />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)}
+                                            className="journal-edit-icon-btn journal-delete-icon-btn"
+                                            title="Delete group reflection"
+                                          >
+                                            <DeleteRoundedIcon sx={{ fontSize: 15 }} />
+                                          </button>
+                                        </>
                                       ) : (
                                         <>
                                           <button
