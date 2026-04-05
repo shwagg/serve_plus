@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction, increment } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -19,6 +19,7 @@ import "../../../styles/EventActivity.css";
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
 import PostActivitySurvey from "../../../forms/PostActivitySurvey.jsx";
 import ParticipantModal from "./ParticipantModal.jsx";
+import GroupModal from "./GroupModal.jsx";
 
 export default function EventActivity() {
   const isEventEditable = (eventDate) => {
@@ -290,6 +291,8 @@ export default function EventActivity() {
   const [expandedTasks, setExpandedTasks] = useState({});
   const [taskParticipantCounts, setTaskParticipantCounts] = useState({});
   const [selectedTaskForParticipants, setSelectedTaskForParticipants] = useState(null);
+  const [selectedTaskForGroups, setSelectedTaskForGroups] = useState(null);
+  const [groupModalMode, setGroupModalMode] = useState("view");
   const [timerNow, setTimerNow] = useState(Date.now());
 
   const compareParticipantsByEnrollment = useCallback((a, b) => {
@@ -422,6 +425,9 @@ export default function EventActivity() {
       }));
       return;
     }
+
+    const reflectionText = journalReflections[activityIdx].trim();
+
     try {
       // Update the reflection field in the participant document
       const participantRef = doc(
@@ -433,6 +439,93 @@ export default function EventActivity() {
         "participants",
         user.uid
       );
+
+      if (activity?.type === "grouped") {
+        const participantSnap = await getDoc(participantRef);
+        if (!participantSnap.exists()) {
+          setSubmitStatus((prev) => ({
+            ...prev,
+            [activityIdx]: "You must join a group before submitting.",
+          }));
+          return;
+        }
+
+        const groupId = participantSnap.data()?.groupId;
+        if (!groupId) {
+          setSubmitStatus((prev) => ({
+            ...prev,
+            [activityIdx]: "Your group assignment is missing. Rejoin the task.",
+          }));
+          return;
+        }
+
+        const submittedAt = new Date().toISOString();
+        const groupRef = doc(db, "missions", id, "task", activity.id, "group", groupId);
+
+        await runTransaction(db, async (transaction) => {
+          const groupSnap = await transaction.get(groupRef);
+
+          if (!groupSnap.exists()) {
+            throw new Error("GROUP_NOT_FOUND");
+          }
+
+          const existingReflection = String(groupSnap.data()?.reflection || "").trim();
+          if (existingReflection) {
+            throw new Error("GROUP_REFLECTION_ALREADY_SUBMITTED");
+          }
+
+          transaction.update(groupRef, {
+            reflection: reflectionText,
+            reflectionSubmittedBy: user.uid,
+            reflectionSubmittedAt: submittedAt,
+            status: "completed",
+            lastUpdated: submittedAt,
+          });
+        });
+        const groupPoints = Number(activity.points) || 0;
+
+        await updateDoc(participantRef, {
+          status: "completed",
+          reflection: reflectionText,
+          pointsEarned: groupPoints,
+          completedAt: submittedAt,
+          lastUpdated: submittedAt,
+          groupId,
+        });
+
+        await setDoc(
+          doc(db, "missions", id, "volunteer", user.uid),
+          {
+            pointsEarned: increment(groupPoints),
+          },
+          { merge: true },
+        );
+
+        setTotalPointsEarned((prev) => prev + groupPoints);
+
+        setSubmitStatus((prev) => ({
+          ...prev,
+          [activityIdx]: `Group reflection submitted! +${groupPoints} points applied to your account.`,
+        }));
+        setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
+
+        await createNotification(user.uid, {
+          type: "points_earned",
+          title: "Points Earned!",
+          message: `You earned ${groupPoints} points for group task "${activity.title}"`,
+          link: `/event/${id}/activity`,
+        });
+
+        await createNotification(user.uid, {
+          type: "reflection_submitted",
+          title: "Group Reflection Submitted",
+          message: `Your group reflection for "${activity.title}" has been submitted successfully!`,
+          link: `/event/${id}/activity`,
+        });
+
+        await fetchUserJournals();
+        return;
+      }
 
       let pointsToAward = activity.points || 0;
       if (activity?.type !== "grouped") {
@@ -464,7 +557,7 @@ export default function EventActivity() {
       const eligibleForPoints = isEnrollmentClosed(activity);
 
       await updateDoc(participantRef, {
-        reflection: journalReflections[activityIdx],
+        reflection: reflectionText,
         status: "completed",
         pointsEarned: eligibleForPoints ? pointsToAward : 0,
         completedAt: new Date().toISOString(),
@@ -541,9 +634,16 @@ export default function EventActivity() {
       await fetchUserJournals();
     } catch (err) {
       console.error("Error submitting reflection:", err);
+      const isGroupReflectionConflict = err?.message === "GROUP_REFLECTION_ALREADY_SUBMITTED";
+      const isGroupMissing = err?.message === "GROUP_NOT_FOUND";
+
       setSubmitStatus((prev) => ({
         ...prev,
-        [activityIdx]: "Error submitting. Try again.",
+        [activityIdx]: isGroupReflectionConflict
+          ? "This group reflection has already been submitted by a teammate."
+          : isGroupMissing
+            ? "Group not found. Please rejoin the grouped task."
+            : "Error submitting. Try again.",
       }));
     }
   };
@@ -691,6 +791,178 @@ export default function EventActivity() {
     }
   };
 
+  const syncGroupedTaskCompletionForUser = async (tasksData, userId) => {
+    if (!Array.isArray(tasksData) || !userId) {
+      return false;
+    }
+
+    let totalAddedPoints = 0;
+    let hasParticipantUpdates = false;
+
+    for (const task of tasksData) {
+      if (task?.type !== "grouped") {
+        continue;
+      }
+
+      const participantRef = doc(
+        db,
+        "missions",
+        id,
+        "task",
+        task.id,
+        "participants",
+        userId,
+      );
+      const participantSnap = await getDoc(participantRef);
+      if (!participantSnap.exists()) {
+        continue;
+      }
+
+      const participantData = participantSnap.data() || {};
+      const groupId = participantData.groupId;
+      if (!groupId) {
+        continue;
+      }
+
+      const groupRef = doc(db, "missions", id, "task", task.id, "group", groupId);
+      const groupSnap = await getDoc(groupRef);
+      if (!groupSnap.exists()) {
+        continue;
+      }
+
+      const groupData = groupSnap.data() || {};
+      const groupReflection = String(groupData.reflection || "").trim();
+      if (!groupReflection) {
+        continue;
+      }
+
+      const groupPoints = Number(task.points) || 0;
+      const participantPoints = Number(participantData.pointsEarned) || 0;
+      const alreadySynced =
+        participantData.status === "completed" &&
+        participantPoints === groupPoints &&
+        String(participantData.reflection || "").trim() === groupReflection;
+
+      if (!alreadySynced) {
+        const completedAt =
+          participantData.completedAt ||
+          groupData.reflectionSubmittedAt ||
+          new Date().toISOString();
+
+        await updateDoc(participantRef, {
+          status: "completed",
+          reflection: groupReflection,
+          pointsEarned: groupPoints,
+          completedAt,
+          lastUpdated: new Date().toISOString(),
+          groupId,
+        });
+
+        const pointsToAdd = Math.max(groupPoints - participantPoints, 0);
+        if (pointsToAdd > 0) {
+          await setDoc(
+            doc(db, "missions", id, "volunteer", userId),
+            {
+              pointsEarned: increment(pointsToAdd),
+            },
+            { merge: true },
+          );
+          totalAddedPoints += pointsToAdd;
+        }
+
+        hasParticipantUpdates = true;
+      }
+    }
+
+    if (totalAddedPoints > 0) {
+      setTotalPointsEarned((prev) => prev + totalAddedPoints);
+    }
+
+    return hasParticipantUpdates;
+  };
+
+  const handleGroupedTaskSelection = async ({ groupId }) => {
+    const user = auth.currentUser;
+    const groupedTask = selectedTaskForGroups;
+
+    if (!user || !groupedTask?.id || !groupId) {
+      window.showToast?.("Unable to join grouped task.", "error");
+      return;
+    }
+
+    try {
+      const participantRef = doc(
+        db,
+        "missions",
+        id,
+        "task",
+        groupedTask.id,
+        "participants",
+        user.uid,
+      );
+      const participantsRef = collection(
+        db,
+        "missions",
+        id,
+        "task",
+        groupedTask.id,
+        "participants",
+      );
+
+      const [participantSnap, participantsSnap] = await Promise.all([
+        getDoc(participantRef),
+        getDocs(participantsRef),
+      ]);
+
+      if (participantSnap.exists()) {
+        await updateDoc(participantRef, {
+          groupId,
+          lastUpdated: new Date().toISOString(),
+        });
+
+        setEnrolledTasks((prev) => ({ ...prev, [groupedTask.id]: true }));
+        setTaskParticipantCounts((prev) => ({
+          ...prev,
+          [groupedTask.id]: participantsSnap.size,
+        }));
+        window.showToast?.("Joined grouped task successfully", "success");
+        setSelectedTaskForGroups(null);
+        return;
+      }
+
+      const highestOrder = participantsSnap.docs.reduce((maxOrder, participantDoc) => {
+        const order = Number(participantDoc.data()?.enrollmentOrder);
+        if (Number.isFinite(order) && order > maxOrder) {
+          return order;
+        }
+        return maxOrder;
+      }, 0);
+
+      await setDoc(participantRef, {
+        status: "todo",
+        role: "",
+        proof: "",
+        reflection: "",
+        pointsEarned: 0,
+        enrollmentOrder: highestOrder + 1,
+        groupId,
+        joinedAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      });
+
+      setEnrolledTasks((prev) => ({ ...prev, [groupedTask.id]: true }));
+      setTaskParticipantCounts((prev) => ({
+        ...prev,
+        [groupedTask.id]: participantsSnap.size + 1,
+      }));
+      window.showToast?.("Joined grouped task successfully", "success");
+      setSelectedTaskForGroups(null);
+    } catch (error) {
+      console.error("Error completing grouped task enrollment:", error);
+      window.showToast?.("Failed to join grouped task", "error");
+    }
+  };
+
   const handleJoinActivity = async (taskId, task) => {
     const user = auth.currentUser;
     if (!user) {
@@ -719,6 +991,12 @@ export default function EventActivity() {
         alert("Enrollment deadline has passed for this task.");
         return;
       }
+    }
+
+    if (task?.type === "grouped") {
+      setGroupModalMode("join");
+      setSelectedTaskForGroups(task);
+      return;
     }
 
     // Proceed with direct enrollment
@@ -781,7 +1059,7 @@ export default function EventActivity() {
     }
   };
 
-  const handleUnjoinActivity = async (taskId) => {
+  const handleUnjoinActivity = async (taskId, task) => {
     const user = auth.currentUser;
     if (!user) {
       alert("You must be logged in.");
@@ -815,11 +1093,49 @@ export default function EventActivity() {
 
       const participantsSnap = await getDocs(participantsRef);
       const participantDocs = participantsSnap.docs;
+      const leavingParticipantDoc = participantDocs.find(
+        (participantDoc) => participantDoc.id === user.uid,
+      );
+      const leavingGroupId =
+        task?.type === "grouped"
+          ? leavingParticipantDoc?.data()?.groupId || null
+          : null;
       const userParticipantExists = participantDocs.some(
         (participantDoc) => participantDoc.id === user.uid,
       );
 
       if (!userParticipantExists) {
+        if (task?.type === "grouped") {
+          try {
+            const groupsSnap = await getDocs(
+              collection(db, "missions", id, "task", taskId, "group"),
+            );
+
+            for (const groupDoc of groupsSnap.docs) {
+              const memberRef = doc(groupDoc.ref, "members", user.uid);
+              const memberSnap = await getDoc(memberRef);
+              if (!memberSnap.exists()) continue;
+
+              const updateTime = new Date().toISOString();
+              await runTransaction(db, async (transaction) => {
+                const latestGroupSnap = await transaction.get(groupDoc.ref);
+                transaction.delete(memberRef);
+
+                if (latestGroupSnap.exists()) {
+                  const currentCount = Number(latestGroupSnap.data()?.memberCount) || 0;
+                  transaction.update(groupDoc.ref, {
+                    memberCount: Math.max(currentCount - 1, 0),
+                    lastUpdated: updateTime,
+                  });
+                }
+              });
+              break;
+            }
+          } catch (groupCleanupError) {
+            console.warn("Could not remove stale group membership:", groupCleanupError);
+          }
+        }
+
         setEnrolledTasks((prev) => ({
           ...prev,
           [taskId]: false,
@@ -867,6 +1183,43 @@ export default function EventActivity() {
         ...prev,
         [taskId]: remainingParticipantDocs.length,
       }));
+
+      if (task?.type === "grouped" && leavingGroupId) {
+        try {
+          const groupRef = doc(
+            db,
+            "missions",
+            id,
+            "task",
+            taskId,
+            "group",
+            leavingGroupId,
+          );
+          const memberRef = doc(groupRef, "members", user.uid);
+          const updateTime = new Date().toISOString();
+
+          await runTransaction(db, async (transaction) => {
+            const [groupSnap, memberSnap] = await Promise.all([
+              transaction.get(groupRef),
+              transaction.get(memberRef),
+            ]);
+
+            if (memberSnap.exists()) {
+              transaction.delete(memberRef);
+            }
+
+            if (groupSnap.exists() && memberSnap.exists()) {
+              const currentCount = Number(groupSnap.data()?.memberCount) || 0;
+              transaction.update(groupRef, {
+                memberCount: Math.max(currentCount - 1, 0),
+                lastUpdated: updateTime,
+              });
+            }
+          });
+        } catch (groupLeaveError) {
+          console.warn("Left task but failed to clean up group membership:", groupLeaveError);
+        }
+      }
 
       window.showToast?.("Removed from task", "success");
 
@@ -1529,10 +1882,29 @@ export default function EventActivity() {
           const counts = {};
           await Promise.all(
             tasksData.map(async (task) => {
-              const snap = await getDocs(
-                collection(db, "missions", id, "task", task.id, "participants")
+              if (task.type === "grouped") {
+                const groupsSnap = await getDocs(
+                  collection(db, "missions", id, "task", task.id, "group"),
+                );
+
+                let groupedCount = 0;
+                for (const groupDoc of groupsSnap.docs) {
+                  const memberCount = Number(groupDoc.data()?.memberCount);
+                  if (Number.isFinite(memberCount)) {
+                    groupedCount += memberCount;
+                  } else {
+                    const membersSnap = await getDocs(collection(groupDoc.ref, "members"));
+                    groupedCount += membersSnap.size;
+                  }
+                }
+                counts[task.id] = groupedCount;
+                return;
+              }
+
+              const participantsSnap = await getDocs(
+                collection(db, "missions", id, "task", task.id, "participants"),
               );
-              counts[task.id] = snap.size;
+              counts[task.id] = participantsSnap.size;
             })
           );
           setTaskParticipantCounts(counts);
@@ -1602,9 +1974,38 @@ export default function EventActivity() {
                 user.uid
               );
               const participantSnap = await getDoc(participantRef);
-              enrollmentStatus[task.id] = participantSnap.exists();
+
+              if (participantSnap.exists()) {
+                enrollmentStatus[task.id] = true;
+                continue;
+              }
+
+              if (task.type !== "grouped") {
+                enrollmentStatus[task.id] = false;
+                continue;
+              }
+
+              const groupsSnap = await getDocs(
+                collection(db, "missions", id, "task", task.id, "group"),
+              );
+
+              let isGroupedMember = false;
+              for (const groupDoc of groupsSnap.docs) {
+                const memberSnap = await getDoc(doc(groupDoc.ref, "members", user.uid));
+                if (memberSnap.exists()) {
+                  isGroupedMember = true;
+                  break;
+                }
+              }
+
+              enrollmentStatus[task.id] = isGroupedMember;
             }
             setEnrolledTasks(enrollmentStatus);
+
+            const hadGroupedUpdates = await syncGroupedTaskCompletionForUser(tasksData, user.uid);
+            if (hadGroupedUpdates) {
+              await fetchUserJournals();
+            }
           }
         } else {
           console.error("Event not found for id:", id);
@@ -2173,11 +2574,14 @@ export default function EventActivity() {
                           const isEnrolled = !!enrolledTasks[activity.id];
                           const isGrouped = activity.type === 'grouped';
                           const filledSlots = taskParticipantCounts[activity.id] || 0;
-                          const participantsText = `${filledSlots} participant${filledSlots === 1 ? '' : 's'}`;
-                          const maxSlots = isGrouped ? (activity.maxParticipants || null) : null;
-                          const isFull = maxSlots !== null && filledSlots >= maxSlots;
+                          const participantsText = isGrouped
+                            ? `${filledSlots} member${filledSlots === 1 ? '' : 's'}`
+                            : `${filledSlots} participant${filledSlots === 1 ? '' : 's'}`;
+                          const maxSlots = Number.isFinite(Number(activity.maxParticipants))
+                            ? Number(activity.maxParticipants)
+                            : null;
+                          const isTaskCapacityFull = !isGrouped && maxSlots !== null && filledSlots >= maxSlots;
                           const isDeadlineClosed = isEnrollmentClosed(activity);
-                          const slotPct = maxSlots ? Math.min((filledSlots / maxSlots) * 100, 100) : 0;
                           const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
                           const hasSubmittedJournal = journalsForActivity.length > 0;
                           const enrollmentCountdown = getEnrollmentCountdown(activity);
@@ -2199,14 +2603,6 @@ export default function EventActivity() {
                                 <span className="task-card__emoji">{activity.emoji || '🎯'}</span>
                                 <div className="task-card__info">
                                   <span className="task-card__title">{activity.title}</span>
-                                  {isGrouped && maxSlots && (
-                                    <div className="task-slot-wrap">
-                                      <div className="task-slot-bar">
-                                        <div className="task-slot-fill" style={{ width: `${slotPct}%`, background: isFull ? '#ef4444' : '#30bdb7' }} />
-                                      </div>
-                                      <span className="task-slot-label">{filledSlots}/{maxSlots} members{isFull ? ' · Full' : ''}</span>
-                                    </div>
-                                  )}
                                   <div className="task-card__meta">
                                     <span className="task-card__pts">{activity.points} PTS</span>
                                     {isEventDay && (
@@ -2214,11 +2610,16 @@ export default function EventActivity() {
                                         className="task-participants-indicator"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setSelectedTaskForParticipants(activity);
+                                          if (isGrouped) {
+                                            setGroupModalMode("view");
+                                            setSelectedTaskForGroups(activity);
+                                          } else {
+                                            setSelectedTaskForParticipants(activity);
+                                          }
                                         }}
-                                        aria-label={`View participants for ${activity.title}`}
+                                        aria-label={`View ${isGrouped ? "groups" : "participants"} for ${activity.title}`}
                                       >
-                                        👥 {participantsText}
+                                        {isGrouped ? "Groups" : "Participants"}: {participantsText}
                                       </button>
                                     )}
                                     {enrollmentCountdown && (
@@ -2235,7 +2636,7 @@ export default function EventActivity() {
                                         className="task-enrolled-badge"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleUnjoinActivity(activity.id);
+                                          handleUnjoinActivity(activity.id, activity);
                                         }}
                                         disabled={!isEditable}
                                       >
@@ -2255,7 +2656,7 @@ export default function EventActivity() {
                                         </button>
                                       )}
                                     </div>
-                                  ) : isFull ? (
+                                  ) : isTaskCapacityFull ? (
                                     <span className="task-slot-full-badge">Full</span>
                                   ) : isDeadlineClosed ? (
                                     <span className="req-status locked">Closed</span>
@@ -2291,25 +2692,35 @@ export default function EventActivity() {
                                   {hasSubmittedJournal ? (
                                     <div className="journal-submit-row">
                                       <span className="journal-submitted-badge">Submitted</span>
-                                      <button
-                                        onClick={() => handleEditJournal(journalsForActivity[0])}
-                                        className="journal-edit-icon-btn"
-                                        title="Edit reflection"
-                                      >
-                                        <ModeRoundedIcon sx={{ fontSize: 15 }} />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)}
-                                        className="journal-edit-icon-btn journal-delete-icon-btn"
-                                        title="Delete reflection"
-                                      >
-                                        <DeleteRoundedIcon sx={{ fontSize: 15 }} />
-                                      </button>
+                                      {isGrouped ? (
+                                        <span className="journal-group-note">Group reflection submitted by your team.</span>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => handleEditJournal(journalsForActivity[0])}
+                                            className="journal-edit-icon-btn"
+                                            title="Edit reflection"
+                                          >
+                                            <ModeRoundedIcon sx={{ fontSize: 15 }} />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)}
+                                            className="journal-edit-icon-btn journal-delete-icon-btn"
+                                            title="Delete reflection"
+                                          >
+                                            <DeleteRoundedIcon sx={{ fontSize: 15 }} />
+                                          </button>
+                                        </>
+                                      )}
                                     </div>
                                   ) : (
                                     <>
                                       <textarea
-                                        placeholder={!isHalfwayDone ? 'Journal will unlock once the event has started' : 'Write your reflection for this task…'}
+                                        placeholder={!isHalfwayDone
+                                          ? 'Journal will unlock once the event has started'
+                                          : isGrouped
+                                            ? 'Only one member needs to submit this reflection for your group.'
+                                            : 'Write your reflection for this task…'}
                                         className="journal-textarea"
                                         value={journalReflections[idx] || ''}
                                         onChange={(e) => handleJournalChange(idx, e.target.value)}
@@ -2320,7 +2731,7 @@ export default function EventActivity() {
                                           <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
                                         )}
                                         <button className="activity-submit-button journal-submit-compact" disabled={!isHalfwayDone || !journalReflections[idx]?.trim()} onClick={() => handleJournalSubmit(idx, activity)}>
-                                          {!isHalfwayDone ? 'LOCKED' : 'SUBMIT'}
+                                          {!isHalfwayDone ? 'LOCKED' : isGrouped ? 'SUBMIT FOR GROUP' : 'SUBMIT'}
                                         </button>
                                       </div>
                                     </>
@@ -2497,6 +2908,16 @@ export default function EventActivity() {
         onClose={() => setSelectedTaskForParticipants(null)}
         missionId={id}
         task={selectedTaskForParticipants}
+      />
+
+      <GroupModal
+        open={!!selectedTaskForGroups}
+        onClose={() => setSelectedTaskForGroups(null)}
+        missionId={id}
+        task={selectedTaskForGroups}
+        user={auth.currentUser}
+        mode={groupModalMode}
+        onGroupSelected={handleGroupedTaskSelection}
       />
 
 

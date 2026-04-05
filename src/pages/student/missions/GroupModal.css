@@ -1,0 +1,151 @@
+.group-modal {
+	max-width: 560px;
+}
+
+.group-modal__body {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.group-modal__summary {
+	width: fit-content;
+}
+
+.group-modal__current {
+	font-size: 12px;
+	color: #0f766e;
+	background: #ecfeff;
+	border: 1px solid #a5f3fc;
+	border-radius: 999px;
+	padding: 6px 12px;
+	width: fit-content;
+}
+
+.group-modal__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.group-modal__random-btn {
+	background: #2563eb;
+}
+
+.group-modal__random-btn:hover {
+	background: #1d4ed8;
+}
+
+.group-modal__error {
+	font-size: 13px;
+	color: #b91c1c;
+	background: #fee2e2;
+	border: 1px solid #fecaca;
+	border-radius: 10px;
+	padding: 8px 10px;
+}
+
+.group-modal__list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.group-modal__group-card {
+	border: 1px solid #dbeafe;
+	border-radius: 14px;
+	padding: 12px;
+	background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.group-modal__group-card--current {
+	border-color: #30bdb7;
+	box-shadow: 0 0 0 1px rgba(48, 189, 183, 0.2);
+}
+
+.group-modal__group-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 10px;
+}
+
+.group-modal__group-title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.group-modal__group-meta {
+	margin: 3px 0 0;
+	font-size: 12px;
+	color: #64748b;
+}
+
+.group-modal__group-join-btn {
+	min-width: 84px;
+}
+
+.group-modal__slot-wrap {
+	margin-bottom: 10px;
+}
+
+.group-modal__slot-bar {
+	height: 7px;
+	background: #e2e8f0;
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+.group-modal__slot-fill {
+	height: 100%;
+	border-radius: 999px;
+	transition: width 0.2s ease;
+}
+
+.group-modal__slot-label {
+	display: inline-block;
+	margin-top: 6px;
+	font-size: 12px;
+	color: #475569;
+}
+
+.group-modal__members {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.group-modal__member {
+	font-size: 12px;
+	color: #1f2937;
+	background: #f1f5f9;
+	border: 1px solid #e2e8f0;
+	border-radius: 999px;
+	padding: 4px 10px;
+}
+
+.group-modal__member--you {
+	color: #1d4ed8;
+	border-color: #bfdbfe;
+	background: #eff6ff;
+	font-weight: 700;
+}
+
+.group-modal__member--empty {
+	color: #6b7280;
+	background: #f8fafc;
+}
+
+@media (max-width: 640px) {
+	.group-modal {
+		max-width: 96vw;
+	}
+
+	.group-modal__group-header {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+}
