@@ -500,6 +500,35 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
               <label>Approved By:</label>
               <p>{proposal.approvedBy || "N/A"}</p>
             </div>
+            {/* Signed document uploaded by proponent */}
+            <div className="field-group">
+              <label>Signed Document:</label>
+              {proposal.signedDocUrl ? (
+                <a
+                  href={proposal.signedDocUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '6px 14px',
+                    background: '#f0fdfc',
+                    border: '1.5px solid #30bdb7',
+                    borderRadius: 6,
+                    color: '#1a9e99',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    textDecoration: 'none',
+                    marginTop: 4,
+                  }}
+                >
+                  📄 View Signed Document
+                </a>
+              ) : (
+                <p style={{ color: '#a0aec0' }}>No document uploaded</p>
+              )}
+            </div>
           </div>
         </div>
 

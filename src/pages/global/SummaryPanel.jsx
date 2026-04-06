@@ -21,6 +21,7 @@ function SummaryPanel({
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
   const [signedDoc, setSignedDoc] = useState(null);
+  const [signatureConfirmed, setSignatureConfirmed] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -447,13 +448,45 @@ function SummaryPanel({
         )}
       </div>
 
+      {/* Signature confirmation checkbox */}
+      {signedDoc && (
+        <label style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.6rem',
+          marginTop: '0.85rem',
+          cursor: 'pointer',
+          fontSize: '0.85rem',
+          color: '#4a5568',
+          lineHeight: 1.5,
+        }}>
+          <input
+            type="checkbox"
+            checked={signatureConfirmed}
+            onChange={(e) => setSignatureConfirmed(e.target.checked)}
+            style={{ marginTop: 2, accentColor: '#30bdb7', width: 16, height: 16, flexShrink: 0 }}
+          />
+          <span>
+            I confirm that the uploaded document has been physically signed by the{' '}
+            <strong>Reviewed By</strong> and <strong>Recommended By</strong> signatories.
+          </span>
+        </label>
+      )}
+
       <div className="form-actions" style={{ marginTop: '1rem' }}>
         <button type="button" className="btn-cancel" onClick={onBack}>Back</button>
-        <button type="button" className="btn-next" disabled={loading} onClick={handleExport}>
-          Export PDF
-        </button>
-        <button type="button" className="btn-submit" disabled={loading || !signedDoc} onClick={handleSubmit}>
-          Submit
+        {!signedDoc && (
+          <button type="button" className="btn-next" disabled={loading} onClick={handleExport}>
+            Export PDF
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn-submit"
+          disabled={loading || !signedDoc || !signatureConfirmed}
+          onClick={handleSubmit}
+        >
+          Submit to CSCE
         </button>
       </div>
     </div>
