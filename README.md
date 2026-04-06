@@ -30,7 +30,7 @@ close niyo lang lahat from database to vite(react) tas run this command
 
 Rename-Item (currentname)  emulator_data
 Example: 
-Rename-Item "firebase-export-1774925164764o3m6NB" -NewName "emulator_data"
+Rename-Item "firebase-export-1775358537534BqOGHH" -NewName "emulator_data"
 
 Hi, for material-icons, install lang ito:
 close yung run npm dev.

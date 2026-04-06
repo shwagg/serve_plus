@@ -2597,17 +2597,28 @@ export default function EventActivity() {
                   <span className="ea-progress-back-circle"><WestIcon sx={{ fontSize: 16 }} /></span>
                   <span className="ea-progress-back-label">Back</span>
                 </button>
+                <span className="ea-progress-card__title">Progress</span>
+                <div className="ea-progress-bar-wrap">
+                  <div className="ea-progress-bar-fill" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="ea-progress-card__pct">{pct}%</span>
+                <button className="ea-progress-toggle" onClick={() => setShowProgressDetails(v => !v)} aria-label={showProgressDetails ? 'Collapse progress' : 'Expand progress'}>
+                  {showProgressDetails
+                    ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} />
+                    : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
+                </button>
                 <button
                   style={{
-                    marginLeft: 8,
-                    background: '#fee2e2',
+                    marginLeft: 'auto',
+                    background: 'transparent',
                     color: '#dc2626',
-                    border: 'none',
+                    border: '1.5px solid #fca5a5',
                     borderRadius: 8,
-                    padding: '5px 14px',
+                    padding: '4px 12px',
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
+                    whiteSpace: 'nowrap',
                   }}
                   onClick={async () => {
                     if (!await showConfirm('Are you sure you want to un-enroll from this event?')) return;
@@ -2623,16 +2634,6 @@ export default function EventActivity() {
                   }}
                 >
                   Un-enroll
-                </button>
-                <span className="ea-progress-card__title">Progress</span>
-                <div className="ea-progress-bar-wrap">
-                  <div className="ea-progress-bar-fill" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="ea-progress-card__pct">{pct}%</span>
-                <button className="ea-progress-toggle" onClick={() => setShowProgressDetails(v => !v)} aria-label={showProgressDetails ? 'Collapse progress' : 'Expand progress'}>
-                  {showProgressDetails
-                    ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} />
-                    : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
                 </button>
               </div>
               {showProgressDetails && (
