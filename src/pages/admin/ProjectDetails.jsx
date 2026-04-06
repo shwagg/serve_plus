@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
 import { createNotification } from "../../utils/notificationUtils";
-import { showToast } from "../../utils/toast";
+import { showToast, showConfirm } from "../../utils/toast";
 
 import "../../styles/ProjectDetails.css";
 
@@ -68,7 +68,7 @@ export default function ProjectDetails({ projectId, onClose }) {
   }, [projectId, showQR]);
 
   const handleRemoveVolunteer = async (uid, name) => {
-    if (!window.confirm(`Remove "${name}" from this event?`)) return;
+    if (!await showConfirm(`Remove "${name}" from this event?`)) return;
     try {
       await deleteDoc(doc(db, "missions", projectId, "volunteer", uid));
       await deleteDoc(doc(db, "userMissions", uid, "missions", projectId));
@@ -244,7 +244,7 @@ export default function ProjectDetails({ projectId, onClose }) {
 
   //for archiving projects (admin-privilege)
   const handleArchive = async () => {
-    if (!window.confirm("Archive this project? You can restore it later.")) return;
+    if (!await showConfirm("Archive this project? You can restore it later.")) return;
 
     setSaving(true);
     try {
@@ -288,7 +288,7 @@ export default function ProjectDetails({ projectId, onClose }) {
   };
 
   const handleRestore = async () => {
-    if (!window.confirm("Restore this project to Draft?")) return;
+    if (!await showConfirm("Restore this project to Draft?")) return;
 
     setSaving(true);
     try {
@@ -308,10 +308,7 @@ export default function ProjectDetails({ projectId, onClose }) {
 
   //able to delete (admin-privilege) -> 
   const handleDelete = async () => {
-    const ok = window.confirm(
-      "Delete this project permanently? This cannot be undone."
-    );
-    if (!ok) return;
+    if (!await showConfirm("Delete this project permanently? This cannot be undone.")) return;
 
     setSaving(true);
     try {

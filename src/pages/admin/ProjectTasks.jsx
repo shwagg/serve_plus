@@ -2,7 +2,7 @@ import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, } from 
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
-import { showToast } from "../../utils/toast";
+import { showToast, showConfirm } from "../../utils/toast";
 
 import "../../styles/admin.css";
 
@@ -180,7 +180,7 @@ export default function ProjectTasks() {
   };
 
   const handleDeleteTask = async (taskId) => {
-    if (!window.confirm("Delete this task? This cannot be undone.")) return;
+    if (!await showConfirm("Delete this task? This cannot be undone.")) return;
 
     setSaving(true);
     try {

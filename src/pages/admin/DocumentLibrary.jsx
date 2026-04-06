@@ -5,7 +5,7 @@ import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
-import { showToast } from "../../utils/toast";
+import { showToast, showConfirm } from "../../utils/toast";
 import "../../styles/DocumentLibrary.css";
 
 function toTitleCase(str) {
@@ -48,7 +48,7 @@ export default function DocumentLibrary() {
   const [answerModalData, setAnswerModalData] = useState(null);
 
   const handleBackfillUserId = async () => {
-    if (!window.confirm("Backfill userId for all existing volunteer documents? This is a one-time fix.")) return;
+    if (!await showConfirm("Backfill userId for all existing volunteer documents? This is a one-time fix.")) return;
     const missionsSnap = await getDocs(collection(db, "missions"));
     let updated = 0;
     for (const missionDoc of missionsSnap.docs) {

@@ -158,14 +158,14 @@ export default function EventDetails({ onClose = null, missionId = null }) {
         },
       });
 
-      // Keep a reverse index so the chat dropdown can load instantly
-      await setDoc(doc(db, "userMissions", user.uid, "missions", id), {
+      // Keep a reverse index so the chat dropdown can load instantly — non-blocking
+      setDoc(doc(db, "userMissions", user.uid, "missions", id), {
         missionId: id,
         title: mission?.title || "Untitled Mission",
         role: "volunteer",
         date: mission?.targetDate || '',
         joinedAt: serverTimestamp(),
-      });
+      }).catch(e => console.error("Failed to write userMissions index:", e));
 
       // Fire notification without awaiting — non-critical
       const notificationsRef = collection(db, "users", user.uid, "notifications");
