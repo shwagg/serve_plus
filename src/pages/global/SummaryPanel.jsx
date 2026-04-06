@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../../firebaseConfig';
+import { useEffect, useState, useRef } from 'react';
+import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
 import { showToast } from '../../utils/toast';
 
@@ -15,14 +16,49 @@ function SummaryPanel({
   onBack,
   onClose,
   sdgOptions,
-  setLoading
+  setLoading,
+  onClearDraft,
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
+  const [signedDoc, setSignedDoc] = useState(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain'];
+  const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
+
+  const handleFileSelect = (file) => {
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      showToast('Unsupported file type. Please upload a PDF, image, Word, or Excel file.');
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      showToast('File is too large. Maximum size is 50 MB.');
+      return;
+    }
+    setSignedDoc(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    handleFileSelect(file);
+  };
 
   /**
    * Handles form submission: creates a mission document in the unified missions collection.
    */
   const handleSubmit = async () => {
+    if (!signedDoc) {
+      showToast('Please upload the signed scanned document before submitting.');
+      return;
+    }
     setLoading(true);
     try {
       const user = auth.currentUser;
@@ -31,44 +67,37 @@ function SummaryPanel({
         setLoading(false);
         return;
       }
+
+      // Upload signed document to Firebase Storage
+      let signedDocUrl = '';
+      try {
+        const ext = signedDoc.name.split('.').pop();
+        const storageRef = ref(storage, `proposals/signed/${user.uid}_${Date.now()}.${ext}`);
+        const snapshot = await uploadBytes(storageRef, signedDoc);
+        signedDocUrl = await getDownloadURL(snapshot.ref);
+      } catch (uploadErr) {
+        console.error('Failed to upload signed document:', uploadErr);
+        showToast('Failed to upload document. Please try again.');
+        return;
+      }
       const now = serverTimestamp();
 
       // --- Approval Flow Logic ---
-      // 1. Query Firestore for program chair and dean of selected department
-      // 2. Add admin/regular and admin/director (hardcoded names from README)
-      // 3. Store approvalFlow: [chair, dean, admin, director] (full names)
-      // 4. Auto-fill reviewedBy if proponent is program chair
-      let approvalFlow = [];
-      let reviewedBy = '';
-      let recommendedBy = '';
+      // reviewedBy / recommendedBy come from the proponent's form selections.
+      // approvalFlow is built from Firestore for tracking the full chain.
+      const reviewedBy    = formData.reviewedBy    || '';
+      const recommendedBy = formData.recommendedBy || '';
       let endorsedBy = '';
       let approvedBy = '';
+      let approvalFlow = [];
       try {
-        const { getDocs, collection, query, where } = await import('firebase/firestore');
+        const { getDocs, collection: col, query, where } = await import('firebase/firestore');
         const dept = formData.affiliatedDepartment;
-        // Query for program chair
-        const chairSnap = await getDocs(query(collection(db, 'users'), where('department', '==', dept), where('position', '==', 'program chair')));
-        const deanSnap = await getDocs(query(collection(db, 'users'), where('department', '==', dept), where('position', '==', 'college dean')));
+        const chairSnap = await getDocs(query(col(db, 'users'), where('department', '==', dept), where('position', '==', 'program chair')));
+        const deanSnap  = await getDocs(query(col(db, 'users'), where('department', '==', dept), where('position', '==', 'college dean')));
         const chairName = chairSnap.docs.length > 0 ? (chairSnap.docs[0].data().name || '') : '';
-        const deanName = deanSnap.docs.length > 0 ? (deanSnap.docs[0].data().name || '') : '';
-        // Admin names from README
-        const adminRegular = 'Admin Regular';
-        const adminDirector = 'Admin Director';
-        approvalFlow = [chairName, deanName, adminRegular, adminDirector];
-
-        // Determine proponent's position
-        let proponentPosition = '';
-        // Try to get the proponent's position from Firestore
-        const proponentSnap = await getDocs(query(collection(db, 'users'), where('name', '==', formData.preparedBy)));
-        if (proponentSnap.docs.length > 0) {
-          proponentPosition = proponentSnap.docs[0].data().position || '';
-        }
-
-        // Auto-fill logic
-        if (proponentPosition === 'program chair') {
-          reviewedBy = formData.preparedBy;
-        }
-        // If the proponent is the dean, all steps are manual (no auto-fill)
+        const deanName  = deanSnap.docs.length  > 0 ? (deanSnap.docs[0].data().name  || '') : '';
+        approvalFlow = [chairName, deanName, 'Admin Regular', 'Admin Director'];
       } catch (e) {
         approvalFlow = [];
       }
@@ -90,27 +119,26 @@ function SummaryPanel({
         dateProposed: formData.targetDate,
         sdgs: formData.sdgs || [],
         targetDate: formData.targetDate,
-        stakeholders: formData.stakeholders,
+        stakeholders: Array.isArray(formData.stakeholders) ? formData.stakeholders : (formData.stakeholders ? [formData.stakeholders] : []),
         location: formData.location,
         volunteerHours: Number(formData.volunteerHours) || 0,
         description: formData.description,
         objectives: formData.objectives,
-        specificActivities: formData.specificActivities.split('\n').filter(a => a.trim()),
+        specificActivities: Array.isArray(formData.specificActivities)
+          ? formData.specificActivities
+          : (formData.specificActivities || '').split('\n').filter(a => a.trim()),
         successIndicators: formData.successIndicators.split('\n').filter(a => a.trim()),
         budget: formData.budget,
         studentOutcomes: formData.studentOutcomes || '',
 
         // People involved
-        proponents: [formData.preparedBy],
-        preparedBy: formData.preparedBy,
+        proponents: formData.proponents?.length ? formData.proponents : [formData.preparedBy],
+        preparedBy: formData.proponents?.[0] || formData.preparedBy,
         createdBy: user.uid,
         reviewedBy,
         recommendedBy,
         endorsedBy,
         approvedBy,
-
-        // Affiliation
-        affiliation: formData.affiliation || '',
 
         // Partner School (for filtering)
         partnerSchool: formData.partnerSchool || '',
@@ -127,6 +155,9 @@ function SummaryPanel({
 
         // --- Add approval flow ---
         approvalFlow,
+
+        // Signed document uploaded by proponent
+        signedDocUrl,
       };
 
       // Add type-specific fields
@@ -142,11 +173,28 @@ function SummaryPanel({
           nature: ceFields.nature,
           learningOutcomes: ceFields.learningOutcomes,
           customLearningOutcome: ceFields.customLearningOutcome || '',
+          assignedFaculty: ceFields.assignedFaculty || '',
         };
       }
 
       // Save to missions collection
       const docRef = await addDoc(collection(db, 'missions'), missionData);
+
+      // Create task subcollection documents from specific activities
+      const activities = Array.isArray(formData.specificActivities) ? formData.specificActivities : [];
+      for (let i = 0; i < activities.length; i++) {
+        try {
+          await setDoc(doc(db, 'missions', docRef.id, 'task', String(i)), {
+            title: activities[i],
+            description: '',
+            points: 0,
+            type: 'individual',
+            createdAt: new Date().toISOString(),
+          });
+        } catch (taskErr) {
+          console.warn('Failed to create task:', activities[i], taskErr);
+        }
+      }
 
       try {
         await createNotification(user.uid, {
@@ -169,6 +217,7 @@ function SummaryPanel({
       }
 
       showToast('Proposal submitted successfully!');
+      onClearDraft?.();
       onClose();
     } catch (error) {
       console.error('Error submitting proposal:', error);
@@ -194,7 +243,7 @@ function SummaryPanel({
         proposalTitle: formData.title,
         dateProposed: new Date().toLocaleString(),
         participatingSections: slFields.section || '',
-        proponent: formData.preparedBy,
+        proponent: (formData.proponents?.length ? formData.proponents : [formData.preparedBy]).join(', '),
         courseTitle: slFields.course || '',
         courseCode: slFields.courseCode || '',
         targetDates: formData.targetDate,
@@ -202,11 +251,20 @@ function SummaryPanel({
         sdgs: (formData.sdgs || []).map(num => sdgNumberToLabel[num] || num),
         proposalDescription: formData.description,
         proposalObjectives: formData.objectives,
-        specificActivities: formData.specificActivities,
+        specificActivities: Array.isArray(formData.specificActivities)
+          ? formData.specificActivities.join('\n')
+          : formData.specificActivities,
         successIndicators: formData.successIndicators,
         budget: formData.budget,
-        stakeholders: formData.stakeholders,
-        volunteerHours: formData.volunteerHours
+        stakeholders: Array.isArray(formData.stakeholders)
+          ? formData.stakeholders.join(', ')
+          : formData.stakeholders,
+        volunteerHours: formData.volunteerHours,
+        preparedBy: formData.proponents?.[0] || formData.preparedBy,
+        reviewedBy: formData.reviewedBy || '',
+        recommendedBy: formData.recommendedBy || '',
+        endorsedBy: formData.endorsedBy || '',
+        approvedBy: formData.approvedBy || '',
       };
     }
     // community-engagement
@@ -231,22 +289,29 @@ function SummaryPanel({
     return {
       communityEngagementTitle: formData.title,
       dateProposed: new Date().toLocaleString(),
-      proponent: formData.preparedBy,
-      affiliation: formData.affiliation,
+      proponent: (formData.proponents?.length ? formData.proponents : [formData.preparedBy]).join(', '),
       studentOutcomes: formData.studentOutcomes || '',
       sdgs: (formData.sdgs || []).map(num => sdgNumberToLabel[num] || num),
       natureOfEngagement: natureArr,
       learningOutcomes: loArr,
       targetDate: formData.targetDate,
       location: formData.location,
-      stakeholders: formData.stakeholders,
+      stakeholders: Array.isArray(formData.stakeholders)
+        ? formData.stakeholders.join(', ')
+        : formData.stakeholders,
       numberOfVolunteerHours: formData.volunteerHours,
       ceDescription: formData.description,
       ceObjectives: formData.objectives,
-      specificActivities: formData.specificActivities,
+      specificActivities: Array.isArray(formData.specificActivities)
+        ? formData.specificActivities.join('\n')
+        : formData.specificActivities,
       successIndicators: formData.successIndicators,
       budget: formData.budget,
-      preparedBy: formData.preparedBy
+      preparedBy: formData.proponents?.[0] || formData.preparedBy,
+      reviewedBy: formData.reviewedBy || '',
+      recommendedBy: formData.recommendedBy || '',
+      endorsedBy: formData.endorsedBy || '',
+      approvedBy: formData.approvedBy || '',
     };
   };
 
@@ -304,15 +369,90 @@ function SummaryPanel({
       ) : (
         <div style={{ textAlign: 'center', padding: '2rem', color: '#a0aec0' }}>Generating preview…</div>
       )}
-      <p style={{ margin: '0.75rem 0 0', color: '#718096', fontSize: '0.8rem', textAlign: 'center' }}>
-        Review all fields carefully — the proposal cannot be edited once submitted.
-      </p>
+
+      {/* Signature instruction */}
+      <div style={{
+        margin: '1rem 0 0',
+        padding: '0.75rem 1rem',
+        background: '#fffbeb',
+        border: '1px solid #fcd34d',
+        borderRadius: 8,
+        fontSize: '0.85rem',
+        color: '#92400e',
+        lineHeight: 1.5,
+      }}>
+        <strong>Before submitting:</strong> Export the PDF above, have it physically signed by your
+        <em> Reviewed By</em> and <em>Recommended By</em> signatories, then scan and upload the signed
+        document below. The Submit button will be enabled once a document is attached.
+      </div>
+
+      {/* Upload bin */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          marginTop: '1rem',
+          border: `2px dashed ${isDragOver ? '#30bdb7' : signedDoc ? '#30bdb7' : '#cbd5e0'}`,
+          borderRadius: 10,
+          background: isDragOver ? '#f0fdfc' : signedDoc ? '#f0fdfc' : '#f9fafb',
+          padding: '1.5rem 1rem',
+          textAlign: 'center',
+          cursor: 'pointer',
+          transition: 'border-color 0.2s, background 0.2s',
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt"
+          style={{ display: 'none' }}
+          onChange={(e) => handleFileSelect(e.target.files?.[0])}
+        />
+        {signedDoc ? (
+          <>
+            <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>📄</div>
+            <div style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>{signedDoc.name}</div>
+            <div style={{ color: '#718096', fontSize: '0.78rem', marginTop: 2 }}>
+              {(signedDoc.size / 1024).toFixed(0)} KB — click to replace
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: '2rem', color: '#cbd5e0', marginBottom: '0.5rem' }}>☁</div>
+            <div style={{ fontWeight: 600, color: '#4a5568', fontSize: '0.9rem' }}>
+              Choose a file or drag &amp; drop it here.
+            </div>
+            <div style={{ color: '#a0aec0', fontSize: '0.78rem', margin: '0.3rem 0 0.75rem' }}>
+              txt, docx, pdf, jpeg, xlsx — Up to 50MB
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+              style={{
+                padding: '6px 20px',
+                borderRadius: 6,
+                border: '1.5px solid #cbd5e0',
+                background: '#fff',
+                color: '#4a5568',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Browse files
+            </button>
+          </>
+        )}
+      </div>
+
       <div className="form-actions" style={{ marginTop: '1rem' }}>
         <button type="button" className="btn-cancel" onClick={onBack}>Back</button>
         <button type="button" className="btn-next" disabled={loading} onClick={handleExport}>
           Export PDF
         </button>
-        <button type="button" className="btn-submit" disabled={loading} onClick={handleSubmit}>
+        <button type="button" className="btn-submit" disabled={loading || !signedDoc} onClick={handleSubmit}>
           Submit
         </button>
       </div>

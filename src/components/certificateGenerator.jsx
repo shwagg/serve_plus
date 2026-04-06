@@ -146,7 +146,7 @@ export default function CertificateGenerator() {
     try {
       // Use userID from navigation state (admin flow)
       if (!userID) {
-        showToast("No student selected. Please select a student.");
+        showToast("No volunteer selected. Please select a volunteer.");
         return;
       }
       // Generate a unique certificate ID
@@ -191,7 +191,7 @@ export default function CertificateGenerator() {
         read: false
       });
 
-      showToast("Certificate released to student, saved to Storage, and recorded in Firestore!");
+      showToast("Certificate released to volunteer, saved to Storage, and recorded in Firestore!");
     } catch (err) {
       showToast("Failed to release certificate: " + err.message);
     }
@@ -304,7 +304,7 @@ export default function CertificateGenerator() {
             Download Certificate
           </button>
           <button className="release-btn" onClick={handleReleaseToStudent}>
-            Release to Student
+            Release to Volunteer
           </button>
         </div>
         <div className="certificate-preview-panel">

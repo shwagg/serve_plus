@@ -46,6 +46,7 @@ export default function AdminLayout() {
             <Header />
             <Sidebar
                 links={adminLinks}
+                roleLabel="Admin"
                 collapsed={collapsed}
                 setCollapsed={setCollapsed}
                 userProfile={userProfile}

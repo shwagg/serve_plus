@@ -133,15 +133,15 @@ function AwardBadgesTab() {
           <input
             className="bm-search"
             type="text"
-            placeholder="Search students..."
+            placeholder="Search volunteers..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         {loadingStudents ? (
-          <p className="bm-loading">Loading students…</p>
+          <p className="bm-loading">Loading volunteers…</p>
         ) : filtered.length === 0 ? (
-          <p className="bm-empty">No students found.</p>
+          <p className="bm-empty">No volunteers found.</p>
         ) : (
           <div className="bm-student-list">
             {filtered.map((s) => (
@@ -171,7 +171,7 @@ function AwardBadgesTab() {
       <div className="bm-badge-panel">
         {!selected ? (
           <div className="bm-no-selection">
-            <span>Select a student to manage their badges</span>
+            <span>Select a volunteer to manage their badges</span>
           </div>
         ) : (
           <>
@@ -269,7 +269,7 @@ export default function BadgeManage() {
       <div className="bm-header">
         <h2 className="bm-title">Badge Management</h2>
         <p className="bm-subtitle">
-          View the badge catalog and award institutional badges to students.
+          View the badge catalog and award institutional badges to volunteers.
         </p>
       </div>
 

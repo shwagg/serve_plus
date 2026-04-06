@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-//import { ViewSidebarOutlinedIcon } from "./icons/index.js";
 import { adminLinks } from "../hooks/sidebarConfig";
 
-export default function Sidebar({ userProfile }) {
+export default function Sidebar({ userProfile, links, roleLabel }) {
+    const resolvedLinks = links || adminLinks;
+    const resolvedRoleLabel = roleLabel || "Admin";
     const [activeCategory, setActiveCategory] = useState(null);
     const stripRef = useRef(null);
     const sidebarRef = useRef(null);
@@ -57,7 +58,7 @@ export default function Sidebar({ userProfile }) {
             };
         }
 
-        for (const cat of adminLinks) {
+        for (const cat of resolvedLinks) {
             for (const child of cat.children || []) {
                 if (location.pathname.startsWith(child.to)) {
                     return {
@@ -99,7 +100,7 @@ export default function Sidebar({ userProfile }) {
                                 {userProfile?.name}
                             </span>
                             <span className="sidebar-user-role">
-                                Admin
+                                {resolvedRoleLabel}
                             </span>
                         </div>
                     </div>
@@ -109,7 +110,7 @@ export default function Sidebar({ userProfile }) {
                 {/* RIGHT SECTION */}
                 <div className="sidebar-right">
                     <div className="sidebar-categories">
-                        {adminLinks.map((cat) => (
+                        {resolvedLinks.map((cat) => (
                             <button
                                 key={cat.key}
                                 ref={(el) => (categoryRefs.current[cat.key] = el)}
@@ -131,7 +132,7 @@ export default function Sidebar({ userProfile }) {
                         style={ribbonStyle}
                     >
 
-                        {adminLinks
+                        {resolvedLinks
                             .find(cat => cat.key === activeCategory)
                             ?.children?.map(sub => (
                                 <NavLink

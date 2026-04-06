@@ -486,7 +486,7 @@ export default function DocumentLibrary() {
               <table className="submission-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 8px #0001' }}>
                 <thead>
                   <tr style={{ background: '#f3f4f8', color: '#23335b', borderBottom: '2px solid #e0e4ea' }}>
-                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'left', fontSize: '1.05rem' }}>Student Name / Participant</th>
+                    <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'left', fontSize: '1.05rem' }}>Volunteer Name / Participant</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Role</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Attendance</th>
                     <th style={{ padding: '14px 10px', fontWeight: 700, borderRight: '1px solid #e0e4ea', textAlign: 'center', fontSize: '1.05rem' }}>Pre-Activity Survey</th>

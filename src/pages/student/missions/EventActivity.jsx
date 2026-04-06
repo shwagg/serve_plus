@@ -2596,6 +2596,33 @@ export default function EventActivity() {
                   <span className="ea-progress-back-circle"><WestIcon sx={{ fontSize: 16 }} /></span>
                   <span className="ea-progress-back-label">Back</span>
                 </button>
+                <button
+                  style={{
+                    marginLeft: 8,
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '5px 14px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                  onClick={async () => {
+                    if (!window.confirm('Are you sure you want to un-enroll from this event?')) return;
+                    const user = auth.currentUser;
+                    if (!user) return;
+                    try {
+                      await deleteDoc(doc(db, 'missions', id, 'volunteer', user.uid));
+                      await deleteDoc(doc(db, 'userMissions', user.uid, 'missions', id));
+                      navigate('/student/home', { state: { scrollTo: 'missions' } });
+                    } catch (err) {
+                      alert('Failed to un-enroll. Please try again.');
+                    }
+                  }}
+                >
+                  Un-enroll
+                </button>
                 <span className="ea-progress-card__title">Progress</span>
                 <div className="ea-progress-bar-wrap">
                   <div className="ea-progress-bar-fill" style={{ width: `${pct}%` }} />
@@ -2784,6 +2811,11 @@ export default function EventActivity() {
                   <div className={`event-activities-panel${!isEditable ? ' event-activities-panel--ended' : ''}`}>
                     <h2 className="event-activities-title">Task Assignment</h2>
                     <p className="event-activities-desc">Pick an extra role you want to take on for this event</p>
+                    {isEventDay && volunteerProgress?.attendance !== 'present' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', marginBottom: 4, fontSize: 13, color: '#92400e' }}>
+                        🔒 Scan your attendance QR code first to unlock task assignment.
+                      </div>
+                    )}
                     <p className="event-activities-subtitle">
                       {tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined
                     </p>
@@ -2811,10 +2843,14 @@ export default function EventActivity() {
                           const hasSubmittedJournal = journalsForActivity.length > 0;
                           const enrollmentCountdown = getEnrollmentCountdown(activity);
 
-                          if (!isEventDay && !isEnrolled) {
+                          const attendanceDone = volunteerProgress?.attendance === 'present';
+                          if (!isEnrolled && (!isEventDay || !attendanceDone)) {
                             return (
                               <div key={idx} className="task-card task-card--locked">
                                 <span className="task-card__title-only">{activity.title}</span>
+                                {isEventDay && !attendanceDone && (
+                                  <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to unlock</span>
+                                )}
                               </div>
                             );
                           }
@@ -3004,8 +3040,8 @@ export default function EventActivity() {
                       })()}
                     </div>
                   </div>
-                  {/*REQUIREMENTS SECTION (UNDER ALL TASKS)*/}
-                  <div className="event-activities-panel">
+                  {/*REQUIREMENTS SECTION*/}
+                  <div className="event-activities-panel" style={{ order: -1 }}>
                     <h3 className="event-activities-title">Requirements</h3>
                     {(() => {
                       const preSurveyDone = volunteerProgress?.preSurvey === 'submitted';
@@ -3373,7 +3409,7 @@ export default function EventActivity() {
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                   <ul className="consent-note-list">
-                    <li>Students without a submitted consent form will <strong>not</strong> be allowed to join the event.</li>
+                    <li>Volunteers without a submitted consent form will <strong>not</strong> be allowed to join the event.</li>
                     <li>Download the form, fill it out, have your parent/guardian sign it, then upload the signed copy below.</li>
                   </ul>
                 </div>

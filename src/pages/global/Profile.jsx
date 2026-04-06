@@ -242,7 +242,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
     </div>
   );
 }
-import { SessionContext } from "../../context/SessionContext.jsx";
+import { useSession } from "../../context/SessionContext.jsx";
 import Header from "../../components/Header.jsx";
 import BadgeShelf from "../../components/badges/BadgeShelf";
 import "../../styles/Profile.css";
@@ -303,6 +303,7 @@ const mockProfile = {
 };
 
 export default function Profile() {
+  const { refreshUserData } = useSession();
   const [profile, setProfile] = useState(null);
   const [rewards, setRewards] = useState([]);
   const [earnedBadges, setEarnedBadges] = useState([]);
@@ -417,139 +418,108 @@ export default function Profile() {
           return;
         }
 
-        // Fetch profile
+        // Phase 1: Fetch profile only — show the page immediately
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
-        let profileData = docSnap.exists()
-          ? docSnap.data()
-          : mockProfile;
+        let profileData = docSnap.exists() ? docSnap.data() : mockProfile;
 
-        // Fetch events (NO POINT CALCULATION HERE)
-        const missionsRef = collection(db, "missions");
-        const missionsSnap = await getDocs(missionsRef);
-
-        let registeredEvents = [];
-
-        for (const eventDoc of missionsSnap.docs) {
-          const eventId = eventDoc.id;
-          const eventData = eventDoc.data();
-
-          const volunteerRef = doc(
-            db,
-            "missions",
-            eventId,
-            "volunteer",
-            user.uid
-          );
-
-          const volunteerSnap = await getDoc(volunteerRef);
-
-          if (volunteerSnap.exists()) {
-            const vData = volunteerSnap.data();
-
-            // Fetch tasks for this event where the user has a participant document
-            const tasksDone = [];
-            try {
-              const tasksRef = collection(db, "missions", eventId, "task");
-              const tasksSnap = await getDocs(tasksRef);
-              for (const taskDoc of tasksSnap.docs) {
-                try {
-                  const participantRef = doc(db, "missions", eventId, "task", taskDoc.id, "participants", user.uid);
-                  const participantSnap = await getDoc(participantRef);
-                  if (participantSnap.exists()) {
-                    const pdata = participantSnap.data();
-                    tasksDone.push({
-                      id: taskDoc.id,
-                      title: taskDoc.data().title || taskDoc.id,
-                      status: pdata.status || "todo",
-                      pointsEarned: pdata.pointsEarned || 0,
-                      completedAt: pdata.completedAt || pdata.lastUpdated || pdata.joinedAt || null,
-                      reflection: pdata.reflection || "",
-                    });
-                  }
-                } catch (e) {
-                  console.warn(`Failed to load participant for task ${taskDoc.id} in ${eventId}:`, e);
-                }
-              }
-            } catch (e) {
-              console.warn(`Failed to load tasks for event ${eventId}:`, e);
-            }
-
-            registeredEvents.push({
-              id: eventId,
-              title: eventData.title || eventId,
-              role: vData.role || "participant",
-              pointsEarned: vData.pointsEarned || 0,
-              sdgs: eventData.sdgs || [],
-              tasksDone,
-            });
-          }
-        }
-
-        profileData.registeredEvents = registeredEvents;
-
-        //Reading totalPoints DIRECTLY FROM USER DOC
         const totalPoints = profileData.totalPoints || 0;
-
         profileData.totalPoints = totalPoints;
         profileData.level = Math.floor(totalPoints / 100) + 1;
         profileData.levelProgress = totalPoints % 100;
+        profileData.registeredEvents = [];
 
         setProfile(profileData);
+        setLoading(false); // Show the page now — events load in background
 
-        // Fetch rewards
-        const rewardsSnap = await getDocs(
-          collection(db, "users", user.uid, "rewards")
-        );
+        // Phase 2: Fetch missions, rewards, badges all in parallel
+        const [missionsSnap, rewardsSnap, badgesSnap] = await Promise.all([
+          getDocs(collection(db, "missions")),
+          getDocs(collection(db, "users", user.uid, "rewards")),
+          getDocs(collection(db, "users", user.uid, "badges")),
+        ]);
 
-        setRewards(
-          rewardsSnap.docs.map(r => ({
-            id: r.id,
-            ...r.data(),
-          }))
-        );
+        setRewards(rewardsSnap.docs.map(r => ({ id: r.id, ...r.data() })));
 
-        // Fetch earned badges — and auto-award SERVE Ready if missing
-        const badgesSnap = await getDocs(
-          collection(db, "users", user.uid, "badges")
-        );
+        // Badges — auto-award SERVE Ready if missing
         const badgeList = badgesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const hasServeReady = badgeList.some(b => (b.badgeId ?? b.id) === "serve-ready");
         if (!hasServeReady) {
           const { awardServeReadyBadge } = await import("../../hooks/badgeSystem");
           await awardServeReadyBadge(user.uid);
-          // Re-fetch so shelf shows it immediately
           const refreshed = await getDocs(collection(db, "users", user.uid, "badges"));
           setEarnedBadges(refreshed.docs.map(d => ({ id: d.id, ...d.data() })));
         } else {
           setEarnedBadges(badgeList);
         }
 
-        // Fetch certificates for the logged-in user
-        const fetchCertificates = async () => {
-          try {
-            const user = auth.currentUser;
-            if (!user) {
-              setCertificates([]);
-              return;
+        // Certificates — real-time listener
+        const certsRef = collection(db, "users", user.uid, "certificates");
+        onSnapshot(certsRef, (snapshot) => {
+          setCertificates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
+        // Check all volunteer docs in parallel (instead of sequential for-loop)
+        const volunteerSnaps = await Promise.all(
+          missionsSnap.docs.map(eventDoc =>
+            getDoc(doc(db, "missions", eventDoc.id, "volunteer", user.uid))
+          )
+        );
+
+        // Only process missions the user is enrolled in
+        const enrolledEntries = missionsSnap.docs
+          .map((eventDoc, i) => ({ eventDoc, volunteerSnap: volunteerSnaps[i] }))
+          .filter(({ volunteerSnap }) => volunteerSnap.exists());
+
+        // For each enrolled mission, fetch tasks and participant docs in parallel
+        const registeredEvents = await Promise.all(
+          enrolledEntries.map(async ({ eventDoc, volunteerSnap }) => {
+            const eventId = eventDoc.id;
+            const eventData = eventDoc.data();
+            const vData = volunteerSnap.data();
+
+            let tasksDone = [];
+            try {
+              const tasksSnap = await getDocs(collection(db, "missions", eventId, "task"));
+              const participantSnaps = await Promise.all(
+                tasksSnap.docs.map(taskDoc =>
+                  getDoc(doc(db, "missions", eventId, "task", taskDoc.id, "participants", user.uid))
+                )
+              );
+              tasksDone = tasksSnap.docs
+                .map((taskDoc, i) => ({ taskDoc, participantSnap: participantSnaps[i] }))
+                .filter(({ participantSnap }) => participantSnap.exists())
+                .map(({ taskDoc, participantSnap }) => {
+                  const pdata = participantSnap.data();
+                  return {
+                    id: taskDoc.id,
+                    title: taskDoc.data().title || taskDoc.id,
+                    status: pdata.status || "todo",
+                    pointsEarned: pdata.pointsEarned || 0,
+                    completedAt: pdata.completedAt || pdata.lastUpdated || pdata.joinedAt || null,
+                    reflection: pdata.reflection || "",
+                  };
+                });
+            } catch (e) {
+              console.warn(`Failed to load tasks for event ${eventId}:`, e);
             }
-            const userID = user.uid;
-            const certsRef = collection(db, "users", userID, "certificates");
-            return onSnapshot(certsRef, (snapshot) => {
-              const certs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-              setCertificates(certs);
-            });
-          } catch (err) {
-            setCertificates([]);
-            console.error("Error fetching certificates:", err);
-          }
-        };
-        fetchCertificates();
+
+            return {
+              id: eventId,
+              title: eventData.title || eventId,
+              role: vData.role || "participant",
+              pointsEarned: vData.pointsEarned || 0,
+              sdgs: eventData.sdgs || [],
+              tasksDone,
+            };
+          })
+        );
+
+        setProfile(prev => ({ ...prev, registeredEvents }));
 
       } catch (err) {
         setError("Failed to load profile.");
         setProfile(mockProfile);
-      } finally {
         setLoading(false);
       }
     };
@@ -667,6 +637,7 @@ export default function Profile() {
                   })
                 );
                 setProfile(prev => ({ ...prev, ...updated }));
+                refreshUserData();
                 setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
               } catch (err) {
                 setProfileMsg({ type: 'error', text: 'Failed to update profile. Please try again.' });

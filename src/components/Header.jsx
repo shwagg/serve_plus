@@ -4,6 +4,7 @@ import { auth, db, functions } from '../firebaseConfig';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
+import { useSession } from '../context/SessionContext';
 import './Header.css';
 import menuIcon from '../assets/headassets/Menu Icon.svg';
 import NotificationBell from './NotificationBell';
@@ -68,11 +69,12 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
 };
 
 export default function Header() {
-  const [userRole, setUserRole] = useState(null);
-  const [userName, setUserName] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [userUsername, setUserUsername] = useState('');
-  const [userAvatar, setUserAvatar] = useState('');
+  const { userData } = useSession();
+  const userRole = userData?.role || null;
+  const userName = userData?.name || '';
+  const userEmail = userData?.email || '';
+  const userUsername = userData?.username || '';
+  const userAvatar = userData?.avatar || '';
   const [showMenu, setShowMenu] = useState(false);
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [showProposalForm, setShowProposalForm] = useState(false);
@@ -83,27 +85,6 @@ export default function Header() {
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const menuRef = useRef(null);
   const navigate = useNavigate();
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      const user = auth.currentUser;
-      if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUserRole(userData.role);
-            setUserName(userData.name || user.displayName || 'User');
-            setUserUsername(userData.username || '');
-            setUserAvatar(userData.avatar || '');
-          }
-          setUserEmail(user.email || '');
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-        }
-      }
-    };
-    fetchUserRole();
-  }, []);
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {

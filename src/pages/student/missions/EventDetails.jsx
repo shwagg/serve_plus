@@ -9,8 +9,9 @@ import '../../../styles/student.css';
 import PreActivitySurvey from '../../../forms/PreActivitySurvey';
 import mission1 from '../../../assets/mission1.jpg';
 
-export default function EventDetails({ onClose = null }) {
-  const { id } = useParams();
+export default function EventDetails({ onClose = null, missionId = null }) {
+  const { id: paramId } = useParams();
+  const id = missionId || paramId;
   const navigate = useNavigate();
   const [mission, setMission] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -113,6 +114,12 @@ export default function EventDetails({ onClose = null }) {
     fetchMission();
   }, [id, navigate]);
 
+  useEffect(() => {
+    if (volunteer?.registrationStatus === "approved") {
+      navigate(`/event/${id}/activity?mode=active`);
+    }
+  }, [volunteer, id, navigate]);
+
   const handleCancelRequest = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -160,33 +167,25 @@ export default function EventDetails({ onClose = null }) {
         joinedAt: serverTimestamp(),
       });
 
-      setVolunteer({ registrationStatus: "approved" });
+      // Fire notification without awaiting — non-critical
+      const notificationsRef = collection(db, "users", user.uid, "notifications");
+      getDocs(query(notificationsRef, where("type", "==", "event_registration"), where("eventId", "==", id)))
+        .then(existing => {
+          if (existing.empty) {
+            createNotification(user.uid, {
+              type: "event_registration",
+              title: "Enrolled Successfully",
+              message: `You have been enrolled in "${mission?.title || "this event"}".`,
+              link: `/event/${id}/activity?mode=active`,
+              eventId: id,
+            });
+          }
+        })
+        .catch(e => console.error("Failed to create registration notification:", e));
 
-      // Notify volunteer of auto-enrollment
-      try {
-        const notificationsRef = collection(db, "users", user.uid, "notifications");
-        const existingQuery = query(
-          notificationsRef,
-          where("type", "==", "event_registration"),
-          where("eventId", "==", id)
-        );
-        const existing = await getDocs(existingQuery);
-        if (existing.empty) {
-          await createNotification(user.uid, {
-            type: "event_registration",
-            title: "Enrolled Successfully",
-            message: `You have been enrolled in "${mission?.title || "this event"}".`,
-            link: `/event/${id}/activity?mode=active`,
-            eventId: id,
-          });
-        }
-      } catch (e) {
-        console.error("Failed to create registration notification:", e);
-      }
-      setShowSurveyModal(false);
+      navigate(`/event/${id}/activity?mode=active`);
     } catch (err) {
-      setSurveyError('Failed to upload consent form or submit survey. Please try again.');
-    } finally {
+      console.error("Failed to join event:", err);
       setJoining(false);
     }
 
@@ -216,8 +215,8 @@ export default function EventDetails({ onClose = null }) {
       {!onClose && <Header />}
       {!onClose && <div className="header-spacer"></div>}
       <div className="content-page" style={onClose ? { height: 'auto', overflow: 'visible', padding: 0 } : undefined}>
-        <div className="event-details-center">
-          <div className="event-details-image" style={{ position: 'relative', ...(onClose ? { height: '160px' } : {}) }}>
+        <div className="event-details-center" style={onClose ? { padding: 0 } : undefined}>
+          <div className="event-details-image" style={{ position: 'relative', ...(onClose ? { height: '180px', flexShrink: 0 } : {}) }}>
             <img
               src={mission.img && mission.img.trim() !== "" ? mission.img : defaultBanner}
               alt={mission.alt || "Event image"}
@@ -227,33 +226,38 @@ export default function EventDetails({ onClose = null }) {
                 onClick={onClose}
                 style={{
                   position: 'absolute', top: 10, right: 12,
-                  background: 'none', border: 'none',
-                  fontSize: 28, color: '#111',
+                  background: 'rgba(0,0,0,0.45)',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: 18,
                   cursor: 'pointer', zIndex: 20,
-                  padding: 0, lineHeight: 1,
-                  fontWeight: 700,
+                  width: 32, height: 32,
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1, fontWeight: 700,
+                  backdropFilter: 'blur(4px)',
                 }}
                 aria-label="Close"
               >✕</button>
             )}
           </div>
-          <div className="event-details-card" style={onClose ? { marginTop: -16, padding: '16px 20px 20px', transform: 'none', boxShadow: 'none' } : undefined}>
-            <div className="event-details-grid" style={onClose ? { gap: '16px', padding: '0' } : undefined}>
+          <div className="event-details-card" style={onClose ? { marginTop: -16, padding: '16px 28px 20px', transform: 'none', boxShadow: 'none' } : undefined}>
+            <div className="event-details-grid" style={onClose ? { padding: '0', gap: '12px' } : undefined}>
 
               {/* LEFT COLUMN */}
               <div className="event-details-left">
-                <h1 className="event-details-title" style={onClose ? { fontSize: 28 } : undefined}>{mission.title}</h1>
-                <p className="event-details-desc" style={onClose ? { fontSize: 13, lineHeight: 1.4, margin: 0 } : undefined}>{mission.description}</p>
-                <div className="event-details-meta" style={onClose ? { gap: 4 } : undefined}>
-                  <div className="event-meta-item" style={onClose ? { fontSize: 13 } : undefined}>
+                <h1 className="event-details-title" style={onClose ? { fontSize: '1.5rem', lineHeight: 1.25, marginBottom: 6 } : undefined}>{mission.title}</h1>
+                <p className="event-details-desc" style={onClose ? { fontSize: '0.85rem', lineHeight: 1.5, margin: 0 } : undefined}>{mission.description}</p>
+                <div className="event-details-meta" style={onClose ? { marginTop: 10, gap: 4 } : undefined}>
+                  <div className="event-meta-item" style={onClose ? { fontSize: '0.82rem' } : undefined}>
                     📅 <span>{mission.targetDate || "Date TBA"}</span>
                   </div>
 
-                  <div className="event-meta-item" style={onClose ? { fontSize: 13 } : undefined}>
+                  <div className="event-meta-item" style={onClose ? { fontSize: '0.82rem' } : undefined}>
                     📍 <span>{mission.location || "Location TBA"}</span>
                   </div>
 
-                  <div className="event-meta-item" style={onClose ? { fontSize: 13 } : undefined}>
+                  <div className="event-meta-item" style={onClose ? { fontSize: '0.82rem' } : undefined}>
                     ⏱ <span>
                       {mission.volunteerHours
                         ? `${mission.volunteerHours} hours`
@@ -301,7 +305,7 @@ export default function EventDetails({ onClose = null }) {
 
               </div>
             </div>
-            <div className="event-details-cta" style={onClose ? { margin: '12px 0 0' } : undefined}>
+            <div className="event-details-cta">
               {/* Left: volunteer avatars + joined count */}
               <div className="volunteer-avatars">
                 {volunteerCount > 0 && (
@@ -346,15 +350,7 @@ export default function EventDetails({ onClose = null }) {
                       Restriction lifts on {attendanceFlag.expiry?.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.
                     </p>
                   </div>
-                ) : volunteer?.registrationStatus === "approved" ? (
-                  <button
-                    className="event-details-join-btn"
-                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)', cursor: 'pointer' }}
-                    onClick={() => navigate(`/event/${id}/activity?mode=active`)}
-                  >
-                    View Event
-                  </button>
-                ) : (
+                ) : volunteer?.registrationStatus === "approved" ? null : (
                   <button
                     className="event-details-join-btn"
                     disabled={joining}

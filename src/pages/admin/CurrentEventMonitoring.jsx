@@ -356,13 +356,13 @@ export default function CurrentEventMonitoring() {
               <div className="cem-metric-row">
                 <span className="cem-metric-label">Volunteers Registered</span>
                 <span className="cem-metric-value">
-                  {volunteersRegistered} Students
+                  {volunteersRegistered} Volunteers
                 </span>
               </div>
               <div className="cem-metric-row">
-                <span className="cem-metric-label">Students Present</span>
+                <span className="cem-metric-label">Volunteers Present</span>
                 <span className="cem-metric-value">
-                  {studentsPresent} Students
+                  {studentsPresent} Volunteers
                 </span>
               </div>
               <div className="cem-metric-row">
@@ -510,7 +510,7 @@ export default function CurrentEventMonitoring() {
             <div className="cem-analytics-content">
               <div className="cem-metric-row">
                 <span className="cem-metric-label">Volunteers Registered</span>
-                <span className="cem-metric-value">{volunteersRegistered} Students</span>
+                <span className="cem-metric-value">{volunteersRegistered} Volunteers</span>
               </div>
               <div className="cem-metric-row">
                 <span className="cem-metric-label">Pre Activity Survey Answers</span>
@@ -518,8 +518,8 @@ export default function CurrentEventMonitoring() {
                   {(() => {
                     const preSurveyCount = volunteers.filter(v => v.preSurveyAnswers).length;
                     return preSurveyCount === 1
-                      ? '1 student submitted'
-                      : `${preSurveyCount} students submitted`;
+                      ? '1 volunteer submitted'
+                      : `${preSurveyCount} volunteers submitted`;
                   })()}
                 </span>
               </div>
@@ -585,8 +585,8 @@ export default function CurrentEventMonitoring() {
                   {(() => {
                     const postSurveyCount = volunteers.filter(v => v.postSurveyAnswers).length;
                     return postSurveyCount === 1
-                      ? '1 student submitted'
-                      : `${postSurveyCount} students submitted`;
+                      ? '1 volunteer submitted'
+                      : `${postSurveyCount} volunteers submitted`;
                   })()}
                 </span>
               </div>
@@ -649,7 +649,7 @@ export default function CurrentEventMonitoring() {
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>Student</th>
+                      <th>Volunteer</th>
                       <th>Task</th>
                       <th>Reflection</th>
                       <th>Status</th>

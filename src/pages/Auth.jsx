@@ -35,6 +35,7 @@ function Auth() {
   //only developers can see detailed debug info while developing.
 
   const [step, setStep] = useState("login"); //"login" or "mfa"
+  const [mfaRole, setMfaRole] = useState("admin"); // tracks which privileged role is doing MFA
   const intendedPath = useLocation().state?.from || null;
   const [mfaCode, setMfaCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -134,10 +135,11 @@ function Auth() {
       }
 
       // ✅ 5. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
-      if (role === "admin") {
+      if (role === "admin" || role === "sysadmin") {
         try {
           const signedInEmail = userCred.user.email;
           setMfaEmail(signedInEmail);
+          setMfaRole(role);
           const sendMfaCode = httpsCallable(functions, "sendMfaCode");
           await sendMfaCode({ email: signedInEmail });
         } catch (mfaErr) {
@@ -242,8 +244,12 @@ function Auth() {
         return;
       }
 
-      //MFA success → now redirect admin
-      navigate("/admin/dashboard", { replace: true });
+      //MFA success → redirect based on role
+      if (mfaRole === "sysadmin") {
+        navigate("/sysadmin/roster", { replace: true });
+      } else {
+        navigate("/admin/dashboard", { replace: true });
+      }
     } catch (err) {
       console.error(err);
       setError("Unable to verify the code. Please try again.");
@@ -273,10 +279,11 @@ function Auth() {
 
     const { role, email: pendingEmail, userCred } = pendingNavigation;
 
-    if (role === "admin") {
+    if (role === "admin" || role === "sysadmin") {
       try {
         const signedInEmail = userCred.user.email;
         setMfaEmail(signedInEmail);
+        setMfaRole(role);
         const sendMfaCode = httpsCallable(functions, "sendMfaCode");
         await sendMfaCode({ email: signedInEmail });
       } catch (mfaErr) {

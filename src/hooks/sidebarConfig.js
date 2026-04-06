@@ -44,13 +44,30 @@ export const adminLinks = [
     key: "system",
     label: "System",
     children: [
-      { label: "System Activity Log", to: "/admin/audit-logs" },
-      { label: "Backup & Restore", to: "/admin/backup-restore" },
-      { label: "Students Banner", to: "/admin/system/banner" },
+      { label: "Volunteers Banner", to: "/admin/system/banner" },
       { label: "Announcement", to: "/admin/system/announcement" },
-      { label: "Privacy & Terms", to: "/admin/system/agreements" },
       { label: "Badges", to: "/admin/system/badges" },
-      { label: "Support Inbox", to: "/admin/support" },
+    ],
+  },
+];
+
+// system admin side
+export const sysadminLinks = [
+  {
+    key: "roster",
+    label: "Roster",
+    children: [
+      { label: "Account Management", to: "/sysadmin/roster" },
+    ],
+  },
+  {
+    key: "system",
+    label: "System",
+    children: [
+      { label: "Support Inbox", to: "/sysadmin/support" },
+      { label: "Privacy & Terms", to: "/sysadmin/system/agreements" },
+      { label: "Activity Log", to: "/sysadmin/audit-logs" },
+      { label: "Backup & Restore", to: "/sysadmin/backup-restore" },
     ],
   },
 ];

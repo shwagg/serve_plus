@@ -301,7 +301,7 @@ export default function AdminDashboard() {
             <svg width="26" height="26" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" fill="#4C48FF"/></g></svg>
           </div>
           <div>
-            <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total registered students</div>
+            <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total registered volunteers</div>
             <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{totalStudents === null ? '...' : totalStudents}</div>
           </div>
         </div>
@@ -357,7 +357,7 @@ export default function AdminDashboard() {
               }}>
                 <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" fill="#4C48FF"/></g></svg>
               </span>
-              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Students Engagement</span>
+              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Volunteers Engagement</span>
             </div>
             <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 60 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 8 }}>

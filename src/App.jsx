@@ -23,6 +23,7 @@ import Register from "./pages/Register";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSupport from "./pages/admin/AdminSupport";
 import AdminLayout from "./pages/admin/AdminLayout";
+import SysAdminLayout from "./pages/sysadmin/SysAdminLayout";
 import AgreementEditor from "./pages/admin/AgreementEditor";
 import AuditLogs from "./pages/admin/AuditLogs";
 import BackupRestore from "./pages/admin/BackupRestore";
@@ -105,11 +106,27 @@ function App() {
               element={<ProjectTasks />}
             />
             <Route path="support" element={<AdminSupport />} />
-            <Route path="roster" element={<RosterAccountManagement />} />
+            <Route path="roster" element={<RosterAccountManagement readOnly />} />
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="system/agreements" element={<AgreementEditor />} />
             <Route path="system/badges" element={<BadgeManage />} />
+          </Route>
+
+          {/* System Admin Routes */}
+          <Route
+            path="/sysadmin"
+            element={
+              <ProtectedRoute allowedRoles={["sysadmin"]}>
+                <SysAdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="roster" element={<RosterAccountManagement />} />
+            <Route path="support" element={<AdminSupport />} />
+            <Route path="system/agreements" element={<AgreementEditor />} />
+            <Route path="audit-logs" element={<AuditLogs />} />
+            <Route path="backup-restore" element={<BackupRestore />} />
           </Route>
 
           <Route

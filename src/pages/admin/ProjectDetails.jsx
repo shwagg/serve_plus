@@ -36,10 +36,20 @@ export default function ProjectDetails({ projectId, onClose }) {
         const snap = await getDocs(volunteerRef);
 
         // All volunteers with their status
-        const allVols = snap.docs.map(doc => ({
-          name: doc.data().name || doc.data().email || "Unknown",
-          status: doc.data().attendanceStatus || "not_checked",
-          email: doc.data().email || ""
+        const allVols = await Promise.all(snap.docs.map(async (d) => {
+          let name = d.data().name || d.data().email || "Unknown";
+          if (name === "Unknown") {
+            try {
+              const userSnap = await getDoc(doc(db, "users", d.id));
+              if (userSnap.exists()) name = userSnap.data().name || userSnap.data().email || "Unknown";
+            } catch (_) {}
+          }
+          return {
+            uid: d.id,
+            name,
+            status: d.data().attendanceStatus || "not_checked",
+            email: d.data().email || ""
+          };
         }));
         setAllVolunteers(allVols);
 
@@ -56,6 +66,25 @@ export default function ProjectDetails({ projectId, onClose }) {
     };
     fetchAttendees();
   }, [projectId, showQR]);
+
+  const handleRemoveVolunteer = async (uid, name) => {
+    if (!window.confirm(`Remove "${name}" from this event?`)) return;
+    try {
+      await deleteDoc(doc(db, "missions", projectId, "volunteer", uid));
+      await deleteDoc(doc(db, "userMissions", uid, "missions", projectId));
+      setAllVolunteers(prev => prev.filter(v => v.uid !== uid));
+      setAttendees(prev => prev.filter(n => n !== name));
+      createNotification(uid, {
+        type: "event_removed",
+        title: "Removed from Event",
+        message: `You have been removed from "${project?.title || "an event"}".`,
+        link: "/student",
+      }).catch(() => {});
+      showToast(`${name} removed from this event.`);
+    } catch (err) {
+      showToast("Failed to remove volunteer. Please try again.");
+    }
+  };
 
   //attendance re-generate timestamp for qr code
   const generateNewQR = async () => {
@@ -339,7 +368,7 @@ export default function ProjectDetails({ projectId, onClose }) {
       {/*progress bar no. of joined */}
       <div className="mission-progress">
         <div className="progress-info">
-          {attendees.length} / {project.maxStudents || 0} students joined
+          {attendees.length} / {project.maxStudents || 0} volunteers joined
         </div>
         <div className="progress-bar">
           <div
@@ -387,7 +416,7 @@ export default function ProjectDetails({ projectId, onClose }) {
         <div className="qr-card">
           <div>
             <strong>Attendance QR</strong>
-            <p>Students scan to mark attendance</p>
+            <p>Volunteers scan to mark attendance</p>
           </div>
 
           <div className="qr-actions">
@@ -621,7 +650,7 @@ export default function ProjectDetails({ projectId, onClose }) {
                 background: '#f9fafb',
                 borderRadius: 8
               }}>
-                No students have joined this event yet.
+                No volunteers have joined this event yet.
               </div>
             ) : (
               <div>
@@ -635,6 +664,7 @@ export default function ProjectDetails({ projectId, onClose }) {
                       <th style={{ padding: '12px 8px', textAlign: 'left', color: '#234e7b', fontWeight: 600 }}>#</th>
                       <th style={{ padding: '12px 8px', textAlign: 'left', color: '#234e7b', fontWeight: 600 }}>Name</th>
                       <th style={{ padding: '12px 8px', textAlign: 'left', color: '#234e7b', fontWeight: 600 }}>Status</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', color: '#234e7b', fontWeight: 600 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -654,6 +684,23 @@ export default function ProjectDetails({ projectId, onClose }) {
                           }}>
                             {volunteer.status}
                           </span>
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <button
+                            onClick={() => handleRemoveVolunteer(volunteer.uid, volunteer.name)}
+                            style={{
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: 6,
+                              padding: '4px 12px',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Remove
+                          </button>
                         </td>
                       </tr>
                     ))}

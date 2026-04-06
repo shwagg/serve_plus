@@ -1,9 +1,10 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import EventDetails from "./missions/EventDetails";
 import { auth, functions, db } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
-import { collection, getDocs, doc, getDoc, query, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, orderBy, limit, where, getCountFromServer } from "firebase/firestore";
 import Header from "../../components/Header";
 import GlobalAnnouncements from "../../components/GlobalAnnouncements";
 import "../../styles/student.css";
@@ -59,6 +60,11 @@ const StudentHome = () => {
   const [enrolledMissions, setEnrolledMissions] = useState({});
   const [completedMissions, setCompletedMissions] = useState(0);
 
+  const [selectedMissionId, setSelectedMissionId] = useState(null);
+  const [enrollmentRefreshKey, setEnrollmentRefreshKey] = useState(0);
+  const [proposalCards, setProposalCards] = useState([]);
+  const [volunteerInfo, setVolunteerInfo] = useState({});
+
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = landingPromos.length;
   const currentPromo = landingPromos[currentPage];
@@ -90,21 +96,59 @@ const StudentHome = () => {
 
         setMissionCards(missions);
 
+        // Fetch total count, preview volunteers (first 4), and current user enrollment — all in parallel
+        const [countSnaps, previewSnaps, enrollmentSnaps] = await Promise.all([
+          Promise.all(missions.map((m) =>
+            getCountFromServer(collection(db, "missions", m.id, "volunteer"))
+          )),
+          Promise.all(missions.map((m) =>
+            getDocs(query(collection(db, "missions", m.id, "volunteer"), limit(4)))
+          )),
+          user
+            ? Promise.all(missions.map((m) =>
+                getDoc(doc(db, "missions", m.id, "volunteer", user.uid))
+              ))
+            : Promise.resolve([]),
+        ]);
+
+        // Collect unique volunteer UIDs needed for profile lookup
+        const allUids = new Set();
+        previewSnaps.forEach((snap) => snap.docs.forEach((d) => allUids.add(d.id)));
+        const uidArr = [...allUids];
+
+        // Batch-fetch user profiles for preview bubbles
+        const profileMap = {};
+        if (uidArr.length > 0) {
+          const profileSnaps = await Promise.all(uidArr.map((uid) => getDoc(doc(db, "users", uid))));
+          uidArr.forEach((uid, i) => {
+            if (profileSnaps[i].exists()) {
+              const d = profileSnaps[i].data();
+              profileMap[uid] = {
+                name: d.name || d.username || d.email?.split('@')[0] || '?',
+                avatar: d.avatar && !d.avatar.includes('ui-avatars.com') ? d.avatar : null,
+              };
+            }
+          });
+        }
+
+        // Build volunteerInfo map
+        const infoMap = {};
+        missions.forEach((m, i) => {
+          const previewUids = previewSnaps[i].docs.map((d) => d.id);
+          infoMap[m.id] = {
+            count: countSnaps[i].data().count,
+            preview: previewUids.map((uid) => profileMap[uid] || { name: '?', avatar: null }),
+          };
+        });
+        setVolunteerInfo(infoMap);
+
         const enrollmentMap = {};
         let completed = 0;
-
         if (user) {
-          const enrollmentSnaps = await Promise.all(
-            missions.map((mission) =>
-              getDoc(doc(db, "missions", mission.id, "volunteer", user.uid))
-            )
-          );
-          missions.forEach((mission, i) => {
+          missions.forEach((m, i) => {
             const snap = enrollmentSnaps[i];
-            enrollmentMap[mission.id] = snap.exists() ? (snap.data().registrationStatus || "pending") : null;
-            if (snap.exists() && snap.data().completionStatus === "completed") {
-              completed++;
-            }
+            enrollmentMap[m.id] = snap.exists() ? (snap.data().registrationStatus || "pending") : null;
+            if (snap.exists() && snap.data().completionStatus === "completed") completed++;
           });
         }
 
@@ -116,7 +160,32 @@ const StudentHome = () => {
     };
 
     fetchMissions();
-  }, []);
+  }, [enrollmentRefreshKey, currentUser]);
+
+  // Fetch proposals created by the current user
+  useEffect(() => {
+    const fetchProposals = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        setProposalCards([]);
+        return;
+      }
+      try {
+        const q = query(
+          collection(db, "missions"),
+          where("createdBy", "==", user.uid)
+        );
+        const snap = await getDocs(q);
+        const proposals = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(p => p.status !== "published");
+        setProposalCards(proposals);
+      } catch (error) {
+        console.error("Error fetching proposals:", error);
+      }
+    };
+    fetchProposals();
+  }, [currentUser]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -286,13 +355,20 @@ const StudentHome = () => {
         behavior: "auto",
       });
     });
-  }, []);
+  }, [leaderboard]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+
+  const getInitials = (name) => {
+    const parts = (name || '?').trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
   };
 
   //for the ranking of the user logged in for label
@@ -317,6 +393,7 @@ const StudentHome = () => {
   }, [activeTab, missionCards, enrolledMissions]);
 
   return (
+    <>
     <div className="full-page">
       {/* Logout Popup */}
       {showLogoutPopup && (
@@ -440,10 +517,65 @@ const StudentHome = () => {
               >
                 Your Missions
               </button>
+              <button
+                role="tab"
+                aria-selected={activeTab === "proposals"}
+                className={`mission-tab ${activeTab === "proposals" ? "active" : ""}`}
+                onClick={() => setActiveTab("proposals")}
+              >
+                Your Proposals
+              </button>
             </div>
           </div>
           <div className="mission-list" role="tabpanel">
-            {filteredMissions.length === 0 ? (
+            {activeTab === "proposals" ? (
+              proposalCards.length === 0 ? (
+                <div className="mission-empty-state">
+                  <span className="mission-empty-icon">📝</span>
+                  <p>You haven't created any proposals yet.</p>
+                </div>
+              ) : (
+                proposalCards.map((proposal) => {
+                  const statusLabels = {
+                    for_approval: { label: '📋 For Approval', color: '#d97706' },
+                    draft: { label: '✏️ Draft', color: '#64748b' },
+                    rejected: { label: '❌ Rejected', color: '#dc2626' },
+                    approved: { label: '✅ Approved', color: '#16a34a' },
+                  };
+                  const statusInfo = statusLabels[proposal.status] || { label: proposal.status, color: '#64748b' };
+                  const typeLabel = proposal.projectType === 'sl' ? 'Service Learning' : proposal.projectType === 'ce' ? 'Community Engagement' : '';
+                  return (
+                    <div
+                      key={proposal.id}
+                      className="mission-card"
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <span
+                        className="mission-enrolled-badge"
+                        style={{ background: statusInfo.color }}
+                      >
+                        {statusInfo.label}
+                      </span>
+                      <div className="mission-card-image">
+                        <img src={proposal.img || mission1} alt={proposal.alt || proposal.title} loading="lazy" />
+                      </div>
+                      <div className="mission-card-body">
+                        <h3 className="mission-card-title">{proposal.title}</h3>
+                        <div className="mission-card-meta">
+                          {typeLabel && (
+                            <span className="mission-card-date">🗂️ {typeLabel}</span>
+                          )}
+                          <span className="mission-card-date">
+                            📅 {formatDate(proposal.targetDate) || "Date TBA"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )
+            ) : filteredMissions.length === 0 ? (
               <div className="mission-empty-state">
                 <span className="mission-empty-icon">🔍</span>
                 <p>{activeTab === "your" ? "You haven't joined any missions yet." : "No missions available right now."}</p>
@@ -457,7 +589,7 @@ const StudentHome = () => {
                     if (enrolledMissions[mission.id] === "approved") {
                       navigate(`/event/${mission.id}/activity`);
                     } else {
-                      navigate(`/event/${mission.id}`);
+                      setSelectedMissionId(mission.id);
                     }
                   }}
                   role="button"
@@ -468,7 +600,7 @@ const StudentHome = () => {
                       if (enrolledMissions[mission.id] === "approved") {
                         navigate(`/event/${mission.id}/activity`);
                       } else {
-                        navigate(`/event/${mission.id}`);
+                        setSelectedMissionId(mission.id);
                       }
                     }
                   }}
@@ -488,6 +620,33 @@ const StudentHome = () => {
                       <span className="mission-card-date">
                         📅 {formatDate(mission.targetDate || mission.targetDates) || "Date TBA"}
                       </span>
+                      {(() => {
+                        const info = volunteerInfo[mission.id];
+                        const count = info?.count ?? 0;
+                        const preview = info?.preview ?? [];
+                        const extra = count - preview.length;
+                        if (count === 0) return null;
+                        return (
+                          <div className="vol-preview">
+                            {preview.map((vol, i) => (
+                              <div
+                                key={i}
+                                className="vol-bubble"
+                                style={{ zIndex: preview.length - i, background: vol.avatar ? undefined : '#30bdb7' }}
+                              >
+                                {vol.avatar
+                                  ? <img src={vol.avatar} alt="" />
+                                  : <span>{getInitials(vol.name)}</span>
+                                }
+                              </div>
+                            ))}
+                            {extra > 0 && (
+                              <div className="vol-bubble vol-bubble-extra">+{extra}</div>
+                            )}
+                            <span className="vol-joined-text">joined</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -582,6 +741,37 @@ const StudentHome = () => {
 
       </div>
     </div>
+
+    {/* Event Details Modal */}
+    {selectedMissionId && (
+      <div
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          zIndex: 3000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) setSelectedMissionId(null); }}
+      >
+        <div style={{
+          background: '#fff',
+          borderRadius: 16,
+          boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
+          width: '90vw',
+          maxWidth: 900,
+          overflow: 'hidden',
+          position: 'relative',
+        }}>
+          <EventDetails
+            key={selectedMissionId}
+            missionId={selectedMissionId}
+            onClose={() => { setSelectedMissionId(null); setEnrollmentRefreshKey(k => k + 1); }}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

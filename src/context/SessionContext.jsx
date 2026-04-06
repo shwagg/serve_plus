@@ -8,10 +8,11 @@ import { showToast } from "../utils/toast";
 export const SessionContext = createContext();
 
 const SESSION_TIMEOUTS = {
-  admin:   10 * 60 * 1000,  // 10 minutes
-  faculty: 10 * 60 * 1000,  // 10 minutes
-  student: 30 * 60 * 1000,  // 30 minutes
-  partner: 30 * 60 * 1000,  // 30 minutes
+  admin:    10 * 60 * 1000,  // 10 minutes
+  sysadmin: 10 * 60 * 1000,  // 10 minutes
+  faculty:  10 * 60 * 1000,  // 10 minutes
+  student:  30 * 60 * 1000,  // 30 minutes
+  partner:  30 * 60 * 1000,  // 30 minutes
 };
 const DEFAULT_TIMEOUT = 10 * 60 * 1000;
 
@@ -165,6 +166,20 @@ export function SessionProvider({ children }) {
     return setupActivityListeners();
   }, [isSessionActive]);
 
+  const refreshUserData = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        setUserData(userSnap.data());
+      }
+    } catch (error) {
+      console.error("SessionContext - Error refreshing user data:", error);
+    }
+  };
+
   const logout = async () => {
     await handleSessionTimeout();
   };
@@ -175,6 +190,7 @@ export function SessionProvider({ children }) {
     logout,
     resetInactivityTimer,
     userData,
+    refreshUserData,
   };
 
   return (

@@ -345,11 +345,12 @@
 }
 
 .mission-list {
-  width: 85%;
+  width: 90%;
+  max-width: 1200px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  row-gap: 20px;
-  column-gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 300px));
+  row-gap: 28px;
+  column-gap: 28px;
   justify-content: center;
   justify-items: center;
   box-sizing: border-box;
@@ -357,9 +358,9 @@
 }
 .mission-card {
   width: 100%;
-  max-width: 260px;
+  max-width: 300px;
   height: 260px;
-  margin: 0 auto;
+  margin: 0;
   display: flex;
   flex-direction: column;
   background: #ffffff;
@@ -453,8 +454,9 @@
 }
 .mission-card-meta {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   margin-top: auto;
   font-size: 12px;
   color: #6b7280;
@@ -467,6 +469,52 @@
 }
 
 .mission-card-date {
+  white-space: nowrap;
+}
+
+/* Volunteer preview bubbles */
+.vol-preview {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.vol-bubble {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  margin-left: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.vol-bubble:first-child {
+  margin-left: 0;
+}
+
+.vol-bubble img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vol-bubble-extra {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.vol-joined-text {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 8px;
   white-space: nowrap;
 }
 

@@ -1,11 +1,147 @@
 
 // React and library imports
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../../firebaseConfig';
 import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import '../../../styles/ProjectProposal.css';
 import SummaryPanel from '../SummaryPanel';
+import { showToast } from '../../../utils/toast';
+
+/**
+ * Reusable custom dropdown that matches the SDG dropdown style and stays the same width as its trigger.
+ */
+function CustomSelect({ id, name, value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className="sdg-dropdown-wrapper" ref={wrapperRef}>
+      <button
+        type="button"
+        id={id}
+        className="sdg-dropdown-toggle"
+        onClick={() => setOpen(o => !o)}
+      >
+        <span style={{ color: selected ? '#2d3748' : '#a0aec0' }}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <span className="dropdown-arrow">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="sdg-dropdown-menu" role="listbox">
+          {options.length === 0 ? (
+            <div className="sdg-option" style={{ color: '#a0aec0', cursor: 'default' }}>
+              <span className="sdg-option-text">{placeholder}</span>
+            </div>
+          ) : (
+            options.map(opt => (
+              <div
+                key={opt.value}
+                className={`sdg-option${value === opt.value ? ' selected' : ''}`}
+                role="option"
+                aria-selected={value === opt.value}
+                onClick={() => {
+                  onChange({ target: { name, value: opt.value } });
+                  setOpen(false);
+                }}
+              >
+                <span className="sdg-option-text">{opt.label}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Tag input for proponents. Pressing Enter or comma commits the typed name as a tag.
+ * The first `lockedCount` tags show a lock instead of a remove button.
+ */
+function ProponentTagInput({ tags, onAdd, onRemove, lockedCount = 0 }) {
+  const [input, setInput] = useState('');
+
+  const commit = () => {
+    const name = input.trim();
+    if (!name || tags.includes(name)) { setInput(''); return; }
+    onAdd(name);
+    setInput('');
+  };
+
+  return (
+    <div className="proponent-tags-box">
+      {tags.map((tag, i) => (
+        <span key={i} className="proponent-tag">
+          {tag}
+          {i < lockedCount
+            ? <span className="proponent-tag-lock" title="Auto-filled from your account">🔒</span>
+            : <button type="button" className="proponent-tag-remove" onClick={() => onRemove(i)}>×</button>
+          }
+        </span>
+      ))}
+      <input
+        type="text"
+        className="proponent-tag-input"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === ',')    { e.preventDefault(); commit(); }
+        }}
+        placeholder={tags.length === 0 ? 'Type a name and press Enter' : 'Add another name…'}
+      />
+    </div>
+  );
+}
+
+/**
+ * Numbered list input for stakeholders. Pressing Enter commits the item and shows it
+ * as "1. Name", "2. Name", etc.
+ */
+function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMorePlaceholder }) {
+  const [input, setInput] = useState('');
+
+  const commit = () => {
+    const val = input.trim();
+    if (!val) return;
+    onAdd(val);
+    setInput('');
+  };
+
+  return (
+    <div className="numbered-list-box">
+      {items.map((item, i) => (
+        <div key={i} className="numbered-item">
+          <span className="numbered-item-num">{i + 1}.</span>
+          <span className="numbered-item-text">{item}</span>
+          <button type="button" className="numbered-item-remove" onClick={() => onRemove(i)}>×</button>
+        </div>
+      ))}
+      <input
+        type="text"
+        className="numbered-item-add"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+        placeholder={items.length === 0
+          ? (placeholder || 'Type a name and press Enter')
+          : (addMorePlaceholder || 'Add another…')}
+      />
+    </div>
+  );
+}
 
 /**
  * Main component for the Project Proposal form.
@@ -24,19 +160,21 @@ function ProjectProposal({ projectType, onClose }) {
     title: '',
     sdgs: [],
     targetDate: '',
-    stakeholders: '',
+    stakeholders: [],         // array — rendered as numbered list
     location: '',
     volunteerHours: '',
     description: '',
     objectives: '',
-    specificActivities: '',
+    specificActivities: [],   // array — each item becomes a task on submission
     successIndicators: '',
     budget: '',
-    preparedBy: '', // Faculty in Charge/Proponent
-    affiliation: '', // College/Program/Department/Student Org
-    affiliatedDepartment: '', // NEW: Affiliated Department
+    preparedBy: '',           // primary proponent name (auto-filled from auth)
+    proponents: [],           // full proponents array (managed by tag input)
+    reviewedBy: '',           // Program Chair signatory
+    recommendedBy: '',        // College Dean signatory
+    affiliatedDepartment: '',
     studentOutcomes: '',
-    alt: '', // Alt text for image
+    alt: '',
     partnerSchool: '',
   });
   // Department options for dropdown
@@ -52,59 +190,62 @@ function ProjectProposal({ projectType, onClose }) {
     "Mapua MCL Senior High School (SHS)"
   ];
   const [partnerSchools, setPartnerSchools] = useState([]);
+  const [facultyList, setFacultyList] = useState([]);
+  const [chairList, setChairList] = useState([]);
+  const [deanList, setDeanList] = useState([]);
   const [loadingSchools, setLoadingSchools] = useState(true);
 
   useEffect(() => {
-    async function fetchPartners() {
+    async function fetchUsers() {
       try {
         const snap = await getDocs(collection(db, 'users'));
-        const partners = snap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(user => user.role === 'partner');
-        setPartnerSchools(partners);
+        const allUsers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setPartnerSchools(allUsers.filter(u => u.role === 'partner'));
+        setFacultyList(allUsers.filter(u => u.role === 'faculty'));
+        setChairList(allUsers.filter(u => u.position === 'program chair'));
+        setDeanList(allUsers.filter(u => u.position === 'college dean'));
       } catch {
         setPartnerSchools([]);
+        setFacultyList([]);
+        setChairList([]);
+        setDeanList([]);
       } finally {
         setLoadingSchools(false);
       }
     }
-    fetchPartners();
+    fetchUsers();
   }, []);
-  // Get user info and update formData.preparedBy on mount or when user changes
-  // Effect: Fetch user info and update preparedBy field on mount or when user changes
+  // Always fetch the user's full name from Firestore (avoids showing email as the proponent tag)
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user?.displayName) {
-        setFormData(prev => ({ ...prev, preparedBy: user.displayName }));
-        setHasProponentName(true);
-      } else if (user?.uid) {
-        // Try to fetch name from Firestore user profile
+      if (user?.uid) {
         try {
           const { getDoc, doc } = await import('firebase/firestore');
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
-            if (data.name) {
-              setFormData(prev => ({ ...prev, preparedBy: data.name }));
+            // Prefer Firestore name; fall back to displayName only if absent
+            const name = data.name || user.displayName || '';
+            if (name) {
+              setFormData(prev => ({
+                ...prev,
+                preparedBy: name,
+                proponents: prev.proponents?.length ? prev.proponents : [name],
+              }));
               setHasProponentName(true);
-
-              // Set user role
-              if (data.role) {
-                setUserRole(data.role);
-
-                // If user is faculty, auto-populate assignedFaculty
-                if (data.role === 'faculty') {
-                  setSlFields(prev => ({ ...prev, assignedFaculty: data.name }));
-                }
-              }
             } else {
               setHasProponentName(false);
+            }
+            if (data.role) {
+              setUserRole(data.role);
+              if (data.role === 'faculty') {
+                setSlFields(prev => ({ ...prev, assignedFaculty: data.name || '' }));
+              }
             }
           } else {
             setHasProponentName(false);
           }
         } catch (err) {
-          // Ignore errors
           setHasProponentName(false);
         }
       }
@@ -125,7 +266,97 @@ function ProjectProposal({ projectType, onClose }) {
     nature: '',
     learningOutcomes: '0', // Default to first option (Intellectual Development)
     customLearningOutcome: '',
+    assignedFaculty: '',
   });
+
+  // Draft persistence — placed after all state declarations so refs initialise correctly
+  const draftKey = useRef(`serve_plus_draft_${projectType}_${auth.currentUser?.uid || 'guest'}`).current;
+  const submittedRef = useRef(false);
+  const hasUserInputRef = useRef(false); // true only after user actually types/selects something
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const formDataRef = useRef(formData);
+  const slFieldsRef = useRef(slFields);
+  const ceFieldsRef = useRef(ceFields);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
+  useEffect(() => { slFieldsRef.current = slFields; }, [slFields]);
+  useEffect(() => { ceFieldsRef.current = ceFields; }, [ceFields]);
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft.formData) {
+          const restored = { ...draft.formData };
+          // Backward compat: stakeholders / specificActivities were strings in older drafts
+          if (typeof restored.stakeholders === 'string') {
+            restored.stakeholders = restored.stakeholders
+              ? restored.stakeholders.split('\n').filter(s => s.trim())
+              : [];
+          }
+          if (typeof restored.specificActivities === 'string') {
+            restored.specificActivities = restored.specificActivities
+              ? restored.specificActivities.split('\n').filter(s => s.trim())
+              : [];
+          }
+          if (!Array.isArray(restored.stakeholders))       restored.stakeholders       = [];
+          if (!Array.isArray(restored.proponents))         restored.proponents         = [];
+          if (!Array.isArray(restored.specificActivities)) restored.specificActivities = [];
+          setFormData(prev => ({ ...prev, ...restored }));
+        }
+        if (draft.slFields) setSlFields(prev => ({ ...prev, ...draft.slFields }));
+        if (draft.ceFields) setCeFields(prev => ({ ...prev, ...draft.ceFields }));
+        setDraftRestored(true);
+      }
+    } catch (e) { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save draft while typing (debounced 1.5s)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ formData, slFields, ceFields }));
+      } catch (e) { /* ignore */ }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [formData, slFields, ceFields, draftKey]);
+
+  // Save draft immediately on unmount (handles accidental close)
+  // Guard: only save if user has actually typed something — prevents React StrictMode's
+  // simulated unmount from overwriting a previously saved draft with the initial empty state.
+  useEffect(() => {
+    return () => {
+      if (submittedRef.current) return;
+      if (!hasUserInputRef.current) return;
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({
+          formData: formDataRef.current,
+          slFields: slFieldsRef.current,
+          ceFields: ceFieldsRef.current,
+        }));
+      } catch (e) { /* ignore */ }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const clearDraft = useCallback(() => {
+    submittedRef.current = true;
+    try { localStorage.removeItem(draftKey); } catch (e) { /* ignore */ }
+  }, [draftKey]);
+
+  const discardDraft = () => {
+    clearDraft();
+    submittedRef.current = false;
+    hasUserInputRef.current = false;
+    setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '' });
+    setSlFields({ section: '', course: '', courseCode: '', assignedFaculty: slFieldsRef.current?.assignedFaculty || '' });
+    setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '', assignedFaculty: '' });
+    setDraftRestored(false);
+    showToast('Draft discarded.');
+  };
 
   // SDG dropdown state
   const [showSdgDropdown, setShowSdgDropdown] = useState(false);
@@ -162,19 +393,23 @@ function ProjectProposal({ projectType, onClose }) {
 
   /**
    * Handles changes to main form fields (formData).
+   * Clears assigned faculty selections when the affiliated department changes.
    */
   const handleInputChange = (e) => {
+    hasUserInputRef.current = true;
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'affiliatedDepartment') {
+      setSlFields(prev => ({ ...prev, assignedFaculty: '' }));
+      setCeFields(prev => ({ ...prev, assignedFaculty: '' }));
+    }
   };
 
   /**
    * Handles changes to Service Learning specific fields.
    */
   const handleSlFieldChange = (e) => {
+    hasUserInputRef.current = true;
     const { name, value } = e.target;
     setSlFields(prev => ({
       ...prev,
@@ -186,6 +421,7 @@ function ProjectProposal({ projectType, onClose }) {
    * Handles changes to Community Engagement specific fields.
    */
   const handleCeFieldChange = (e) => {
+    hasUserInputRef.current = true;
     const { name, value } = e.target;
     setCeFields(prev => ({
       ...prev,
@@ -198,6 +434,7 @@ function ProjectProposal({ projectType, onClose }) {
    * @param {number} sdgNumber
    */
   const handleSdgToggle = (sdgNumber) => {
+    hasUserInputRef.current = true;
     setFormData(prev => {
       const currentSdgs = prev.sdgs || [];
       if (currentSdgs.includes(sdgNumber)) {
@@ -219,10 +456,41 @@ function ProjectProposal({ projectType, onClose }) {
    * @param {number} sdgNumber
    */
   const handleRemoveSdg = (sdgNumber) => {
+    hasUserInputRef.current = true;
     setFormData(prev => ({
       ...prev,
       sdgs: prev.sdgs.filter(num => num !== sdgNumber)
     }));
+  };
+
+  const handleAddProponent = (name) => {
+    hasUserInputRef.current = true;
+    setFormData(prev => ({ ...prev, proponents: [...(prev.proponents || []), name] }));
+  };
+
+  const handleRemoveProponent = (index) => {
+    hasUserInputRef.current = true;
+    setFormData(prev => ({ ...prev, proponents: prev.proponents.filter((_, i) => i !== index) }));
+  };
+
+  const handleAddStakeholder = (text) => {
+    hasUserInputRef.current = true;
+    setFormData(prev => ({ ...prev, stakeholders: [...(prev.stakeholders || []), text] }));
+  };
+
+  const handleRemoveStakeholder = (index) => {
+    hasUserInputRef.current = true;
+    setFormData(prev => ({ ...prev, stakeholders: prev.stakeholders.filter((_, i) => i !== index) }));
+  };
+
+  const handleAddActivity = (text) => {
+    hasUserInputRef.current = true;
+    setFormData(prev => ({ ...prev, specificActivities: [...(prev.specificActivities || []), text] }));
+  };
+
+  const handleRemoveActivity = (index) => {
+    hasUserInputRef.current = true;
+    setFormData(prev => ({ ...prev, specificActivities: prev.specificActivities.filter((_, i) => i !== index) }));
   };
 
   //1 month rule for selecting target date for the project
@@ -236,12 +504,32 @@ function ProjectProposal({ projectType, onClose }) {
     "-" +
     String(minTargetDate.getDate()).padStart(2, "0");
 
+  // Faculty / chairs / deans filtered by the selected affiliated department
+  const filteredFaculty = facultyList.filter(
+    f => !formData.affiliatedDepartment || f.department === formData.affiliatedDepartment
+  );
+  const filteredChairs = chairList.filter(
+    c => !formData.affiliatedDepartment || c.department === formData.affiliatedDepartment
+  );
+  const filteredDeans = deanList.filter(
+    d => !formData.affiliatedDepartment || d.department === formData.affiliatedDepartment
+  );
+
   // Submission logic is now handled in SummaryPanel
 
   return (
     <div className="proposal-content-wrapper">
       {!showSummary ? (
           <form className="proposal-form" onSubmit={(e) => e.preventDefault()}>
+            {/* Draft restored banner */}
+            {draftRestored && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#92400e', gap: 12 }}>
+                <span>✏️ <strong>Draft restored.</strong> You can continue where you left off.</span>
+                <button type="button" onClick={discardDraft} style={{ background: 'none', border: 'none', color: '#b45309', fontWeight: 600, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap', padding: 0 }}>
+                  Discard draft
+                </button>
+              </div>
+            )}
             {/* Basic Information */}
             <div className="form-section">
               <h2>Basic Information</h2>
@@ -265,52 +553,41 @@ function ProjectProposal({ projectType, onClose }) {
                 {loadingSchools ? (
                   <div>Loading schools...</div>
                 ) : (
-                  <select
+                  <CustomSelect
                     id="partnerSchool"
                     name="partnerSchool"
                     value={formData.partnerSchool || ''}
                     onChange={handleInputChange}
-                    required
-                  >
-                    <option value="">Select Partner School</option>
-                    {partnerSchools.map(school => (
-                      <option key={school.id} value={school.organizationName || school.name}>
-                        {school.organizationName || school.name || school.email}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Partner School"
+                    options={partnerSchools.map(s => ({
+                      value: s.organizationName || s.name || s.email,
+                      label: s.organizationName || s.name || s.email,
+                    }))}
+                  />
                 )}
               </div>
 
               {/* Affiliated Department Dropdown (for both project types) */}
               <div className="form-group">
                 <label htmlFor="affiliatedDepartment">Affiliated Department</label>
-                <select
+                <CustomSelect
                   id="affiliatedDepartment"
                   name="affiliatedDepartment"
                   value={formData.affiliatedDepartment}
                   onChange={handleInputChange}
-                  required
-                >
-                  <option value="">Select Department</option>
-                  {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
+                  placeholder="Select Department"
+                  options={departments.map(d => ({ value: d, label: d }))}
+                />
               </div>
 
               {projectType === 'service-learning' && (
                 <div className="form-group">
-                  <label htmlFor="preparedBy">Faculty-in-Charge / Proponent(s) *</label>
-                  <input
-                    type="text"
-                    id="preparedBy"
-                    name="preparedBy"
-                    value={formData.preparedBy}
-                    onChange={handleInputChange}
-                    readOnly={hasProponentName}
-                    required
-                    placeholder="e.g., Juan Dela Cruz"
+                  <label>Faculty-in-Charge / Proponent(s) *</label>
+                  <ProponentTagInput
+                    tags={formData.proponents || []}
+                    onAdd={handleAddProponent}
+                    onRemove={handleRemoveProponent}
+                    lockedCount={hasProponentName ? 1 : 0}
                   />
                 </div>
               )}
@@ -318,44 +595,60 @@ function ProjectProposal({ projectType, onClose }) {
               {projectType === 'service-learning' && (
                 <div className="form-group">
                   <label htmlFor="assignedFaculty">Assigned Faculty *</label>
-                  <input
-                    type="text"
-                    id="assignedFaculty"
-                    name="assignedFaculty"
-                    value={slFields.assignedFaculty}
-                    onChange={handleSlFieldChange}
-                    readOnly={userRole === 'faculty'}
-                    required
-                    placeholder="e.g., Juan Dela Cruz"
-                  />
+                  {userRole === 'faculty' ? (
+                    <input
+                      type="text"
+                      id="assignedFaculty"
+                      name="assignedFaculty"
+                      value={slFields.assignedFaculty}
+                      readOnly
+                      required
+                    />
+                  ) : (
+                    <CustomSelect
+                      id="assignedFaculty"
+                      name="assignedFaculty"
+                      value={slFields.assignedFaculty}
+                      onChange={handleSlFieldChange}
+                      placeholder={
+                        !formData.affiliatedDepartment
+                          ? 'Select a department first'
+                          : filteredFaculty.length === 0
+                            ? 'No faculty available for this department'
+                            : 'Select Faculty'
+                      }
+                      options={filteredFaculty.map(f => ({ value: f.name || f.email, label: f.name || f.email }))}
+                    />
+                  )}
                 </div>
               )}
 
               {projectType === 'community-engagement' && (
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="ceProponent">Name of Proponent(s)</label>
-                    <input
-                      type="text"
-                      id="ceProponent"
-                      name="preparedBy"
-                      value={formData.preparedBy}
-                      onChange={handleInputChange}
-                      readOnly={hasProponentName}
-                      required
-                      placeholder="e.g., Juan Dela Cruz"
+                    <label>Name of Proponent(s)</label>
+                    <ProponentTagInput
+                      tags={formData.proponents || []}
+                      onAdd={handleAddProponent}
+                      onRemove={handleRemoveProponent}
+                      lockedCount={hasProponentName ? 1 : 0}
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="affiliation">Affiliation</label>
-                    <input
-                      type="text"
-                      id="affiliation"
-                      name="affiliation"
-                      value={formData.affiliation}
-                      onChange={handleInputChange}
-                      required
-                      placeholder="e.g., College of Science"
+                    <label htmlFor="ceAssignedFaculty">Assigned Faculty *</label>
+                    <CustomSelect
+                      id="ceAssignedFaculty"
+                      name="assignedFaculty"
+                      value={ceFields.assignedFaculty}
+                      onChange={handleCeFieldChange}
+                      placeholder={
+                        !formData.affiliatedDepartment
+                          ? 'Select a department first'
+                          : filteredFaculty.length === 0
+                            ? 'No faculty available for this department'
+                            : 'Select Faculty'
+                      }
+                      options={filteredFaculty.map(f => ({ value: f.name || f.email, label: f.name || f.email }))}
                     />
                   </div>
                 </div>
@@ -387,7 +680,7 @@ function ProjectProposal({ projectType, onClose }) {
                       <div className="sdg-selected-tags">
                         {formData.sdgs.map(sdgNum => (
                           <span key={sdgNum} className="sdg-tag">
-                            {sdgNum}
+                            SDG {sdgNum}
                             <button
                               type="button"
                               className="sdg-tag-remove"
@@ -462,15 +755,11 @@ function ProjectProposal({ projectType, onClose }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="stakeholders">Stakeholders</label>
-                <textarea
-                  id="stakeholders"
-                  name="stakeholders"
-                  value={formData.stakeholders}
-                  onChange={handleInputChange}
-                  required
-                  rows="3"
-                  placeholder="List all stakeholders involved in the project"
+                <label>Stakeholders</label>
+                <NumberedStakeholderInput
+                  items={formData.stakeholders || []}
+                  onAdd={handleAddStakeholder}
+                  onRemove={handleRemoveStakeholder}
                 />
               </div>
             </div>
@@ -530,18 +819,18 @@ function ProjectProposal({ projectType, onClose }) {
 
                 <div className="form-group">
                   <label htmlFor="nature">Nature of Engagement</label>
-                  <select
+                  <CustomSelect
                     id="nature"
                     name="nature"
                     value={ceFields.nature}
                     onChange={handleCeFieldChange}
-                    required
-                  >
-                    <option value="">Select nature of engagement</option>
-                    <option value="program">Program</option>
-                    <option value="project/advocacy">Project/Advocacy</option>
-                    <option value="consultation/extension">Consultation/Extension</option>
-                  </select>
+                    placeholder="Select nature of engagement"
+                    options={[
+                      { value: 'program', label: 'Program' },
+                      { value: 'project/advocacy', label: 'Project/Advocacy' },
+                      { value: 'consultation/extension', label: 'Consultation/Extension' },
+                    ]}
+                  />
                 </div>
 
                 {/* Student Outcomes Field */}
@@ -555,25 +844,36 @@ function ProjectProposal({ projectType, onClose }) {
                     onChange={handleInputChange}
                     placeholder="Describe expected student outcomes"
                   />
+                  {(() => {
+                    const len = (formData.studentOutcomes || '').length;
+                    const limit = 130;
+                    const color = len > limit ? '#e53e3e' : len > 105 ? '#d97706' : '#a0aec0';
+                    const note = len > limit ? ' — text may be cut off in the PDF' : len > 105 ? ' — text will appear smaller in the PDF to fit' : '';
+                    return (
+                      <small style={{ color, fontSize: '0.78rem', marginTop: 4, display: 'block' }}>
+                        {len} / {limit} characters{note}
+                      </small>
+                    );
+                  })()}
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="learningOutcomes">Learning Outcomes Level</label>
-                  <select
+                  <CustomSelect
                     id="learningOutcomes"
                     name="learningOutcomes"
                     value={ceFields.learningOutcomes}
                     onChange={handleCeFieldChange}
-                    required
-                  >
-                    <option value="">Select learning outcomes level</option>
-                    <option value="0">Intellectual Development</option>
-                    <option value="1">Collaboration</option>
-                    <option value="2">Appreciation of Culture and Diversity</option>
-                    <option value="3">Career Exploration</option>
-                    <option value="4">Socio-Civic Responsibility</option>
-                    <option value="5">Others, pls. Specify</option>
-                  </select>
+                    placeholder="Select learning outcomes level"
+                    options={[
+                      { value: '0', label: 'Intellectual Development' },
+                      { value: '1', label: 'Collaboration' },
+                      { value: '2', label: 'Appreciation of Culture and Diversity' },
+                      { value: '3', label: 'Career Exploration' },
+                      { value: '4', label: 'Socio-Civic Responsibility' },
+                      { value: '5', label: 'Others, pls. Specify' },
+                    ]}
+                  />
                 </div>
 
                 {ceFields.learningOutcomes === '5' && (
@@ -625,16 +925,17 @@ function ProjectProposal({ projectType, onClose }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="specificActivities">Specific Activities</label>
-                <textarea
-                  id="specificActivities"
-                  name="specificActivities"
-                  value={formData.specificActivities}
-                  onChange={handleInputChange}
-                  required
-                  rows="5"
-                  placeholder="Describe the specific activities planned for this project"
+                <label>Specific Activities / Task Assignment</label>
+                <NumberedStakeholderInput
+                  items={formData.specificActivities || []}
+                  onAdd={handleAddActivity}
+                  onRemove={handleRemoveActivity}
+                  placeholder="Type an activity and press Enter"
+                  addMorePlaceholder="Add another activity…"
                 />
+                <small style={{ color: '#718096', fontSize: '0.8rem', marginTop: 4, display: 'block' }}>
+                  Each activity will automatically become a volunteer task when the proposal is approved.
+                </small>
               </div>
 
               <div className="form-group">
@@ -661,6 +962,48 @@ function ProjectProposal({ projectType, onClose }) {
                   rows="4"
                   placeholder="Provide a detailed budget breakdown"
                 />
+              </div>
+            </div>
+
+            {/* Signatories */}
+            <div className="form-section">
+              <h2>Signatories</h2>
+              <p style={{ margin: '0 0 1rem', color: '#718096', fontSize: '0.85rem' }}>
+                Select the signatories for this proposal. Export the PDF, collect physical signatures from each signatory, then upload the signed scan from the proposal review page.
+              </p>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Reviewed By <span style={{ color: '#718096', fontWeight: 400 }}>(Program Chair)</span></label>
+                  <CustomSelect
+                    name="reviewedBy"
+                    value={formData.reviewedBy}
+                    onChange={handleInputChange}
+                    placeholder={
+                      !formData.affiliatedDepartment
+                        ? 'Select a department first'
+                        : filteredChairs.length === 0
+                          ? 'No program chair found for this department'
+                          : 'Select Program Chair'
+                    }
+                    options={filteredChairs.map(c => ({ value: c.name || c.email, label: c.name || c.email }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Recommended By <span style={{ color: '#718096', fontWeight: 400 }}>(College Dean)</span></label>
+                  <CustomSelect
+                    name="recommendedBy"
+                    value={formData.recommendedBy}
+                    onChange={handleInputChange}
+                    placeholder={
+                      !formData.affiliatedDepartment
+                        ? 'Select a department first'
+                        : filteredDeans.length === 0
+                          ? 'No college dean found for this department'
+                          : 'Select College Dean'
+                    }
+                    options={filteredDeans.map(d => ({ value: d.name || d.email, label: d.name || d.email }))}
+                  />
+                </div>
               </div>
             </div>
 
@@ -694,6 +1037,7 @@ function ProjectProposal({ projectType, onClose }) {
             onClose={onClose}
             sdgOptions={sdgOptions}
             setLoading={setLoading}
+            onClearDraft={clearDraft}
           />
       )}
     </div>

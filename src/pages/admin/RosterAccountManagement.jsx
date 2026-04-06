@@ -11,7 +11,7 @@ import { db } from "../../firebaseConfig";
 import { showToast } from "../../utils/toast";
 import "../../styles/RosterAccountManagement.css";
 
-export default function RosterAccountManagement() {
+export default function RosterAccountManagement({ readOnly = false }) {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -350,7 +350,7 @@ export default function RosterAccountManagement() {
                 onChange={() => handleRoleFilterChange("student")}
                 className="filter-role"
               />
-              <span>Student</span>
+              <span>Volunteer</span>
             </label>
             <label className="filter-label">
               <input
@@ -396,7 +396,7 @@ export default function RosterAccountManagement() {
               <thead>
                 <tr>
                   <th className="text-left"> </th>
-                  <th className="text-left">Name</th>
+                  <th className="text-left">Email</th>
                   <th className="text-center">Role</th>
                   <th className="text-center">Account Created</th>
                 </tr>
@@ -416,42 +416,43 @@ export default function RosterAccountManagement() {
                       </td>
                       <td className="user-name">{user.email || "N/A"}</td>
                       <td className="text-center role-cell">
-                        {editingRoleUserId === user.id ? (
+                        {!readOnly && editingRoleUserId === user.id ? (
                           <div className="role-edit-container">
                             <select
                               value={selectedRole}
                               onChange={(e) => {
                                 setSelectedRole(e.target.value);
-                                setSelectedPosition(""); // Reset position when role changes
-                                setSelectedDepartment(""); // Reset department when role changes
+                                setSelectedPosition("");
+                                setSelectedDepartment("");
                               }}
                               className="role-select"
                             >
-                              <option value="student">Student</option>
+                              <option value="student">Volunteer</option>
                               <option value="faculty">Faculty</option>
                               <option value="partner">Partner</option>
                               <option value="admin">Admin</option>
+                              <option value="sysadmin">System Admin</option>
                             </select>
 
                             {(selectedRole === "faculty" ||
                               selectedRole === "admin") && (
-                              <select
-                                value={selectedPosition}
-                                onChange={(e) =>
-                                  setSelectedPosition(e.target.value)
-                                }
-                                className="role-select"
-                              >
-                                <option value="">Select Position</option>
-                                {positionsByRole[selectedRole]?.map(
-                                  (position) => (
-                                    <option key={position} value={position}>
-                                      {position}
-                                    </option>
-                                  ),
-                                )}
-                              </select>
-                            )}
+                                <select
+                                  value={selectedPosition}
+                                  onChange={(e) =>
+                                    setSelectedPosition(e.target.value)
+                                  }
+                                  className="role-select"
+                                >
+                                  <option value="">Select Position</option>
+                                  {positionsByRole[selectedRole]?.map(
+                                    (position) => (
+                                      <option key={position} value={position}>
+                                        {position}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              )}
 
                             {selectedRole === "faculty" && (
                               <select
@@ -488,19 +489,21 @@ export default function RosterAccountManagement() {
                         ) : (
                           <div className="role-display">
                             <span>{user.role || "N/A"}</span>
-                            <button
-                              onClick={() =>
-                                handleChangeRoleClick(
-                                  user.id,
-                                  user.role,
-                                  user.position,
-                                  user.department,
-                                )
-                              }
-                              className="change-role-btn"
-                            >
-                              <img src={ChangeIcon} alt="Change Role" />
-                            </button>
+                            {!readOnly && (
+                              <button
+                                onClick={() =>
+                                  handleChangeRoleClick(
+                                    user.id,
+                                    user.role,
+                                    user.position,
+                                    user.department,
+                                  )
+                                }
+                                className="change-role-btn"
+                              >
+                                <img src={ChangeIcon} alt="Change Role" />
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>

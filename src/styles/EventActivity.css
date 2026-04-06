@@ -1654,6 +1654,20 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  scrollbar-width: thin; /* Firefox */
+}
+.ea-scrollable-body::-webkit-scrollbar {
+  width: 6px; /* Chrome/Safari — thin scrollbar so it doesn't overlap the 📢 toggle button */
+}
+.ea-scrollable-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ea-scrollable-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+.ea-scrollable-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 .ea-progress-strip {
   z-index: 4;

@@ -252,9 +252,15 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions, retu
     form.getTextField('textarea_25nitg').setText(formData.participatingSections || '');
     form.getTextField('text_22bjc').setText(formData.courseTitle || '');
     form.getTextField('text_27xsue').setText(formData.courseCode || '');
-    form.getTextField('textarea_23zuvj').setText(formData.stakeholders || '');
+    const slStakeholdersField = form.getTextField('textarea_23zuvj');
+    try { slStakeholdersField.enableMultiline(); } catch {}
+    slStakeholdersField.setFontSize(8);
+    slStakeholdersField.setText(formData.stakeholders || '');
     form.getTextField('text_28odnz').setText(formData.targetDates || '');
-    form.getTextField('text_24dmff').setText(formData.targetLocation || '');
+    const slLocationField = form.getTextField('text_24dmff');
+    try { slLocationField.enableMultiline(); } catch {}
+    slLocationField.setFontSize(8);
+    slLocationField.setText(formData.targetLocation || '');
     form.getTextField('text_29svdr').setText(formData.volunteerHours?.toString() || '');
 
     // SDG Checkboxes mapping (NEW)
@@ -296,6 +302,11 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions, retu
     form.getTextField('textarea_32gfbz').setText(formData.specificActivities || '');
     form.getTextField('textarea_33pffk').setText(formData.successIndicators || '');
     form.getTextField('textarea_35lsbz').setText((formData.budget || '').replace(/₱/g, 'PHP'));
+    try { form.getTextField('text_33ixka').setText(formData.preparedBy || ' '); } catch {}
+    try { form.getTextField('text_34fpep').setText(formData.reviewedBy || ' '); } catch {}
+    try { form.getTextField('text_35ixwb').setText(formData.recommendedBy || ' '); } catch {}
+    try { form.getTextField('text_36qjiq').setText(formData.endorsedBy || ' '); } catch {}
+    try { form.getTextField('text_37nyfm').setText(formData.approvedBy || ' '); } catch {}
     form.flatten();
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -360,7 +371,12 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions, retu
     form.getTextField('text_1gjss').setText(formData.communityEngagementTitle || '');
     form.getTextField('text_2empx').setText(formData.dateProposed || '');
     form.getTextField('text_3ting').setText(formData.proponent || '');
-    form.getTextField('text_4uee').setText(formData.studentOutcomes || '');
+    const studentOutcomesField = form.getTextField('text_4uee');
+    try { studentOutcomesField.enableMultiline(); } catch {}
+    const soLen = (formData.studentOutcomes || '').length;
+    const soFontSize = soLen > 130 ? 7 : 8;
+    studentOutcomesField.setFontSize(soFontSize);
+    studentOutcomesField.setText(formData.studentOutcomes || '');
 
     // SDG Checkboxes mapping (NEW)
     const ceSdgCheckboxMap = [
@@ -473,15 +489,25 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions, retu
     });
 
     form.getTextField('text_32nsrl').setText(formData.targetDate || '');
-    form.getTextField('text_33olvu').setText(formData.location || '');
-    form.getTextField('text_34nwi').setText(formData.stakeholders || '');
+    const ceLocationField = form.getTextField('text_33olvu');
+    try { ceLocationField.enableMultiline(); } catch {}
+    ceLocationField.setFontSize(8);
+    ceLocationField.setText(formData.location || '');
+    const ceStakeholdersField = form.getTextField('text_34nwi');
+    try { ceStakeholdersField.enableMultiline(); } catch {}
+    ceStakeholdersField.setFontSize(8);
+    ceStakeholdersField.setText(formData.stakeholders || '');
     form.getTextField('text_35fgvb').setText(formData.numberOfVolunteerHours?.toString() || '');
     form.getTextField('textarea_36deco').setText(formData.ceDescription || '');
     form.getTextField('textarea_37phsy').setText(formData.ceObjectives || '');
     form.getTextField('textarea_38xian').setText(formData.specificActivities || '');
     form.getTextField('textarea_39zrqx').setText(formData.successIndicators || '');
     form.getTextField('text_40bmwp').setText((formData.budget || '').replace(/₱/g, 'PHP'));
-    form.getTextField('text_41upqr').setText(formData.preparedBy || '');
+    try { form.getTextField('text_41upqr').setText(formData.preparedBy || ' '); } catch {}
+    try { form.getTextField('text_42wcjw').setText(formData.reviewedBy || ' '); } catch {}
+    try { form.getTextField('text_43zgvm').setText(formData.recommendedBy || ' '); } catch {}
+    try { form.getTextField('text_44hegs').setText(formData.endorsedBy || ' '); } catch {}
+    try { form.getTextField('text_45mqpp').setText(formData.approvedBy || ' '); } catch {}
     form.flatten();
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });

@@ -180,6 +180,7 @@
   background: #f7fafc;
   color: #2d3748;
   font-size: 1rem;
+  font-weight: 400;
   text-align: left;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -254,6 +255,15 @@
 
 .sdg-option:hover {
   background: #f7fafc;
+}
+
+.sdg-option.selected {
+  background: #f0fdfc;
+}
+
+.sdg-option.selected .sdg-option-text {
+  color: #30bdb7;
+  font-weight: 600;
 }
 
 .sdg-option input[type="checkbox"] {
@@ -339,6 +349,161 @@
 .btn-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ── Proponent Tag Input ─────────────────────────────────── */
+.proponent-tags-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: #f7fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  min-height: 50px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: text;
+}
+
+.proponent-tags-box:focus-within {
+  border-color: #667eea;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.proponent-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  background: #30bdb7;
+  color: #fff;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.proponent-tag-lock {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.proponent-tag-remove {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.proponent-tag-remove:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.proponent-tag-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: #2d3748;
+  flex: 1;
+  min-width: 160px;
+  padding: 4px 2px;
+}
+
+.proponent-tag-input::placeholder {
+  color: #a0aec0;
+}
+
+/* ── Numbered Stakeholder List Input ─────────────────────── */
+.numbered-list-box {
+  background: #f7fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.numbered-list-box:focus-within {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.numbered-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.numbered-item-num {
+  font-weight: 700;
+  color: #30bdb7;
+  font-size: 0.85rem;
+  min-width: 22px;
+  flex-shrink: 0;
+}
+
+.numbered-item-text {
+  flex: 1;
+  color: #2d3748;
+  font-size: 0.95rem;
+}
+
+.numbered-item-remove {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.2s, background 0.2s;
+}
+
+.numbered-item-remove:hover {
+  color: #e53e3e;
+  background: #fff5f5;
+}
+
+.numbered-item-add {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: #f7fafc;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: #2d3748;
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+.numbered-item-add::placeholder {
+  color: #a0aec0;
 }
 
 @media (max-width: 768px) {

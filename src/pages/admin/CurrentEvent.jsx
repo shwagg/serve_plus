@@ -61,7 +61,7 @@ export default function CurrentEvent() {
                 missionData.push({
                     id: mId,
                     title: mission.title,
-                    status: mission.eventStatus || "Accepting Students",
+                    status: mission.eventStatus || "Accepting Volunteers",
                     pendingCount: pendingSnap.size,
                     approvedCount: approvedSnap.size
                 });
@@ -438,7 +438,7 @@ export default function CurrentEvent() {
 
                 {pendingVolunteers.length === 0 ? (
                     <div className="empty-label">
-                        No students awaiting approval.
+                        No volunteers awaiting approval.
                     </div>
                 ) : (
                     <table className="admin-table">
@@ -579,7 +579,7 @@ export default function CurrentEvent() {
                         whiteSpace: "nowrap",
                     }}
                 >
-                    📄 View Flagged Students
+                    📄 View Flagged Volunteers
                 </button>
                 {globalFlagResult && (
                     <span style={{ fontSize: 13, color: globalFlagResult.ok ? "#15803d" : "#b91c1c", fontWeight: 600 }}>
@@ -627,7 +627,7 @@ export default function CurrentEvent() {
                         }}
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <h3 style={{ margin: 0, fontSize: "1.1rem" }}>🚩 Flagged Students</h3>
+                            <h3 style={{ margin: 0, fontSize: "1.1rem" }}>🚩 Flagged Volunteers</h3>
                             <button
                                 onClick={() => setShowFlaggedModal(false)}
                                 style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}
@@ -637,7 +637,7 @@ export default function CurrentEvent() {
                         {flaggedLoading ? (
                             <div style={{ color: "#6b7280", padding: 16 }}>Loading...</div>
                         ) : flaggedStudents.length === 0 ? (
-                            <div style={{ color: "#6b7280", padding: 16 }}>No flagged students.</div>
+                            <div style={{ color: "#6b7280", padding: 16 }}>No flagged volunteers.</div>
                         ) : (
                             <div style={{ overflowY: "auto" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
