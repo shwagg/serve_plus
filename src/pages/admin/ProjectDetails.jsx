@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
 import { createNotification } from "../../utils/notificationUtils";
@@ -12,9 +12,16 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import ceBg from "../../assets/ce-proposal-page1.png";
 import { QRCodeCanvas } from "qrcode.react";
+import ImpactMetrics from "./ImpactMetrics";
 
-
-export default function ProjectDetails({ projectId, onClose }) {
+export default function ProjectDetails({ projectId: propProjectId, onClose, sidebar }) {
+  const params = useParams();
+  const projectId = propProjectId || params.projectId;
+  const [showRosterModal, setShowRosterModal] = useState(false);
+  const [showPreSurveyAnalytics, setShowPreSurveyAnalytics] = useState(false);
+  const [showPostSurveyAnalytics, setShowPostSurveyAnalytics] = useState(false);
+  const [impactModalOpen, setImpactModalOpen] = useState(false);
+  const [impactModalType, setImpactModalType] = useState(null); // 'pre' or 'post'
 
   const navigate = useNavigate();
   const [attendees, setAttendees] = useState([]);
@@ -26,45 +33,84 @@ export default function ProjectDetails({ projectId, onClose }) {
   const [showQR, setShowQR] = useState(false);
   const [showFeedbackQR, setShowFeedbackQR] = useState(false);
   const [showAttendanceReport, setShowAttendanceReport] = useState(false);
+  const [tasks, setTasks] = useState([]);
+  const [taskParticipants, setTaskParticipants] = useState([]);
 
-  // Fetch attendees from Firestore subcollection
+  // Fetch volunteers with pre/post survey answers (like CurrentEventMonitoring)
   useEffect(() => {
-    if (!projectId || !showQR) return;
-    const fetchAttendees = async () => {
+    if (!projectId) return;
+    const fetchVolunteersWithSurveys = async () => {
       try {
         const volunteerRef = collection(db, "missions", projectId, "volunteer");
         const snap = await getDocs(volunteerRef);
-
-        // All volunteers with their status
-        const allVols = await Promise.all(snap.docs.map(async (d) => {
-          let name = d.data().name || d.data().email || "Unknown";
-          if (name === "Unknown") {
-            try {
-              const userSnap = await getDoc(doc(db, "users", d.id));
-              if (userSnap.exists()) name = userSnap.data().name || userSnap.data().email || "Unknown";
-            } catch (_) {}
-          }
-          return {
-            uid: d.id,
-            name,
-            status: d.data().attendanceStatus || "not_checked",
-            email: d.data().email || ""
-          };
+        const volunteersRaw = snap.docs.map((d) => ({
+          uid: d.id,
+          ...d.data(),
         }));
-        setAllVolunteers(allVols);
-
-        // Only present attendees for quick view
-        setAttendees(
-          snap.docs
-            .filter(doc => doc.data().attendanceStatus === "present")
-            .map(doc => doc.data().name || doc.data().email || "Unknown")
+        // Fetch pre/post survey answers for each volunteer
+        const volunteersWithSurveys = await Promise.all(
+          volunteersRaw.map(async (v) => {
+            let name = v.name || v.email || "Unknown";
+            if (name === "Unknown") {
+              try {
+                const userSnap = await getDoc(doc(db, "users", v.uid));
+                if (userSnap.exists()) name = userSnap.data().name || userSnap.data().email || "Unknown";
+              } catch (_) {}
+            }
+            let preSurveyAnswers = null;
+            let postSurveyAnswers = null;
+            try {
+              const preDoc = await getDoc(doc(db, "missions", projectId, "volunteer", v.uid, "preSurvey", "response"));
+              if (preDoc.exists()) preSurveyAnswers = preDoc.data();
+            } catch (e) {}
+            try {
+              const postDoc = await getDoc(doc(db, "missions", projectId, "volunteer", v.uid, "postSurvey", "response"));
+              if (postDoc.exists()) postSurveyAnswers = postDoc.data();
+            } catch (e) {}
+            return {
+              ...v,
+              name,
+              preSurveyAnswers,
+              postSurveyAnswers,
+            };
+          })
         );
+        setAllVolunteers(volunteersWithSurveys);
+        setAttendees(
+          volunteersWithSurveys
+            .filter(v => v.status === "present")
+            .map(v => v.name)
+        );
+        // Tasks
+        const tasksRef = collection(db, "missions", projectId, "task");
+        const tasksSnap = await getDocs(tasksRef);
+        const tasksData = tasksSnap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setTasks(tasksData);
+        // Task participants
+        const allParticipants = [];
+        for (const task of tasksData) {
+          const participantsRef = collection(db, "missions", projectId, "task", task.id, "participants");
+          const participantsSnap = await getDocs(participantsRef);
+          participantsSnap.docs.forEach((doc) => {
+            allParticipants.push({
+              id: doc.id,
+              taskId: task.id,
+              ...doc.data(),
+            });
+          });
+        }
+        setTaskParticipants(allParticipants);
       } catch (err) {
         setAttendees([]);
         setAllVolunteers([]);
+        setTasks([]);
+        setTaskParticipants([]);
       }
     };
-    fetchAttendees();
+    fetchVolunteersWithSurveys();
   }, [projectId, showQR]);
 
   const handleRemoveVolunteer = async (uid, name) => {
@@ -324,43 +370,106 @@ export default function ProjectDetails({ projectId, onClose }) {
   };
 
   //will be fixing ui here shortly - aly
-  return (
-    <div>
-      <div className="project-details-header">
-        <button onClick={onClose}>✕</button>
-      </div>
+  // Sidebar style for overlay panel
+  const sidebarStyle = sidebar
+    ? {
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        width: 420,
+        height: '100vh',
+        background: '#fff',
+        borderLeft: '1px solid #e5e7eb',
+        boxShadow: '-4px 0 20px rgba(0,0,0,0.08)',
+        zIndex: 1000,
+        overflowY: 'auto',
+        padding: 24,
+        color: '#111',
+        display: 'flex',
+        flexDirection: 'column',
+      }
+    : { color: '#111' };
 
+  // Card style for analytics panels
+  const cardStyle = {
+    background: '#fff',
+    borderRadius: 16,
+    boxShadow: '0 1px 8px #0001',
+    padding: 24,
+    marginBottom: 24,
+    border: 'none',
+  };
+
+  // Close button for sidebar
+  const closeBtn = sidebar && (
+    <button
+      onClick={onClose}
+      style={{
+        position: 'absolute',
+        top: 18,
+        left: 18,
+        background: '#222',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '50%',
+        width: 36,
+        height: 36,
+        fontSize: 22,
+        fontWeight: 700,
+        cursor: 'pointer',
+        zIndex: 10,
+        boxShadow: '0 2px 8px #0002',
+      }}
+      aria-label="Close"
+    >
+      ×
+    </button>
+  );
+
+  return (
+    <div style={sidebarStyle}>
+      {closeBtn}
       {/* Export PDF using proposal under assets (demo) */}
-      <button disabled type="button" onClick={handleExportPdf}>
+      <button disabled type="button" onClick={handleExportPdf} style={{
+        margin: '16px 0 12px 0',
+        background: '#222',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 18,
+        padding: '7px 18px',
+        fontWeight: 600,
+        fontSize: 15,
+        cursor: 'not-allowed',
+        width: 'fit-content',
+        alignSelf: 'flex-start',
+        opacity: 0.85,
+      }}>
         Export PDF (still editing)
       </button>
 
-      <div className="mission-header">
-
-        {/*mission title */}
-        <h2 className="mission-title">
-          {project.title || "Untitled Mission"}
-        </h2>
-
-        {/*tags */}
-        <div className="mission-tags">
-          <span className="tag">
-            📅 {project.targetDate || "No target date"}
-          </span>
-          <span className={`tag status-${project.status}`}>
-            {project.status}
-          </span>
-          <span className="tag">
-            ⏰ {project.startTime || "TBD"}
-          </span>
-          <span className="tag">
-            🏫 {project.department || "—"}
-          </span>
-          <span className="tag">
-            👤 {project.preparedBy || "Organizer"}
-          </span>
-        </div>
+      {/*mission title */}
+      <h2 className="mission-title" style={{ marginTop: 0, marginBottom: 8, fontSize: 22, fontWeight: 700 }}>
+        {project.title || "Untitled Mission"}
+      </h2>
+      {/*tags */}
+      <div className="mission-tags" style={{ marginBottom: 18 }}>
+        <span className="tag">
+          📅 {project.targetDate || "No target date"}
+        </span>
+        <span className={`tag status-${project.status}`}>
+          {project.status}
+        </span>
+        <span className="tag">
+          ⏰ {project.startTime || "TBD"}
+        </span>
+        <span className="tag">
+          🏫 {project.department || "—"}
+        </span>
+        <span className="tag">
+          👤 {project.preparedBy || "Organizer"}
+        </span>
       </div>
+
 
       {/*progress bar no. of joined */}
       <div className="mission-progress">
@@ -377,6 +486,179 @@ export default function ProjectDetails({ projectId, onClose }) {
         </div>
       </div>
 
+      {/* --- Analytics Section --- */}
+      <h3 style={{ color: '#111', fontWeight: 700, margin: '18px 0 8px 0' }}>Analytics</h3>
+      {/* Participation & Roster Analytics */}
+      <div className="cem-panel cem-analytics" style={cardStyle}>
+        <h2 className="cem-panel-title" style={{ color: '#23335b', fontSize: 18, marginBottom: 12, fontWeight: 700 }}>
+          Participation & Roster Analytics
+        </h2>
+        <div className="cem-analytics-content">
+          <div className="cem-metric-row"><span className="cem-metric-label">Volunteers Registered</span><span className="cem-metric-value">{allVolunteers.length} Volunteers</span></div>
+          <div className="cem-metric-row"><span className="cem-metric-label">Volunteers Present</span><span className="cem-metric-value">{attendees.length} Volunteers</span></div>
+          <div className="cem-metric-row"><span className="cem-metric-label">Attendance Success Rate</span><span className="cem-metric-badge success">{allVolunteers.length > 0 ? ((attendees.length / allVolunteers.length) * 100).toFixed(0) : 0}% out of 100</span></div>
+          <button className="cem-btn-secondary" style={{ marginTop: 12, borderRadius: 18, fontWeight: 600, fontSize: 16, padding: '8px 18px' }} onClick={() => setShowRosterModal(true)}>
+            View & Validate Roster
+          </button>
+        </div>
+        {/* Roster Modal with Pie Chart */}
+        {showRosterModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              background: 'rgba(44,62,80,0.18)',
+              zIndex: 11000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={() => setShowRosterModal(false)}
+          >
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: 16,
+                padding: 32,
+                minWidth: 400,
+                maxWidth: '90vw',
+                boxShadow: '0 2px 16px #0002',
+                position: 'relative',
+                color: '#000',
+                maxHeight: '80vh',
+                overflowY: 'auto',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                style={{
+                  position: 'absolute',
+                  top: 16,
+                  right: 16,
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 22,
+                  cursor: 'pointer',
+                  color: '#23335b',
+                }}
+                onClick={() => setShowRosterModal(false)}
+              >
+                ×
+              </button>
+              <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Registered Volunteers</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+                {/* Pie chart for attendance rate */}
+                <svg width={120} height={120} viewBox="0 0 120 120" style={{ marginRight: 24 }}>
+                  <circle
+                    cx={60}
+                    cy={60}
+                    r={54}
+                    fill="#f3f4f8"
+                    stroke="#e0e4ea"
+                    strokeWidth={12}
+                  />
+                  <circle
+                    cx={60}
+                    cy={60}
+                    r={54}
+                    fill="none"
+                    stroke="#30bdb7"
+                    strokeWidth={12}
+                    strokeDasharray={`${allVolunteers.length > 0 ? ((attendees.length / allVolunteers.length) * 2 * Math.PI * 54).toFixed(2) : 0} ${(2 * Math.PI * 54 - (allVolunteers.length > 0 ? ((attendees.length / allVolunteers.length) * 2 * Math.PI * 54) : 0)).toFixed(2)}`}
+                    strokeDashoffset={2 * Math.PI * 54 / 4}
+                    style={{ transition: 'stroke-dasharray 0.6s' }}
+                  />
+                  <text
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize="1.5rem"
+                    fontWeight="bold"
+                    fill="#23335b"
+                  >
+                    {allVolunteers.length > 0 ? ((attendees.length / allVolunteers.length) * 100).toFixed(0) : 0}%
+                  </text>
+                </svg>
+                <div style={{ fontWeight: 600, color: '#23335b', fontSize: '1.1rem' }}>
+                  Attendance Success Rate
+                  <div style={{ fontWeight: 400, color: '#888', fontSize: '0.95rem', marginTop: 4 }}>
+                    {attendees.length} of {allVolunteers.length} present
+                  </div>
+                </div>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 8px #0001' }}>
+                <thead>
+                  <tr style={{ background: '#f3f4f8', color: '#23335b', borderBottom: '2px solid #e0e4ea' }}>
+                    <th style={{ padding: '12px 10px', fontWeight: 700, textAlign: 'left' }}>Name</th>
+                    <th style={{ padding: '12px 10px', fontWeight: 700, textAlign: 'center' }}>Attendance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allVolunteers.map((v, idx) => (
+                    <tr key={v.uid || v.id || idx}>
+                      <td style={{ padding: '10px 10px', color: '#111' }}>{v.name}</td>
+                      <td style={{ padding: '10px 10px', textAlign: 'center', color: v.status === 'present' ? '#28a745' : '#888' }}>{v.status === 'present' ? 'Present' : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Impact & Feedback Analytics (with charts) */}
+      <div className="cem-panel cem-analytics" style={cardStyle}>
+        <h2 className="cem-panel-title" style={{ color: '#23335b', fontSize: 18, marginBottom: 12, fontWeight: 700 }}>
+          Impact & Feedback Analytics
+        </h2>
+        <div className="cem-analytics-content">
+          <div className="cem-metric-row">
+            <span className="cem-metric-label">Pre Activity Survey Answers</span>
+            <span className="cem-metric-value">
+              {allVolunteers.filter(v => v.preSurveyAnswers).length} submitted
+            </span>
+          </div>
+          <div className="cem-metric-row">
+            <span className="cem-metric-label">Post Activity Survey Answers</span>
+            <span className="cem-metric-value">
+              {allVolunteers.filter(v => v.postSurveyAnswers).length} submitted
+            </span>
+          </div>
+          <div className="cem-metric-row">
+            <span className="cem-metric-label">Community Feedback Answers</span>
+            <span className="cem-metric-value">N/A</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8, gap: 8 }}>
+            <button
+              className="cem-btn-secondary"
+              style={{ fontSize: 15, padding: '8px 18px', borderRadius: 18, fontWeight: 600 }}
+              onClick={() => { setImpactModalType('pre'); setImpactModalOpen(true); }}
+            >
+              View Pre-Survey Analytics
+            </button>
+            <button
+              className="cem-btn-secondary"
+              style={{ fontSize: 15, padding: '8px 18px', borderRadius: 18, fontWeight: 600 }}
+              onClick={() => { setImpactModalType('post'); setImpactModalOpen(true); }}
+            >
+              View Post-Survey Analytics
+            </button>
+          </div>
+        </div>
+      </div>
+      {/* ImpactMetrics Modal (charts) */}
+      {impactModalOpen && (
+        <ImpactMetrics
+          open={impactModalOpen}
+          onClose={() => setImpactModalOpen(false)}
+          volunteers={allVolunteers}
+          showType={impactModalType}
+        />
+      )}
       {/*points and badges */}
       <div className="mission-points">
         <div className="points-value">

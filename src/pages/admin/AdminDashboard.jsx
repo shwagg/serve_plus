@@ -365,8 +365,8 @@ export default function AdminDashboard() {
                   <div
                     key={x.label}
                     style={{ marginBottom: 2, cursor: 'pointer' }}
-                    onClick={() => x.id && navigate(`/admin/events/${x.id}`)}
-                    title="View Event Monitoring"
+                    onClick={() => x.id && navigate(`/admin/projects/${x.id}`)}
+                    title="View Project Details"
                   >
                     <div style={{ fontWeight: 600, color: '#1f3b73', fontSize: 15, marginBottom: 6 }}>{x.label}</div>
                     <div style={{ background: '#e6eaf3', borderRadius: 8, height: 18, position: 'relative', overflow: 'hidden', width: '100%' }}>

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { createNotification } from "../../utils/notificationUtils";
-import "../../styles/CurrentEventMonitoring.css";
 import ImpactMetrics from "./ImpactMetrics";
 
 export default function CurrentEventMonitoring() {

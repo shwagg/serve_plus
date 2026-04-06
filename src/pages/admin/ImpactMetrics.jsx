@@ -4,14 +4,13 @@ import React from "react";
 export default function ImpactMetrics({
   open,
   onClose,
-  preSurveyAnalytics,
   volunteers,
+  showType, // 'pre' or 'post'
 }) {
   if (!open) return null;
 
-  // --- Begin: Pre Activity Survey Analytics modal logic ---
-  // --- Field order for Pre Activity Survey ---
-  const fieldOrder = [
+  // --- Field order for Pre and Post Activity Survey ---
+  const preFieldOrder = [
     { key: 'respondent.college', label: 'College/Department/Organization:' },
     { key: 'respondent.program', label: 'Program:' },
     { key: 'engagement.type', label: 'Type of Engagement:' },
@@ -21,7 +20,7 @@ export default function ImpactMetrics({
     { key: 'background.frequency', label: 'Frequency of Community Service:' },
   ];
   // --- Likert scale questions for Pre Activity Survey ---
-  const likertQuestions = [
+  const preLikertQuestions = [
     {
       key: 'q1',
       label: 'There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.'
@@ -191,14 +190,76 @@ export default function ImpactMetrics({
     return path.split('.').reduce((o, p) => (o ? o[p] : undefined), obj);
   }
 
-  // Re-aggregate analytics for new fieldOrder keys
-  // --- Re-aggregate analytics for new fieldOrder keys ---
-  const newPreSurveyAnalytics = {};
+  // --- Field order and likert for Post Activity Survey ---
+  const postFieldOrder = [
+    { key: 'respondent.college', label: 'College/Department/Organization:' },
+    { key: 'respondent.program', label: 'Program:' },
+    { key: 'engagement.type', label: 'Type of Engagement:' },
+    { key: 'engagement.initiativeTitle', label: 'Title of Initiative:' },
+    { key: 'engagement.participation', label: 'Type/Level of Participation:' },
+    { key: 'background.previousService', label: 'Previous Community Service Experience:' },
+    { key: 'background.frequency', label: 'Frequency of Community Service:' },
+  ];
+  const postLikertQuestions = [
+    {
+      key: 'q1',
+      label:
+        'The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.'
+    },
+    {
+      key: 'q2',
+      label:
+        'The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.'
+    },
+    {
+      key: 'q3',
+      label:
+        'Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.'
+    },
+    {
+      key: 'q4',
+      label:
+        'Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.'
+    },
+    {
+      key: 'q5',
+      label:
+        'The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.'
+    },
+    {
+      key: 'q6',
+      label:
+        'I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.'
+    },
+    {
+      key: 'q7',
+      label:
+        'I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.'
+    },
+    {
+      key: 'q8',
+      label:
+        'I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.'
+    },
+  ];
+
+  // Helper to get value by dot notation path
+  function getValueByPath(obj, path) {
+    return path.split('.').reduce((o, p) => (o ? o[p] : undefined), obj);
+  }
+
+  // Aggregation logic for pre/post survey based on showType
+  const surveyFieldOrder = showType === 'post' ? postFieldOrder : preFieldOrder;
+  const surveyLikertQuestions = showType === 'post' ? postLikertQuestions : preLikertQuestions;
+  const surveyAnswerKey = showType === 'post' ? 'postSurveyAnswers' : 'preSurveyAnswers';
+
+  // Aggregate analytics for selected survey
+  const surveyAnalytics = {};
   if (Array.isArray(volunteers)) {
-    fieldOrder.forEach(({ key }) => {
+    surveyFieldOrder.forEach(({ key }) => {
       const counts = {};
       volunteers.forEach(v => {
-        const ans = v.preSurveyAnswers;
+        const ans = v[surveyAnswerKey];
         if (!ans) return;
         const val = getValueByPath(ans, key);
         if (val === undefined || val === null || val === "") return;
@@ -211,9 +272,10 @@ export default function ImpactMetrics({
           counts[val] = (counts[val] || 0) + 1;
         }
       });
-      newPreSurveyAnalytics[key] = counts;
+      surveyAnalytics[key] = counts;
     });
   }
+
 
   // --- Begin: Analytics Summary Header ---
   // Calculate summary values
@@ -363,97 +425,96 @@ export default function ImpactMetrics({
           </div>
         </div>
         {/* --- End Analytics Summary Header --- */}
-        {/* --- Pre Activity Survey Analytics Section --- */}
-        <h2 style={{ textAlign: 'left', marginBottom: 24, color: '#000' }}>Pre Activity Survey Analytics</h2>
-        {preSurveyAnalytics ? (
-          <>
-            {/* --- Pre Activity Survey Analytics Grid --- */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: 24,
-                marginTop: 12,
-                alignItems: 'stretch',
-              }}
-            >
-              {/* --- Pre Activity Survey Field Cards --- */}
-              {fieldOrder.map(({ key, label }) => {
-                const content = newPreSurveyAnalytics[key];
-                if (!content || Object.keys(content).length === 0) return null;
-                const entryCount = Object.keys(content).length;
-                const isSingleAnswer = entryCount === 1;
-                const dynamicMinHeight = isSingleAnswer ? 120 : Math.max(180, Math.min(320, 120 + entryCount * 32));
-                const dynamicPadding = isSingleAnswer ? '12px 10px' : (entryCount > 4 ? '18px 16px' : '28px 24px');
-                return (
-                  <div
-                    key={key}
-                    style={{
-                      background: '#fff',
-                      borderRadius: 16,
-                      boxShadow: '0 2px 12px #0001',
-                      padding: dynamicPadding,
-                      border: '1.5px solid #e3eafc',
-                      minHeight: dynamicMinHeight,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'stretch',
-                      transition: 'min-height 0.2s, padding 0.2s',
-                      fontSize: isSingleAnswer ? 15 : undefined,
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
-                    <div style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>{Object.values(content).reduce((a, b) => a + b, 0)} responses</div>
-                    {renderPieChartAndLegend(content, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
-                  </div>
-                );
-              })}
-              {/* Likert scale questions */}
-              {/* --- Pre Activity Survey Likert Cards --- */}
-              {likertQuestions.map(({ key, label }) => {
-                const counts = {};
-                if (Array.isArray(volunteers)) {
-                  volunteers.forEach(v => {
-                    const ans = v.preSurveyAnswers;
-                    if (!ans || !ans.likert) return;
-                    const val = ans.likert[key];
-                    if (val === undefined || val === null || val === "") return;
-                    counts[val] = (counts[val] || 0) + 1;
-                  });
-                }
-                if (Object.keys(counts).length === 0) return null;
-                const entryCount = Object.keys(counts).length;
-                const dynamicMinHeight = Math.max(180, Math.min(320, 120 + entryCount * 32));
-                const dynamicPadding = entryCount > 4 ? '18px 16px' : '28px 24px';
-                return (
-                  <div
-                    key={key}
-                    style={{
-                      background: '#fff',
-                      borderRadius: 16,
-                      boxShadow: '0 2px 12px #0001',
-                      padding: dynamicPadding,
-                      border: '1.5px solid #e3eafc',
-                      minHeight: dynamicMinHeight,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'stretch',
-                      transition: 'min-height 0.2s, padding 0.2s',
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
-                    <div style={{ color: '#888', fontSize: 14, marginBottom: 12 }}>{Object.values(counts).reduce((a, b) => a + b, 0)} responses</div>
-                    {renderPieChartAndLegend(counts, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
-                  </div>
-                );
-              })}
-            </div>
-            {/* --- Post Activity Survey Analytics Section --- */}
-            <h2 style={{ textAlign: 'center', margin: '40px 0 24px 0', color: '#000' }}>Post Activity Survey Analytics</h2>
-            <PostSurveyAnalytics volunteers={volunteers} />
-          </>
+        {/* --- Survey Analytics Section (Pre or Post) --- */}
+        <h2 style={{ textAlign: 'left', marginBottom: 24, color: '#000' }}>
+          {showType === 'post' ? 'Post Activity Survey Analytics' : 'Pre Activity Survey Analytics'}
+        </h2>
+        {Array.isArray(volunteers) && volunteers.filter(v => v[surveyAnswerKey]).length > 0 ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 24,
+              marginTop: 12,
+              alignItems: 'stretch',
+            }}
+          >
+            {/* --- Survey Field Cards --- */}
+            {surveyFieldOrder.map(({ key, label }) => {
+              const content = surveyAnalytics[key];
+              if (!content || Object.keys(content).length === 0) return null;
+              const entryCount = Object.keys(content).length;
+              const isSingleAnswer = entryCount === 1;
+              const dynamicMinHeight = isSingleAnswer ? 120 : Math.max(180, Math.min(320, 120 + entryCount * 32));
+              const dynamicPadding = isSingleAnswer ? '12px 10px' : (entryCount > 4 ? '18px 16px' : '28px 24px');
+              return (
+                <div
+                  key={key}
+                  style={{
+                    background: '#fff',
+                    borderRadius: 16,
+                    boxShadow: '0 2px 12px #0001',
+                    padding: dynamicPadding,
+                    border: '1.5px solid #e3eafc',
+                    minHeight: dynamicMinHeight,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'stretch',
+                    transition: 'min-height 0.2s, padding 0.2s',
+                    fontSize: isSingleAnswer ? 15 : undefined,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
+                  <div style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>{Object.values(content).reduce((a, b) => a + b, 0)} responses</div>
+                  {showType === 'post'
+                    ? renderBarGraphAndLegend(content, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])
+                    : renderPieChartAndLegend(content, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
+                </div>
+              );
+            })}
+            {/* --- Survey Likert Cards --- */}
+            {surveyLikertQuestions.map(({ key, label }) => {
+              const counts = {};
+              if (Array.isArray(volunteers)) {
+                volunteers.forEach(v => {
+                  const ans = v[surveyAnswerKey];
+                  if (!ans || !ans.likert) return;
+                  const val = ans.likert[key];
+                  if (val === undefined || val === null || val === "") return;
+                  counts[val] = (counts[val] || 0) + 1;
+                });
+              }
+              if (Object.keys(counts).length === 0) return null;
+              const entryCount = Object.keys(counts).length;
+              const dynamicMinHeight = Math.max(180, Math.min(320, 120 + entryCount * 32));
+              const dynamicPadding = entryCount > 4 ? '18px 16px' : '28px 24px';
+              return (
+                <div
+                  key={key}
+                  style={{
+                    background: '#fff',
+                    borderRadius: 16,
+                    boxShadow: '0 2px 12px #0001',
+                    padding: dynamicPadding,
+                    border: '1.5px solid #e3eafc',
+                    minHeight: dynamicMinHeight,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'stretch',
+                    transition: 'min-height 0.2s, padding 0.2s',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
+                  <div style={{ color: '#888', fontSize: 14, marginBottom: 12 }}>{Object.values(counts).reduce((a, b) => a + b, 0)} responses</div>
+                  {showType === 'post'
+                    ? renderBarGraphAndLegend(counts, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])
+                    : renderPieChartAndLegend(counts, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div style={{ color: '#888', textAlign: 'center', margin: '32px 0' }}>
             No submissions yet.

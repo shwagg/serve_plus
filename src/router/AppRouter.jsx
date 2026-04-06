@@ -17,7 +17,6 @@ const BackupRestore = lazy(() => import("../pages/admin/BackupRestore"));
 const ProjectDetails = lazy(() => import("../pages/admin/ProjectDetails"));
 const ProjectTasks = lazy(() => import("../pages/admin/ProjectTasks"));
 const RosterAccountManagement = lazy(() => import("../pages/admin/RosterAccountManagement"));
-const CurrentEventMonitoring = lazy(() => import("../pages/admin/CurrentEventMonitoring"));
 
 // Lazy-loaded global pages
 const CreateProject = lazy(() => import("../pages/global/CreateProject"));
@@ -65,7 +64,6 @@ export default function AppRouter() {
           <Route path="backup-restore" element={<BackupRestore />} />
           <Route path="system/agreements" element={<AgreementEditor />} />
           <Route path="roster" element={<RosterAccountManagement />} />
-          <Route path="events/:eventId/monitor" element={<CurrentEventMonitoring />} />
         </Route>
       </Routes>
       </Suspense>

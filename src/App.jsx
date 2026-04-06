@@ -28,7 +28,6 @@ import AgreementEditor from "./pages/admin/AgreementEditor";
 import AuditLogs from "./pages/admin/AuditLogs";
 import BackupRestore from "./pages/admin/BackupRestore";
 import CurrentEvent from "./pages/admin/CurrentEvent";
-import CurrentEventMonitoring from "./pages/admin/CurrentEventMonitoring";
 import DocumentLibrary from "./pages/admin/DocumentLibrary";
 import ProjectDetails from "./pages/admin/ProjectDetails";
 import ProjectTasks from "./pages/admin/ProjectTasks";
@@ -93,7 +92,6 @@ function App() {
             <Route path="documents" element={<DocumentLibrary />} />
             <Route
               path="events/:eventId"
-              element={<CurrentEventMonitoring />}
             />
             <Route path="projects" element={<ProjectList />} />
             <Route path="projects/proposal" element={<ProposeProject />} />
@@ -185,7 +183,6 @@ function App() {
             path="/current-event/:missionId"
             element={
               <ProtectedRoute allowedRoles={["partner", "admin"]}>
-                <CurrentEventMonitoring />
               </ProtectedRoute>
             }
           />
