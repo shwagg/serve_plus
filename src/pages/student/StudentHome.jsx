@@ -213,6 +213,7 @@ const StudentHome = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
+        // Fetch all users, then filter for students (Firestore does not support compound queries with orderBy and where on different fields unless indexed)
         const usersQuery = query(
           collection(db, "users"),
           orderBy("totalPoints", "desc"),
@@ -220,20 +221,23 @@ const StudentHome = () => {
         );
         const usersSnap = await getDocs(usersQuery);
 
-        const leaderboardData = usersSnap.docs.map(userDoc => {
-          const userData = userDoc.data();
-
-          return {
-            uid: userDoc.id,
-            name:
-              userData.username ||
-              userData.name ||
-              userData.email?.split("@")[0] ||
-              "User",
-            points: userData.totalPoints || 0,
-            avatar: userData.avatar && !userData.avatar.includes('ui-avatars.com') ? userData.avatar : "",
-          };
-        });
+        // Only include users with role === 'student'
+        const leaderboardData = usersSnap.docs
+          .map(userDoc => {
+            const userData = userDoc.data();
+            return {
+              uid: userDoc.id,
+              name:
+                userData.username ||
+                userData.name ||
+                userData.email?.split("@")[0] ||
+                "User",
+              points: userData.totalPoints || 0,
+              avatar: userData.avatar && !userData.avatar.includes('ui-avatars.com') ? userData.avatar : "",
+              role: userData.role || ""
+            };
+          })
+          .filter(user => user.role === "student");
 
         leaderboardData.sort((a, b) => b.points - a.points);
         setLeaderboard(leaderboardData);
