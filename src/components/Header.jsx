@@ -13,6 +13,7 @@ import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
 import PartnerMenu from './menu/PartnerMenu';
+import SysAdminMenu from './menu/SysAdminMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
 import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon } from './icons';
@@ -190,6 +191,8 @@ export default function Header() {
         return <AdminMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} onOpenCertificateQR={() => setShowCertificateQRModal(true)} />;
       case 'partner':
         return <PartnerMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
+      case 'sysadmin':
+        return <SysAdminMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
       default:
         return null;
     }
