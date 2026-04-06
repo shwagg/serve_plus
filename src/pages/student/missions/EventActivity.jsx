@@ -5,6 +5,7 @@ import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
+import { showConfirm } from "../../../utils/toast";
 import { Face6RoundedIcon, WestIcon, ModeRoundedIcon, DeleteRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
 import cloudsBg from '../../../assets/clouds-bg.jpg';
 import mission1 from '../../../assets/mission1.jpg';
@@ -2609,13 +2610,13 @@ export default function EventActivity() {
                     cursor: 'pointer',
                   }}
                   onClick={async () => {
-                    if (!window.confirm('Are you sure you want to un-enroll from this event?')) return;
+                    if (!await showConfirm('Are you sure you want to un-enroll from this event?')) return;
                     const user = auth.currentUser;
                     if (!user) return;
                     try {
                       await deleteDoc(doc(db, 'missions', id, 'volunteer', user.uid));
-                      await deleteDoc(doc(db, 'userMissions', user.uid, 'missions', id));
-                      navigate('/student/home', { state: { scrollTo: 'missions' } });
+                      deleteDoc(doc(db, 'userMissions', user.uid, 'missions', id)).catch(() => {});
+                      navigate('/student', { state: { scrollTo: 'missions' } });
                     } catch (err) {
                       alert('Failed to un-enroll. Please try again.');
                     }
