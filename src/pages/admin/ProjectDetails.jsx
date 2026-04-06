@@ -486,24 +486,9 @@ export default function ProjectDetails({ projectId, onClose }) {
 
       <hr />
 
-      <h3 style={{ color: "#111" }}>Actions (demo)</h3>
+
+      <h3 style={{ color: "#111" }}>Actions</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button disabled={saving} onClick={() => setStatus("draft")}>
-          Set Draft
-        </button>
-
-        <button disabled={saving} onClick={() => setStatus("for_approval")}>
-          Submit for Approval
-        </button>
-
-        <button disabled={saving} onClick={() => toggleApproval("faculty")}>
-          Toggle Faculty Approval
-        </button>
-
-        <button disabled={saving} onClick={() => toggleApproval("partner")}>
-          Toggle Partner Approval
-        </button>
-
         {project.status !== "archived" ? (
           <button disabled={saving} onClick={handleArchive}>
             Archive
@@ -518,7 +503,7 @@ export default function ProjectDetails({ projectId, onClose }) {
           Delete
         </button>
 
-        <button disabled={!canPublish || saving} onClick={() => setStatus("published")}>
+        <button disabled={!canPublish || saving} onClick={() => setStatus("published")}> 
           Publish
         </button>
       </div>
