@@ -2,9 +2,16 @@ export function showToast(message, type = 'success') {
   window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type } }));
 }
 
-// Make accessible from non-React files (e.g. exportProposalPDF.js)
+export function showConfirm(message) {
+  return new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent('app-confirm', { detail: { message, resolve } }));
+  });
+}
+
+// Make accessible from non-React files
 if (typeof window !== 'undefined') {
   window.showToast = showToast;
+  window.showConfirm = showConfirm;
 }
 
 // Override native alert globally
