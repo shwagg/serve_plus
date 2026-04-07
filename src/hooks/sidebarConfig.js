@@ -30,6 +30,7 @@ export const adminLinks = [
     label: "Project",
     children: [
       { label: "Project List", to: "/admin/projects" },
+      { label: "Review Proposals", to: "/admin/review-proposals" },
       { label: "Badge & Points", to: "/admin/projects/badges" },
     ],
   },
@@ -86,26 +87,11 @@ export const partnerLinks = [
 //faculty side
 export const facultyLinks = [
   {
-    key: "events",
-    label: "Events",
-    children: [
-      { label: "Current Event", to: "/admin/events/current" },
-      { label: "Roster", to: "/admin/roster" },
-      { label: "Partner Hub", to: "/admin/events/partners" },
-    ],
-  },
-  {
     key: "project",
     label: "Project",
     children: [
       { label: "Project List", to: "/faculty/projects" },
-    ],
-  },
-  {
-    key: "forms",
-    label: "Forms",
-    children: [
-      { label: "Document Library", to: "/admindocuments" },
+      { label: "Review Proposals", to: "/global/review-proposals" },
     ],
   },
 ];

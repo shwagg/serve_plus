@@ -1,5 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import EventDetails from "./missions/EventDetails";
+import ProjectProposal from "../global/proposal/ProjectProposal";
+import ReviewModal from "../global/proposal/ReviewModal";
 import { auth, functions, db } from "../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -12,6 +14,7 @@ import "../../styles/ui.css";
 import { WestIcon, EastIcon } from "../../components/icons";
 import mission1 from '../../assets/mission1.jpg';
 import { Face6RoundedIcon } from '../../components/icons';
+import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
 import cloudsBg from '../../assets/clouds-bg.jpg';
 import mountainBg from '../../assets/mountain-bg.jpg';
@@ -62,6 +65,8 @@ const StudentHome = () => {
 
   const [selectedMissionId, setSelectedMissionId] = useState(null);
   const [enrollmentRefreshKey, setEnrollmentRefreshKey] = useState(0);
+  const [selectedProposalForView, setSelectedProposalForView] = useState(null);
+  const [proposalRefreshKey, setProposalRefreshKey] = useState(0);
   const [proposalCards, setProposalCards] = useState([]);
   const [volunteerInfo, setVolunteerInfo] = useState({});
 
@@ -185,7 +190,7 @@ const StudentHome = () => {
       }
     };
     fetchProposals();
-  }, [currentUser]);
+  }, [currentUser, proposalRefreshKey]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -357,6 +362,20 @@ const StudentHome = () => {
     });
   }, [leaderboard]);
 
+  const getProposalStatusLine = (proposal) => {
+    const { reviewedBy, recommendedBy, endorsedBy, approvedBy, status, rejectedBy, rejectedByUser } = proposal;
+    if (rejectedBy && status === 'for_approval' && !reviewedBy) {
+      return `Returned for revision${rejectedByUser ? ` by ${rejectedByUser}` : ''}`;
+    }
+    if (approvedBy && recommendedBy && endorsedBy && reviewedBy) {
+      return 'All signatures collected · Ready for CSCE upload';
+    }
+    if (endorsedBy) return `Endorsed by ${endorsedBy} · Awaiting final approval`;
+    if (recommendedBy) return `Recommended by ${recommendedBy} · Awaiting endorsement`;
+    if (reviewedBy) return `Reviewed by ${reviewedBy} · Awaiting recommendation`;
+    return 'Submitted · Awaiting Program Chair review';
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
@@ -480,18 +499,8 @@ const StudentHome = () => {
             </div>
 
             <div className="player-profile">
-              {studentAvatar && !studentAvatar.includes('ui-avatars.com') ? (
-                <img
-                  src={studentAvatar}
-                  alt="Profile"
-                  className="player-avatar"
-                  loading="lazy"
-                />
-              ) : (
-                <Face6RoundedIcon sx={{ width: 36, height: 36, color: '#30bdb7' }} />
-              )}
               <span className="player-greeting">
-                {studentUsername || (currentUser?.email ? currentUser.email.split('@')[0] : studentName)}
+                Hi, {studentName || studentUsername || (currentUser?.email ? currentUser.email.split('@')[0] : 'Student')}!
               </span>
             </div>
           </div>
@@ -550,6 +559,9 @@ const StudentHome = () => {
                       className="mission-card"
                       role="button"
                       tabIndex={0}
+                      onClick={() => setSelectedProposalForView(proposal)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedProposalForView(proposal); } }}
+                      style={{ cursor: 'pointer' }}
                     >
                       <span
                         className="mission-enrolled-badge"
@@ -569,6 +581,9 @@ const StudentHome = () => {
                           <span className="mission-card-date">
                             📅 {formatDate(proposal.targetDate) || "Date TBA"}
                           </span>
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                          {getProposalStatusLine(proposal)}
                         </div>
                       </div>
                     </div>
@@ -741,6 +756,61 @@ const StudentHome = () => {
 
       </div>
     </div>
+
+    {/* Proposal View/Edit Modal */}
+    {selectedProposalForView && (
+      <div
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          zIndex: 3000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) setSelectedProposalForView(null); }}
+      >
+        <div style={{
+          background: '#fff',
+          borderRadius: 16,
+          boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
+          width: '90vw',
+          maxWidth: 700,
+          maxHeight: '90vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+        }}>
+          {selectedProposalForView.status === 'for_approval' ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1f3b73' }}>
+                  {selectedProposalForView.projectType === 'sl' ? '📝 Service Learning Proposal' : '📝 Community Engagement Proposal'}
+                </h3>
+                <button
+                  onClick={() => setSelectedProposalForView(null)}
+                  style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#64748b', lineHeight: 1 }}
+                >✕</button>
+              </div>
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                <ProjectProposal
+                  projectType={selectedProposalForView.projectType === 'sl' ? 'service-learning' : 'community-engagement'}
+                  editProposal={selectedProposalForView}
+                  onClose={() => { setSelectedProposalForView(null); setProposalRefreshKey(k => k + 1); }}
+                  timelineNode={<ProposalTimeline proposal={selectedProposalForView} compact />}
+                />
+              </div>
+            </>
+          ) : (
+            <ReviewModal
+              proposal={selectedProposalForView}
+              onClose={() => setSelectedProposalForView(null)}
+              isPartner={true}
+            />
+          )}
+        </div>
+      </div>
+    )}
 
     {/* Event Details Modal */}
     {selectedMissionId && (

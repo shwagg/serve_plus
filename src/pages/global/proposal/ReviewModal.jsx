@@ -1,4 +1,5 @@
 import React, { useState, useContext, useMemo, useEffect } from "react";
+import ProposalTimeline from "../../../components/ProposalTimeline";
 import { db, auth } from "../../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { createNotification, notifyUsersByRoles } from "../../../utils/notificationUtils";
@@ -123,13 +124,6 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     return false;
   }
 
-  // Debug logs for troubleshooting
-  console.log("[DEBUG][ReviewModal] userData:", userData);
-  console.log("[DEBUG][ReviewModal] normalizedPositions:", normalizedPositions);
-  console.log("[DEBUG][ReviewModal] approvalLevel:", approvalLevel);
-  console.log("[DEBUG][ReviewModal] canApproveSequential:", canApproveSequential());
-  console.log("[DEBUG][ReviewModal] proposal:", proposal);
-
   // Check if this approval field has already been filled
   const isAlreadyApproved = () => {
     if (!approvalLevel) return false;
@@ -150,10 +144,15 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     setIsSubmitting(true);
     try {
       const proposalRef = doc(db, "missions", proposal.id);
+      const approverName = userData.name || userData.email;
       let updateData = {
-        [approvalLevel]: userData.name || userData.email,
+        [approvalLevel]: approverName,
         lastApprovedAt: serverTimestamp(),
         lastApprovedBy: approvalLevel,
+        // Track per-step approval details without overwriting approvals.faculty / approvals.partner
+        [`approvals.${approvalLevel}.approved`]: true,
+        [`approvals.${approvalLevel}.decidedAt`]: serverTimestamp(),
+        [`approvals.${approvalLevel}.name`]: approverName,
       };
 
       // Check how many approval fields are currently filled (before this approval)
@@ -244,17 +243,23 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     setIsSubmitting(true);
     try {
       const proposalRef = doc(db, "missions", proposal.id);
+      const rejectorName = userData.name || userData.email;
       const updateData = {
         status: "for_approval",
         rejectionReason: rejectComments,
         rejectedBy: approvalLevel,
         rejectedAt: serverTimestamp(),
-        rejectedByUser: userData.name || userData.email,
-        // Clear all approval fields when rejected
+        rejectedByUser: rejectorName,
+        // Clear signatory name strings
         reviewedBy: "",
         recommendedBy: "",
         endorsedBy: "",
         approvedBy: "",
+        // Clear all per-step signatory approvals (preserve approvals.faculty / approvals.partner)
+        "approvals.reviewedBy": null,
+        "approvals.recommendedBy": null,
+        "approvals.endorsedBy": null,
+        "approvals.approvedBy": null,
       };
       setApprovalMessage("Proposal rejected. All approvals cleared and returned to For Approval for resubmission.");
 
@@ -295,293 +300,223 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     }
   };
 
+  const typeLabel = proposal.projectType === "sl"
+    ? "Service Learning"
+    : proposal.projectType === "ce"
+    ? "Community Engagement"
+    : proposal.projectType || "Proposal";
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="header-title-group">
-            <h2>Proposal Summary</h2>
-          </div>
-          <button className="modal-close" onClick={onClose}>&&#10;</button>
-        </div>
-        
-        <div className="modal-body">
-          {/* Basic Information */}
-          <div className="modal-section">
-            <h3>Basic Information</h3>
-            <div className="field-group">
-              <label>Title:</label>
-              <p>{proposal.title || "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Project Type:</label>
-              <p>{proposal.projectType === "sl" ? "Service Learning" : proposal.projectType === "ce" ? "Community Engagement" : "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Status:</label>
-              <p>
-                <span className={`status-badge ${getStatusBadgeClass(proposal.status)}`}>
-                  {formatStatus(proposal.status) || "Draft"}
-                </span>
-              </p>
-            </div>
-            <div className="field-group">
-              <label>Date Proposed:</label>
-              <p>{formatDate(proposal.dateProposed)}</p>
-            </div>
-            <div className="field-group">
-              <label>Target Date:</label>
-              <p>{proposal.targetDate || "N/A"}</p>
-            </div>
-          </div>
+      <div className="rm-modal" onClick={(e) => e.stopPropagation()}>
 
-          {/* SDGs */}
-          {proposal.sdg && proposal.sdg.length > 0 && (
-            <div className="modal-section">
-              <h3>Sustainable Development Goals</h3>
-              <div className="field-group">
+        {/* ── Header ── */}
+        <div className="rm-header">
+          <div className="rm-header-left">
+            <span className="rm-type-chip">{typeLabel}</span>
+            <h2 className="rm-title">{proposal.title || "Untitled Proposal"}</h2>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        {/* ── Two-column body ── */}
+        <div className="rm-body">
+
+          {/* Left: scrollable proposal details */}
+          <div className="rm-left">
+
+            {/* Meta row */}
+            <div className="rm-meta-row">
+              <span className={`status-badge ${getStatusBadgeClass(proposal.status)}`}>
+                {formatStatus(proposal.status)}
+              </span>
+              {proposal.targetDate && (
+                <span className="rm-meta-item">📅 {proposal.targetDate}</span>
+              )}
+              {proposal.dateProposed && (
+                <span className="rm-meta-item">Submitted {formatDate(proposal.dateProposed)}</span>
+              )}
+              {proposal.preparedBy && (
+                <span className="rm-meta-item">By {proposal.preparedBy}</span>
+              )}
+            </div>
+
+            {/* SDGs */}
+            {proposal.sdg && proposal.sdg.length > 0 && (
+              <div className="modal-section">
+                <h3>SDGs</h3>
                 <div className="sdg-list">
                   {proposal.sdg.map((sdg, idx) => (
                     <span key={idx} className="sdg-badge">SDG {sdg}</span>
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Project Details */}
-          <div className="modal-section">
-            <h3>Project Details</h3>
-            <div className="field-group">
-              <label>Stakeholders:</label>
-              <p>{proposal.stakeholders || "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Location:</label>
-              <p>{proposal.location || "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Volunteer Hours:</label>
-              <p>{proposal.volunteerHours || "N/A"}</p>
-            </div>
-          </div>
-
-          {/* Proponents */}
-          {proposal.proponents && proposal.proponents.length > 0 && (
+            {/* Project Details */}
             <div className="modal-section">
-              <h3>Proponents</h3>
+              <h3>Project Details</h3>
               <div className="field-group">
+                <label>Location</label>
+                <p>{proposal.location || "N/A"}</p>
+              </div>
+              <div className="field-group">
+                <label>Stakeholders</label>
+                <p>{proposal.stakeholders || "N/A"}</p>
+              </div>
+              <div className="field-group">
+                <label>Volunteer Hours</label>
+                <p>{proposal.volunteerHours || "N/A"}</p>
+              </div>
+            </div>
+
+            {/* Proponents */}
+            {proposal.proponents && proposal.proponents.length > 0 && (
+              <div className="modal-section">
+                <h3>Proponents</h3>
                 <ul className="proponents-list">
-                  {proposal.proponents.map((proponent, idx) => (
-                    <li key={idx}>{proponent}</li>
-                  ))}
+                  {proposal.proponents.map((p, idx) => <li key={idx}>{p}</li>)}
                 </ul>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Description & Objectives */}
-          <div className="modal-section">
-            <h3>Description & Objectives</h3>
-            <div className="field-group">
-              <label>Student Outcomes:</label>
-              <p>{proposal.studentOutcomes || "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Description:</label>
-              <p>{proposal.description || "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Objectives:</label>
-              <p>{proposal.objectives || "N/A"}</p>
-            </div>
-          </div>
-
-          {/* Specific Activities */}
-          {proposal.specificActivities && proposal.specificActivities.length > 0 && (
+            {/* Description */}
             <div className="modal-section">
-              <h3>Specific Activities</h3>
-              <div className="field-group">
-                <ul className="activities-list">
-                  {proposal.specificActivities.map((activity, idx) => (
-                    <li key={idx}>{activity}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* Success Indicators */}
-          {proposal.successIndicators && proposal.successIndicators.length > 0 && (
-            <div className="modal-section">
-              <h3>Success Indicators</h3>
-              <div className="field-group">
-                <ul className="indicators-list">
-                  {proposal.successIndicators.map((indicator, idx) => (
-                    <li key={idx}>{indicator}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* Budget */}
-          <div className="modal-section">
-            <h3>Budget</h3>
-            <div className="field-group">
-              <p>{proposal.budget || "N/A"}</p>
-            </div>
-          </div>
-
-          {/* Service Learning Fields */}
-          {proposal.projectType === "sl" && proposal.slFields && (
-            <div className="modal-section">
-              <h3>Service Learning Details</h3>
-              <div className="field-group">
-                <label>Section:</label>
-                <p>{proposal.slFields.section || "N/A"}</p>
-              </div>
-              <div className="field-group">
-                <label>Course:</label>
-                <p>{proposal.slFields.course || "N/A"}</p>
-              </div>
-              <div className="field-group">
-                <label>Course Code:</label>
-                <p>{proposal.slFields.courseCode || "N/A"}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Community Engagement Fields */}
-          {proposal.projectType === "ce" && proposal.ceFields && (
-            <div className="modal-section">
-              <h3>Community Engagement Details</h3>
-              <div className="field-group">
-                <label>Nature:</label>
-                <p>{proposal.ceFields.nature || "N/A"}</p>
-              </div>
-              <div className="field-group">
-                <label>Learning Outcomes:</label>
-                <p>{proposal.ceFields.learningOutcomes || "N/A"}</p>
-              </div>
-              {proposal.ceFields.customLearningOutcome && (
+              <h3>Description & Objectives</h3>
+              {proposal.studentOutcomes && (
                 <div className="field-group">
-                  <label>Custom Learning Outcome:</label>
-                  <p>{proposal.ceFields.customLearningOutcome}</p>
+                  <label>Student Outcomes</label>
+                  <p>{proposal.studentOutcomes}</p>
                 </div>
               )}
               <div className="field-group">
-                <label>Affiliation:</label>
-                <p>{proposal.ceFields.affiliation || "N/A"}</p>
+                <label>Description</label>
+                <p>{proposal.description || "N/A"}</p>
+              </div>
+              <div className="field-group">
+                <label>Objectives</label>
+                <p>{proposal.objectives || "N/A"}</p>
               </div>
             </div>
-          )}
 
-          {/* Approval Chain */}
-          <div className="modal-section">
-            <h3>Approval Chain</h3>
-            <div className="field-group">
-              <label>Prepared By:</label>
-              <p>{proposal.preparedBy || "N/A"}</p>
+            {/* Specific Activities */}
+            {proposal.specificActivities && proposal.specificActivities.length > 0 && (
+              <div className="modal-section">
+                <h3>Specific Activities</h3>
+                <ul className="activities-list">
+                  {proposal.specificActivities.map((a, idx) => <li key={idx}>{a}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {/* Success Indicators */}
+            {proposal.successIndicators && proposal.successIndicators.length > 0 && (
+              <div className="modal-section">
+                <h3>Success Indicators</h3>
+                <ul className="indicators-list">
+                  {proposal.successIndicators.map((s, idx) => <li key={idx}>{s}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {/* Budget */}
+            <div className="modal-section">
+              <h3>Budget</h3>
+              <p>{proposal.budget || "N/A"}</p>
             </div>
-            <div className="field-group">
-              <label>Reviewed By:</label>
-              <p>{proposal.reviewedBy || "N/A"}</p>
+
+            {/* SL Fields */}
+            {proposal.projectType === "sl" && proposal.slFields && (
+              <div className="modal-section">
+                <h3>Service Learning Details</h3>
+                <div className="field-group"><label>Section</label><p>{proposal.slFields.section || "N/A"}</p></div>
+                <div className="field-group"><label>Course</label><p>{proposal.slFields.course || "N/A"}</p></div>
+                <div className="field-group"><label>Course Code</label><p>{proposal.slFields.courseCode || "N/A"}</p></div>
+              </div>
+            )}
+
+            {/* CE Fields */}
+            {proposal.projectType === "ce" && proposal.ceFields && (
+              <div className="modal-section">
+                <h3>Community Engagement Details</h3>
+                <div className="field-group"><label>Nature</label><p>{proposal.ceFields.nature || "N/A"}</p></div>
+                <div className="field-group"><label>Learning Outcomes</label><p>{proposal.ceFields.learningOutcomes || "N/A"}</p></div>
+                {proposal.ceFields.customLearningOutcome && (
+                  <div className="field-group"><label>Custom Learning Outcome</label><p>{proposal.ceFields.customLearningOutcome}</p></div>
+                )}
+                <div className="field-group"><label>Affiliation</label><p>{proposal.ceFields.affiliation || "N/A"}</p></div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: sticky action panel */}
+          <div className="rm-right">
+
+            {/* Signatories Timeline */}
+            <div className="rm-panel-section">
+              <div className="rm-panel-label">Approval Progress</div>
+              <ProposalTimeline proposal={proposal} />
             </div>
-            <div className="field-group">
-              <label>Recommended By:</label>
-              <p>{proposal.recommendedBy || "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Endorsed By:</label>
-              <p>{proposal.endorsedBy || "N/A"}</p>
-            </div>
-            <div className="field-group">
-              <label>Approved By:</label>
-              <p>{proposal.approvedBy || "N/A"}</p>
-            </div>
-            {/* Signed document uploaded by proponent */}
-            <div className="field-group">
-              <label>Signed Document:</label>
+
+            {/* Signed Document */}
+            <div className="rm-panel-section">
+              <div className="rm-panel-label">Signed Document</div>
               {proposal.signedDocUrl ? (
                 <a
                   href={proposal.signedDocUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    padding: '6px 14px',
-                    background: '#f0fdfc',
-                    border: '1.5px solid #30bdb7',
-                    borderRadius: 6,
-                    color: '#1a9e99',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    textDecoration: 'none',
-                    marginTop: 4,
-                  }}
+                  className="rm-doc-link"
                 >
                   📄 View Signed Document
                 </a>
               ) : (
-                <p style={{ color: '#a0aec0' }}>No document uploaded</p>
+                <p className="rm-no-doc">No document uploaded yet</p>
               )}
             </div>
-          </div>
-        </div>
 
-        <div className="modal-footer">
-          {approvalMessage && (
-            <div className="approval-message">
-              {approvalMessage}
-            </div>
-          )}
-
-          {!actionSaved && (
-            <div className="rejection-form">
-              <label>Comments for rejection (required if rejecting):</label>
-              <textarea
-                className="rejection-textarea"
-                placeholder="Please provide your comments for rejection..."
-                value={rejectComments}
-                onChange={(e) => setRejectComments(e.target.value)}
-                rows="3"
-                disabled={isSubmitting || !approvalLevel || !canApproveSequential()}
-              />
-            </div>
-          )}
-
-          <div className="modal-actions">
-            {/* Partners see only Close button, no approve/reject */}
-            {isPartner ? (
-              <button className="btn-close" onClick={onClose}>
-                Close
-              </button>
-            ) : !actionSaved ? (
-              <>
-                <button
-                  className="btn-approve"
-                  onClick={handleApprove}
-                  disabled={isSubmitting || !approvalLevel || isAlreadyApproved() || !canApproveSequential()}
-                  title={`Approval Level: ${approvalLevel || 'None'} ${isAlreadyApproved() ? '(Already approved)' : ''} ${!canApproveSequential() ? '(Not your turn)' : ''}`}
-                >
-                  {isSubmitting ? "Approving..." : "Approve"}
-                </button>
-                <button
-                  className="btn-reject"
-                  onClick={handleReject}
-                  disabled={isSubmitting || !approvalLevel || isAlreadyApproved() || !canApproveSequential()}
-                  title={`Approval Level: ${approvalLevel || 'None'} ${isAlreadyApproved() ? '(Already approved)' : ''} ${!canApproveSequential() ? '(Not your turn)' : ''}`}
-                >
-                  {isSubmitting ? "Rejecting..." : "Reject"}
-                </button>
-              </>
+            {/* Actions */}
+            {approvalMessage ? (
+              <div className="rm-approval-msg">{approvalMessage}</div>
+            ) : isPartner || !approvalLevel ? (
+              <button className="rm-btn-close" onClick={onClose}>Close</button>
+            ) : actionSaved ? (
+              <button className="rm-btn-close" onClick={onClose}>Close</button>
             ) : (
-              <button className="btn-close" onClick={onClose}>
-                Close
-              </button>
+              <div className="rm-action-panel">
+                {canApproveSequential() && !isAlreadyApproved() ? (
+                  <>
+                    <div className="rm-panel-label">Your Action</div>
+                    <button
+                      className="rm-btn-approve"
+                      onClick={handleApprove}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? "Approving…" : "✓ Approve"}
+                    </button>
+                    <div className="rm-return-label">Return to proposer</div>
+                    <textarea
+                      className="rm-rejection-textarea"
+                      placeholder="Reason for returning (required)…"
+                      value={rejectComments}
+                      onChange={(e) => setRejectComments(e.target.value)}
+                      rows={3}
+                      disabled={isSubmitting}
+                    />
+                    <button
+                      className="rm-btn-return"
+                      onClick={handleReject}
+                      disabled={isSubmitting || !rejectComments.trim()}
+                    >
+                      {isSubmitting ? "Returning…" : "↩ Return"}
+                    </button>
+                  </>
+                ) : isAlreadyApproved() ? (
+                  <div className="rm-already-done">You have already approved this proposal.</div>
+                ) : (
+                  <div className="rm-not-turn">Not your turn yet — waiting for the previous signatory.</div>
+                )}
+              </div>
             )}
           </div>
         </div>

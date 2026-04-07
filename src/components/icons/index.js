@@ -36,6 +36,7 @@ import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 //under proposal type selection icons
 import VolunteerActivismOutlinedIcon from '@mui/icons-material/VolunteerActivismOutlined';
 import LocalLibraryOutlinedIcon from '@mui/icons-material/LocalLibraryOutlined';
+import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined';
 
 
 export {
@@ -72,4 +73,5 @@ export {
     ExpandLessRoundedIcon,
     VolunteerActivismOutlinedIcon,
     LocalLibraryOutlinedIcon,
+    CloudSyncOutlinedIcon,
 };

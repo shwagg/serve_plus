@@ -12,7 +12,7 @@ const sharedStyle = {
   letterSpacing: '0.01em',
   boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
   pointerEvents: 'auto',
-  minWidth: 220,
+  minWidth: 'fit-content',
   maxWidth: 360,
 };
 
@@ -127,8 +127,8 @@ export default function ToastContainer() {
             whiteSpace: 'normal',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-            <span style={{ lineHeight: 1.5, flex: 1, wordBreak: 'break-word' }}>{t.message}</span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <span style={{ lineHeight: 1.5, wordBreak: 'break-word' }}>{t.message}</span>
             <button
               onClick={() => removeToast(t.id)}
               onMouseEnter={(e) => e.currentTarget.style.color = '#30bdb7'}

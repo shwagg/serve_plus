@@ -12,6 +12,9 @@ functions/node_modules/
 .firebase/
 firebaserc.bak
 
+# Personal script ni Aly(local only)
+start-emulators.ps1
+
 # Emulator artifacts
 .emulator.log
 ui-debug.log

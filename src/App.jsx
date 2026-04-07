@@ -109,6 +109,7 @@ function App() {
             <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="system/agreements" element={<AgreementEditor />} />
             <Route path="system/badges" element={<BadgeManage />} />
+            <Route path="review-proposals" element={<ReviewProposal />} />
           </Route>
 
           {/* System Admin Routes */}

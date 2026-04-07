@@ -116,6 +116,13 @@ export function SessionProvider({ children }) {
               const data = userSnap.data();
               console.log("SessionContext - Fetched user data:", data);
               setUserData(data);
+
+              // Award SERVE Ready badge on login (idempotent — won't duplicate)
+              if (data.role === "student") {
+                import("../hooks/badgeSystem").then(({ awardServeReadyBadge }) => {
+                  awardServeReadyBadge(user.uid).catch(() => {});
+                });
+              }
             } else {
               console.warn("SessionContext - User document not found for uid:", user.uid);
               setUserData(null);

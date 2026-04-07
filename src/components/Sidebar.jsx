@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { adminLinks } from "../hooks/sidebarConfig";
 
-export default function Sidebar({ userProfile, links, roleLabel }) {
+export default function Sidebar({ links, roleLabel }) {
     const resolvedLinks = links || adminLinks;
     const resolvedRoleLabel = roleLabel || "Admin";
     const [activeCategory, setActiveCategory] = useState(null);
@@ -63,7 +63,9 @@ export default function Sidebar({ userProfile, links, roleLabel }) {
                 if (location.pathname.startsWith(child.to)) {
                     return {
                         parent: cat.label,
-                        current: child.label
+                        parentTo: cat.children?.[0]?.to || null,
+                        current: child.label,
+                        currentTo: child.to,
                     };
                 }
             }
@@ -80,33 +82,6 @@ export default function Sidebar({ userProfile, links, roleLabel }) {
     return (
         <section className="admin-strip" ref={sidebarRef}>
             <div className="admin-strip-inner" ref={stripRef}>
-                {/* LEFT SECTION */}
-                <div className="sidebar-left">
-                    <div className="sidebar-user">
-                        <div className="sidebar-avatar">
-                            {userProfile?.avatar ? (
-                                <img
-                                    src={userProfile.avatar}
-                                    alt="profile"
-                                    className="sidebar-avatar-img"
-                                />
-                            ) : (
-                                userProfile?.name?.charAt(0).toUpperCase()
-                            )}
-                        </div>
-
-                        <div className="sidebar-user-info">
-                            <span className="sidebar-user-name">
-                                {userProfile?.name}
-                            </span>
-                            <span className="sidebar-user-role">
-                                {resolvedRoleLabel}
-                            </span>
-                        </div>
-                    </div>
-
-                </div>
-
                 {/* RIGHT SECTION */}
                 <div className="sidebar-right">
                     <div className="sidebar-categories">
@@ -159,9 +134,21 @@ export default function Sidebar({ userProfile, links, roleLabel }) {
 
                 {breadcrumb && (
                     <div className="context-breadcrumb">
-                        <span>{breadcrumb.parent}</span>
+                        {breadcrumb.parentTo ? (
+                            <button className="breadcrumb-link" onClick={() => navigate(breadcrumb.parentTo)}>
+                                {breadcrumb.parent}
+                            </button>
+                        ) : (
+                            <span>{breadcrumb.parent}</span>
+                        )}
                         <span className="sep">/</span>
-                        <span>{breadcrumb.current}</span>
+                        {breadcrumb.currentTo ? (
+                            <button className="breadcrumb-link breadcrumb-current" onClick={() => navigate(breadcrumb.currentTo)}>
+                                {breadcrumb.current}
+                            </button>
+                        ) : (
+                            <span>{breadcrumb.current}</span>
+                        )}
                         {breadcrumb.child && (
                             <>
                                 <span className="sep">/</span>

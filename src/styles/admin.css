@@ -65,10 +65,9 @@
   border-radius: 2px;
   padding: 0 50px;
   height: 80px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  justify-content: center;
   align-items: center;
-
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
   border-bottom: 1px solid var(--border);
   position: relative;
@@ -333,6 +332,28 @@
 
 .context-breadcrumb .sep {
   color: var(--muted);
+}
+
+.breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.breadcrumb-link:hover {
+  color: var(--navy);
+  text-decoration: underline;
+}
+
+.breadcrumb-link.breadcrumb-current {
+  font-weight: 600;
+  color: var(--navy);
 }
 
 /* CSS Design for every pages in Outlet under Admin*/

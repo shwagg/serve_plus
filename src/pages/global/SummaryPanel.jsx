@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
@@ -18,6 +18,8 @@ function SummaryPanel({
   sdgOptions,
   setLoading,
   onClearDraft,
+  proposalId,
+  existingSignedDocUrl,
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
   const [signedDoc, setSignedDoc] = useState(null);
@@ -56,7 +58,8 @@ function SummaryPanel({
    * Handles form submission: creates a mission document in the unified missions collection.
    */
   const handleSubmit = async () => {
-    if (!signedDoc) {
+    const hasDoc = signedDoc || (proposalId && existingSignedDocUrl);
+    if (!hasDoc) {
       showToast('Please upload the signed scanned document before submitting.');
       return;
     }
@@ -69,19 +72,72 @@ function SummaryPanel({
         return;
       }
 
-      // Upload signed document to Firebase Storage
-      let signedDocUrl = '';
-      try {
-        const ext = signedDoc.name.split('.').pop();
-        const storageRef = ref(storage, `proposals/signed/${user.uid}_${Date.now()}.${ext}`);
-        const snapshot = await uploadBytes(storageRef, signedDoc);
-        signedDocUrl = await getDownloadURL(snapshot.ref);
-      } catch (uploadErr) {
-        console.error('Failed to upload signed document:', uploadErr);
-        showToast('Failed to upload document. Please try again.');
-        return;
+      // Upload signed document to Firebase Storage (skip if editing and no new file)
+      let signedDocUrl = existingSignedDocUrl || '';
+      if (signedDoc) {
+        try {
+          const ext = signedDoc.name.split('.').pop();
+          const storageRef = ref(storage, `proposals/signed/${user.uid}_${Date.now()}.${ext}`);
+          const snapshot = await uploadBytes(storageRef, signedDoc);
+          signedDocUrl = await getDownloadURL(snapshot.ref);
+        } catch (uploadErr) {
+          console.error('Failed to upload signed document:', uploadErr);
+          showToast('Failed to upload document. Please try again.');
+          return;
+        }
       }
       const now = serverTimestamp();
+
+      // --- UPDATE MODE (editing existing proposal) ---
+      if (proposalId) {
+        const updateData = {
+          updatedAt: now,
+          projectType: projectType === 'service-learning' ? 'sl' : 'ce',
+          title: formData.title,
+          alt: formData.alt || '',
+          dateProposed: formData.targetDate,
+          sdgs: formData.sdgs || [],
+          targetDate: formData.targetDate,
+          stakeholders: Array.isArray(formData.stakeholders) ? formData.stakeholders : (formData.stakeholders ? [formData.stakeholders] : []),
+          location: formData.location,
+          volunteerHours: Number(formData.volunteerHours) || 0,
+          description: formData.description,
+          objectives: formData.objectives,
+          specificActivities: Array.isArray(formData.specificActivities)
+            ? formData.specificActivities
+            : (formData.specificActivities || '').split('\n').filter(a => a.trim()),
+          successIndicators: formData.successIndicators.split('\n').filter(a => a.trim()),
+          budget: formData.budget,
+          studentOutcomes: formData.studentOutcomes || '',
+          proponents: formData.proponents?.length ? formData.proponents : [formData.preparedBy],
+          preparedBy: formData.proponents?.[0] || formData.preparedBy,
+          reviewedBy: formData.reviewedBy || '',
+          recommendedBy: formData.recommendedBy || '',
+          affiliatedDepartment: formData.affiliatedDepartment || '',
+          partnerSchool: formData.partnerSchool || '',
+          signedDocUrl,
+        };
+        if (projectType === 'service-learning') {
+          updateData.slFields = {
+            section: slFields.section,
+            course: slFields.course,
+            courseCode: slFields.courseCode,
+            assignedFaculty: slFields.assignedFaculty,
+          };
+        } else {
+          updateData.ceFields = {
+            nature: ceFields.nature,
+            learningOutcomes: ceFields.learningOutcomes,
+            customLearningOutcome: ceFields.customLearningOutcome || '',
+            assignedFaculty: ceFields.assignedFaculty || '',
+          };
+        }
+        await updateDoc(doc(db, 'missions', proposalId), updateData);
+        showToast('Proposal updated successfully!');
+        onClearDraft?.();
+        onClose();
+        return;
+      }
 
       // --- Approval Flow Logic ---
       // reviewedBy / recommendedBy come from the proponent's form selections.
@@ -141,7 +197,8 @@ function SummaryPanel({
         endorsedBy,
         approvedBy,
 
-        // Partner School (for filtering)
+        // Department & Partner
+        affiliatedDepartment: formData.affiliatedDepartment || '',
         partnerSchool: formData.partnerSchool || '',
 
         // Activities
@@ -261,7 +318,7 @@ function SummaryPanel({
           ? formData.stakeholders.join(', ')
           : formData.stakeholders,
         volunteerHours: formData.volunteerHours,
-        preparedBy: formData.proponents?.[0] || formData.preparedBy,
+        preparedBy: formData.preparedBy || formData.proponents?.[0] || '',
         reviewedBy: formData.reviewedBy || '',
         recommendedBy: formData.recommendedBy || '',
         endorsedBy: formData.endorsedBy || '',
@@ -308,7 +365,7 @@ function SummaryPanel({
         : formData.specificActivities,
       successIndicators: formData.successIndicators,
       budget: formData.budget,
-      preparedBy: formData.proponents?.[0] || formData.preparedBy,
+      preparedBy: formData.preparedBy || formData.proponents?.[0] || '',
       reviewedBy: formData.reviewedBy || '',
       recommendedBy: formData.recommendedBy || '',
       endorsedBy: formData.endorsedBy || '',
@@ -419,6 +476,14 @@ function SummaryPanel({
               {(signedDoc.size / 1024).toFixed(0)} KB — click to replace
             </div>
           </>
+        ) : proposalId && existingSignedDocUrl ? (
+          <>
+            <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>📄</div>
+            <div style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>Previously uploaded document</div>
+            <div style={{ color: '#718096', fontSize: '0.78rem', marginTop: 2 }}>
+              <a href={existingSignedDocUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#30bdb7' }}>View current file</a> — click here to replace it
+            </div>
+          </>
         ) : (
           <>
             <div style={{ fontSize: '2rem', color: '#cbd5e0', marginBottom: '0.5rem' }}>☁</div>
@@ -449,7 +514,7 @@ function SummaryPanel({
       </div>
 
       {/* Signature confirmation checkbox */}
-      {signedDoc && (
+      {(signedDoc || (proposalId && existingSignedDocUrl)) && (
         <label style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -483,10 +548,10 @@ function SummaryPanel({
         <button
           type="button"
           className="btn-submit"
-          disabled={loading || !signedDoc || !signatureConfirmed}
+          disabled={loading || !(signedDoc || (proposalId && existingSignedDocUrl)) || !signatureConfirmed}
           onClick={handleSubmit}
         >
-          Submit to CSCE
+          {proposalId ? 'Update Proposal' : 'Submit to CSCE'}
         </button>
       </div>
     </div>

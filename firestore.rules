@@ -94,6 +94,12 @@ service cloud.firestore {
         request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
 
+      // PROPOSAL CREATOR - can update their own proposal only while it's still 'for_approval' (not yet reviewed)
+      allow update: if
+        request.auth != null &&
+        request.auth.uid == resource.data.createdBy &&
+        resource.data.status == 'for_approval';
+
       // FACULTY - can update approval chain fields (reviewedBy, recommendedBy)
       allow update: if
         request.auth != null &&

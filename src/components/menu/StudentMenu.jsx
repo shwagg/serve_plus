@@ -29,11 +29,8 @@ export default function StudentMenu({
     onCreateProposal();
   };
 
-  // Use username if available, otherwise fall back to email prefix
-  const displayUsername =
-    userUsername || (userEmail ? userEmail.split("@")[0] : "User");
-  // Get first letter for avatar fallback
-  const avatarLetter = displayUsername.charAt(0).toUpperCase();
+  const displayName = userName || userUsername || (userEmail ? userEmail.split("@")[0] : "User");
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <div className="menu-dropdown">
@@ -47,7 +44,7 @@ export default function StudentMenu({
           <Face6RoundedIcon sx={{ width: 40, height: 40, color: '#30bdb7' }} />
         )}
         <div className="user-info">
-          <p className="user-name">{displayUsername}</p>
+          <p className="user-name">{displayName}</p>
           <p className="user-email">{userEmail}</p>
         </div>
         <span className="user-role">Volunteer</span>

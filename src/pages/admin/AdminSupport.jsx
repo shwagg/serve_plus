@@ -148,6 +148,7 @@ export default function AdminSupport() {
 
         <div className="as-filters">
           <div className="as-filter-row">
+            <span className="as-filter-label">Status</span>
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f}
@@ -159,6 +160,7 @@ export default function AdminSupport() {
             ))}
           </div>
           <div className="as-filter-row">
+            <span className="as-filter-label">Type</span>
             {TYPE_FILTERS.map((f) => (
               <button
                 key={f}

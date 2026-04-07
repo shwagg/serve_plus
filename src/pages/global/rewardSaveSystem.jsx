@@ -4,7 +4,7 @@ import { doc, getDoc, getDocs, collection, updateDoc, increment, serverTimestamp
 import { db } from "../../firebaseConfig";
 import { getAuth } from "firebase/auth";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
-//import { checkAndAssignBadges } from "../../hooks/badgeSystem";
+import { checkAndAssignBadges } from "../../hooks/badgeSystem";
 
 export const releaseMissionPoints = async (missionId) => {
     const volunteerSnap = await getDocs(
@@ -112,6 +112,9 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         releasedAt: serverTimestamp(),
         releasedBy: adminName,
     });
+
+    // Check and assign any newly earned badges after grading
+    await checkAndAssignBadges(volunteerId);
 
     return finalPoints;
 };

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useContext } from "react";
+import { useLocation } from "react-router-dom";
 import { db } from "../../../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import Header from "../../../components/Header";
@@ -7,6 +8,8 @@ import "../../../styles/ReviewProposal.css";
 import { SessionContext } from "../../../context/SessionContext";
 
 export default function ReviewProposal() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin/");
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -126,15 +129,6 @@ export default function ReviewProposal() {
     return data;
   }, [proposals, searchTerm, statusFilter, userApprovalField, isPartner, userData]);
 
-  // Debug logs for troubleshooting
-  console.log("[DEBUG] userData:", userData);
-  console.log("[DEBUG] userData keys:", Object.keys(userData));
-  console.log("[DEBUG] positionField:", userData.position, userData.positions, userData.Position, userData.Positions);
-  console.log("[DEBUG] normalizedPositions:", normalizedPositions);
-  console.log("[DEBUG] userApprovalField:", userApprovalField);
-  console.log("[DEBUG] proposals:", proposals);
-  console.log("[DEBUG] filteredProposals:", filteredProposals);
-
   const getStatusBadgeClass = (status = "") => {
     const s = status.toLowerCase();
     if (s === "for_approval" || s === "for-approval") return "pending";
@@ -167,95 +161,156 @@ export default function ReviewProposal() {
     fetchProposals();
   };
 
+  const actionableCount = filteredProposals.filter(p => getContextStatusLabel(p) === "For Approval").length;
+
+  const filterLabels = {
+    "overall": "All",
+    "for-approval": "For Approval",
+    "pending": "Pending",
+    "draft": "Draft",
+    "published": "Published",
+    "completed": "Completed",
+  };
+
+  const filterColors = {
+    "overall":      { active: "#1f3b73", bg: "#e8edf7" },
+    "for-approval": { active: "#92400e", bg: "#fef3c7" },
+    "pending":      { active: "#9a3412", bg: "#ffedd5" },
+    "draft":        { active: "#475569", bg: "#f1f5f9" },
+    "published":    { active: "#166534", bg: "#dcfce7" },
+    "completed":    { active: "#1e40af", bg: "#dbeafe" },
+  };
+
   return (
     <>
-      <Header />
-      <div className="review-proposal-container">
+      {!isAdminRoute && <Header />}
+      <div className={`review-proposal-container${isAdminRoute ? " rp-admin" : ""}`}>
         <div className="review-proposal-wrapper">
-          <div className="review-proposal-header">
-            <h1 className="review-proposal-title">Review Proposals</h1>
-            <div className="status-filters">
-              {["overall","for-approval","pending","draft","published","completed"].map(filter => (
-                <label key={filter} className="filter-label">
-                  <input
-                    type="radio"
-                    name="status"
-                    checked={statusFilter === filter}
-                    onChange={() => setStatusFilter(filter)}
-                    className={`filter-${filter.replace('_', '-')}`}
-                  />
-                  <span>{filter === "for-approval" ? "For Approval" : filter.charAt(0).toUpperCase() + filter.slice(1)}</span>
-                </label>
-              ))}
+
+          {/* Breadcrumb */}
+          <nav className="rp-breadcrumb" aria-label="breadcrumb">
+            <span className="rp-breadcrumb-item">Admin</span>
+            <span className="rp-breadcrumb-sep">›</span>
+            <span className="rp-breadcrumb-item rp-breadcrumb-current">Review Proposals</span>
+          </nav>
+
+          {/* Page header */}
+          <div className="rp-page-header">
+            <div>
+              <h1 className="review-proposal-title">Review Proposals</h1>
+              {actionableCount > 0 && (
+                <p className="rp-action-hint">
+                  {actionableCount} proposal{actionableCount !== 1 ? "s" : ""} awaiting your approval
+                </p>
+              )}
             </div>
-          </div>
-          <div className="search-filter-row">
             <div className="search-wrapper">
               <input
                 type="text"
-                placeholder="Search proposals by title"
+                placeholder="Search by title…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="search-input"
               />
             </div>
           </div>
-          <hr className="review-proposal-divider" />
-          <div className="table-container">
-            {loading && <div className="loading-message">Loading proposals...</div>}
-            {error && <div className="error-message">{error}</div>}
-            {!loading && !error && (
-              <table className="review-proposal-table">
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th>Title</th>
-                    <th className="text-left description-header">Description</th>
-                    <th className="text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProposals.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="no-proposals-message">
-                        No proposals found
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredProposals.map((proposal, index) => (
-                      <tr key={proposal.id}>
-                        <td className="row-number">{index + 1}</td>
-                        <td className="proposal-title">
-                          <button 
-                            className="title-link"
-                            onClick={() => handleOpenModal(proposal)}
-                          >
-                            {proposal.title || "N/A"}
-                          </button>
-                        </td>
-                        <td className="proposal-description">
-                          {proposal.description 
-                            ? (proposal.description.length > 150 
-                                ? proposal.description.substring(0, 150) + "..." 
-                                : proposal.description)
-                            : "No description"}
-                        </td>
-                        <td className="text-center">
-                          <span className={`status-badge ${getStatusBadgeClass(proposal.status)}`}>
-                            {getContextStatusLabel(proposal) || "Draft"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            )}
+
+          {/* Pill filter tabs */}
+          <div className="rp-filter-tabs">
+            {Object.keys(filterLabels).map(f => {
+              const isActive = statusFilter === f;
+              const col = filterColors[f];
+              return (
+                <button
+                  key={f}
+                  className={`rp-filter-tab${isActive ? " active" : ""}`}
+                  style={isActive ? { background: col.bg, color: col.active, borderColor: col.active } : {}}
+                  onClick={() => setStatusFilter(f)}
+                >
+                  {filterLabels[f]}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Cards */}
+          {loading && <div className="loading-message">Loading proposals…</div>}
+          {error && <div className="error-message">{error}</div>}
+          {!loading && !error && (
+            filteredProposals.length === 0 ? (
+              <div className="rp-empty">
+                <div className="rp-empty-icon">📋</div>
+                <p>No proposals found</p>
+              </div>
+            ) : (
+              <div className="rp-card-grid">
+                {filteredProposals.map(proposal => {
+                  const contextStatus = getContextStatusLabel(proposal);
+                  const needsAction = contextStatus === "For Approval";
+                  const typeLabel = proposal.projectType === "sl"
+                    ? "Service Learning"
+                    : proposal.projectType === "ce"
+                    ? "Community Engagement"
+                    : proposal.projectType || "Proposal";
+
+                  return (
+                    <div
+                      key={proposal.id}
+                      className={`rp-card${needsAction ? " rp-card--action" : ""}`}
+                      onClick={() => handleOpenModal(proposal)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={e => (e.key === "Enter" || e.key === " ") && handleOpenModal(proposal)}
+                    >
+                      <div className="rp-card-top">
+                        <div className="rp-card-tags">
+                          <span className="rp-type-tag">{typeLabel}</span>
+                          {needsAction && <span className="rp-action-tag">Needs Approval</span>}
+                        </div>
+                        <span className={`status-badge ${getStatusBadgeClass(proposal.status)}`}>
+                          {contextStatus}
+                        </span>
+                      </div>
+
+                      <h3 className="rp-card-title">{proposal.title || "Untitled Proposal"}</h3>
+
+                      {proposal.description && (
+                        <p className="rp-card-desc">
+                          {proposal.description.length > 110
+                            ? proposal.description.slice(0, 110) + "…"
+                            : proposal.description}
+                        </p>
+                      )}
+
+                      <div className="rp-card-meta">
+                        {proposal.preparedBy && <span>By {proposal.preparedBy}</span>}
+                        {proposal.targetDate && <span>Target: {proposal.targetDate}</span>}
+                      </div>
+
+                      <div className="rp-card-footer">
+                        <button
+                          className={`rp-review-btn${needsAction ? " rp-review-btn--primary" : ""}`}
+                          onClick={e => { e.stopPropagation(); handleOpenModal(proposal); }}
+                        >
+                          {needsAction ? "Review & Approve →" : "View Details →"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
         </div>
       </div>
-      {/* Proposal Summary Modal */}
-      {showModal && <ReviewModal proposal={selectedProposal} onClose={handleCloseModal} onApprovalChange={handleApprovalChange} isPartner={isPartner} />}
+      {showModal && (
+        <ReviewModal
+          proposal={selectedProposal}
+          onClose={handleCloseModal}
+          onApprovalChange={handleApprovalChange}
+          isPartner={isPartner}
+        />
+      )}
     </>
   );
 }

@@ -150,7 +150,7 @@ function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMore
  * @param {string} props.projectType - The type of project ('service-learning' or 'community-engagement')
  * @param {Function} props.onClose - Callback to close the proposal form
  */
-function ProjectProposal({ projectType, onClose }) {
+function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -224,13 +224,14 @@ function ProjectProposal({ projectType, onClose }) {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
-            // Prefer Firestore name; fall back to displayName only if absent
-            const name = data.name || user.displayName || '';
+            // Use the user's full name from Firestore (the 'name' field, not 'username')
+            const name = data.name || '';
             if (name) {
               setFormData(prev => ({
                 ...prev,
                 preparedBy: name,
-                proponents: prev.proponents?.length ? prev.proponents : [name],
+                // Always refresh the first (locked) proponent with the current user's name
+                proponents: prev.proponents?.length ? [name, ...prev.proponents.slice(1)] : [name],
               }));
               setHasProponentName(true);
             } else {
@@ -282,8 +283,54 @@ function ProjectProposal({ projectType, onClose }) {
   useEffect(() => { slFieldsRef.current = slFields; }, [slFields]);
   useEffect(() => { ceFieldsRef.current = ceFields; }, [ceFields]);
 
-  // Restore draft on mount
+  // Pre-populate form when editing an existing proposal
   useEffect(() => {
+    if (!editProposal) return;
+    const p = editProposal;
+    setFormData({
+      title: p.title || '',
+      sdgs: p.sdgs || [],
+      targetDate: p.targetDate || '',
+      stakeholders: Array.isArray(p.stakeholders) ? p.stakeholders : [],
+      location: p.location || '',
+      volunteerHours: p.volunteerHours ? String(p.volunteerHours) : '',
+      description: p.description || '',
+      objectives: p.objectives || '',
+      specificActivities: Array.isArray(p.specificActivities) ? p.specificActivities : [],
+      successIndicators: Array.isArray(p.successIndicators) ? p.successIndicators.join('\n') : (p.successIndicators || ''),
+      budget: p.budget || '',
+      studentOutcomes: p.studentOutcomes || '',
+      preparedBy: p.preparedBy || '',
+      proponents: Array.isArray(p.proponents) ? p.proponents : [],
+      reviewedBy: p.reviewedBy || '',
+      recommendedBy: p.recommendedBy || '',
+      affiliatedDepartment: p.affiliatedDepartment || '',
+      alt: p.alt || '',
+      partnerSchool: p.partnerSchool || '',
+    });
+    if (p.projectType === 'sl' && p.slFields) {
+      setSlFields({
+        section: p.slFields.section || '',
+        course: p.slFields.course || '',
+        courseCode: p.slFields.courseCode || '',
+        assignedFaculty: p.slFields.assignedFaculty || '',
+      });
+    }
+    if (p.projectType === 'ce' && p.ceFields) {
+      setCeFields({
+        nature: p.ceFields.nature || '',
+        learningOutcomes: p.ceFields.learningOutcomes || '0',
+        customLearningOutcome: p.ceFields.customLearningOutcome || '',
+        assignedFaculty: p.ceFields.assignedFaculty || '',
+      });
+    }
+    setHasProponentName(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editProposal?.id]);
+
+  // Restore draft on mount (skip when editing an existing proposal)
+  useEffect(() => {
+    if (editProposal) return;
     try {
       const saved = localStorage.getItem(draftKey);
       if (saved) {
@@ -1007,6 +1054,12 @@ function ProjectProposal({ projectType, onClose }) {
               </div>
             </div>
 
+            {timelineNode && (
+              <div style={{ padding: '0 0 8px' }}>
+                {timelineNode}
+              </div>
+            )}
+
             <div className="form-actions">
               <button
                 type="button"
@@ -1038,6 +1091,8 @@ function ProjectProposal({ projectType, onClose }) {
             sdgOptions={sdgOptions}
             setLoading={setLoading}
             onClearDraft={clearDraft}
+            proposalId={editProposal?.id}
+            existingSignedDocUrl={editProposal?.signedDocUrl}
           />
       )}
     </div>
