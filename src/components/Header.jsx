@@ -223,7 +223,11 @@ export default function Header() {
                   <img src={userAvatar} alt="Profile" className="header-avatar" />
                 ) : (
                   <div className="header-avatar-initials">
-                    {(userName?.charAt(0) || '?').toUpperCase()}
+                    {(() => {
+                      const parts = (userName || '?').trim().split(/\s+/);
+                      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+                      return (userName?.slice(0, 2) || '?').toUpperCase();
+                    })()}
                   </div>
                 )}
               </button>

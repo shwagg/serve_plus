@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { Face6RoundedIcon } from '../icons';
 import createIcon from "../../assets/menuassets/Create.svg";
 import viewIcon from "../../assets/menuassets/View.svg";
 import infoIcon from "../../assets/menuassets/Info.svg";
@@ -30,7 +29,8 @@ export default function StudentMenu({
   };
 
   const displayName = userName || userUsername || (userEmail ? userEmail.split("@")[0] : "User");
-  const avatarLetter = displayName.charAt(0).toUpperCase();
+  const parts = displayName.trim().split(/\s+/);
+  const initials = parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : displayName.slice(0, 2).toUpperCase();
 
   return (
     <div className="menu-dropdown">
@@ -41,7 +41,7 @@ export default function StudentMenu({
         {userAvatar && !userAvatar.includes('ui-avatars.com') ? (
           <img src={userAvatar} alt="avatar" className="user-avatar-img" />
         ) : (
-          <Face6RoundedIcon sx={{ width: 40, height: 40, color: '#30bdb7' }} />
+          <div className="user-avatar">{initials}</div>
         )}
         <div className="user-info">
           <p className="user-name">{displayName}</p>

@@ -2,18 +2,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import EventDetails from "./missions/EventDetails";
 import ProjectProposal from "../global/proposal/ProjectProposal";
 import ReviewModal from "../global/proposal/ReviewModal";
-import { auth, functions, db } from "../../firebaseConfig";
-import { httpsCallable } from "firebase/functions";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
+import { auth, db } from "../../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
 import { collection, getDocs, doc, getDoc, query, orderBy, limit, where, getCountFromServer } from "firebase/firestore";
 import Header from "../../components/Header";
-import GlobalAnnouncements from "../../components/GlobalAnnouncements";
 import "../../styles/student.css";
 import "../../styles/ui.css";
 import { WestIcon, EastIcon } from "../../components/icons";
 import mission1 from '../../assets/mission1.jpg';
-import { Face6RoundedIcon } from '../../components/icons';
 import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
 import cloudsBg from '../../assets/clouds-bg.jpg';
@@ -53,10 +50,8 @@ const StudentHome = () => {
 
   const [level, setLevel] = useState(1);
   const [currentPoints, setCurrentPoints] = useState(0);
-  const [nextLevelPoints, setNextLevelPoints] = useState(100);
   const [studentName, setStudentName] = useState("");
   const [studentUsername, setStudentUsername] = useState("");
-  const [studentAvatar, setStudentAvatar] = useState("");
   const currentUserRef = useRef(null);
   const leaderboardListRef = useRef(null);
   const [missionCards, setMissionCards] = useState([]);
@@ -230,20 +225,11 @@ const StudentHome = () => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setStudentUsername(userData.username || "");
-            setStudentAvatar(userData.avatar || "");
             setStudentName(userData.name || resolvedName);
-            if (userData.level !== undefined) setLevel(userData.level);
-            if (userData.levelProgress !== undefined) {
-              const progress = userData.levelProgress;
-              setCurrentPoints(progress);
-              setNextLevelPoints(100);
-            }
-
             const totalPoints = userData.totalPoints || 0;
             setCurrentPoints(totalPoints);
             const calculatedLevel = Math.floor(totalPoints / 100) + 1;
             setLevel(calculatedLevel);
-            setNextLevelPoints(100);
           }
 
         } catch (error) {
@@ -258,27 +244,6 @@ const StudentHome = () => {
 
     return unsubscribe;
   }, []);
-
-  async function handleLogout() {
-    const user = auth.currentUser;
-    try {
-      if (user?.uid) {
-        const logLogout = httpsCallable(functions, "logLogout");
-        await logLogout({ uid: user.uid });
-      }
-    } catch (e) {
-      // Log audit failures when logging out
-      console.error("Audit log (logout) failed:", e);
-    }
-
-    try {
-      await signOut(auth);
-    } catch (e) {
-      // Ignore sign-out failures for now
-    }
-
-    navigate("/auth");
-  }
 
   //leaderboard with actual data from Firestore
   const [leaderboard, setLeaderboard] = useState([]);
@@ -485,12 +450,10 @@ const StudentHome = () => {
         {/* PROFILE LEVEL RANK */}
         <section className="player-strip" aria-label="Player stats">
           <div className="player-strip-inner">
-            <div className="player-level">
-              <span className="level-label">Level {level}</span>
-              <div className="level-bar" role="progressbar" aria-valuenow={currentPoints % 100} aria-valuemin={0} aria-valuemax={100}>
-                <div className="level-bar-fill" style={{ width: `${currentPoints % 100}%` }}></div>
-              </div>
-              <span className="level-points">{currentPoints} pts ({currentPoints % 100}/100)</span>
+            <div className="player-profile">
+              <span className="player-greeting">
+                Hi, {(studentName || studentUsername || '').trim().split(/\s+/)[0] || (currentUser?.email ? currentUser.email.split('@')[0] : 'Student')}!
+              </span>
             </div>
 
             <div className="player-missions">
@@ -498,10 +461,12 @@ const StudentHome = () => {
               <span className="missions-count">{completedMissions}</span>
             </div>
 
-            <div className="player-profile">
-              <span className="player-greeting">
-                Hi, {studentName || studentUsername || (currentUser?.email ? currentUser.email.split('@')[0] : 'Student')}!
-              </span>
+            <div className="player-level">
+              <span className="level-label">Level {level}</span>
+              <div className="level-bar" role="progressbar" aria-valuenow={currentPoints % 100} aria-valuemin={0} aria-valuemax={100}>
+                <div className="level-bar-fill" style={{ width: `${currentPoints % 100}%` }}></div>
+              </div>
+              <span className="level-points">{currentPoints} pts ({currentPoints % 100}/100)</span>
             </div>
           </div>
         </section>
@@ -703,7 +668,11 @@ const StudentHome = () => {
                             }
                           }}
                         >
-                          {user.avatar ? <img src={user.avatar} alt={user.name} /> : <Face6RoundedIcon sx={{ width: 80, height: 80, color: '#30bdb7' }} />}
+                          {user.avatar ? <img src={user.avatar} alt={user.name} /> : (
+                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#30bdb7', color: '#fff', fontSize: 28, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}>
+                              {getInitials(user.name)}
+                            </div>
+                          )}
                           <span className="podium-rank">{rank}</span>
 
                         </div>
@@ -740,7 +709,7 @@ const StudentHome = () => {
                     <span className="rank-num">{rank}</span>
                     {user.avatar
                       ? <img src={user.avatar} alt={`${user.name}'s avatar`} className="leaderboard-avatar" />
-                      : <Face6RoundedIcon sx={{ width: 32, height: 32, color: '#30bdb7' }} />
+                      : <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#30bdb7', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', flexShrink: 0 }}>{getInitials(user.name)}</div>
                     }
                     <span className="rank-name">{user.name}</span>
                     <span className="rank-points">{user.points} pts</span>

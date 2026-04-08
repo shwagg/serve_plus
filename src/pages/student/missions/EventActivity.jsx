@@ -6,7 +6,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
 import { showConfirm } from "../../../utils/toast";
-import { Face6RoundedIcon, WestIcon, ModeRoundedIcon, DeleteRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
+import { WestIcon, ModeRoundedIcon, DeleteRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
 import cloudsBg from '../../../assets/clouds-bg.jpg';
 import mission1 from '../../../assets/mission1.jpg';
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
@@ -2437,12 +2437,7 @@ export default function EventActivity() {
           <section className="player-strip" aria-label="Player stats">
             <div className="player-strip-inner">
               <div className="player-profile">
-                {userData?.avatar && !userData.avatar.includes('ui-avatars.com') ? (
-                  <img src={userData.avatar} alt="Profile" className="player-avatar" loading="lazy" />
-                ) : (
-                  <Face6RoundedIcon sx={{ width: 36, height: 36, color: '#30bdb7' }} />
-                )}
-                <span className="player-greeting">{userData?.username || userData?.name || ''}</span>
+                <span className="player-greeting">Hi, {(userData?.name || userData?.username || '').trim().split(/\s+/)[0] || 'Student'}!</span>
               </div>
               <div className="player-missions">
                 <span className="missions-label">Missions Completed</span>
@@ -2549,12 +2544,7 @@ export default function EventActivity() {
         <section className="player-strip" aria-label="Player stats">
           <div className="player-strip-inner">
             <div className="player-profile">
-              {userData?.avatar && !userData.avatar.includes('ui-avatars.com') ? (
-                <img src={userData.avatar} alt="Profile" className="player-avatar" loading="lazy" />
-              ) : (
-                <Face6RoundedIcon sx={{ width: 36, height: 36, color: '#30bdb7' }} />
-              )}
-              <span className="player-greeting">{userData?.username || userData?.name || ''}</span>
+              <span className="player-greeting">Hi, {(userData?.name || userData?.username || '').trim().split(/\s+/)[0] || 'Student'}!</span>
             </div>
             <div className="player-missions">
               <span className="missions-label">Missions Completed</span>

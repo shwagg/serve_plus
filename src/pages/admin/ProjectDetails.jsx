@@ -55,18 +55,18 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
               try {
                 const userSnap = await getDoc(doc(db, "users", v.uid));
                 if (userSnap.exists()) name = userSnap.data().name || userSnap.data().email || "Unknown";
-              } catch (_) {}
+              } catch (_) { }
             }
             let preSurveyAnswers = null;
             let postSurveyAnswers = null;
             try {
               const preDoc = await getDoc(doc(db, "missions", projectId, "volunteer", v.uid, "preSurvey", "response"));
               if (preDoc.exists()) preSurveyAnswers = preDoc.data();
-            } catch (e) {}
+            } catch (e) { }
             try {
               const postDoc = await getDoc(doc(db, "missions", projectId, "volunteer", v.uid, "postSurvey", "response"));
               if (postDoc.exists()) postSurveyAnswers = postDoc.data();
-            } catch (e) {}
+            } catch (e) { }
             return {
               ...v,
               name,
@@ -125,7 +125,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
         title: "Removed from Event",
         message: `You have been removed from "${project?.title || "an event"}".`,
         link: "/student",
-      }).catch(() => {});
+      }).catch(() => { });
       showToast(`${name} removed from this event.`);
     } catch (err) {
       showToast("Failed to remove volunteer. Please try again.");
@@ -281,9 +281,9 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   };
 
   const canPublish =
-    project?.status === "for_approval" &&
-    project?.approvals?.faculty?.approved === true &&
-    project?.approvals?.partner?.approved === true;
+    project?.status === "draft" &&
+    project?.approvals?.approvedBy?.approved === true &&
+    project?.approvals?.endorsedBy?.approved === true;
 
   if (loading) return <p>Loading…</p>;
   if (!project) return <p>Project not found.</p>;
@@ -373,21 +373,21 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   // Sidebar style for overlay panel
   const sidebarStyle = sidebar
     ? {
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        width: 420,
-        height: '100vh',
-        background: '#fff',
-        borderLeft: '1px solid #e5e7eb',
-        boxShadow: '-4px 0 20px rgba(0,0,0,0.08)',
-        zIndex: 1000,
-        overflowY: 'auto',
-        padding: 24,
-        color: '#111',
-        display: 'flex',
-        flexDirection: 'column',
-      }
+      position: 'fixed',
+      top: 0,
+      right: 0,
+      width: 420,
+      height: '100vh',
+      background: '#fff',
+      borderLeft: '1px solid #e5e7eb',
+      boxShadow: '-4px 0 20px rgba(0,0,0,0.08)',
+      zIndex: 1000,
+      overflowY: 'auto',
+      padding: 24,
+      color: '#111',
+      display: 'flex',
+      flexDirection: 'column',
+    }
     : { color: '#111' };
 
   // Card style for analytics panels
@@ -785,7 +785,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
           Delete
         </button>
 
-        <button disabled={!canPublish || saving} onClick={() => setStatus("published")}> 
+        <button onClick={() => setStatus("published")}>
           Publish
         </button>
       </div>
