@@ -1,51 +1,29 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { adminLinks } from "../hooks/sidebarConfig";
 
-export default function Sidebar({ links, roleLabel }) {
-    const resolvedLinks = links || adminLinks;
-    const resolvedRoleLabel = roleLabel || "Admin";
-    const [activeCategory, setActiveCategory] = useState(null);
-    const stripRef = useRef(null);
-    const sidebarRef = useRef(null);
-    const categoryRefs = useRef({});
-    const [ribbonStyle, setRibbonStyle] = useState({});
+export default function Sidebar({ links, collapsed, setCollapsed }) {
     const location = useLocation();
     const navigate = useNavigate();
     const missionTitle = location.state?.missionTitle;
+    const resolvedLinks = links || [];
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
 
+    // Close dropdown on outside click
     useEffect(() => {
-        const btn = categoryRefs.current[activeCategory];
-        const strip = stripRef.current;
-        if (!btn || !strip) return;
-
-        const btnRect = btn.getBoundingClientRect();
-        const stripRect = strip.getBoundingClientRect();
-
-        const centerX =
-            btnRect.left - stripRect.left + btnRect.width / 2;
-
-        setRibbonStyle({
-            left: centerX,
-            transform: "translateX(-50%)",
-            minWidth: btnRect.width,
-        })
-    }, [activeCategory]);
-
-    useEffect(() => {
-        function handleClickOutside(event) {
-            if (
-                sidebarRef.current &&
-                !sidebarRef.current.contains(event.target)
-            ) {
-                setActiveCategory(null);
+        function handleClick(e) {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                setDropdownOpen(false);
             }
         }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
     }, []);
+
+    // Close dropdown on route change
+    useEffect(() => {
+        setDropdownOpen(false);
+    }, [location.pathname]);
 
     const breadcrumb = (() => {
         const pathParts = location.pathname.split("/").filter(Boolean);
@@ -53,8 +31,9 @@ export default function Sidebar({ links, roleLabel }) {
         if (pathParts[1] === "current-event") {
             return {
                 parent: "Events",
+                parentKey: "events",
                 current: "Current Event",
-                child: missionTitle || null
+                child: missionTitle || null,
             };
         }
 
@@ -63,7 +42,7 @@ export default function Sidebar({ links, roleLabel }) {
                 if (location.pathname.startsWith(child.to)) {
                     return {
                         parent: cat.label,
-                        parentTo: cat.children?.[0]?.to || null,
+                        parentKey: cat.key,
                         current: child.label,
                         currentTo: child.to,
                     };
@@ -74,81 +53,72 @@ export default function Sidebar({ links, roleLabel }) {
         return null;
     })();
 
-    const handleSubItemClick = () => {
-        setActiveCategory(null);
-    };
-
+    const activeCategory = breadcrumb
+        ? resolvedLinks.find(c => c.key === breadcrumb.parentKey)
+        : null;
 
     return (
-        <section className="admin-strip" ref={sidebarRef}>
-            <div className="admin-strip-inner" ref={stripRef}>
-                {/* RIGHT SECTION */}
-                <div className="sidebar-right">
-                    <div className="sidebar-categories">
-                        {resolvedLinks.map((cat) => (
-                            <button
-                                key={cat.key}
-                                ref={(el) => (categoryRefs.current[cat.key] = el)}
-                                className={`sidebar-category ${activeCategory === cat.key ? "active" : ""}`}
-                                onClick={() =>
-                                    setActiveCategory(prev =>
-                                        prev === cat.key ? null : cat.key
-                                    )
-                                }
-                            >
-                                {cat.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                {activeCategory && (
-                    <div
-                        className={`sidebar-ribbon ${activeCategory ? "show" : ""}`}
-                        style={ribbonStyle}
-                    >
+        <>
+            {/* Floating toggle button — slides between sidebar and strip */}
+            <button
+                className={`sidebar-toggle-btn sidebar-toggle-floating ${collapsed ? "collapsed" : ""}`}
+                onClick={() => setCollapsed(prev => !prev)}
+                aria-label="Toggle sidebar"
+            >
+                <span className="material-symbols-outlined">dock_to_right</span>
+            </button>
 
-                        {resolvedLinks
-                            .find(cat => cat.key === activeCategory)
-                            ?.children?.map(sub => (
-                                <NavLink
-                                    key={sub.to}
-                                    to={sub.to}
-                                    onClick={handleSubItemClick}
-                                    className={({ isActive }) =>
-                                        `sidebar-ribbon-item ${isActive ? "active" : ""}`
-                                    }
-                                >
-                                    {sub.label}
-                                </NavLink>
-                            ))}
-                    </div>
-                )}
-            </div>
+            {/* Context strip: breadcrumbs only */}
             <div className="admin-context-strip">
-                <button
-                    className="context-back"
-                    onClick={() => navigate(-1)}
-                >
-                    ← Back
-                </button>
-
                 {breadcrumb && (
                     <div className="context-breadcrumb">
-                        {breadcrumb.parentTo ? (
-                            <button className="breadcrumb-link" onClick={() => navigate(breadcrumb.parentTo)}>
+                        {/* Parent category — clickable, opens sub-item dropdown */}
+                        <div className="breadcrumb-dropdown-wrapper" ref={dropdownRef}>
+                            <button
+                                className="breadcrumb-link"
+                                onClick={() => setDropdownOpen(prev => !prev)}
+                            >
                                 {breadcrumb.parent}
                             </button>
-                        ) : (
-                            <span>{breadcrumb.parent}</span>
-                        )}
+
+                            {dropdownOpen && activeCategory && (
+                                <div className="breadcrumb-dropdown">
+                                    <p className="breadcrumb-dropdown-header">
+                                        {activeCategory.label}
+                                    </p>
+                                    {activeCategory.children?.map(sub => {
+                                        const isActive = location.pathname.startsWith(sub.to);
+                                        return (
+                                            <button
+                                                key={sub.to}
+                                                className={`breadcrumb-dropdown-item ${isActive ? "active" : ""}`}
+                                                onClick={() => {
+                                                    navigate(sub.to);
+                                                    setDropdownOpen(false);
+                                                }}
+                                            >
+                                                <span>{sub.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
                         <span className="sep">/</span>
+
+                        {/* Current page */}
                         {breadcrumb.currentTo ? (
-                            <button className="breadcrumb-link breadcrumb-current" onClick={() => navigate(breadcrumb.currentTo)}>
+                            <button
+                                className="breadcrumb-link breadcrumb-current"
+                                onClick={() => navigate(breadcrumb.currentTo)}
+                            >
                                 {breadcrumb.current}
                             </button>
                         ) : (
-                            <span>{breadcrumb.current}</span>
+                            <span className="breadcrumb-current-plain">{breadcrumb.current}</span>
                         )}
+
                         {breadcrumb.child && (
                             <>
                                 <span className="sep">/</span>
@@ -158,6 +128,28 @@ export default function Sidebar({ links, roleLabel }) {
                     </div>
                 )}
             </div>
-        </section >
+
+            {/* Left sidebar panel */}
+            <aside className={`admin-sidebar ${collapsed ? "collapsed" : ""}`}>
+                <nav className="admin-sidebar-nav">
+                    {resolvedLinks.map((cat) => (
+                        <div key={cat.key} className="admin-sidebar-group">
+                            <span className="admin-sidebar-group-label">{cat.label}</span>
+                            {cat.children?.map((sub) => (
+                                <NavLink
+                                    key={sub.to}
+                                    to={sub.to}
+                                    className={({ isActive }) =>
+                                        `admin-sidebar-item ${isActive ? "active" : ""}`
+                                    }
+                                >
+                                    {sub.label}
+                                </NavLink>
+                            ))}
+                        </div>
+                    ))}
+                </nav>
+            </aside>
+        </>
     );
 }

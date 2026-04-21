@@ -9,7 +9,7 @@ export default function SysAdminLayout() {
     const [collapsed, setCollapsed] = useState(false);
 
     return (
-        <div className="admin-page">
+        <div className={`admin-page${collapsed ? " sidebar-collapsed" : ""}`}>
             <Header />
             <Sidebar
                 links={sysadminLinks}

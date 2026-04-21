@@ -55,13 +55,6 @@ export default function AdminMenu({
         </button>
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/admin/review-proposals")}
-        >
-          <img src={viewIcon} alt="Review Proposals" className="menu-icon" />
-          Review Proposals
-        </button>
-        <button
-          className="menu-item"
           onClick={() => handleMenuClick("/global/menu/settings")}
         >
           <img src={settingsIcon} alt="Settings" className="menu-icon" />
