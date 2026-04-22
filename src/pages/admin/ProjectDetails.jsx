@@ -32,6 +32,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   const [saving, setSaving] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showFeedbackQR, setShowFeedbackQR] = useState(false);
+  const [qrGenerating, setQrGenerating] = useState(false);
   const [showAttendanceReport, setShowAttendanceReport] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [taskParticipants, setTaskParticipants] = useState([]);
@@ -133,22 +134,67 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   };
 
   //attendance re-generate timestamp for qr code
-  const generateNewQR = async () => {
-    const newTimestamp = Date.now();
+  const generateNewQR = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        showToast("Geolocation is not supported by this browser.");
+        reject(new Error("No geolocation support"));
+        return;
+      }
+      setQrGenerating(true);
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const newTimestamp = Date.now();
+            const qrLocation = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy: pos.coords.accuracy
+            };
 
-    await updateDoc(doc(db, "missions", projectId), {
-      validQRTimestamp: newTimestamp,
-      updatedAt: serverTimestamp()
+            // Reverse-geocode using Google Maps API
+            let qrLocationName = null;
+            try {
+              const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(qrLocation.lat)},${encodeURIComponent(qrLocation.lng)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+              const geoResp = await fetch(geoUrl);
+              if (geoResp.ok) {
+                const geoJson = await geoResp.json();
+                qrLocationName = geoJson.results?.[0]?.formatted_address ?? null;
+              }
+            } catch (_) { /* non-critical, skip */ }
+
+            const updatePayload = {
+              validQRTimestamp: newTimestamp,
+              qrLocation,
+              updatedAt: serverTimestamp()
+            };
+            if (qrLocationName) updatePayload.qrLocationName = qrLocationName;
+
+            await updateDoc(doc(db, "missions", projectId), updatePayload);
+            await load(); // reload project (picks up new qrLocation + qrLocationName)
+            resolve();
+          } catch (err) {
+            showToast("Failed to save QR location. Please try again.");
+            reject(err);
+          } finally {
+            setQrGenerating(false);
+          }
+        },
+        (err) => {
+          setQrGenerating(false);
+          showToast("Could not get your location. Please allow GPS access and try again.");
+          reject(err);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
     });
-
-    await load(); // reload project
   };
   const generateQRValue = () => {
     const expiresAt = Date.now() + (30 * 60 * 1000); // After 30 minutes
-
     return JSON.stringify({
       eventId: projectId,
-      expiresAt
+      expiresAt,
+      location: project?.qrLocation ?? null
     });
   };
 
@@ -700,7 +746,9 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
 
           <div className="qr-actions">
             <button onClick={() => setShowQR(true)}>View</button>
-            <button onClick={generateNewQR}>Reset</button>
+            <button onClick={() => generateNewQR().catch(() => {})} disabled={qrGenerating}>
+              {qrGenerating ? "Getting location…" : "Reset"}
+            </button>
           </div>
 
         </div>
@@ -801,13 +849,20 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
           <div style={{ marginTop: 8, fontSize: 12, color: "#555" }}>
             Scan this code to record attendance.
           </div>
+          {project?.qrLocationName && (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#444", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              <span>📍</span>
+              <span>{project.qrLocationName}</span>
+            </div>
+          )}
           <button
+            disabled={qrGenerating}
             onClick={async () => {
-              await generateNewQR();
+              await generateNewQR().catch(() => {});
               setShowQR(true);
             }}
           >
-            Generate Attendance QR
+            {qrGenerating ? "Getting location…" : "Generate Attendance QR"}
           </button>
         </div>
       )}

@@ -92,6 +92,18 @@ export default function EventActivity() {
   const [scannerKey, setScannerKey] = useState(0);
   const [scanSuccess, setScanSuccess] = useState(false);
 
+  // Haversine distance between two GPS points (returns meters)
+  const getDistanceMeters = (lat1, lng1, lat2, lng2) => {
+    const R = 6371000;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
   const handleQRScan = async (decodedText, position) => {
     setQRStatus("");
     const projectId = id;
@@ -115,6 +127,24 @@ export default function EventActivity() {
       if (Date.now() > parsed.expiresAt) {
         setQRStatus("QR code has expired.");
         return;
+      }
+
+      // Location proximity check — only if QR has embedded location
+      if (parsed.location && position?.coords) {
+        const dist = getDistanceMeters(
+          parsed.location.lat,
+          parsed.location.lng,
+          position.coords.latitude,
+          position.coords.longitude
+        );
+        const THRESHOLD_METERS = 200;
+        if (dist > THRESHOLD_METERS) {
+          setQRStatus(
+            "You are not close to the supposed event location. If you are there, kindly ask the nearby coordinator."
+          );
+          setScanSuccess(false);
+          return;
+        }
       }
 
       // Save scan location to volunteer doc (best-effort) and mark attendance present
