@@ -47,7 +47,7 @@ exports.blackboardCallback = onRequest(
 
       // Create or update user in Firestore
       console.log("Creating/updating user in Firestore...");
-      const userRef = await createOrUpdateUser(blackboardProfile, uid);
+      await createOrUpdateUser(blackboardProfile, uid);
 
       // Create Firebase custom token
       console.log("Creating Firebase custom token...");

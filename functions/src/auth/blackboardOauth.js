@@ -57,6 +57,7 @@ async function createOrUpdateUser(blackboardProfile, uid) {
 
   const userRef = admin.firestore().collection("users").doc(uid);
 
+  //name, username, id number, and email 
   const userData = {
     email: blackboardProfile.email || blackboardProfile.contact?.email || "",
     displayName:
