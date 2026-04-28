@@ -274,6 +274,38 @@ export default function CurrentEvent() {
         }
     };
 
+    const [togglingAttendance, setTogglingAttendance] = useState({});
+
+    const handleToggleAttendance = async (userId, currentStatus) => {
+        const isPresent = currentStatus === "present";
+        setTogglingAttendance(prev => ({ ...prev, [userId]: true }));
+        try {
+            const payload = isPresent
+                ? {
+                    "progress.attendance": null,
+                    "scanAttendance.scannedAt": null,
+                    "scanAttendance.markedManually": false,
+                }
+                : {
+                    "progress.attendance": "present",
+                    "scanAttendance.scannedAt": serverTimestamp(),
+                    "scanAttendance.markedManually": true,
+                };
+            await updateDoc(doc(db, "missions", missionId, "volunteer", userId), payload);
+            setApprovedVolunteers(prev => prev.map(v =>
+                v.id === userId
+                    ? {
+                        ...v,
+                        attendanceStatus: isPresent ? null : "present",
+                        tookAttendanceAt: isPresent ? null : new Date(),
+                    }
+                    : v
+            ));
+        } finally {
+            setTogglingAttendance(prev => ({ ...prev, [userId]: false }));
+        }
+    };
+
     const FLAG_DURATION_DAYS = 30;
 
     // Core: flag absent volunteers for a single mission doc. Returns count flagged.
@@ -497,6 +529,7 @@ export default function CurrentEvent() {
                                 <th>Level</th>
                                 <th>Joined At</th>
                                 <th>Took Attendance At</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -520,6 +553,30 @@ export default function CurrentEvent() {
                                             : volunteer.attendanceStatus === "present"
                                                 ? "Present (no timestamp)"
                                                 : <span style={{ color: "#9ca3af" }}>—</span>}
+                                    </td>
+                                    <td>
+                                        <button
+                                            disabled={togglingAttendance[volunteer.id]}
+                                            onClick={() => handleToggleAttendance(volunteer.id, volunteer.attendanceStatus)}
+                                            style={{
+                                                padding: "4px 12px",
+                                                background: volunteer.attendanceStatus === "present" ? "#fff3cd" : "#d4edda",
+                                                color: volunteer.attendanceStatus === "present" ? "#856404" : "#155724",
+                                                border: "none",
+                                                borderRadius: 6,
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                cursor: togglingAttendance[volunteer.id] ? "not-allowed" : "pointer",
+                                                opacity: togglingAttendance[volunteer.id] ? 0.6 : 1,
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {togglingAttendance[volunteer.id]
+                                                ? "Saving…"
+                                                : volunteer.attendanceStatus === "present"
+                                                    ? "Mark Absent"
+                                                    : "Mark Present"}
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
