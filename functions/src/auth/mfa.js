@@ -14,8 +14,7 @@ exports.sendMfaCode = async (request) => {
     throw new Error("Email required.");
   }
 
-  //const code = String(Math.floor(100000 + Math.random() * 900000)); //6 digits
-  const code = "123456";
+  const code = String(Math.floor(100000 + Math.random() * 900000)); //6 digits
   const codeHash = hashCode(code);
   const expiresAt = Date.now() + 5 * 60 * 1000; //5 mins
 
