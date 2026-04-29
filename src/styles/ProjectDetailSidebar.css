@@ -1,0 +1,469 @@
+/* ── Overlay backdrop ────────────────────────────── */
+.pds-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  z-index: 1200;
+}
+
+/* ── Slide-in panel ──────────────────────────────── */
+.pds-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 440px;
+  max-width: 100vw;
+  height: 100vh;
+  background: #fff;
+  z-index: 1210;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -6px 0 28px rgba(0, 0, 0, 0.13);
+  animation: pds-slide-in 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Banner image ────────────────────────────────── */
+.pds-banner {
+  flex-shrink: 0;
+  height: 150px;
+  overflow: hidden;
+}
+
+.pds-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+@keyframes pds-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ── Header ──────────────────────────────────────── */
+.pds-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pds-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pds-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.pds-close:hover { background: #e2e8f0; }
+
+.pds-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  padding-right: 44px;
+  line-height: 1.4;
+}
+
+/* ── Scrollable body ─────────────────────────────── */
+.pds-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 32px;
+  scrollbar-width: thin;
+  scrollbar-color: #ddd transparent;
+}
+
+/* ── Section ─────────────────────────────────────── */
+.pds-section {
+  padding: 16px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.pds-section:last-child { border-bottom: none; }
+
+.pds-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+
+/* ── Meta grid (2-col) ───────────────────────────── */
+.pds-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.pds-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pds-meta-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.pds-meta-value {
+  font-size: 0.875rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* ── Field (label + value) ───────────────────────── */
+.pds-field { margin-bottom: 12px; }
+.pds-field:last-child { margin-bottom: 0; }
+
+.pds-field-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.pds-field-value {
+  font-size: 0.85rem;
+  color: #334155;
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ── PDF inline preview (for-approval) ──────────── */
+.pds-pdf-preview {
+  width: 100%;
+  height: 280px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pds-pdf-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* ── Approval actions ────────────────────────────── */
+.pds-action-msg {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  color: #166534;
+  font-weight: 500;
+}
+
+.pds-status-note {
+  font-size: 0.82rem;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.pds-btn-approve {
+  width: 100%;
+  padding: 10px 16px;
+  background: #0D9488;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: background 0.15s;
+}
+.pds-btn-approve:hover { background: #0f766e; }
+.pds-btn-approve:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.pds-return-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pds-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  margin-bottom: 8px;
+  color: #1e293b;
+}
+.pds-textarea:focus { border-color: #1f3b73; }
+
+.pds-btn-return {
+  width: 100%;
+  padding: 10px 16px;
+  background: #fff;
+  color: #dc2626;
+  border: 1.5px solid #dc2626;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pds-btn-return:hover { background: #fef2f2; }
+.pds-btn-return:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Attendance pie chart ────────────────────────── */
+.pds-pie-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.pds-pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pds-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pds-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pds-legend-registered { background: #eef2f7; border: 2px solid #e2e8f0; }
+.pds-legend-attended   { background: #30bdb7; }
+
+.pds-legend-count {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.pds-legend-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* ── Attendance roster ───────────────────────────── */
+.pds-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #ddd transparent;
+}
+
+.pds-roster-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pds-roster-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #30bdb7;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.pds-roster-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pds-roster-name {
+  font-size: 0.82rem;
+  color: #334155;
+  font-weight: 500;
+  flex: 1;
+}
+
+.pds-roster-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #e8edf7;
+  color: #1f3b73;
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+/* ── PDF link button (published view) ────────────── */
+.pds-btn-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  background: #1f3b73;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pds-btn-pdf:hover { background: #16306a; }
+
+/* ── QR codes grid ───────────────────────────────── */
+.pds-qr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.pds-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.pds-qr-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #475569;
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* ── Loading placeholder ─────────────────────────── */
+.pds-loading {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ── PDF popup modal ─────────────────────────────── */
+.pds-pdf-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.pds-pdf-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 860px;
+  height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.pds-pdf-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #1e293b;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.pds-pdf-modal-close:hover { background: #0f172a; }
+
+.pds-pdf-modal-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* ── Mobile ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .pds-panel {
+    width: 80vw;
+  }
+
+  .pds-banner {
+    height: 110px;
+  }
+
+  .pds-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .pds-qr-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pds-pdf-modal {
+    height: 70vh;
+  }
+
+  .pds-pdf-modal-overlay {
+    padding: 12px;
+  }
+}

@@ -27,6 +27,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   const [attendees, setAttendees] = useState([]);
   const [allVolunteers, setAllVolunteers] = useState([]);
   const [taskCount, setTaskCount] = useState(0);
+  const [specificActivities, setSpecificActivities] = useState([]);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -256,7 +257,17 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   useEffect(() => {
     load();
     loadTaskCount();
+    loadSpecificActivities();
   }, [projectId]);
+
+  const loadSpecificActivities = async () => {
+    try {
+      const snap = await getDocs(collection(db, "missions", projectId, "specificActivities"));
+      setSpecificActivities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) {
+      setSpecificActivities([]);
+    }
+  };
 
   const loadTaskCount = async () => {
     try {
@@ -516,6 +527,39 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
         </span>
       </div>
 
+
+      {/* Activities from specificActivities subcollection */}
+      {specificActivities.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <h3 style={{ color: '#111', fontWeight: 700, margin: '0 0 8px 0', fontSize: 15 }}>Activities</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {specificActivities.map((act, idx) => (
+              <div key={act.id || idx} style={{
+                background: '#f8fafc',
+                border: '1px solid #e5e7eb',
+                borderRadius: 10,
+                padding: '10px 14px',
+              }}>
+                <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 14 }}>
+                  {act.title || act.name || `Activity ${idx + 1}`}
+                </div>
+                {act.description && (
+                  <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>{act.description}</div>
+                )}
+                {act.date && (
+                  <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 4 }}>📅 {act.date}</div>
+                )}
+                {act.time && (
+                  <div style={{ color: '#94a3b8', fontSize: 12 }}>⏰ {act.time}</div>
+                )}
+                {act.location && (
+                  <div style={{ color: '#94a3b8', fontSize: 12 }}>📍 {act.location}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/*progress bar no. of joined */}
       <div className="mission-progress">

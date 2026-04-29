@@ -63,7 +63,7 @@
   width: 100%;
   padding: 0.55rem 0.9rem;
   border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 0.9rem;
   outline: none;
   background: #fff;
@@ -82,7 +82,7 @@
 .rp-filter-tab {
   padding: 6px 16px;
   border: 1.5px solid #e2e8f0;
-  border-radius: 99px;
+  border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 500;
   color: #64748b;
@@ -208,7 +208,7 @@
 .rp-review-btn {
   background: none;
   border: 1.5px solid #e2e8f0;
-  border-radius: 7px;
+  border-radius: 999px;
   padding: 6px 16px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -232,6 +232,152 @@
 }
 .rp-empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
 .rp-empty p { font-size: 0.95rem; }
+
+/* ── Admin Projects (merged Projects page) ─────────────────── */
+.admin-projects-page {
+  width: 100%;
+}
+
+.ap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.ap-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ap-divider {
+  border: none;
+  border-top: 1.5px solid #e5e7eb;
+  margin: 0 0 24px;
+}
+
+/* Split-style filter button */
+.ap-filter-wrap {
+  position: relative;
+}
+
+.ap-split-btn {
+  display: flex;
+  align-items: stretch;
+  border-radius: 999px;
+  overflow: hidden;
+  border: none;
+  background: #30bdb7;
+}
+
+.ap-split-label {
+  padding: 7px 14px;
+  background: #30bdb7;
+  color: #fff;
+  font-size: 0.87rem;
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.ap-split-arrow {
+  padding: 7px 10px;
+  background: #27a8a2;
+  color: #fff;
+  border: none;
+  border-left: 1px solid rgba(255,255,255,0.3);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.ap-split-arrow:hover {
+  background: #1f9490;
+}
+
+.ap-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  z-index: 200;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.ap-dropdown-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  padding: 9px 16px;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-radius: 999px;
+}
+
+.ap-dropdown-item:hover { background: #f1f5f9; }
+
+.ap-dropdown-item.active {
+  font-weight: 700;
+  color: #1f3b73;
+  background: #e8edf7;
+  border-radius: 999px;
+}
+
+/* Section containers */
+.ap-section {
+  margin-bottom: 28px;
+}
+
+/* Legacy badge label (kept for reference) */
+.ap-section-label {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 3px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+/* Plain-text section heading (used for For Approval / Other Projects) */
+.ap-section-heading {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+/* Edit Draft button variant */
+.rp-review-btn--edit {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+  margin-left: 6px;
+}
+.rp-review-btn--edit:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
 
 /* ── Misc ─────────────────────────────────────────────────────── */
 .loading-message {

@@ -1,4 +1,42 @@
 
+/* ── Live participant count ──────────────────────────────────────────── */
+.ce-live-count {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: #374151;
+}
+
+.ce-live-dot {
+  width: 7px;
+  height: 7px;
+  background: #16a34a;
+  border-radius: 50%;
+  animation: ce-pulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ce-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ── Date urgency strip at bottom of card ────────────────────────────── */
+.ce-urgency-bar {
+  font-size: 0.73rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* ── Slight left-border accent on event cards ────────────────────────── */
+.ce-event-card {
+  border-left: 3px solid #30bdb7;
+}
+
 .current-events-horizontal-container {
   width: 100%;
   padding: 24px 0 24px 0;

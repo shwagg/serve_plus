@@ -12,8 +12,7 @@ export const adminLinks = [
     key: "dashboard",
     label: "Dashboard",
     children: [
-      { label: "Program Impact Metrics", to: "/admin/dashboard/metrics" },
-      { label: "SDG", to: "/admin/dashboard/sdg" },
+      { label: "Overview", to: "/admin/dashboard" },
     ],
   },
   {
@@ -29,9 +28,8 @@ export const adminLinks = [
     key: "project",
     label: "Project",
     children: [
-      { label: "Project List", to: "/admin/projects" },
-      { label: "Review Proposals", to: "/admin/review-proposals" },
-      { label: "Badge & Points", to: "/admin/projects/badges" },
+      { label: "Project Proposals", to: "/admin/projects" },
+      { label: "Badges", to: "/admin/system/badges" },
     ],
   },
   {
@@ -45,9 +43,7 @@ export const adminLinks = [
     key: "system",
     label: "System",
     children: [
-      { label: "Volunteers Banner", to: "/admin/system/banner" },
-      { label: "Announcement", to: "/admin/system/announcement" },
-      { label: "Badges", to: "/admin/system/badges" },
+      { label: "Announcements & Banner", to: "/admin/system/announcements" },
     ],
   },
 ];

@@ -83,7 +83,7 @@
   /*color: #1f2937;*/
   color: #1f3c88;
   text-align: center;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Inter', system-ui, Helvetica, Arial, sans-serif;
 }
 .ui-title-to { /*"login 'TO' serve"*/
   color: #9fa1a4;

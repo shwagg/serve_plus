@@ -11,9 +11,11 @@ const EventDetails = lazy(() => import("../pages/student/missions/EventDetails")
 
 // Lazy-loaded admin pages
 const AdminDashboard = lazy(() => import("../pages/admin/AdminDashboard"));
+const AdminProjects = lazy(() => import("../pages/admin/AdminProjects"));
 const AgreementEditor = lazy(() => import("../pages/admin/AgreementEditor"));
 const AuditLogs = lazy(() => import("../pages/admin/AuditLogs"));
 const BackupRestore = lazy(() => import("../pages/admin/BackupRestore"));
+const CurrentEvent = lazy(() => import("../pages/admin/CurrentEvent"));
 const ProjectDetails = lazy(() => import("../pages/admin/ProjectDetails"));
 const ProjectTasks = lazy(() => import("../pages/admin/ProjectTasks"));
 const RosterAccountManagement = lazy(() => import("../pages/admin/RosterAccountManagement"));
@@ -56,10 +58,12 @@ export default function AppRouter() {
         {/* Admin routes with sidebar layout */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="projects" element={<ProjectList />} />
+          <Route path="projects" element={<AdminProjects />} />
           <Route path="projects/new" element={<CreateProject />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
+          <Route path="current-event" element={<CurrentEvent />} />
+          <Route path="current-event/:missionId" element={<CurrentEvent />} />
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="backup-restore" element={<BackupRestore />} />
           <Route path="system/agreements" element={<AgreementEditor />} />

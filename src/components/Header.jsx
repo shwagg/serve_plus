@@ -147,6 +147,12 @@ export default function Header() {
       return;
     }
 
+    // Admins can always create proposals
+    if (userRole === 'admin') {
+      setShowProposalModal(true);
+      return;
+    }
+
     setIsCheckingPendingProposal(true);
     try {
       const blockedStatuses = new Set(['for_approval', 'for-approval', 'pending']);
@@ -244,16 +250,18 @@ export default function Header() {
           </div>
         </div>
       </header>
-      <GlobalNotificationButton
-        unreadCount={announcementUnreadCount}
-        onClick={() => setAnnouncementsOpen(!announcementsOpen)}
-        isOpen={announcementsOpen}
-      />
-      <aside
-        className={`global-feed ${announcementsOpen ? 'open' : ''}`}
-      >
-        <GlobalAnnouncements />
-      </aside>
+      {userRole !== 'admin' && (
+        <>
+          <GlobalNotificationButton
+            unreadCount={announcementUnreadCount}
+            onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+            isOpen={announcementsOpen}
+          />
+          <aside className={`global-feed ${announcementsOpen ? 'open' : ''}`}>
+            <GlobalAnnouncements />
+          </aside>
+        </>
+      )}
 
       <CreateProposalModal
         isOpen={showProposalModal}

@@ -3,7 +3,7 @@
   --navy:#1f3b73;
   --teal:#30bdb7;
   --teal-dark:#0f766e;
-  --bg:#f6f7fb;
+  --bg:#ffffff;
   --card:#ffffff;
   --muted:#64748b;
   --border:#e5e7eb;
@@ -31,9 +31,9 @@
   flex-direction: column;
 }
 .admin-main{ /* contains outlet pages */
-  width: 100%;
+  width: calc(100% - var(--sidebar-width));
   padding: 24px 32px;
-  overflow-x: visible;
+  overflow-x: hidden;
   margin-top: calc(var(--header-height) + var(--context-height));
   margin-left: var(--sidebar-width);
   transition: margin-left 0.25s ease, width 0.25s ease;
@@ -43,6 +43,7 @@
 
 .admin-page.sidebar-collapsed .admin-main {
   margin-left: 0;
+  width: 100%;
 }
 
 /* Outlet */
@@ -138,16 +139,21 @@
 }
 
 .admin-sidebar-nav {
-  padding: var(--context-height) 0 24px;
+  padding: calc(var(--context-height) + 8px) 0 32px;
 }
 
 .admin-sidebar-group {
-  margin-bottom: 4px;
+  margin-bottom: 18px;
+}
+
+.admin-sidebar-group + .admin-sidebar-group {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
 }
 
 .admin-sidebar-group-label {
   display: block;
-  padding: 10px 16px 4px;
+  padding: 8px 16px 6px;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -301,6 +307,24 @@
   color: var(--teal-dark);
   font-weight: 600;
   border-radius: 8px;
+}
+
+/* Announcements form inputs */
+.ann-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1a1a1a;
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+.ann-input:focus {
+  border-color: var(--teal);
 }
 
 /* CSS Design for every pages in Outlet under Admin*/
@@ -524,6 +548,85 @@
 .event-details:hover{
   text-decoration: underline;
 }
+/* ── Mobile / Phone Responsive ──────────────────── */
+@media (max-width: 768px) {
+  /* Hide breadcrumbs to maximise vertical space */
+  .admin-context-strip {
+    display: none;
+  }
+
+  /* Reposition toggle below header (context strip is gone) */
+  .sidebar-toggle-floating {
+    top: calc(var(--header-height) + 10px);
+    transform: none;
+  }
+
+  /* Sidebar slides over content (overlay), not push */
+  .admin-sidebar {
+    z-index: 1050;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.18);
+  }
+
+  /* Backdrop that closes the sidebar when tapped */
+  .mobile-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    top: var(--header-height);
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1040;
+  }
+
+  /* Main content fills full width; only header offset */
+  .admin-main {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-top: var(--header-height) !important;
+    padding: 16px;
+    min-height: calc(100vh - var(--header-height));
+  }
+
+  /* Content wrapper: full width on mobile */
+  .admin-outlet.content {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  /* Slightly smaller page title on phone */
+  .page-title {
+    font-size: 20px;
+  }
+
+  /* Two-column event grid → single column on phone */
+  .event-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Rounded buttons + inputs (admin UI) ──────────── */
+/* Buttons */
+.btn-primary,
+.panel-link,
+.event-details,
+.sidebar-toggle-btn,
+.breadcrumb-link,
+.breadcrumb-dropdown-item {
+  border-radius: 999px;
+}
+
+.btn-primary { border-radius: 999px; }
+
+/* Search inputs */
+.ann-input,
+.search-input {
+  border-radius: 20px;
+}
+
+/* Card / panel action buttons */
+.card button,
+.panel-body button:not(.icon-button) {
+  border-radius: 999px;
+}
+
 /*Join Event Button*/
 /* Disabled / Pending Style */
 .event-details-join-btn.pending {

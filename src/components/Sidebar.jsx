@@ -29,11 +29,24 @@ export default function Sidebar({ links, collapsed, setCollapsed }) {
         const pathParts = location.pathname.split("/").filter(Boolean);
 
         if (pathParts[1] === "current-event") {
+            const isDetail = !!pathParts[2];
             return {
                 parent: "Events",
                 parentKey: "events",
                 current: "Current Event",
+                currentTo: isDetail ? "/admin/current-event" : null,
                 child: missionTitle || null,
+            };
+        }
+
+        // Handle project detail and tasks sub-routes
+        if (pathParts[1] === "projects" && pathParts[2]) {
+            return {
+                parent: "Project",
+                parentKey: "project",
+                current: "Project Proposals",
+                currentTo: "/admin/projects",
+                child: pathParts[3] === "tasks" ? "Manage Tasks" : null,
             };
         }
 

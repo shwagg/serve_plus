@@ -38,6 +38,8 @@ import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
 import EventActivity from "./pages/student/missions/EventActivity";
 import EventDetails from "./pages/student/missions/EventDetails";
 import BadgeManage from "./pages/admin/BadgeManage";
+import AnnouncementsManager from "./pages/admin/AnnouncementsManager";
+import PartnerHub from "./pages/admin/PartnerHub";
 import BadgeEarnedModal from "./components/badges/BadgeEarnedModal";
 import { useBadgeEarnedPopup } from "./hooks/useBadgeEarnedPopup";
 import Profile from "./pages/global/Profile";
@@ -46,6 +48,7 @@ import ProposeProject from "./pages/global/ProposeProject";
 import PublicProfile from "./pages/global/PublicProfile";
 import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
+import AdminProjects from "./pages/admin/AdminProjects";
 import Support from "./pages/global/menu/Support";
 import PartnerHome from "./pages/partner/PartnerHome";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
@@ -93,7 +96,7 @@ function App() {
             <Route
               path="events/:eventId"
             />
-            <Route path="projects" element={<ProjectList />} />
+            <Route path="projects" element={<Navigate to="/admin/review-proposals" replace />} />
             <Route path="projects/proposal" element={<ProposeProject />} />
             <Route
               path="projects/:projectId"
@@ -109,7 +112,9 @@ function App() {
             <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="system/agreements" element={<AgreementEditor />} />
             <Route path="system/badges" element={<BadgeManage />} />
-            <Route path="review-proposals" element={<ReviewProposal />} />
+            <Route path="system/announcements" element={<AnnouncementsManager />} />
+            <Route path="events/partners" element={<PartnerHub />} />
+            <Route path="review-proposals" element={<AdminProjects />} />
           </Route>
 
           {/* System Admin Routes */}
