@@ -51,6 +51,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const [loadingData, setLoadingData] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [approveNote, setApproveNote] = useState("");
   const [rejectText, setRejectText] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
@@ -130,6 +131,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         [`approvals.${approvalLevel}.approved`]: true,
         [`approvals.${approvalLevel}.decidedAt`]: serverTimestamp(),
         [`approvals.${approvalLevel}.name`]: name,
+        ...(approveNote.trim() ? { [`approvals.${approvalLevel}.note`]: approveNote.trim() } : {}),
       });
       setActionMsg(allDone ? "All signatures collected! Status updated to Draft." : "Approval recorded!");
       if (onApprovalChange) onApprovalChange();
@@ -308,7 +310,13 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                 </div>
               )}
 
-              {/* Approval actions */}
+              {/* Signatory flow */}
+              <div className="pds-section">
+                <div className="pds-section-label">Signatory Flow</div>
+                <ProposalTimeline proposal={project} />
+              </div>
+
+              {/* Approval actions — below signatory flow */}
               {isForApproval(project.status) && approvalLevel && (
                 <div className="pds-section pds-action-section">
                   <div className="pds-section-label">Your Action</div>
@@ -320,13 +328,22 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                     <div className="pds-status-note">Not your turn yet — waiting for the previous signatory.</div>
                   ) : (
                     <>
+                      <textarea
+                        className="pds-textarea"
+                        placeholder="Optional note for approval…"
+                        value={approveNote}
+                        onChange={e => setApproveNote(e.target.value)}
+                        rows={2}
+                        disabled={approving}
+                        style={{ marginBottom: 8 }}
+                      />
                       <button className="pds-btn-approve" onClick={handleApprove} disabled={approving}>
                         {approving ? "Approving…" : "✓ Approve"}
                       </button>
-                      <div className="pds-return-label">Return to proposer</div>
+                      <div className="pds-return-label" style={{ marginTop: 16 }}>Reject / Return to proposer</div>
                       <textarea
                         className="pds-textarea"
-                        placeholder="Reason for returning (required)…"
+                        placeholder="Reason for rejection (required)…"
                         value={rejectText}
                         onChange={e => setRejectText(e.target.value)}
                         rows={3}
@@ -337,18 +354,12 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                         onClick={handleReject}
                         disabled={approving || !rejectText.trim()}
                       >
-                        {approving ? "Returning…" : "↩ Return"}
+                        {approving ? "Rejecting…" : "✗ Reject"}
                       </button>
                     </>
                   )}
                 </div>
               )}
-
-              {/* Signatory flow */}
-              <div className="pds-section">
-                <div className="pds-section-label">Signatory Flow</div>
-                <ProposalTimeline proposal={project} />
-              </div>
             </>
           ) : (
             /* ────── Published / Completed view ────── */

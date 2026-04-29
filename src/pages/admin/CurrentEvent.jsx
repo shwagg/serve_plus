@@ -5,9 +5,11 @@ import {
 import { db } from "../../firebaseConfig";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { QRCodeCanvas } from "qrcode.react";
 import "../../styles/CurrentEvent.css";
 import "../../styles/ReviewProposal.css";
 import { createNotification } from "../../utils/notificationUtils";
+import { showToast, showConfirm } from "../../utils/toast";
 
 // ── helpers ───────────────────────────────────────────────────────────
 function getDateUrgency(targetDate) {
@@ -95,6 +97,20 @@ function CheckBadge({ ok }) {
     : <span style={{ color: "#9ca3af" }}>—</span>;
 }
 
+function MetaItem({ icon, label, value }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 1 }}>
+        {icon} {label}
+      </div>
+      <div style={{ fontSize: "0.85rem", color: "#1e293b", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 // ── main component ────────────────────────────────────────────────────
 export default function CurrentEvent() {
   const { missionId } = useParams();
@@ -128,6 +144,13 @@ export default function CurrentEvent() {
   const [togglingAttendance, setTogglingAttendance] = useState({});
 
   const FLAG_DURATION_DAYS = 30;
+
+  // ── QR + close event state ────────────────────────────────────────
+  const [showAttQR, setShowAttQR]           = useState(false);
+  const [showFeedbackQR, setShowFeedbackQR] = useState(false);
+  const [qrGenerating, setQrGenerating]     = useState(false);
+  const [closingEvent, setClosingEvent]     = useState(false);
+  const [togglingFeedback, setTogglingFeedback] = useState(false);
 
   // ── load published missions with live volunteer counts ────────────
   useEffect(() => {
@@ -447,6 +470,157 @@ export default function CurrentEvent() {
     }
   };
 
+  // ── attendance QR helpers ─────────────────────────────────────────
+  const generateAttendanceQR = () => {
+    if (!navigator.geolocation) {
+      showToast("Geolocation is not supported by this browser.");
+      return;
+    }
+    setQrGenerating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const newTimestamp = Date.now();
+          const qrLocation = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          };
+          let qrLocationName = null;
+          try {
+            const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${qrLocation.lat},${qrLocation.lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+            const geoResp = await fetch(geoUrl);
+            if (geoResp.ok) {
+              const geoJson = await geoResp.json();
+              qrLocationName = geoJson.results?.[0]?.formatted_address ?? null;
+            }
+          } catch (_) {}
+          const payload = { validQRTimestamp: newTimestamp, qrLocation, updatedAt: serverTimestamp() };
+          if (qrLocationName) payload.qrLocationName = qrLocationName;
+          await updateDoc(doc(db, "missions", missionId), payload);
+          const refreshed = await getDoc(doc(db, "missions", missionId));
+          if (refreshed.exists()) setMissionData({ id: refreshed.id, ...refreshed.data() });
+        } catch (_) {
+          showToast("Failed to save QR location. Try again.");
+        } finally {
+          setQrGenerating(false);
+        }
+      },
+      () => {
+        setQrGenerating(false);
+        showToast("Could not get your location. Please allow GPS access.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const getAttendanceQRValue = () =>
+    JSON.stringify({
+      eventId: missionId,
+      expiresAt: Date.now() + 30 * 60 * 1000,
+      location: missionData?.qrLocation ?? null,
+    });
+
+  const handleCloseEvent = async () => {
+    if (!await showConfirm("Close this event? Status will be set to Completed. This action is visible to volunteers.")) return;
+    setClosingEvent(true);
+    try {
+      await updateDoc(doc(db, "missions", missionId), {
+        status: "completed",
+        completedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      showToast("Event closed and marked as Completed.");
+      navigate("/admin/current-event");
+    } catch (_) {
+      showToast("Failed to close event. Try again.");
+    } finally {
+      setClosingEvent(false);
+    }
+  };
+
+  const handleToggleFeedback = async () => {
+    const isActive = missionData?.feedback?.isActive;
+    const action = isActive ? "close" : "open";
+    if (!await showConfirm(`${isActive ? "Close" : "Open"} the community partner feedback form? ${isActive ? "No new responses will be accepted after closing." : "The form will accept responses from the QR link."}`)) return;
+    setTogglingFeedback(true);
+    try {
+      const update = isActive
+        ? { "feedback.isActive": false, "feedback.closedAt": serverTimestamp() }
+        : { "feedback.isActive": true, "feedback.openedAt": serverTimestamp() };
+      await updateDoc(doc(db, "missions", missionId), update);
+      const refreshed = await getDoc(doc(db, "missions", missionId));
+      if (refreshed.exists()) setMissionData({ id: refreshed.id, ...refreshed.data() });
+      showToast(`Feedback form ${action}d.`);
+    } catch {
+      showToast(`Failed to ${action} feedback form. Try again.`);
+    } finally {
+      setTogglingFeedback(false);
+    }
+  };
+
+  const buildQRImage = (canvasId, headerText, footerLine1, footerLine2, accentColor) => {
+    const qrCanvas = document.getElementById(canvasId);
+    if (!qrCanvas) return null;
+    const qrSize = qrCanvas.width;
+    const pad = 24;
+    const headerH = 48;
+    const footerH = footerLine2 ? 58 : 40;
+    const out = document.createElement("canvas");
+    out.width = qrSize + pad * 2;
+    out.height = headerH + qrSize + pad + footerH;
+    const ctx = out.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.fillStyle = accentColor;
+    ctx.font = "bold 15px sans-serif";
+    ctx.textAlign = "center";
+    const truncated = headerText.length > 38 ? headerText.slice(0, 35) + "..." : headerText;
+    ctx.fillText(truncated, out.width / 2, 30);
+    ctx.drawImage(qrCanvas, pad, headerH);
+    ctx.fillStyle = "#374151";
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText(footerLine1, out.width / 2, headerH + qrSize + pad + 18);
+    if (footerLine2) {
+      ctx.fillStyle = "#dc2626";
+      ctx.font = "12px sans-serif";
+      ctx.fillText(footerLine2, out.width / 2, headerH + qrSize + pad + 36);
+    }
+    return out;
+  };
+
+  const downloadAttendanceQR = () => {
+    const expiry = new Date(Date.now() + 30 * 60 * 1000);
+    const expiryStr = expiry.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const out = buildQRImage(
+      "att-qr-canvas",
+      missionData?.title || missionTitle || "Event",
+      "Attendance QR",
+      `Expires at: ${expiryStr}`,
+      "#234e7b"
+    );
+    if (!out) return;
+    const link = document.createElement("a");
+    link.download = `${(missionData?.title || missionTitle || "event").replace(/[^a-z0-9]/gi, "_")}_attendance_qr.png`;
+    link.href = out.toDataURL("image/png");
+    link.click();
+  };
+
+  const downloadFeedbackQR = () => {
+    const out = buildQRImage(
+      "feedback-qr-canvas",
+      missionData?.title || missionTitle || "Event",
+      "Partner Feedback QR",
+      null,
+      "#0f766e"
+    );
+    if (!out) return;
+    const link = document.createElement("a");
+    link.download = `${(missionData?.title || missionTitle || "event").replace(/[^a-z0-9]/gi, "_")}_partner_feedback_qr.png`;
+    link.href = out.toDataURL("image/png");
+    link.click();
+  };
+
   // ── DETAIL VIEW ───────────────────────────────────────────────────
   if (missionId) {
     const tabs = [
@@ -455,57 +629,168 @@ export default function CurrentEvent() {
       { key: "docs",    label: "Document Library" },
     ];
 
+    const typeLabel =
+      missionData?.projectType === "sl" ? "Service Learning"
+      : missionData?.projectType === "ce" ? "Community Engagement"
+      : "Event";
+
     return (
       <div style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
-        {/* header bar */}
+
+        {/* ── back link ── */}
+        <button
+          onClick={() => navigate("/admin/current-event")}
+          style={{
+            background: "none", border: "none", color: "#64748b",
+            fontSize: "0.82rem", cursor: "pointer", marginBottom: 16,
+            display: "flex", alignItems: "center", gap: 4, padding: 0, fontWeight: 600,
+          }}
+        >
+          ← Back to Events
+        </button>
+
+        {/* ── mission hero card ── */}
         <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexWrap: "wrap", gap: 8, marginBottom: 20,
+          background: "#fff", borderRadius: 16, padding: "20px 24px",
+          marginBottom: 16, border: "1px solid #e5e7eb",
+          boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
         }}>
-          <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#1e293b" }}>{missionTitle}</h2>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <button
-              onClick={handleFlagThisEvent}
-              disabled={flagging}
-              style={{
-                padding: "8px 14px", background: flagging ? "#9ca3af" : "#dc2626",
-                color: "#fff", border: "none", borderRadius: 8, fontWeight: 700,
-                fontSize: "0.82rem", cursor: flagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-              }}
-            >
-              {flagging ? "Flagging..." : "🚩 Flag Absent Volunteers"}
-            </button>
-            {flagResult && (
-              <span style={{ fontSize: 13, color: flagResult.ok ? "#15803d" : "#b91c1c", fontWeight: 600 }}>
-                {flagResult.ok ? `${flagResult.count} volunteer(s) flagged` : `Error: ${flagResult.error}`}
-              </span>
-            )}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+            <div>
+              <h2 style={{ margin: 0, color: "#1e293b", fontSize: "1.3rem", fontWeight: 800, lineHeight: 1.2 }}>
+                {missionTitle || "Loading…"}
+              </h2>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <span style={{ background: "#e8edf7", color: "#1f3b73", padding: "3px 10px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 700 }}>
+                  {typeLabel}
+                </span>
+                <span style={{ background: "#dcfce7", color: "#15803d", padding: "3px 10px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 700 }}>
+                  ● Active
+                </span>
+                <span style={{ background: "#f1f5f9", color: "#475569", padding: "3px 10px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 600 }}>
+                  {rosterVolunteers.length}{missionData?.maxStudents ? ` / ${missionData.maxStudents}` : ""} volunteers
+                </span>
+              </div>
+            </div>
           </div>
+
+          {missionData && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px 20px" }}>
+              <MetaItem icon="📅" label="Date"       value={missionData.targetDate} />
+              <MetaItem icon="⏰" label="Time"       value={missionData.startTime} />
+              <MetaItem icon="📍" label="Location"   value={missionData.location} />
+              <MetaItem icon="🏫" label="Dept."      value={missionData.affiliatedDepartment || missionData.department} />
+              <MetaItem icon="🤝" label="Partner"    value={missionData.partnerSchool} />
+              <MetaItem icon="⏱" label="Hours"      value={missionData.volunteerHours ? `${missionData.volunteerHours}h` : null} />
+              <MetaItem icon="⭐" label="Points"     value={missionData.points} />
+              <MetaItem icon="👤" label="Prepared by" value={missionData.preparedBy} />
+            </div>
+          )}
+
+          {missionData?.qrLocationName && (
+            <div style={{ marginTop: 12, fontSize: "0.78rem", color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
+              <span>📱</span>
+              <span>QR pinned at: <b>{missionData.qrLocationName}</b></span>
+            </div>
+          )}
         </div>
 
-        {/* tab navigation */}
+        {/* ── action strip ── */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+          <button
+            onClick={() => setShowAttQR(true)}
+            style={{
+              padding: "9px 16px", background: "#234e7b", color: "#fff",
+              border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem",
+              cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            📱 Attendance QR
+          </button>
+          <button
+            onClick={() => setShowFeedbackQR(true)}
+            style={{
+              padding: "9px 16px", background: "#0f766e", color: "#fff",
+              border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem",
+              cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            📋 Partner Feedback QR
+          </button>
+          <button
+            onClick={handleToggleFeedback}
+            disabled={togglingFeedback}
+            style={{
+              padding: "9px 16px",
+              background: missionData?.feedback?.isActive ? "#7c3aed" : "#9ca3af",
+              color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
+              fontSize: "0.85rem", cursor: togglingFeedback ? "not-allowed" : "pointer",
+              whiteSpace: "nowrap", opacity: togglingFeedback ? 0.7 : 1,
+            }}
+          >
+            {togglingFeedback
+              ? "Updating…"
+              : missionData?.feedback?.isActive
+              ? "🔓 Close Feedback Form"
+              : "🔒 Open Feedback Form"}
+          </button>
+          <button
+            onClick={handleFlagThisEvent}
+            disabled={flagging}
+            style={{
+              padding: "9px 16px",
+              background: flagging ? "#9ca3af" : "#b45309",
+              color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
+              fontSize: "0.85rem", cursor: flagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            {flagging ? "Flagging…" : "🚩 Flag Absent"}
+          </button>
+          <button
+            onClick={handleCloseEvent}
+            disabled={closingEvent}
+            style={{
+              padding: "9px 16px",
+              background: closingEvent ? "#9ca3af" : "#dc2626",
+              color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
+              fontSize: "0.85rem", cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            {closingEvent ? "Closing…" : "✓ Close Event"}
+          </button>
+          {flagResult && (
+            <span style={{ fontSize: 13, color: flagResult.ok ? "#15803d" : "#b91c1c", fontWeight: 600 }}>
+              {flagResult.ok ? `${flagResult.count} flagged` : `Error: ${flagResult.error}`}
+            </span>
+          )}
+        </div>
+
+        {/* ── tab navigation ── */}
         <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb", marginBottom: 20 }}>
           {tabs.map(t => (
             <button
               key={t.key}
-              onClick={() => {
-                setActiveTab(t.key);
-                if (t.key === "docs") loadDocLib();
-              }}
+              onClick={() => { setActiveTab(t.key); if (t.key === "docs") loadDocLib(); }}
               style={{
-                padding: "10px 20px",
-                background: "none",
-                border: "none",
+                padding: "10px 20px", background: "none", border: "none",
                 borderBottom: activeTab === t.key ? "2px solid #234e7b" : "2px solid transparent",
                 marginBottom: -2,
                 fontWeight: activeTab === t.key ? 700 : 500,
                 color: activeTab === t.key ? "#234e7b" : "#6b7280",
-                cursor: "pointer",
-                fontSize: "0.9rem",
-                transition: "color 0.15s",
+                cursor: "pointer", fontSize: "0.9rem", transition: "color 0.15s",
+                display: "flex", alignItems: "center", gap: 6,
               }}
             >
               {t.label}
+              {t.key === "roster" && rosterVolunteers.length > 0 && (
+                <span style={{
+                  background: activeTab === "roster" ? "#234e7b" : "#e8edf7",
+                  color: activeTab === "roster" ? "#fff" : "#234e7b",
+                  borderRadius: 99, fontSize: "0.7rem", fontWeight: 700, padding: "1px 7px",
+                }}>
+                  {rosterVolunteers.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -516,12 +801,12 @@ export default function CurrentEvent() {
             <div className="empty-label">No volunteers have joined yet.</div>
           ) : (
             <div style={{ overflowX: "auto", width: "100%" }}>
-              <table className="admin-table" style={{ minWidth: 560 }}>
+              <table className="admin-table" style={{ minWidth: 600 }}>
                 <thead>
                   <tr>
                     <th>Name</th>
                     <th>Level</th>
-                    <th>Joined At</th>
+                    <th>Joined</th>
                     <th>Attendance</th>
                     <th>Actions</th>
                   </tr>
@@ -531,7 +816,10 @@ export default function CurrentEvent() {
                     <tr key={v.id}>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          <span>{v.name}</span>
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#1e293b" }}>{v.name}</div>
+                            {v.email && <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>{v.email}</div>}
+                          </div>
                           {v.isFlagged && (
                             <>
                               <span title={`Flagged${v.flagExpiry ? " until " + v.flagExpiry.toLocaleDateString() : ""}`}>🚩</span>
@@ -552,11 +840,13 @@ export default function CurrentEvent() {
                           )}
                         </div>
                       </td>
-                      <td>{v.level}</td>
-                      <td>{v.joinedAt ? new Date(v.joinedAt).toLocaleDateString() : "-"}</td>
+                      <td style={{ color: "#64748b" }}>{v.level}</td>
+                      <td style={{ fontSize: "0.82rem", color: "#64748b" }}>
+                        {v.joinedAt ? new Date(v.joinedAt).toLocaleDateString() : "—"}
+                      </td>
                       <td>
                         {v.attendanceStatus === "present"
-                          ? <span style={{ color: "#16a34a", fontWeight: 600 }}>Present</span>
+                          ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Present</span>
                           : <span style={{ color: "#9ca3af" }}>—</span>}
                       </td>
                       <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -572,9 +862,7 @@ export default function CurrentEvent() {
                             opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
                           }}
                         >
-                          {togglingAttendance[v.id]
-                            ? "Saving…"
-                            : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
+                          {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
                         </button>
                       </td>
                     </tr>
@@ -588,63 +876,83 @@ export default function CurrentEvent() {
         {/* ── Project Details tab ── */}
         {activeTab === "details" && (
           missionData ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "0 24px" }}>
-              <DetailField label="Title" value={missionData.title} />
-              <DetailField label="Type" value={
-                missionData.projectType === "sl" ? "Service Learning"
-                : missionData.projectType === "ce" ? "Community Engagement"
-                : missionData.projectType
-              } />
-              <DetailField label="Status" value={missionData.status} />
-              <DetailField label="Target Date" value={missionData.targetDate} />
-              <DetailField label="Start Time" value={missionData.startTime} />
-              <DetailField label="Location" value={missionData.location} />
-              <DetailField label="Department" value={missionData.affiliatedDepartment || missionData.department} />
-              <DetailField label="Prepared By" value={missionData.preparedBy} />
-              <DetailField label="Max Volunteers" value={missionData.maxStudents} />
-              <DetailField label="Volunteer Hours" value={missionData.volunteerHours} />
-              <DetailField label="Points" value={missionData.points} />
-              <DetailField label="Budget" value={missionData.budget} />
+            <div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "0 28px" }}>
+                <DetailField label="Type"           value={typeLabel} />
+                <DetailField label="Target Date"    value={missionData.targetDate} />
+                <DetailField label="Start Time"     value={missionData.startTime} />
+                <DetailField label="Location"       value={missionData.location} />
+                <DetailField label="Department"     value={missionData.affiliatedDepartment || missionData.department} />
+                <DetailField label="Partner"        value={missionData.partnerSchool} />
+                <DetailField label="Prepared By"    value={missionData.preparedBy} />
+                <DetailField label="Max Volunteers" value={missionData.maxStudents} />
+                <DetailField label="Volunteer Hours" value={missionData.volunteerHours} />
+                <DetailField label="Points"         value={missionData.points} />
+                <DetailField label="Budget"         value={missionData.budget} />
+              </div>
+
               {missionData.description && (
-                <div style={{ gridColumn: "1 / -1", marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-                    Description
-                  </div>
-                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.6 }}>{missionData.description}</div>
+                <div style={{ marginTop: 16, marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Description</div>
+                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.65 }}>{missionData.description}</div>
                 </div>
               )}
               {missionData.objectives && (
-                <div style={{ gridColumn: "1 / -1", marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-                    Objectives
-                  </div>
-                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.6 }}>{missionData.objectives}</div>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Objectives</div>
+                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.65 }}>{missionData.objectives}</div>
+                </div>
+              )}
+              {missionData.studentOutcomes && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Student Outcomes</div>
+                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.65 }}>{missionData.studentOutcomes}</div>
+                </div>
+              )}
+              {Array.isArray(missionData.successIndicators) && missionData.successIndicators.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Success Indicators</div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {missionData.successIndicators.map((s, i) => <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b" }}>{s}</li>)}
+                  </ul>
                 </div>
               )}
               {Array.isArray(missionData.stakeholders) && missionData.stakeholders.length > 0 && (
-                <div style={{ gridColumn: "1 / -1", marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-                    Stakeholders
-                  </div>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Stakeholders</div>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {missionData.stakeholders.map((s, i) => (
-                      <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b" }}>{s}</li>
-                    ))}
+                    {missionData.stakeholders.map((s, i) => <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b" }}>{s}</li>)}
                   </ul>
                 </div>
               )}
               {Array.isArray(missionData.sdgs) && missionData.sdgs.length > 0 && (
-                <div style={{ gridColumn: "1 / -1", marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-                    SDGs
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>SDGs</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
                     {missionData.sdgs.map((sdg, i) => (
-                      <span key={i} style={{
-                        background: "#e8edf7", color: "#1f3b73",
-                        padding: "3px 10px", borderRadius: 99, fontSize: "0.8rem", fontWeight: 600,
-                      }}>{sdg}</span>
+                      <span key={i} style={{ background: "#e8edf7", color: "#1f3b73", padding: "3px 10px", borderRadius: 99, fontSize: "0.8rem", fontWeight: 600 }}>{sdg}</span>
                     ))}
+                  </div>
+                </div>
+              )}
+              {/* type-specific fields */}
+              {missionData.slFields && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Service Learning Fields</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "0 28px" }}>
+                    <DetailField label="Section"          value={missionData.slFields.section} />
+                    <DetailField label="Course"           value={missionData.slFields.course} />
+                    <DetailField label="Course Code"      value={missionData.slFields.courseCode} />
+                    <DetailField label="Assigned Faculty" value={missionData.slFields.assignedFaculty} />
+                  </div>
+                </div>
+              )}
+              {missionData.ceFields && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Community Engagement Fields</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "0 28px" }}>
+                    <DetailField label="Nature"           value={missionData.ceFields.nature} />
+                    <DetailField label="Assigned Faculty" value={missionData.ceFields.assignedFaculty} />
                   </div>
                 </div>
               )}
@@ -658,14 +966,37 @@ export default function CurrentEvent() {
         {activeTab === "docs" && (
           docLibLoading ? (
             <div className="loading-message">Loading documents…</div>
-          ) : docLibVolunteers.length === 0 && !docLibLoading ? (
+          ) : docLibVolunteers.length === 0 ? (
             <div className="empty-label">No volunteers have joined yet.</div>
           ) : (
             <div style={{ overflowX: "auto", width: "100%" }}>
+              {/* Community feedback summary */}
+              {missionData?.feedback?.isActive === false && missionData.feedback.avgRating ? (
+                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 16px", marginBottom: 14, display: "flex", flexWrap: "wrap", gap: "10px 24px", alignItems: "center" }}>
+                  <span style={{ fontWeight: 700, color: "#15803d", fontSize: "0.85rem" }}>✓ Community Feedback Closed</span>
+                  <span style={{ fontSize: "0.82rem", color: "#374151" }}>
+                    Avg. Rating: <b>{missionData.feedback.avgRating}/5</b>
+                  </span>
+                  {missionData.feedback.multiplier != null && (
+                    <span style={{ fontSize: "0.82rem", color: "#374151" }}>
+                      Grade Multiplier: <b>×{missionData.feedback.multiplier}</b>
+                    </span>
+                  )}
+                  {missionData.points && missionData.feedback.multiplier != null && (
+                    <span style={{ fontSize: "0.82rem", color: "#374151" }}>
+                      Final Score per Volunteer: <b>{(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts</b>
+                    </span>
+                  )}
+                </div>
+              ) : !missionData?.feedback?.isActive && !missionData?.feedback?.avgRating ? (
+                <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: "0.82rem", color: "#92400e" }}>
+                  ⚠️ Community feedback form is not yet closed. Open and close the form to compute grades.
+                </div>
+              ) : null}
               <p style={{ fontSize: "0.82rem", color: "#64748b", marginBottom: 12 }}>
-                Submission status per volunteer. "Done" = submitted or marked present.
+                Submission status per volunteer. ✓ = submitted / marked present.
               </p>
-              <table className="admin-table" style={{ minWidth: 500 }}>
+              <table className="admin-table" style={{ minWidth: 560 }}>
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -673,6 +1004,7 @@ export default function CurrentEvent() {
                     <th>Consent</th>
                     <th>Attendance</th>
                     <th>Post-Survey</th>
+                    {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && <th>Grade</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -683,6 +1015,15 @@ export default function CurrentEvent() {
                       <td><CheckBadge ok={v.consent} /></td>
                       <td><CheckBadge ok={v.attendance} /></td>
                       <td><CheckBadge ok={v.postSurvey} /></td>
+                      {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && (
+                        <td>
+                          {v.attendance && missionData.feedback.multiplier != null && missionData.points
+                            ? <span style={{ color: "#15803d", fontWeight: 700 }}>
+                                {(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts
+                              </span>
+                            : <span style={{ color: "#9ca3af" }}>—</span>}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -690,6 +1031,165 @@ export default function CurrentEvent() {
             </div>
           )
         )}
+
+        {/* ── Attendance QR Modal ── */}
+        {showAttQR && (
+          <div
+            onClick={() => setShowAttQR(false)}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.52)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: "#fff", borderRadius: 18, width: "min(420px, 94vw)", boxShadow: "0 8px 40px rgba(0,0,0,0.22)", overflow: "hidden" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📱 Attendance QR</h3>
+                <button onClick={() => setShowAttQR(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748b", lineHeight: 1 }}>✕</button>
+              </div>
+              <div style={{ padding: "24px 20px", textAlign: "center" }}>
+                {missionData?.validQRTimestamp ? (
+                  <>
+                    <div style={{ display: "inline-block", padding: 14, background: "#f8fafc", borderRadius: 14, border: "1px solid #e5e7eb", marginBottom: 14 }}>
+                      <QRCodeCanvas id="att-qr-canvas" value={getAttendanceQRValue()} size={220} />
+                    </div>
+                    {missionData?.qrLocationName && (
+                      <div style={{ fontSize: "0.8rem", color: "#475569", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                        <span>📍</span><span>{missionData.qrLocationName}</span>
+                      </div>
+                    )}
+                    <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: "0 0 18px 0" }}>
+                      Valid 30 min from generation · Students must be within 200 m of pinned location.
+                    </p>
+                  </>
+                ) : (
+                  <div style={{ padding: "20px 0 24px", color: "#64748b" }}>
+                    <div style={{ fontSize: "3rem", marginBottom: 10 }}>📱</div>
+                    <p style={{ margin: 0, fontSize: "0.88rem" }}>No QR generated yet.<br />Generate one at your current location.</p>
+                  </div>
+                )}
+                <button
+                  disabled={qrGenerating}
+                  onClick={generateAttendanceQR}
+                  style={{
+                    width: "100%", padding: "11px 0",
+                    background: qrGenerating ? "#9ca3af" : "#234e7b",
+                    color: "#fff", border: "none", borderRadius: 10,
+                    fontWeight: 700, fontSize: "0.9rem",
+                    cursor: qrGenerating ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {qrGenerating ? "Getting location…" : missionData?.validQRTimestamp ? "Regenerate QR (update location)" : "Generate Attendance QR"}
+                </button>
+                {missionData?.validQRTimestamp && (
+                  <button
+                    onClick={downloadAttendanceQR}
+                    style={{
+                      width: "100%", marginTop: 8, padding: "10px 0",
+                      background: "#f1f5f9", color: "#334155",
+                      border: "none", borderRadius: 10,
+                      fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+                    }}
+                  >
+                    ⬇ Download QR Image
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Partner Feedback QR Modal ── */}
+        {showFeedbackQR && (
+          <div
+            onClick={() => setShowFeedbackQR(false)}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.52)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: "#fff", borderRadius: 18, width: "min(420px, 94vw)", boxShadow: "0 8px 40px rgba(0,0,0,0.22)", overflow: "hidden" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📋 Partner Feedback QR</h3>
+                <button onClick={() => setShowFeedbackQR(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748b", lineHeight: 1 }}>✕</button>
+              </div>
+              <div style={{ padding: "20px", textAlign: "center" }}>
+                {/* status pill */}
+                <div style={{ marginBottom: 12, display: "flex", justifyContent: "center" }}>
+                  <span style={{
+                    padding: "4px 14px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 700,
+                    background: missionData?.feedback?.isActive ? "#dcfce7" : "#fee2e2",
+                    color: missionData?.feedback?.isActive ? "#15803d" : "#b91c1c",
+                  }}>
+                    {missionData?.feedback?.isActive ? "● Form Open — accepting responses" : "● Form Closed — not accepting responses"}
+                  </span>
+                </div>
+                {missionData?.feedback?.avgRating && !missionData.feedback.isActive && (
+                  <div style={{ marginBottom: 12, fontSize: "0.82rem", color: "#64748b" }}>
+                    Avg. Rating: <b style={{ color: "#1e293b" }}>{missionData.feedback.avgRating}/5</b>
+                    {missionData.feedback.multiplier != null && (
+                      <> · Multiplier: <b style={{ color: "#1e293b" }}>×{missionData.feedback.multiplier}</b></>
+                    )}
+                  </div>
+                )}
+                <div style={{ display: "inline-block", padding: 14, background: "#f8fafc", borderRadius: 14, border: "1px solid #e5e7eb", marginBottom: 12, opacity: missionData?.feedback?.isActive ? 1 : 0.5 }}>
+                  <QRCodeCanvas id="feedback-qr-canvas" value={`${window.location.origin}/global/feedback/${missionId}`} size={200} />
+                </div>
+                {!missionData?.feedback?.isActive && (
+                  <p style={{ fontSize: "0.78rem", color: "#b91c1c", margin: "0 0 10px", fontWeight: 600 }}>
+                    QR inactive — open the form first to collect responses.
+                  </p>
+                )}
+                <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0 0 14px 0" }}>
+                  Share with your community partner to collect feedback.
+                </p>
+                <button
+                  onClick={handleToggleFeedback}
+                  disabled={togglingFeedback}
+                  style={{
+                    width: "100%", padding: "10px 0", marginBottom: 8,
+                    background: missionData?.feedback?.isActive ? "#dc2626" : "#15803d",
+                    color: "#fff", border: "none", borderRadius: 10,
+                    fontWeight: 700, fontSize: "0.85rem",
+                    cursor: togglingFeedback ? "not-allowed" : "pointer",
+                    opacity: togglingFeedback ? 0.7 : 1,
+                  }}
+                >
+                  {togglingFeedback
+                    ? "Updating…"
+                    : missionData?.feedback?.isActive
+                    ? "🔒 Close Feedback Form"
+                    : "🔓 Open Feedback Form"}
+                </button>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <button
+                    onClick={() => window.open(`/global/feedback/${missionId}`, "_blank")}
+                    style={{ flex: 1, padding: "10px 0", background: "#0f766e", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+                  >
+                    Open Form ↗
+                  </button>
+                  <button
+                    onClick={() => setShowFeedbackQR(false)}
+                    style={{ flex: 1, padding: "10px 0", background: "#f1f5f9", color: "#334155", border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+                  >
+                    Close
+                  </button>
+                </div>
+                <button
+                  onClick={downloadFeedbackQR}
+                  style={{
+                    width: "100%", padding: "10px 0",
+                    background: "#f1f5f9", color: "#334155",
+                    border: "none", borderRadius: 10,
+                    fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+                  }}
+                >
+                  ⬇ Download QR Image
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   }

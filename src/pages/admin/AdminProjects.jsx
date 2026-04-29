@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, useContext, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { showToast, showConfirm } from "../../utils/toast";
 import ProjectDetailSidebar from "./ProjectDetailSidebar";
 import ProjectProposal from "../global/proposal/ProjectProposal";
 import "../../styles/ReviewProposal.css";
@@ -13,6 +14,7 @@ const FILTER_OPTIONS = [
   { key: "draft",       label: "Draft" },
   { key: "published",   label: "Published" },
   { key: "completed",   label: "Completed" },
+  { key: "archived",    label: "Archived" },
 ];
 
 function isForApproval(status = "") {
@@ -117,6 +119,8 @@ export default function AdminProjects() {
         if (statusFilter === "for_approval") return isForApproval(s);
         return s === statusFilter;
       });
+    } else {
+      data = data.filter(p => (p.status || "").toLowerCase() !== "archived");
     }
     return data;
   }, [projects, searchTerm, statusFilter]);
@@ -141,12 +145,14 @@ export default function AdminProjects() {
     if (s === "draft") return "draft";
     if (s === "published") return "published";
     if (s === "completed") return "completed";
+    if (s === "archived") return "archived";
     return "draft";
   }
 
   function formatStatus(status = "") {
     if (!status) return "Draft";
     if (isForApproval(status)) return "For Approval";
+    if (status === "archived") return "Archived";
     return status.charAt(0).toUpperCase() + status.slice(1);
   }
 
@@ -160,6 +166,50 @@ export default function AdminProjects() {
     setSelectedProject(project);
     setShowSidebar(true);
   }
+
+  const handlePublish = async (e, project) => {
+    e.stopPropagation();
+    if (!await showConfirm(`Publish "${project.title}"? Volunteers will be able to join the event.`)) return;
+    try {
+      await updateDoc(doc(db, "missions", project.id), {
+        status: "published",
+        publishedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      showToast("Event published.");
+      fetchProjects();
+    } catch {
+      showToast("Failed to publish. Try again.");
+    }
+  };
+
+  const handleDelete = async (e, project) => {
+    e.stopPropagation();
+    if (!await showConfirm(`Delete "${project.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteDoc(doc(db, "missions", project.id));
+      showToast("Proposal deleted.");
+      fetchProjects();
+    } catch {
+      showToast("Failed to delete. Try again.");
+    }
+  };
+
+  const handleArchive = async (e, project) => {
+    e.stopPropagation();
+    if (!await showConfirm(`Archive "${project.title}"? It will be moved to the Archived list.`)) return;
+    try {
+      await updateDoc(doc(db, "missions", project.id), {
+        status: "archived",
+        archivedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      showToast("Proposal archived.");
+      fetchProjects();
+    } catch {
+      showToast("Failed to archive. Try again.");
+    }
+  };
 
   function renderCard(project) {
     const needsAction = needsMyAction(project);
@@ -193,19 +243,46 @@ export default function AdminProjects() {
           {project.preparedBy && <span>By {project.preparedBy}</span>}
           {project.targetDate && <span>Target: {project.targetDate}</span>}
         </div>
-        <div className="rp-card-footer">
+        <div className="rp-card-footer" style={{ flexWrap: "wrap", gap: 6 }}>
           <button
             className={`rp-review-btn${needsAction ? " rp-review-btn--primary" : ""}`}
             onClick={e => { e.stopPropagation(); openSidebar(project); }}
           >
             {needsAction ? "Review & Approve →" : "View Details →"}
           </button>
-          {project.status === "draft" && (
+          {project.status === "draft" && role === "admin" && (
             <button
               className="rp-review-btn rp-review-btn--edit"
               onClick={e => { e.stopPropagation(); setEditProject(project); setShowEditModal(true); }}
             >
-              Edit Draft →
+              Edit →
+            </button>
+          )}
+          {project.status === "draft" && role === "admin" && (
+            <button
+              className="rp-review-btn"
+              onClick={e => handlePublish(e, project)}
+              style={{ background: "#15803d", color: "#fff", borderColor: "transparent" }}
+            >
+              ✓ Publish
+            </button>
+          )}
+          {project.status === "draft" && role === "admin" && (
+            <button
+              className="rp-review-btn"
+              onClick={e => handleDelete(e, project)}
+              style={{ background: "#dc2626", color: "#fff", borderColor: "transparent" }}
+            >
+              🗑 Delete
+            </button>
+          )}
+          {project.status === "completed" && role === "admin" && (
+            <button
+              className="rp-review-btn"
+              onClick={e => handleArchive(e, project)}
+              style={{ background: "#6b7280", color: "#fff", borderColor: "transparent" }}
+            >
+              📦 Archive
             </button>
           )}
         </div>
@@ -310,44 +387,66 @@ export default function AdminProjects() {
         />
       )}
 
-      {showEditModal && editProject && (
-        <div
-          onClick={() => { setShowEditModal(false); setEditProject(null); }}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-            zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
+      {showEditModal && editProject && (() => {
+        const allSigned = !!(editProject.reviewedBy && editProject.recommendedBy && editProject.endorsedBy && editProject.approvedBy);
+        const canEditForm = role === "admin";
+        return (
           <div
-            onClick={e => e.stopPropagation()}
+            onClick={() => { setShowEditModal(false); setEditProject(null); }}
             style={{
-              background: "#fff", borderRadius: 18, width: "min(700px, 95vw)",
-              maxHeight: "90vh", display: "flex", flexDirection: "column",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.2)", overflow: "hidden",
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+              zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "16px 20px", borderBottom: "1px solid #e5e7eb", flexShrink: 0,
-            }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-                {editProject.projectType === "sl" ? "📝 Service Learning Proposal" : "📝 Community Engagement Proposal"}
-              </h3>
-              <button
-                onClick={() => { setShowEditModal(false); setEditProject(null); }}
-                style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}
-              >✕</button>
-            </div>
-            <div style={{ overflowY: "auto", flex: 1 }}>
-              <ProjectProposal
-                projectType={editProject.projectType === "sl" ? "service-learning" : "community-engagement"}
-                editProposal={editProject}
-                onClose={() => { setShowEditModal(false); setEditProject(null); fetchProjects(); }}
-              />
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: "#fff", borderRadius: 18, width: "min(700px, 95vw)",
+                maxHeight: "90vh", display: "flex", flexDirection: "column",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.2)", overflow: "hidden",
+              }}
+            >
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "16px 20px", borderBottom: "1px solid #e5e7eb", flexShrink: 0,
+              }}>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+                  {editProject.projectType === "sl" ? "📝 Service Learning Proposal" : "📝 Community Engagement Proposal"}
+                </h3>
+                <button
+                  onClick={() => { setShowEditModal(false); setEditProject(null); }}
+                  style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}
+                >✕</button>
+              </div>
+              {allSigned && !canEditForm ? (
+                <div style={{ padding: 32, textAlign: "center", color: "#64748b" }}>
+                  <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>🔒</div>
+                  <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 8 }}>
+                    Editing Locked
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                    All signatories have approved this proposal. Only an admin can make changes at this stage.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ overflowY: "auto", flex: 1 }}>
+                  {allSigned && (
+                    <div style={{ background: "#fef3c7", borderBottom: "1px solid #fde68a", padding: "10px 20px", fontSize: "0.82rem", color: "#92400e", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>⚠️</span>
+                      <span>All signatories have approved — changes here are admin-only edits before publishing.</span>
+                    </div>
+                  )}
+                  <ProjectProposal
+                    projectType={editProject.projectType === "sl" ? "service-learning" : "community-engagement"}
+                    editProposal={editProject}
+                    onClose={() => { setShowEditModal(false); setEditProject(null); fetchProjects(); }}
+                  />
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
