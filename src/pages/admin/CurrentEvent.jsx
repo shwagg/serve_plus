@@ -522,15 +522,47 @@ export default function CurrentEvent() {
     });
 
   const handleCloseEvent = async () => {
-    if (!await showConfirm("Close this event? Status will be set to Completed. This action is visible to volunteers.")) return;
+    // Decide cancelled vs completed based on whether today is before the target date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let targetDate = null;
+    if (missionData?.targetDate?.toDate) {
+      targetDate = missionData.targetDate.toDate();
+    } else if (typeof missionData?.targetDate === "string") {
+      targetDate = new Date(missionData.targetDate);
+    }
+    if (targetDate) targetDate.setHours(0, 0, 0, 0);
+    const isCancelled = targetDate && today < targetDate;
+    const newStatus = isCancelled ? "cancelled" : "completed";
+    const statusLabel = isCancelled ? "Cancelled" : "Completed";
+
+    if (!await showConfirm(`Close this event? Status will be set to ${statusLabel}. All enrolled volunteers will be notified.`)) return;
     setClosingEvent(true);
     try {
       await updateDoc(doc(db, "missions", missionId), {
-        status: "completed",
+        status: newStatus,
         completedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      showToast("Event closed and marked as Completed.");
+      // Notify every enrolled volunteer
+      const notifTitle = isCancelled ? "Event Cancelled" : "Event Completed";
+      const notifMessage = isCancelled
+        ? `The event "${missionData?.title || "an event"}" has been cancelled.`
+        : `The event "${missionData?.title || "an event"}" has been marked as completed. Thank you for participating!`;
+      await Promise.all(
+        rosterVolunteers.map(v =>
+          addDoc(collection(db, "users", v.id, "notifications"), {
+            type: isCancelled ? "event_cancelled" : "event_completed",
+            title: notifTitle,
+            message: notifMessage,
+            link: `/event/${missionId}`,
+            eventId: missionId,
+            read: false,
+            createdAt: serverTimestamp(),
+          })
+        )
+      );
+      showToast(`Event closed and marked as ${statusLabel}. ${rosterVolunteers.length} volunteer(s) notified.`);
       navigate("/admin/current-event");
     } catch (_) {
       showToast("Failed to close event. Try again.");
@@ -803,8 +835,8 @@ export default function CurrentEvent() {
           rosterVolunteers.length === 0 ? (
             <div className="empty-label">No volunteers have joined yet.</div>
           ) : (
-            <div style={{ overflowX: "auto", width: "100%" }}>
-              <table className="admin-table" style={{ minWidth: 600 }}>
+            <div style={{ width: "100%" }}>
+              <table className="admin-table">
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -857,10 +889,10 @@ export default function CurrentEvent() {
                           disabled={!!togglingAttendance[v.id]}
                           onClick={() => handleToggleAttendance(v.id, v.attendanceStatus)}
                           style={{
-                            padding: "4px 10px",
+                            padding: "3px 8px",
                             background: v.attendanceStatus === "present" ? "#fff3cd" : "#d4edda",
                             color: v.attendanceStatus === "present" ? "#856404" : "#155724",
-                            border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600,
                             cursor: togglingAttendance[v.id] ? "not-allowed" : "pointer",
                             opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
                           }}
