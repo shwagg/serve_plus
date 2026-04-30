@@ -315,6 +315,8 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [historyFilter, setHistoryFilter] = useState("all");
+  const [historySort, setHistorySort] = useState("date_desc");
   const portfolioPdfRef = useRef(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -336,12 +338,11 @@ export default function Profile() {
       clone.querySelectorAll && clone.querySelectorAll('img').forEach(img => img.setAttribute('crossOrigin', 'anonymous'));
       // place the clone far off-screen using transform so it doesn't visibly appear
       clone.style.cssText = `
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        transform: translateX(2000px) !important;
+        position: fixed !important;
+        top: -9999px !important;
+        left: -9999px !important;
         width: 794px !important;
-        z-index: 99999 !important;
+        z-index: -1 !important;
         background: #fff !important;
         pointer-events: none !important;
       `;
@@ -504,6 +505,13 @@ export default function Profile() {
               console.warn(`Failed to load tasks for event ${eventId}:`, e);
             }
 
+            let targetDate = null;
+            if (eventData.targetDate?.toDate) {
+              targetDate = eventData.targetDate.toDate();
+            } else if (typeof eventData.targetDate === "string" && eventData.targetDate) {
+              targetDate = new Date(eventData.targetDate);
+            }
+
             return {
               id: eventId,
               title: eventData.title || eventId,
@@ -511,6 +519,9 @@ export default function Profile() {
               pointsEarned: vData.pointsEarned || 0,
               sdgs: eventData.sdgs || [],
               tasksDone,
+              status: eventData.status || "unknown",
+              targetDate,
+              attendanceStatus: vData.attendanceStatus || null,
             };
           })
         );
@@ -548,6 +559,25 @@ export default function Profile() {
 
   return (
     <div className="profile-page-bg">
+      {exporting && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
+          zIndex: 9999, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 16,
+        }}>
+          <div style={{
+            width: 48, height: 48, border: '5px solid rgba(255,255,255,0.25)',
+            borderTopColor: '#30bdb7', borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <div style={{ color: '#fff', fontWeight: 600, fontSize: '1rem', letterSpacing: 0.2 }}>
+            Please wait, generating your PDF…
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.82rem' }}>
+            This may take a few seconds
+          </div>
+        </div>
+      )}
       <Header />
       <div className="profile-main-flex">
         <div className="profile-card">
@@ -682,18 +712,114 @@ export default function Profile() {
                   </div>
                 ))}
               </div>
-              {profile.registeredEvents && profile.registeredEvents.length > 0 && (
-                <div className="profile-registered-events-card" style={{ background: '#f7f7f7', borderRadius: 12, padding: 16 }}>
-                  <div className="profile-registered-events-title" style={{ fontWeight: 700, color: '#234e7b', fontSize: 18, marginBottom: 10 }}>
-                    Events You're Registered In
+
+              {/* ── Registered Events ─────────────────────────────── */}
+              {(() => {
+                const allEvents = profile.registeredEvents || [];
+
+                // Filter
+                const filtered = historyFilter === "all"
+                  ? allEvents
+                  : allEvents.filter(e => {
+                      if (historyFilter === "attended") return e.attendanceStatus === "present";
+                      if (historyFilter === "absent") return e.attendanceStatus !== "present";
+                      return e.status === historyFilter;
+                    });
+
+                // Sort
+                const sorted = [...filtered].sort((a, b) => {
+                  if (historySort === "points") return (b.pointsEarned || 0) - (a.pointsEarned || 0);
+                  const da = a.targetDate ? new Date(a.targetDate) : new Date(0);
+                  const db2 = b.targetDate ? new Date(b.targetDate) : new Date(0);
+                  return historySort === "date_asc" ? da - db2 : db2 - da;
+                });
+
+                const statusMeta = {
+                  active:    { label: "Active",    bg: "#d1fae5", color: "#065f46" },
+                  published: { label: "Active",    bg: "#d1fae5", color: "#065f46" },
+                  completed: { label: "Completed", bg: "#dbeafe", color: "#1e40af" },
+                  cancelled: { label: "Cancelled", bg: "#fee2e2", color: "#991b1b" },
+                  unknown:   { label: "Unknown",   bg: "#f3f4f6", color: "#6b7280" },
+                };
+                const roleMeta = {
+                  participant:    { label: "Participant",     bg: "#f0fdf4", color: "#166534" },
+                  organizer:      { label: "Organizer",       bg: "#eff6ff", color: "#1d4ed8" },
+                  lead_organizer: { label: "Lead Organizer",  bg: "#faf5ff", color: "#6b21a8" },
+                  donor:          { label: "Donor",           bg: "#fff7ed", color: "#9a3412" },
+                };
+
+                return (
+                  <div className="peh-section">
+                    <div className="peh-header">
+                      <div className="peh-title">Events You've Joined <span className="peh-count">({allEvents.length})</span></div>
+                      <div className="peh-controls">
+                        <select className="peh-select" value={historyFilter} onChange={e => setHistoryFilter(e.target.value)}>
+                          <option value="all">All</option>
+                          <option value="active">Active</option>
+                          <option value="published">Published</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="attended">Attended ✓</option>
+                          <option value="absent">Absent</option>
+                        </select>
+                        <select className="peh-select" value={historySort} onChange={e => setHistorySort(e.target.value)}>
+                          <option value="date_desc">Newest first</option>
+                          <option value="date_asc">Oldest first</option>
+                          <option value="points">Most points</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {sorted.length === 0 ? (
+                      <div className="peh-empty">
+                        {allEvents.length === 0
+                          ? "You haven't joined any events yet. Explore missions to get started!"
+                          : "No events match the current filter."}
+                      </div>
+                    ) : (
+                      <div className="peh-grid">
+                        {sorted.map(ev => {
+                          const sm = statusMeta[ev.status] || statusMeta.unknown;
+                          const rm = roleMeta[ev.role] || { label: ev.role, bg: "#f3f4f6", color: "#374151" };
+                          const hasCert = certificates.some(c => c.eventId === ev.id || c.missionId === ev.id);
+                          const tasksTotal = ev.tasksDone?.length || 0;
+                          const tasksDone = ev.tasksDone?.filter(t => t.status === "done" || t.status === "completed").length || 0;
+                          return (
+                            <div className="peh-card" key={ev.id}>
+                              <div className="peh-card-top">
+                                <div className="peh-card-title">{ev.title}</div>
+                                <span className="peh-badge" style={{ background: sm.bg, color: sm.color }}>{sm.label}</span>
+                              </div>
+                              <div className="peh-card-row">
+                                <span className="peh-badge" style={{ background: rm.bg, color: rm.color }}>{rm.label}</span>
+                                {ev.attendanceStatus === "present"
+                                  ? <span className="peh-badge" style={{ background: "#d1fae5", color: "#065f46" }}>✓ Attended</span>
+                                  : ev.attendanceStatus === "absent"
+                                    ? <span className="peh-badge" style={{ background: "#fee2e2", color: "#991b1b" }}>✗ Absent</span>
+                                    : <span className="peh-badge" style={{ background: "#f3f4f6", color: "#9ca3af" }}>— Attendance pending</span>}
+                                {hasCert && <span className="peh-badge" style={{ background: "#fef9c3", color: "#854d0e" }}>🎓 Certificate</span>}
+                              </div>
+                              <div className="peh-card-stats">
+                                <span className="peh-stat">⭐ {ev.pointsEarned || 0} pts</span>
+                                {tasksTotal > 0 && <span className="peh-stat">✅ {tasksDone}/{tasksTotal} tasks</span>}
+                                {ev.targetDate && <span className="peh-stat">📅 {ev.targetDate instanceof Date ? ev.targetDate.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : ev.targetDate}</span>}
+                              </div>
+                              {ev.sdgs && ev.sdgs.length > 0 && (
+                                <div className="peh-sdgs">
+                                  {ev.sdgs.slice(0, 5).map(sdg => (
+                                    <span key={sdg} className="peh-sdg-dot" style={{ background: SDG_COLORS[sdg] || "#234e7b" }} title={`SDG ${sdg}`}>#{sdg}</span>
+                                  ))}
+                                  {ev.sdgs.length > 5 && <span className="peh-sdg-dot" style={{ background: "#94a3b8" }}>+{ev.sdgs.length - 5}</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    {profile.registeredEvents.map(event => (
-                      <span key={event.id} style={{ background: '#30bdb7', color: '#fff', padding: '6px 14px', borderRadius: 8, fontWeight: 600 }}>{event.title}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
 
@@ -710,102 +836,109 @@ export default function Profile() {
               return acc;
             }, {});
             const allSdgs = Object.keys(sdgCounts).map(k => Number(k));
-            const displayName = profile.username || (profile.email ? profile.email.split('@')[0] : 'Volunteer');
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div className="portfolio-tab">
+
                 {/* Export button */}
                 <div className="export-row">
                   <button onClick={exportToPDF} disabled={exporting} className={`profile-export-btn ${exporting ? 'disabled' : ''}`}>
-                    {exporting ? '⏳ Exporting...' : '⬇ Export PDF'}
+                    ⬇ Export PDF
                   </button>
-                  {exportError && (
-                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: 6 }}>{exportError}</div>
-                  )}
+                  {exportError && <div className="export-error">{exportError}</div>}
                 </div>
+
                 {/* Achievements */}
-                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                  <div className="card-title">Achievements <span className="muted-count">({rewards.length})</span></div>
-                  {rewards.length === 0 ? (
-                    <p style={{ color: '#aaa' }}>No achievements yet.</p>
-                  ) : (
-                    <div className="achievements-grid">
-                      {rewards.map(r => (
-                        <div key={r.id} title={r.description || r.name || r.id} className="achievement-card">
-                          <div className="achievement-icon">{r.icon || "🏅"}</div>
-                          <div className="achievement-name">{r.name || r.id}</div>
-                          {r.description && <div className="achievement-desc">{r.description}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="portfolio-section">
+                  <div className="card-title">🏅 Achievements <span className="muted-count">({rewards.length})</span></div>
+                  {rewards.length === 0
+                    ? <p className="muted-text">No achievements yet.</p>
+                    : (
+                      <div className="achievements-grid">
+                        {rewards.map(r => (
+                          <div key={r.id} title={r.description || r.name || r.id} className="achievement-card">
+                            <div className="achievement-icon">{r.icon || "🏅"}</div>
+                            <div className="achievement-name">{r.name || r.id}</div>
+                            {r.description && <div className="achievement-desc">{r.description}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                 </div>
 
                 {/* SDG Contributions */}
-                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                  <div className="card-title">SDG Contributions</div>
-                  {allSdgs.length === 0 ? (
-                    <p className="muted-text">No SDG contributions yet.</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {allSdgs.sort((a, b) => a - b).map(sdg => (
-                        <div key={sdg} style={{ background: SDG_COLORS[sdg] || '#234e7b', color: '#fff', borderRadius: 6, padding: '6px 12px', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontWeight: 800, color: '#fff' }}>#{sdg}</span>
-                          <span style={{ flex: '1 1 auto', color: '#fff' }}>{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
-                          <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 800, fontSize: 11 }}>{sdgCounts[sdg]}×</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="portfolio-section">
+                  <div className="card-title">🌍 SDG Contributions</div>
+                  {allSdgs.length === 0
+                    ? <p className="muted-text">No SDG contributions yet.</p>
+                    : (
+                      <div className="sdg-list">
+                        {allSdgs.sort((a, b) => a - b).map(sdg => (
+                          <div key={sdg} className="sdg-badge" style={{ background: SDG_COLORS[sdg] || '#234e7b' }}>
+                            <span className="sdg-index">#{sdg}</span>
+                            <span className="sdg-label">{SDG_LABELS[sdg] || `Goal ${sdg}`}</span>
+                            <span className="sdg-count">{sdgCounts[sdg]}×</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                 </div>
 
-                {/* Event Roles Summary */}
-                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                  <div className="card-title">Events by Role</div>
-                  {events.length === 0 ? (
-                    <p className="muted-text">No events joined yet.</p>
-                  ) : (
-                    <div className="events-list">
-                      {events.map(event => (
-                        <div key={event.id} className="event-card">
-                          <div className="event-card-row">
-                            <span className="event-title">{event.title}</span>
-                            <div className="event-meta">
-                              <span className="event-role">{event.role}</span>
-                              <span className="event-points">+{event.pointsEarned} pts</span>
+                {/* Events by Role */}
+                <div className="portfolio-section">
+                  <div className="card-title">📋 Events by Role</div>
+                  {events.length === 0
+                    ? <p className="muted-text">No events joined yet.</p>
+                    : (
+                      <div className="events-list">
+                        {events.map(event => (
+                          <div key={event.id} className="event-card">
+                            <div className="event-card-row">
+                              <span className="event-title">{event.title}</span>
+                              <div className="event-meta">
+                                <span className="event-role">{event.role}</span>
+                                <span className="event-points">+{event.pointsEarned} pts</span>
+                              </div>
                             </div>
-                          </div>
-                          {event.tasksDone && event.tasksDone.length > 0 && (
-                            <div className="event-tasks">
-                              {event.tasksDone.map(t => (
-                                <div key={t.id} className="event-task-row">
-                                  <div className="task-left">
-                                    <span className="task-title">{t.title}</span>
-                                    <span className="task-status">· {t.status}</span>
+                            {event.tasksDone && event.tasksDone.length > 0 && (
+                              <div className="event-tasks">
+                                {event.tasksDone.map(t => (
+                                  <div key={t.id} className="event-task-row">
+                                    <div className="task-left">
+                                      <span className="task-dot" style={{
+                                        background: t.status === 'done' || t.status === 'completed' ? '#10b981' : '#d1d5db'
+                                      }} />
+                                      <span className="task-title">{t.title}</span>
+                                    </div>
+                                    <div className="task-right">
+                                      <span className={`task-status-badge task-status-${t.status}`}>{t.status}</span>
+                                      {t.pointsEarned > 0 && <span className="task-points">+{t.pointsEarned} pts</span>}
+                                    </div>
                                   </div>
-                                  <div className="task-points">+{t.pointsEarned} pts</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                 </div>
-                {/* Certificates Container */}
-                <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                  <div className="card-title">Certificates</div>
-                  {certificates.length === 0 ? (
-                    <p className="muted-text">No certificates yet.</p>
-                  ) : (
-                    <div className="certificates-list">
-                      {certificates.map(cert => (
-                        <div key={cert.id} className="certificate-card" style={{ marginBottom: 16, padding: 12, border: '1px solid #eee', borderRadius: 8 }}>
-                          <div style={{ color: '#1a3764', fontWeight: 700 }}>{cert.course}</div>
-                          <div style={{ color: '#000' }}>Recipient: {cert.recipient}</div>
-                          <div style={{ color: '#000' }}>Date: {cert.date}</div>
-                          <a href={cert.downloadURL} target="_blank" rel="noopener noreferrer" style={{ color: '#1a3764', fontWeight: 600 }}>View Certificate</a>
-                        </div>
+
+                {/* Certificates */}
+                <div className="portfolio-section">
+                  <div className="card-title">🎓 Certificates</div>
+                  {certificates.length === 0
+                    ? <p className="muted-text">No certificates yet.</p>
+                    : (
+                      <div className="certificates-list">
+                        {certificates.map(cert => (
+                          <div key={cert.id} className="certificate-card">
+                            <div className="cert-icon">🎓</div>
+                            <div className="cert-body">
+                              <div className="cert-course">{cert.course}</div>
+                              <div className="cert-meta">{cert.recipient} &middot; {cert.date}</div>
+                            </div>
+                            <a href={cert.downloadURL} target="_blank" rel="noopener noreferrer" className="cert-link">View ↗</a>
+                          </div>
                       ))}
                     </div>
                   )}
