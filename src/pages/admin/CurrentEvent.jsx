@@ -152,6 +152,15 @@ export default function CurrentEvent() {
   const [closingEvent, setClosingEvent]     = useState(false);
   const [togglingFeedback, setTogglingFeedback] = useState(false);
 
+  // ── location picker state ─────────────────────────────────────────
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [pickerCoords, setPickerCoords]             = useState(null); // { lat, lng }
+  const [pickerAddress, setPickerAddress]           = useState("");
+  const [pickerSaving, setPickerSaving]             = useState(false);
+  const mapDivRef    = useRef(null);
+  const gmapRef      = useRef(null);
+  const gmapMarkerRef = useRef(null);
+
   // ── load published missions with live volunteer counts ────────────
   useEffect(() => {
     if (missionId) return;
@@ -514,12 +523,128 @@ export default function CurrentEvent() {
     );
   };
 
+  // Generate QR at a manually picked location
+  const generateAttendanceQRAtLocation = async (lat, lng, address) => {
+    setPickerSaving(true);
+    try {
+      const newTimestamp = Date.now();
+      const qrLocation = { lat, lng, accuracy: 0 };
+      const payload = { validQRTimestamp: newTimestamp, qrLocation, updatedAt: serverTimestamp() };
+      if (address) payload.qrLocationName = address;
+      await updateDoc(doc(db, "missions", missionId), payload);
+      const refreshed = await getDoc(doc(db, "missions", missionId));
+      if (refreshed.exists()) setMissionData({ id: refreshed.id, ...refreshed.data() });
+      setShowLocationPicker(false);
+    } catch (_) {
+      showToast("Failed to save location. Try again.");
+    } finally {
+      setPickerSaving(false);
+    }
+  };
+
+  // Initialise Google Maps inside the picker modal
+  const initLocationPickerMap = () => {
+    if (!mapDivRef.current) return;
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) { showToast("Google Maps API key not configured."); return; }
+
+    const initMap = (center) => {
+      const map = new window.google.maps.Map(mapDivRef.current, {
+        center,
+        zoom: 17,
+        disableDefaultUI: false,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      });
+      const marker = new window.google.maps.Marker({
+        position: center,
+        map,
+        draggable: true,
+        title: "Drag to set location",
+      });
+      gmapRef.current = map;
+      gmapMarkerRef.current = marker;
+      setPickerCoords({ lat: center.lat, lng: center.lng });
+
+      const updateAddress = async (lat, lng) => {
+        try {
+          const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`);
+          if (r.ok) {
+            const j = await r.json();
+            setPickerAddress(j.results?.[0]?.formatted_address ?? "");
+          }
+        } catch (_) { setPickerAddress(""); }
+      };
+
+      updateAddress(center.lat, center.lng);
+
+      marker.addListener("dragend", (e) => {
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        setPickerCoords({ lat, lng });
+        updateAddress(lat, lng);
+      });
+
+      map.addListener("click", (e) => {
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        marker.setPosition(e.latLng);
+        setPickerCoords({ lat, lng });
+        updateAddress(lat, lng);
+      });
+    };
+
+    const loadAndInit = (center) => {
+      if (window.google?.maps) { initMap(center); return; }
+      const scriptId = "gmap-picker-script";
+      if (!document.getElementById(scriptId)) {
+        const s = document.createElement("script");
+        s.id = scriptId;
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+        s.async = true;
+        s.onload = () => initMap(center);
+        document.head.appendChild(s);
+      } else {
+        // script tag exists but maps not ready yet — poll briefly
+        const poll = setInterval(() => {
+          if (window.google?.maps) { clearInterval(poll); initMap(center); }
+        }, 100);
+      }
+    };
+
+    const existingLoc = missionData?.qrLocation;
+    if (existingLoc?.lat && existingLoc?.lng) {
+      loadAndInit({ lat: existingLoc.lat, lng: existingLoc.lng });
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => loadAndInit({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        ()    => loadAndInit({ lat: 14.5995, lng: 120.9842 }), // fallback: Manila
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      loadAndInit({ lat: 14.5995, lng: 120.9842 });
+    }
+  };
+
   const getAttendanceQRValue = () =>
     JSON.stringify({
       eventId: missionId,
-      expiresAt: Date.now() + 30 * 60 * 1000,
       location: missionData?.qrLocation ?? null,
     });
+
+  // Init map when picker modal opens
+  useEffect(() => {
+    if (!showLocationPicker) return;
+    // reset state from last open
+    setPickerCoords(null);
+    setPickerAddress("");
+    gmapRef.current = null;
+    gmapMarkerRef.current = null;
+    // defer so the modal div is in the DOM
+    const t = setTimeout(() => initLocationPickerMap(), 80);
+    return () => clearTimeout(t);
+  }, [showLocationPicker]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCloseEvent = async () => {
     // Decide cancelled vs completed based on whether today is before the target date
@@ -1067,6 +1192,67 @@ export default function CurrentEvent() {
           )
         )}
 
+        {/* ── Location Picker Modal ── */}
+        {showLocationPicker && (
+          <div
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center" }}
+            onClick={() => setShowLocationPicker(false)}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: "#fff", borderRadius: 18, width: "min(520px, 96vw)", boxShadow: "0 8px 40px rgba(0,0,0,0.26)", overflow: "hidden", display: "flex", flexDirection: "column" }}
+            >
+              {/* header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #e5e7eb" }}>
+                <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#1e293b" }}>📍 Pick Attendance Location</h3>
+                <button onClick={() => setShowLocationPicker(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748b", lineHeight: 1 }}>✕</button>
+              </div>
+              {/* hint */}
+              <div style={{ padding: "8px 18px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: "0.78rem", color: "#475569" }}>
+                Click on the map or drag the marker to set the QR attendance location.
+              </div>
+              {/* map */}
+              <div
+                ref={mapDivRef}
+                style={{ width: "100%", height: 320 }}
+              />
+              {/* selected address */}
+              <div style={{ padding: "10px 18px", borderTop: "1px solid #e5e7eb", fontSize: "0.8rem", color: "#334155", minHeight: 36, display: "flex", alignItems: "center", gap: 6 }}>
+                {pickerCoords ? (
+                  <>
+                    <span>📍</span>
+                    <span style={{ flex: 1 }}>{pickerAddress || `${pickerCoords.lat.toFixed(6)}, ${pickerCoords.lng.toFixed(6)}`}</span>
+                  </>
+                ) : (
+                  <span style={{ color: "#94a3b8" }}>No location selected yet.</span>
+                )}
+              </div>
+              {/* actions */}
+              <div style={{ display: "flex", gap: 8, padding: "12px 18px", borderTop: "1px solid #e5e7eb" }}>
+                <button
+                  onClick={() => setShowLocationPicker(false)}
+                  style={{ flex: 1, padding: "10px 0", background: "#f1f5f9", color: "#334155", border: "none", borderRadius: 9, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={!pickerCoords || pickerSaving}
+                  onClick={() => pickerCoords && generateAttendanceQRAtLocation(pickerCoords.lat, pickerCoords.lng, pickerAddress)}
+                  style={{
+                    flex: 2, padding: "10px 0",
+                    background: (!pickerCoords || pickerSaving) ? "#9ca3af" : "#234e7b",
+                    color: "#fff", border: "none", borderRadius: 9,
+                    fontWeight: 700, fontSize: "0.85rem",
+                    cursor: (!pickerCoords || pickerSaving) ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {pickerSaving ? "Saving…" : "Use This Location & Generate QR"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Attendance QR Modal ── */}
         {showAttQR && (
           <div
@@ -1093,13 +1279,13 @@ export default function CurrentEvent() {
                       </div>
                     )}
                     <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: "0 0 18px 0" }}>
-                      Valid 30 min from generation · Students must be within 200 m of pinned location.
+                      Students must be within 200 m of the pinned location to scan.
                     </p>
                   </>
                 ) : (
                   <div style={{ padding: "20px 0 24px", color: "#64748b" }}>
                     <div style={{ fontSize: "3rem", marginBottom: 10 }}>📱</div>
-                    <p style={{ margin: 0, fontSize: "0.88rem" }}>No QR generated yet.<br />Generate one at your current location.</p>
+                    <p style={{ margin: 0, fontSize: "0.88rem" }}>No QR generated yet.<br />Use your current location or pick one on the map.</p>
                   </div>
                 )}
                 <button
@@ -1113,7 +1299,20 @@ export default function CurrentEvent() {
                     cursor: qrGenerating ? "not-allowed" : "pointer",
                   }}
                 >
-                  {qrGenerating ? "Getting location…" : missionData?.validQRTimestamp ? "Regenerate QR (update location)" : "Generate Attendance QR"}
+                  {qrGenerating ? "Getting location…" : missionData?.validQRTimestamp ? "📍 Use My Current Location" : "📍 Use My Current Location"}
+                </button>
+                <button
+                  disabled={qrGenerating}
+                  onClick={() => { setShowAttQR(false); setShowLocationPicker(true); }}
+                  style={{
+                    width: "100%", marginTop: 8, padding: "11px 0",
+                    background: "#e0f2fe", color: "#0369a1",
+                    border: "none", borderRadius: 10,
+                    fontWeight: 700, fontSize: "0.9rem",
+                    cursor: qrGenerating ? "not-allowed" : "pointer",
+                  }}
+                >
+                  🗺 Pick Location on Map
                 </button>
                 {missionData?.validQRTimestamp && (
                   <button

@@ -124,11 +124,6 @@ export default function EventActivity() {
         setQRStatus("This QR code is not valid for this event.");
         return;
       }
-      if (Date.now() > parsed.expiresAt) {
-        setQRStatus("QR code has expired.");
-        return;
-      }
-
       // Location proximity check — only if QR has embedded location
       if (parsed.location && position?.coords) {
         const dist = getDistanceMeters(

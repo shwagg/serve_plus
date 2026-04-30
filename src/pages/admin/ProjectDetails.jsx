@@ -191,10 +191,8 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
     });
   };
   const generateQRValue = () => {
-    const expiresAt = Date.now() + (30 * 60 * 1000); // After 30 minutes
     return JSON.stringify({
       eventId: projectId,
-      expiresAt,
       location: project?.qrLocation ?? null
     });
   };
