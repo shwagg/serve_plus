@@ -6,7 +6,6 @@ import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { useSession } from '../context/SessionContext';
 import './Header.css';
-import menuIcon from '../assets/headassets/Menu Icon.svg';
 import NotificationBell from './NotificationBell';
 import serveIcon from '../assets/serve_plus_logo.svg';
 import StudentMenu from './menu/StudentMenu';
@@ -218,33 +217,27 @@ export default function Header() {
           <div className="header-actions">
             <ChatModal />
             <NotificationBell />
-            {userRole && (
-              <button
-                className="icon-button profile-btn"
-                onClick={() => navigate('/profile')}
-                aria-label="My Profile"
-                title={userName || 'Profile'}
-              >
-                {userAvatar ? (
-                  <img src={userAvatar} alt="Profile" className="header-avatar" />
-                ) : (
-                  <div className="header-avatar-initials">
-                    {(() => {
-                      const parts = (userName || '?').trim().split(/\s+/);
-                      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-                      return (userName?.slice(0, 2) || '?').toUpperCase();
-                    })()}
-                  </div>
-                )}
-              </button>
-            )}
             <div className="menu-container" ref={menuRef}>
-              <button
-                className="icon-button menu-button"
-                aria-label="Menu"
-                onClick={() => setShowMenu(!showMenu)}>
-                <img src={menuIcon} alt="Menu" width="24" height="24" />
-              </button>
+              {userRole && (
+                <button
+                  className="icon-button profile-btn"
+                  aria-label="Menu"
+                  title={userName || 'Profile'}
+                  onClick={() => setShowMenu(!showMenu)}
+                >
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="Profile" className="header-avatar" />
+                  ) : (
+                    <div className="header-avatar-initials">
+                      {(() => {
+                        const parts = (userName || '?').trim().split(/\s+/);
+                        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+                        return (userName?.slice(0, 2) || '?').toUpperCase();
+                      })()}
+                    </div>
+                  )}
+                </button>
+              )}
               {showMenu && renderMenu()}
             </div>
           </div>

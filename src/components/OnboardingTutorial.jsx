@@ -16,7 +16,7 @@ const STEPS = [
   {
     icon: '✅',
     title: 'Join a Mission',
-    body: "Click on any mission to see its full details, then hit 'Join Mission' to enroll. You'll be notified once your request is reviewed.",
+    body: "Click on any mission to see its full details, then hit 'Join Mission' to enroll.",
   },
   {
     icon: '📝',
