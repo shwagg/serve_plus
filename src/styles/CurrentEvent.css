@@ -1,4 +1,46 @@
 
+/* ── Instant tooltips ───────────────────────────────────────────────── */
+.ce-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ce-tooltip {
+  pointer-events: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #f9fafb;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.45;
+  padding: 7px 11px;
+  border-radius: 7px;
+  white-space: normal;
+  width: 230px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  opacity: 0;
+  transition: opacity 0s;
+  z-index: 100;
+}
+
+.ce-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: #1f2937;
+}
+
+.ce-tooltip-wrap:hover .ce-tooltip {
+  opacity: 1;
+}
+
 /* ── Live participant count ──────────────────────────────────────────── */
 .ce-live-count {
   display: flex;

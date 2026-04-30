@@ -734,18 +734,21 @@ export default function CurrentEvent() {
               ? "🔓 Close Feedback Form"
               : "🔒 Open Feedback Form"}
           </button>
-          <button
-            onClick={handleFlagThisEvent}
-            disabled={flagging}
-            style={{
-              padding: "9px 16px",
-              background: flagging ? "#9ca3af" : "#b45309",
-              color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
-              fontSize: "0.85rem", cursor: flagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-            }}
-          >
-            {flagging ? "Flagging…" : "🚩 Flag Absent"}
-          </button>
+          <div className="ce-tooltip-wrap">
+            <button
+              onClick={handleFlagThisEvent}
+              disabled={flagging}
+              style={{
+                padding: "9px 16px",
+                background: flagging ? "#9ca3af" : "#b45309",
+                color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
+                fontSize: "0.85rem", cursor: flagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+              }}
+            >
+              {flagging ? "Flagging…" : "🚩 Flag Absent Volunteers"}
+            </button>
+            <span className="ce-tooltip">Marks volunteers who missed attendance in this event. Flagged volunteers cannot join new missions for {FLAG_DURATION_DAYS} days.</span>
+          </div>
           <button
             onClick={handleCloseEvent}
             disabled={closingEvent}
@@ -1214,29 +1217,34 @@ export default function CurrentEvent() {
               className="search-input"
             />
           </div>
-          <button
-            onClick={() => { setShowFlaggedModal(true); fetchFlaggedStudents(); }}
-            style={{
-              padding: "7px 14px", background: "#1d4ed8", color: "#fff",
-              border: "none", borderRadius: 8, fontWeight: 700,
-              fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap",
-            }}
-          >
-            📄 Flagged Volunteers
-          </button>
-          <button
-            onClick={handleFlagAllEvents}
-            disabled={globalFlagging}
-            title="Scans every past event — may take a while"
-            style={{
-              padding: "7px 14px",
-              background: globalFlagging ? "#9ca3af" : "#b91c1c",
-              color: "#fff", border: "none", borderRadius: 8, fontWeight: 700,
-              fontSize: "0.82rem", cursor: globalFlagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-            }}
-          >
-            {globalFlagging ? "Flagging..." : "🚩 Flag All"}
-          </button>
+          <div className="ce-tooltip-wrap">
+            <button
+              onClick={() => { setShowFlaggedModal(true); fetchFlaggedStudents(); }}
+              style={{
+                padding: "7px 14px", background: "#1d4ed8", color: "#fff",
+                border: "none", borderRadius: 8, fontWeight: 700,
+                fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap",
+              }}
+            >
+              📄 View Flagged Absent Volunteers
+            </button>
+            <span className="ce-tooltip">Shows a list of all volunteers currently flagged for absence. You can manually remove flags from here.</span>
+          </div>
+          <div className="ce-tooltip-wrap">
+            <button
+              onClick={handleFlagAllEvents}
+              disabled={globalFlagging}
+              style={{
+                padding: "7px 14px",
+                background: globalFlagging ? "#9ca3af" : "#b91c1c",
+                color: "#fff", border: "none", borderRadius: 8, fontWeight: 700,
+                fontSize: "0.82rem", cursor: globalFlagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+              }}
+            >
+              {globalFlagging ? "Flagging..." : "🚩 Flag Absent — All Events"}
+            </button>
+            <span className="ce-tooltip">Scans every past event and flags volunteers who missed attendance. This may take a while.</span>
+          </div>
         </div>
       </div>
 
@@ -1296,7 +1304,7 @@ export default function CurrentEvent() {
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0, fontSize: "1.1rem" }}>🚩 Flagged Volunteers</h3>
+              <h3 style={{ margin: 0, fontSize: "1.1rem" }}>🚩 Flagged Absent Volunteers</h3>
               <button
                 onClick={() => setShowFlaggedModal(false)}
                 style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}
