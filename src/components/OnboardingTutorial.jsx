@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { auth } from '../firebaseConfig';
+import { SessionContext } from '../context/SessionContext';
 import './OnboardingTutorial.css';
 
 const STEPS = [
@@ -36,6 +37,7 @@ const STEPS = [
 ];
 
 export default function OnboardingTutorial() {
+  const { userData } = useContext(SessionContext);
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
 
@@ -50,6 +52,10 @@ export default function OnboardingTutorial() {
     });
     return () => unsub();
   }, []);
+
+  // Only show for students/volunteers
+  const role = userData?.role;
+  if (role && role !== 'student') return null;
 
   const dismiss = () => {
     const user = auth.currentUser;
