@@ -1,3 +1,9 @@
+// Restore CheckBadge for consent/attendance columns
+function CheckBadge({ ok }) {
+  return ok
+    ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Done</span>
+    : <span style={{ color: "#9ca3af" }}>—</span>;
+}
 import {
   collection, getDocs, getDoc, doc, updateDoc, addDoc,
   query, where, serverTimestamp, Timestamp, onSnapshot,
@@ -91,9 +97,13 @@ function DetailField({ label, value }) {
   );
 }
 
-function CheckBadge({ ok }) {
+
+
+
+// View button for survey answers
+function ViewSurveyButton({ ok, label, answers, onView }) {
   return ok
-    ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Done</span>
+    ? <button style={{ color: "#2563eb", background: "none", border: "none", textDecoration: "underline", cursor: "pointer", fontWeight: 600, fontSize: "0.93rem" }} onClick={onView}>View</button>
     : <span style={{ color: "#9ca3af" }}>—</span>;
 }
 
@@ -113,6 +123,16 @@ function MetaItem({ icon, label, value }) {
 
 // ── main component ────────────────────────────────────────────────────
 export default function CurrentEvent() {
+    // Survey modal state (must be before return)
+    const [showSurveyModal, setShowSurveyModal] = useState(false);
+    const [surveyModalType, setSurveyModalType] = useState(null); // 'pre' or 'post'
+    const [surveyModalVolunteer, setSurveyModalVolunteer] = useState(null);
+
+    function handleViewSurvey(type, volunteer) {
+      setSurveyModalType(type);
+      setSurveyModalVolunteer(volunteer);
+      setShowSurveyModal(true);
+    }
   const { missionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -281,23 +301,46 @@ export default function CurrentEvent() {
         const userDoc = await getDoc(doc(db, "users", userId));
         const uData = userDoc.exists() ? userDoc.data() : {};
 
-        let preSurvey = false, postSurvey = false;
+        // Fetch Pre-Survey answers
+        let preSurvey = false;
+        let preSurveyAnswers = null;
         try {
           const preDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "preSurvey", "response"));
           preSurvey = preDoc.exists();
+          preSurveyAnswers = preDoc.exists() ? preDoc.data() : null;
         } catch (_) {}
+
+        // Fetch Uploaded Consent (assume file metadata is stored in consentUpload field or similar)
+        let consentUploaded = false;
+        let consentFile = null;
+        try {
+          // If consent upload is a subcollection or field, adjust accordingly
+          if (vData.progress?.consent === "submitted") {
+            consentUploaded = true;
+            consentFile = vData.consentSubmission?.fileUrl || null;
+          }
+        } catch (_) {}
+
+        // Fetch Post-Survey answers
+        let postSurvey = false;
+        let postSurveyAnswers = null;
         try {
           const postDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "postSurvey", "response"));
           postSurvey = postDoc.exists();
+          postSurveyAnswers = postDoc.exists() ? postDoc.data() : null;
         } catch (_) {}
 
         return {
           id: userId,
           name: uData.name || "Unknown",
           preSurvey,
+          preSurveyAnswers,
           consent: vData.progress?.consent === "submitted",
+          consentUploaded,
+          consentFile,
           attendance: vData.progress?.attendance === "present",
           postSurvey,
+          postSurveyAnswers,
         };
       }));
 
@@ -1129,68 +1172,178 @@ export default function CurrentEvent() {
           ) : docLibVolunteers.length === 0 ? (
             <div className="empty-label">No volunteers have joined yet.</div>
           ) : (
-            <div style={{ overflowX: "auto", width: "100%" }}>
-              {/* Community feedback summary */}
-              {missionData?.feedback?.isActive === false && missionData.feedback.avgRating ? (
-                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 16px", marginBottom: 14, display: "flex", flexWrap: "wrap", gap: "10px 24px", alignItems: "center" }}>
-                  <span style={{ fontWeight: 700, color: "#15803d", fontSize: "0.85rem" }}>✓ Community Feedback Closed</span>
-                  <span style={{ fontSize: "0.82rem", color: "#374151" }}>
-                    Avg. Rating: <b>{missionData.feedback.avgRating}/5</b>
-                  </span>
-                  {missionData.feedback.multiplier != null && (
+            <>
+              <div style={{ overflowX: "auto", width: "100%" }}>
+                {/* Community feedback summary */}
+                {missionData?.feedback?.isActive === false && missionData.feedback.avgRating ? (
+                  <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 16px", marginBottom: 14, display: "flex", flexWrap: "wrap", gap: "10px 24px", alignItems: "center" }}>
+                    <span style={{ fontWeight: 700, color: "#15803d", fontSize: "0.85rem" }}>✓ Community Feedback Closed</span>
                     <span style={{ fontSize: "0.82rem", color: "#374151" }}>
-                      Grade Multiplier: <b>×{missionData.feedback.multiplier}</b>
+                      Avg. Rating: <b>{missionData.feedback.avgRating}/5</b>
                     </span>
-                  )}
-                  {missionData.points && missionData.feedback.multiplier != null && (
-                    <span style={{ fontSize: "0.82rem", color: "#374151" }}>
-                      Final Score per Volunteer: <b>{(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts</b>
-                    </span>
-                  )}
-                </div>
-              ) : !missionData?.feedback?.isActive && !missionData?.feedback?.avgRating ? (
-                <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: "0.82rem", color: "#92400e" }}>
-                  ⚠️ Community feedback form is not yet closed. Open and close the form to compute grades.
-                </div>
-              ) : null}
-              <p style={{ fontSize: "0.82rem", color: "#64748b", marginBottom: 12 }}>
-                Submission status per volunteer. ✓ = submitted / marked present.
-              </p>
-              <table className="admin-table" style={{ minWidth: 560 }}>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Pre-Survey</th>
-                    <th>Consent</th>
-                    <th>Attendance</th>
-                    <th>Post-Survey</th>
-                    {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && <th>Grade</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {docLibVolunteers.map(v => (
-                    <tr key={v.id}>
-                      <td style={{ fontWeight: 600 }}>{v.name}</td>
-                      <td><CheckBadge ok={v.preSurvey} /></td>
-                      <td><CheckBadge ok={v.consent} /></td>
-                      <td><CheckBadge ok={v.attendance} /></td>
-                      <td><CheckBadge ok={v.postSurvey} /></td>
-                      {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && (
-                        <td>
-                          {v.attendance && missionData.feedback.multiplier != null && missionData.points
-                            ? <span style={{ color: "#15803d", fontWeight: 700 }}>
-                                {(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts
-                              </span>
-                            : <span style={{ color: "#9ca3af" }}>—</span>}
-                        </td>
-                      )}
+                    {missionData.feedback.multiplier != null && (
+                      <span style={{ fontSize: "0.82rem", color: "#374151" }}>
+                        Grade Multiplier: <b>×{missionData.feedback.multiplier}</b>
+                      </span>
+                    )}
+                    {missionData.points && missionData.feedback.multiplier != null && (
+                      <span style={{ fontSize: "0.82rem", color: "#374151" }}>
+                        Final Score per Volunteer: <b>{(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts</b>
+                      </span>
+                    )}
+                  </div>
+                ) : !missionData?.feedback?.isActive && !missionData?.feedback?.avgRating ? (
+                  <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: "0.82rem", color: "#92400e" }}>
+                    ⚠️ Community feedback form is not yet closed. Open and close the form to compute grades.
+                  </div>
+                ) : null}
+                <p style={{ fontSize: "0.82rem", color: "#64748b", marginBottom: 12 }}>
+                  Submission status per volunteer. ✓ = submitted / marked present.
+                </p>
+                <table className="admin-table" style={{ minWidth: 560 }}>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Pre-Survey</th>
+                      <th>Consent</th>
+                      <th>Attendance</th>
+                      <th>Post-Survey</th>
+                      {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && <th>Grade</th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {docLibVolunteers.map(v => (
+                      <tr key={v.id}>
+                        <td style={{ fontWeight: 600 }}>{v.name}</td>
+                        <td>
+                          <ViewSurveyButton ok={v.preSurvey} label="Pre-Survey" answers={v.preSurveyAnswers} onView={() => handleViewSurvey("pre", v)} />
+                        </td>
+                        <td>
+                          {v.consent && v.consentFile
+                            ? <button style={{ color: "#2563eb", background: "none", border: "none", textDecoration: "underline", cursor: "pointer", fontWeight: 600, fontSize: "0.93rem" }} onClick={() => window.open(v.consentFile, "_blank")}>View</button>
+                            : v.consent
+                              ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Done</span>
+                              : <span style={{ color: "#9ca3af" }}>—</span>
+                          }
+                        </td>
+                        <td><CheckBadge ok={v.attendance} /></td>
+                        <td>
+                          <ViewSurveyButton ok={v.postSurvey} label="Post-Survey" answers={v.postSurveyAnswers} onView={() => handleViewSurvey("post", v)} />
+                        </td>
+                        {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && (
+                          <td>
+                            {v.attendance && missionData.feedback.multiplier != null && missionData.points
+                              ? <span style={{ color: "#15803d", fontWeight: 700 }}>
+                                  {(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts
+                                </span>
+                              : <span style={{ color: "#9ca3af" }}>—</span>}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Survey Modal */}
+              {showSurveyModal && (
+                <div
+                  style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  onClick={() => setShowSurveyModal(false)}
+                >
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    style={{ background: "#fff", borderRadius: 12, padding: 28, width: "min(600px, 95vw)", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.2)", position: "relative", color: "#000" }}
+                  >
+                    <button
+                      style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#23335b" }}
+                      onClick={() => setShowSurveyModal(false)}
+                    >×</button>
+                    <h2 style={{ textAlign: "center", marginBottom: 24, color: "#000" }}>
+                      {surveyModalType === "pre" ? "Pre-Activity" : "Post-Activity"} Survey Answers{surveyModalVolunteer?.name ? ` - ${surveyModalVolunteer.name}` : ""}
+                    </h2>
+                    {surveyModalVolunteer && surveyModalVolunteer[`${surveyModalType}SurveyAnswers`] ? (
+                      <div style={{ maxWidth: 560, margin: "0 auto" }}>
+                        {surveyModalType === "pre" ? (
+                          <div>
+                            <h3 style={{ fontWeight: 700, color: "#23235b", fontSize: "1.08rem", marginBottom: 18 }}>Pre-Activity Survey</h3>
+                            <div style={{ marginBottom: 12 }}><b>Name:</b> {surveyModalVolunteer.preSurveyAnswers?.respondent?.name || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {surveyModalVolunteer.preSurveyAnswers?.respondent?.college || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Program:</b> {surveyModalVolunteer.preSurveyAnswers?.respondent?.program || ""}</div>
+                            {surveyModalVolunteer.preSurveyAnswers?.respondent?.college === "Non-Academic Organization" && (
+                              <div style={{ marginBottom: 12 }}><b>Organization Name:</b> {surveyModalVolunteer.preSurveyAnswers?.respondent?.nonAcademicOrg || ""}</div>
+                            )}
+                            <div style={{ marginBottom: 12 }}><b>Type of Engagement:</b> {surveyModalVolunteer.preSurveyAnswers?.engagement?.type || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Title of Initiative:</b> {surveyModalVolunteer.preSurveyAnswers?.engagement?.initiativeTitle || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Type/Level of Participation:</b> {(surveyModalVolunteer.preSurveyAnswers?.engagement?.participation || []).join(", ")}{surveyModalVolunteer.preSurveyAnswers?.engagement?.participationOther ? `, Other: ${surveyModalVolunteer.preSurveyAnswers.engagement.participationOther}` : ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Previous Community Service Experience:</b> {surveyModalVolunteer.preSurveyAnswers?.background?.previousService || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Frequency of Community Service:</b> {surveyModalVolunteer.preSurveyAnswers?.background?.frequency || ""}</div>
+                            <div style={{ marginTop: 24, marginBottom: 8, fontWeight: 600 }}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
+                            <ol style={{ paddingLeft: 18 }}>
+                              {[
+                                "There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.",
+                                "Volunteer work along with teamwork would somehow help solve social problems.",
+                                "People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.",
+                                "I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.",
+                                "Contributing and improving skills I\u2019ve learned from my degree program or affiliation would somehow solve social problems.",
+                                "I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.",
+                                "I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.",
+                                "I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can."
+                              ].map((q, idx) => (
+                                <li key={idx} style={{ marginBottom: 6 }}>
+                                  <span>{q}</span><br />
+                                  <span style={{ color: "#30bdb7", fontWeight: 600 }}>Answer: {surveyModalVolunteer.preSurveyAnswers?.likert?.[`q${idx + 1}`]}</span>
+                                </li>
+                              ))}
+                            </ol>
+                          </div>
+                        ) : (
+                          <div>
+                            <h3 style={{ fontWeight: 700, color: "#23235b", fontSize: "1.08rem", marginBottom: 18 }}>Post-Activity Survey</h3>
+                            <div style={{ marginBottom: 12 }}><b>Name:</b> {surveyModalVolunteer.postSurveyAnswers?.respondent?.name || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {surveyModalVolunteer.postSurveyAnswers?.respondent?.college || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Program:</b> {surveyModalVolunteer.postSurveyAnswers?.respondent?.program || ""}</div>
+                            {surveyModalVolunteer.postSurveyAnswers?.respondent?.college === "Non-Academic Organization" && (
+                              <div style={{ marginBottom: 12 }}><b>Organization Name:</b> {surveyModalVolunteer.postSurveyAnswers?.respondent?.nonAcademicOrg || ""}</div>
+                            )}
+                            <div style={{ marginBottom: 12 }}><b>Type of Engagement:</b> {surveyModalVolunteer.postSurveyAnswers?.engagement?.type || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Title of Initiative:</b> {surveyModalVolunteer.postSurveyAnswers?.engagement?.initiativeTitle || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Date of Implementation:</b> {surveyModalVolunteer.postSurveyAnswers?.engagement?.dateOfImplementation || ""}</div>
+                            <div style={{ marginBottom: 12 }}><b>Location/Venue:</b> {surveyModalVolunteer.postSurveyAnswers?.engagement?.location || ""}</div>
+                            <div style={{ marginTop: 24, marginBottom: 8, fontWeight: 600 }}>Please indicate how much you agree with each statement (1=Strongly Disagree, 5=Strongly Agree):</div>
+                            <ol style={{ paddingLeft: 18 }}>
+                              {[
+                                "The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.",
+                                "The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.",
+                                "Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.",
+                                "Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.",
+                                "The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.",
+                                "I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.",
+                                "I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.",
+                                "I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity."
+                              ].map((q, idx) => (
+                                <li key={idx} style={{ marginBottom: 6 }}>
+                                  <span>{q}</span><br />
+                                  <span style={{ color: "#30bdb7", fontWeight: 600 }}>Answer: {surveyModalVolunteer.postSurveyAnswers?.likert?.[`q${idx + 1}`]}</span>
+                                </li>
+                              ))}
+                            </ol>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: "center", color: "#888" }}>No answers found.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )
         )}
+
+
+
+
 
         {/* ── Location Picker Modal ── */}
         {showLocationPicker && (
