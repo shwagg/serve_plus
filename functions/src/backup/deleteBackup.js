@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
+const { deleteArchivedStorageFiles } = require("./storageArchive");
 
 //Deletes a specific backup (both metadata and storage file).
 const deleteBackup = async (request) => {
@@ -40,6 +41,10 @@ const deleteBackup = async (request) => {
     const [exists] = await file.exists();
     if (exists) {
       await file.delete();
+    }
+
+    if (backupMeta.storageArchivePrefix) {
+      await deleteArchivedStorageFiles(bucket, backupMeta.storageArchivePrefix);
     }
   } catch (err) {
     // Continue even if storage deletion fails
