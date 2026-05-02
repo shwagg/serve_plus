@@ -15,10 +15,11 @@ const restoreBackup = async (request) => {
   }
 
   const callerDoc = await db.collection("users").doc(callerUid).get();
-  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+  const callerRole = callerDoc.data()?.role;
+  if (!callerDoc.exists || callerRole !== "sysadmin") {
     throw new HttpsError(
       "permission-denied",
-      "Only administrators can restore backups.",
+      "Only system administrators can restore backups.",
     );
   }
 

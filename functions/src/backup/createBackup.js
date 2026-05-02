@@ -21,10 +21,11 @@ const createBackup = async (request) => {
     console.error("Error fetching caller doc:", err);
     throw new HttpsError("internal", "Failed to verify user role.");
   }
-  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+  const callerRole = callerDoc.data()?.role;
+  if (!callerDoc.exists || callerRole !== "sysadmin") {
     throw new HttpsError(
       "permission-denied",
-      "Only administrators can create backups.",
+      "Only system administrators can create backups.",
     );
   }
 

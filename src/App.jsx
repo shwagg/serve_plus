@@ -109,7 +109,6 @@ function App() {
             <Route path="support" element={<AdminSupport />} />
             <Route path="roster" element={<RosterAccountManagement readOnly />} />
             <Route path="audit-logs" element={<AuditLogs />} />
-            <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="system/agreements" element={<AgreementEditor />} />
             <Route path="system/badges" element={<BadgeManage />} />
             <Route path="system/announcements" element={<AnnouncementsManager />} />
