@@ -12,10 +12,9 @@ const {
 } = require("./storageArchive");
 
 //Scheduled backup that runs weekly (every Sunday at 2:00 AM).
-//Automatically backs up all critical Firestore collections.
 const scheduledBackup = onSchedule(
   {
-    schedule: "0 2 * * 0", // Every Sunday at 2:00 AM
+    schedule: "0 2 * * 0", // 0 = minute, 2 = hour, * = any day of month, * = any month, 0 = Sunday
     region: "asia-southeast1",
     timeZone: "Asia/Manila",
     timeoutSeconds: 540,
