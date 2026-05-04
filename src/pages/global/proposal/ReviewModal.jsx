@@ -4,6 +4,7 @@ import { db, auth } from "../../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { createNotification, notifyUsersByRoles } from "../../../utils/notificationUtils";
 import { SessionContext } from "../../../context/SessionContext";
+import { exportProposalPDF } from "../exportProposalPDF";
 import "./ReviewModal.css";
 
 export default function ReviewModal({ proposal, onClose, onApprovalChange, isPartner }) {
@@ -16,6 +17,131 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
   const [approvalMessage, setApprovalMessage] = useState("");
   const [selectedAction, setSelectedAction] = useState("");
   const [actionSaved, setActionSaved] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
+
+  const sdgNumberToLabel = {
+    1: 'No Poverty', 2: 'Zero Hunger', 3: 'Good Health and Well-Being',
+    4: 'Quality Education', 5: 'Gender Equality', 6: 'Clean Water and Sanitation',
+    7: 'Affordable and Clean Energy', 8: 'Decent Work and Economic Growth',
+    9: 'Industry Innovation and Infrastructure', 10: 'Reduced Inequalities',
+    11: 'Sustainable Cities and Communities', 12: 'Responsible Consumption and Production',
+    13: 'Climate Action', 14: 'Life Below Water', 15: 'Life on Land',
+    16: 'Peace, Justice and Strong Institutions', 17: 'Partnership for the Goals',
+  };
+
+  // Build export data from the live Firestore proposal document
+  const buildExportDataFromProposal = () => {
+    const proponentStr = Array.isArray(proposal.proponents)
+      ? proposal.proponents.join(', ')
+      : (proposal.preparedBy || '');
+    const sdgLabels = (proposal.sdgs || []).map(num => sdgNumberToLabel[num] || String(num));
+    const activitiesStr = Array.isArray(proposal.specificActivities)
+      ? proposal.specificActivities.join('\n')
+      : (proposal.specificActivities || '');
+    const successStr = Array.isArray(proposal.successIndicators)
+      ? proposal.successIndicators.join('\n')
+      : (proposal.successIndicators || '');
+    const stakeholdersStr = Array.isArray(proposal.stakeholders)
+      ? proposal.stakeholders.join(', ')
+      : (proposal.stakeholders || '');
+
+    if (proposal.projectType === 'sl') {
+      return {
+        projectType: 'service-learning',
+        formData: {
+          proposalTitle: proposal.title || '',
+          dateProposed: proposal.dateProposed || proposal.targetDate || '',
+          participatingSections: proposal.slFields?.section || '',
+          proponent: proponentStr,
+          courseTitle: proposal.slFields?.course || '',
+          courseCode: proposal.slFields?.courseCode || '',
+          targetDates: proposal.targetDate || '',
+          targetLocation: proposal.location || '',
+          sdgs: sdgLabels,
+          proposalDescription: proposal.description || '',
+          proposalObjectives: proposal.objectives || '',
+          specificActivities: activitiesStr,
+          successIndicators: successStr,
+          budget: proposal.budget || '',
+          stakeholders: stakeholdersStr,
+          volunteerHours: proposal.volunteerHours || '',
+          preparedBy: proposal.preparedBy || '',
+          reviewedBy: proposal.reviewedBy || '',
+          recommendedBy: proposal.recommendedBy || '',
+          endorsedBy: proposal.endorsedBy || '',
+          approvedBy: proposal.approvedBy || '',
+        },
+        slFields: {
+          section: proposal.slFields?.section || '',
+          course: proposal.slFields?.course || '',
+          courseCode: proposal.slFields?.courseCode || '',
+          assignedFaculty: proposal.slFields?.assignedFaculty || '',
+        },
+        ceFields: {},
+      };
+    }
+    // Community Engagement
+    const ceLOKeyMap = {
+      '0': 'intellectual development', '1': 'collaboration',
+      '2': 'appreciation of culture and diversity', '3': 'career exploration',
+      '4': 'socio-civic responsibility', '5': 'others',
+    };
+    const lo = proposal.ceFields?.learningOutcomes;
+    const loArr = lo !== undefined && lo !== null
+      ? [ceLOKeyMap[String(lo)] || String(lo).toLowerCase().trim()]
+      : [];
+    return {
+      projectType: 'community-engagement',
+      formData: {
+        communityEngagementTitle: proposal.title || '',
+        dateProposed: proposal.dateProposed || proposal.targetDate || '',
+        proponent: proponentStr,
+        studentOutcomes: proposal.studentOutcomes || '',
+        sdgs: sdgLabels,
+        natureOfEngagement: proposal.ceFields?.nature ? [proposal.ceFields.nature] : [],
+        learningOutcomes: loArr,
+        targetDate: proposal.targetDate || '',
+        location: proposal.location || '',
+        stakeholders: stakeholdersStr,
+        numberOfVolunteerHours: proposal.volunteerHours || '',
+        ceDescription: proposal.description || '',
+        ceObjectives: proposal.objectives || '',
+        specificActivities: activitiesStr,
+        successIndicators: successStr,
+        budget: proposal.budget || '',
+        preparedBy: proposal.preparedBy || '',
+        reviewedBy: proposal.reviewedBy || '',
+        recommendedBy: proposal.recommendedBy || '',
+        endorsedBy: proposal.endorsedBy || '',
+        approvedBy: proposal.approvedBy || '',
+      },
+      slFields: {},
+      ceFields: proposal.ceFields || {},
+    };
+  };
+
+  // Regenerate PDF preview whenever any approval field changes
+  useEffect(() => {
+    if (!proposal?.id) return;
+    let cancelled = false;
+    const generate = async () => {
+      setPdfPreviewLoading(true);
+      try {
+        const { projectType: pt, formData, slFields, ceFields } = buildExportDataFromProposal();
+        const url = await exportProposalPDF({ projectType: pt, formData, slFields, ceFields, sdgOptions: [], returnUrl: true });
+        if (!cancelled) setPdfPreviewUrl(url);
+      } catch (e) {
+        if (!cancelled) setPdfPreviewUrl('');
+      } finally {
+        if (!cancelled) setPdfPreviewLoading(false);
+      }
+    };
+    generate();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal.id, proposal.reviewedBy, proposal.recommendedBy, proposal.endorsedBy, proposal.approvedBy]);
 
   // Use context userData or fetch it directly as fallback
   const userData = contextUserData || localUserData;
@@ -458,6 +584,47 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
 
           {/* Right: sticky action panel */}
           <div className="rm-right">
+
+            {/* Proposal Form Preview */}
+            <div className="rm-panel-section">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="rm-panel-label" style={{ margin: 0 }}>Proposal Form Preview</div>
+                <button
+                  type="button"
+                  onClick={() => setShowPdfPreview(v => !v)}
+                  style={{
+                    fontSize: '0.75rem', fontWeight: 600, padding: '3px 10px',
+                    borderRadius: 6, border: '1.5px solid #0d9488',
+                    background: showPdfPreview ? '#0d9488' : '#fff',
+                    color: showPdfPreview ? '#fff' : '#0d9488',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  {showPdfPreview ? 'Hide ▲' : 'View ▼'}
+                </button>
+              </div>
+              {showPdfPreview && (
+                <div style={{ marginTop: 10 }}>
+                  {pdfPreviewLoading ? (
+                    <div style={{ textAlign: 'center', padding: '1.5rem 0', color: '#94a3b8', fontSize: '0.82rem' }}>
+                      Generating preview…
+                    </div>
+                  ) : pdfPreviewUrl ? (
+                    <iframe
+                      src={`${pdfPreviewUrl}#navpanes=0&toolbar=0`}
+                      width="100%"
+                      height="420"
+                      style={{ border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', display: 'block' }}
+                      title="Proposal Form Preview"
+                    />
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '1rem 0', color: '#94a3b8', fontSize: '0.82rem' }}>
+                      Preview unavailable
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Signatories Timeline */}
             <div className="rm-panel-section">

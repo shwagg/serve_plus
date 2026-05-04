@@ -309,12 +309,10 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions, retu
     try { form.getTextField('text_37nyfm').setText(formData.approvedBy || ' '); } catch {}
     form.flatten();
     const pdfBytes = await pdfDoc.save();
-    if (returnUrl) {
-      let binary = '';
-      for (let i = 0; i < pdfBytes.byteLength; i++) binary += String.fromCharCode(pdfBytes[i]);
-      return `data:application/pdf;base64,${btoa(binary)}`;
-    }
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    if (returnUrl) {
+      return URL.createObjectURL(blob);
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -514,12 +512,10 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions, retu
     try { form.getTextField('text_45mqpp').setText(formData.approvedBy || ' '); } catch {}
     form.flatten();
     const pdfBytes = await pdfDoc.save();
-    if (returnUrl) {
-      let binary = '';
-      for (let i = 0; i < pdfBytes.byteLength; i++) binary += String.fromCharCode(pdfBytes[i]);
-      return `data:application/pdf;base64,${btoa(binary)}`;
-    }
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    if (returnUrl) {
+      return URL.createObjectURL(blob);
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
