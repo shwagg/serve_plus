@@ -333,11 +333,11 @@ const StudentHome = () => {
       return `Returned for revision${rejectedByUser ? ` by ${rejectedByUser}` : ''}`;
     }
     if (approvedBy && recommendedBy && endorsedBy && reviewedBy) {
-      return 'All signatures collected · Ready for CSCE upload';
+      return 'All approvals complete · Ready to publish';
     }
-    if (endorsedBy) return `Endorsed by ${endorsedBy} · Awaiting final approval`;
-    if (recommendedBy) return `Recommended by ${recommendedBy} · Awaiting endorsement`;
-    if (reviewedBy) return `Reviewed by ${reviewedBy} · Awaiting recommendation`;
+    if (endorsedBy) return `Endorsed by Admin · Awaiting Director approval`;
+    if (recommendedBy) return `Recommended by ${recommendedBy} · Awaiting Admin (CSCE) endorsement`;
+    if (reviewedBy) return `Reviewed by ${reviewedBy} · Awaiting College Dean recommendation`;
     return 'Submitted · Awaiting Program Chair review';
   };
 

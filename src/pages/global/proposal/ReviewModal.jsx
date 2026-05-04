@@ -109,10 +109,17 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
   // Only allow approval if previous steps are completed
   function canApproveSequential() {
     if (!approvalLevel || !proposal) return false;
+    const approverName = userData?.name || "";
     if (approvalLevel === "reviewedBy") {
+      // Guard: only the designated Program Chair may approve
+      const designated = proposal.selectedReviewedBy || "";
+      if (designated && approverName && designated !== approverName) return false;
       return !proposal.reviewedBy && !proposal.recommendedBy && !proposal.endorsedBy && !proposal.approvedBy;
     }
     if (approvalLevel === "recommendedBy") {
+      // Guard: only the designated College Dean may approve
+      const designated = proposal.selectedRecommendedBy || "";
+      if (designated && approverName && designated !== approverName) return false;
       return typeof proposal.reviewedBy === "string" && proposal.reviewedBy.trim() !== "" && (!proposal.recommendedBy || proposal.recommendedBy.trim() === "") && (!proposal.endorsedBy || proposal.endorsedBy.trim() === "") && (!proposal.approvedBy || proposal.approvedBy.trim() === "");
     }
     if (approvalLevel === "endorsedBy") {

@@ -302,8 +302,8 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       studentOutcomes: p.studentOutcomes || '',
       preparedBy: p.preparedBy || '',
       proponents: Array.isArray(p.proponents) ? p.proponents : [],
-      reviewedBy: p.reviewedBy || '',
-      recommendedBy: p.recommendedBy || '',
+      reviewedBy: p.selectedReviewedBy || '',
+      recommendedBy: p.selectedRecommendedBy || '',
       affiliatedDepartment: p.affiliatedDepartment || '',
       alt: p.alt || '',
       partnerSchool: p.partnerSchool || '',
@@ -1016,7 +1016,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             <div className="form-section">
               <h2>Signatories</h2>
               <p style={{ margin: '0 0 1rem', color: '#718096', fontSize: '0.85rem' }}>
-                Select the signatories for this proposal. Export the PDF, collect physical signatures from each signatory, then upload the signed scan from the proposal review page.
+                Select the signatories who will review this proposal. Once submitted, it will route digitally through <strong>Program Chair → College Dean → Admin (CSCE) → Director</strong> for sequential approval before the event can be published.
               </p>
               <div className="form-row">
                 <div className="form-group">
@@ -1092,7 +1092,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             setLoading={setLoading}
             onClearDraft={clearDraft}
             proposalId={editProposal?.id}
-            existingSignedDocUrl={editProposal?.signedDocUrl}
           />
       )}
     </div>

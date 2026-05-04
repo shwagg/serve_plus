@@ -85,9 +85,9 @@ export default function ProposalTimeline({ proposal, compact = false }) {
       rejected: isRejected && rejectedBy === "approvedBy",
     },
     {
-      key: "csce",
-      label: "Ready for CSCE",
-      sublabel: "All signatures collected — ready to upload",
+      key: "ready",
+      label: "Ready to Publish",
+      sublabel: "All approvals complete — admin or director can now publish the event",
       done: !!isAllDone,
       decidedAt: null,
     },

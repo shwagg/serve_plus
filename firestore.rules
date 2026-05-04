@@ -100,12 +100,12 @@ service cloud.firestore {
         request.auth.uid == resource.data.createdBy &&
         resource.data.status == 'for_approval';
 
-      // FACULTY - can update approval chain fields (reviewedBy, recommendedBy)
+      // FACULTY - can update approval chain fields (reviewedBy, recommendedBy) and nested approvals map
       allow update: if
         request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "faculty" &&
         (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewedBy', 'recommendedBy', 'status', 'lastApprovedAt', 'lastApprovedBy', 'rejectionReason', 'rejectedBy', 'rejectedAt', 'rejectedByUser'])
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewedBy', 'recommendedBy', 'status', 'lastApprovedAt', 'lastApprovedBy', 'rejectionReason', 'rejectedBy', 'rejectedAt', 'rejectedByUser', 'approvals'])
         );
 
       // PARTNER - can update only the approvals field (partner approval decision)
