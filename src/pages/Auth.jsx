@@ -15,6 +15,8 @@ import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
+import servePlusIcon from "../assets/serve_plus_icon.svg";
+import loginPoster from "../assets/login_poster.png";
 import AgreementModal, {
   fetchCurrentAgreementVersion,
 } from "../components/AgreementModal";
@@ -40,6 +42,7 @@ function Auth() {
   const [mfaCode, setMfaCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [emailStatus, setEmailStatus] = useState(null); // null | "checking" | "found" | "not-found"
 
   // Agreement modal state
   const [showAgreement, setShowAgreement] = useState(false);
@@ -59,6 +62,20 @@ function Auth() {
     const snap = await getDocs(q);
     if (snap.empty) throw new Error("No account found for this username.");
     return snap.docs[0].data().email;
+  };
+
+  const handleEmailBlur = async () => {
+    const input = loginId.trim();
+    if (!input) { setEmailStatus(null); return; }
+    setEmailStatus("checking");
+    try {
+      const usersRef = collection(db, "users");
+      const field = input.includes("@") ? "email" : "username";
+      const snap = await getDocs(query(usersRef, where(field, "==", input)));
+      setEmailStatus(snap.empty ? "not-found" : "found");
+    } catch {
+      setEmailStatus(null);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -330,182 +347,176 @@ function Auth() {
       )}
 
       {step === "login" && (
-        <div className="ui-container">
-          <div className="ui-card">
-            <form className="ui-form" onSubmit={handleLogin}>
-              <h2 className="ui-title">
-                LOGIN <span className="ui-title-to">to</span> SERVE
-                <span className="ui-title-plus">+</span>
-              </h2>
+        <div className="auth-page">
+          <div className="auth-split">
+            {/* Left: poster */}
+            <div className="auth-poster-panel">
+              <img src={loginPoster} alt="SERVE+ illustration" />
+            </div>
 
-              <p className="ui-link">
-                New to SERVE+? <Link to="/register">Sign up here</Link>
-              </p>
+            {/* Right: form */}
+            <div className="auth-form-panel">
+              <form className="ui-form auth-login-form" onSubmit={handleLogin}>
 
-              <input
-                className="ui-input"
-                type="text"
-                placeholder="Email or Username"
-                value={loginId}
-                onChange={(e) => setLoginId(e.target.value)}
-                required
-              />
-              <div className="ui-input-pass-wrap">
-                <input
-                  className="ui-input pass"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                {password.length > 0 && (
-                  <button
-                    type="button"
-                    className="ui-btn eye"
-                    aria-label={
-                      showPassword ? "Hide password" : "Show password"
-                    }
-                    onClick={() => setShowPassword((prev) => !prev)}
-                  >
-                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </button>
-                )}
-              </div>
+                {/* Logo */}
+                <div className="auth-logo-row">
+                  <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
+                  <span className="auth-logo-text">
+                    SERVE<span className="auth-logo-plus">+</span>
+                  </span>
+                </div>
 
-              <button className="ui-btn" type="submit">
-                Sign in
-              </button>
-
-              {error && <p className="ui-error">{error}</p>}
-
-              <p className="ui-smallText">
-                <Link to="/reset-password">Forgot Password?</Link>
-              </p>
-
-              <div className="divider">
-                <span>Sign in with</span>
-              </div>
-
-              <button
-                className="icon-btn"
-                type="button"
-                aria-label="Sign in with Blackboard"
-                onClick={initiateBlackboardAuth}
-              >
-                <img src={bbl_icon} alt="Blackboard" />
-              </button>
-
-              {error && (
-                <p
-                  className="ui-smallText"
-                  style={{
-                    marginTop: 6,
-                    textAlign: "center",
-                    color: "#64748b",
-                    fontWeight: 400,
-                    fontSize: 10,
-                  }}
-                >
-                  Need help? Contact the SERVE+ administrator or try again in a
-                  few minutes.
+                <p className="ui-link" style={{ margin: "2px 0 10px" }}>
+                  New to SERVE+? <Link to="/register">Sign up here</Link>
                 </p>
-              )}
-            </form>
+
+                  {/* Blackboard SSO */}
+                <button
+                  className="auth-bbl-btn"
+                  type="button"
+                  onClick={initiateBlackboardAuth}
+                >
+                  <img src={bbl_icon} alt="Blackboard" />
+                  Login with Blackboard
+                </button>
+
+                <div className="divider" style={{ width: "100%", maxWidth: 340 }}>
+                  <span>Sign in with</span>
+                </div>
+
+                {/* Email / Username */}
+                <div style={{ width: "100%", maxWidth: 340 }}>
+                  <input
+                    className={`ui-input${emailStatus === "not-found" ? " ui-input--error" : ""}`}
+                    style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                    type="text"
+                    placeholder="Email or Username"
+                    value={loginId}
+                    onChange={(e) => { setLoginId(e.target.value); setEmailStatus(null); }}
+                    onBlur={handleEmailBlur}
+                    required
+                  />
+                  {emailStatus === "not-found" && (
+                    <p className="field-hint error">No account found for this email or username</p>
+                  )}
+                </div>
+
+                {/* Password + Forgot Password */}
+                <div style={{ width: "100%", maxWidth: 340 }}>
+                  <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
+                    <input
+                      className="ui-input pass"
+                      style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    {password.length > 0 && (
+                      <button
+                        type="button"
+                        className="ui-btn eye"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((prev) => !prev)}
+                      >
+                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </button>
+                    )}
+                  </div>
+                  <p className="ui-smallText" style={{ marginTop: 6 }}>
+                    <Link to="/reset-password">Forgot Password?</Link>
+                  </p>
+                </div>
+
+                <button className="auth-login-btn" type="submit">
+                  Login
+                </button>
+
+                {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
+
+                {error && (
+                  <p className="ui-smallText" style={{ marginTop: 4, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}>
+                    Need help? Contact the SERVE+ administrator or try again in a few minutes.
+                  </p>
+                )}
+              </form>
+            </div>
           </div>
         </div>
       )}
 
       {step === "mfa" && (
-        <div className="ui-container">
-          <div className="ui-card">
-            <form className="ui-form" onSubmit={handleVerifyMfa}>
-              <div style={{ fontSize: 52, marginBottom: 6 }}>🔐</div>
-              <h2 className="ui-title">Admin Verification</h2>
+        <div className="auth-page">
+          <div className="auth-split">
+            <div className="auth-poster-panel">
+              <img src={loginPoster} alt="SERVE+ illustration" />
+            </div>
+            <div className="auth-form-panel">
+              <form className="ui-form auth-login-form" onSubmit={handleVerifyMfa}>
+                <div style={{ fontSize: 52, marginBottom: 6 }}>🔐</div>
+                <h2 className="ui-title">Admin Verification</h2>
 
-              <p
-                className="ui-smallText"
-                style={{
-                  textAlign: "center",
-                  color: "#475569",
-                  fontWeight: 400,
-                }}
-              >
-                We sent a 6-digit code to your email. Enter it to continue.
-              </p>
+                <p
+                  className="ui-smallText"
+                  style={{ textAlign: "center", color: "#475569", fontWeight: 400 }}
+                >
+                  We sent a 6-digit code to your email. Enter it to continue.
+                </p>
 
-              <input
-                className="ui-input"
-                type="text"
-                inputMode="numeric"
-                placeholder="6-digit code"
-                value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value)}
-                required
-              />
+                <input
+                  className="ui-input"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="6-digit code"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  required
+                />
 
-              <button className="ui-btn" type="submit">
-                CONTINUE
-              </button>
+                <button className="ui-btn" type="submit">
+                  CONTINUE
+                </button>
 
-              {error && <p className="ui-error">{error}</p>}
+                {error && <p className="ui-error">{error}</p>}
 
-              <p
-                className="ui-smallText"
-                style={{
-                  marginTop: 10,
-                  cursor: cooldown === 0 ? "pointer" : "not-allowed",
-                  color: cooldown === 0 ? "#0f766e" : "#94a3b8",
-                  fontWeight: 600,
-                  textAlign: "center",
-                }}
-                onClick={cooldown === 0 ? handleResendMfa : undefined}
-                onMouseEnter={(e) => {
-                  if (cooldown === 0)
-                    e.currentTarget.style.textDecoration = "underline";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.textDecoration = "none";
-                }}
-              >
-                {cooldown > 0
-                  ? `Resend available in ${cooldown}s`
-                  : "Resend code"}
-              </p>
-
-              <p
-                className="ui-smallText"
-                style={{ marginTop: 8, textAlign: "center", cursor: "pointer" }}
-                onClick={() => {
-                  setStep("login");
-                  setMfaCode("");
-                  setError("");
-                }}
-              >
-                Back to Login
-              </p>
-
-              {error && (
                 <p
                   className="ui-smallText"
                   style={{
-                    marginTop: 6,
+                    marginTop: 10,
+                    cursor: cooldown === 0 ? "pointer" : "not-allowed",
+                    color: cooldown === 0 ? "#0f766e" : "#94a3b8",
+                    fontWeight: 600,
                     textAlign: "center",
-                    color: "#64748b",
-                    fontWeight: 400,
-                    fontSize: 10,
                   }}
+                  onClick={cooldown === 0 ? handleResendMfa : undefined}
+                  onMouseEnter={(e) => { if (cooldown === 0) e.currentTarget.style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
                 >
-                  Need help? Contact the SERVE+ administrator or try again in a
-                  few minutes.
+                  {cooldown > 0 ? `Resend available in ${cooldown}s` : "Resend code"}
                 </p>
-              )}
-            </form>
+
+                <p
+                  className="ui-smallText"
+                  style={{ marginTop: 8, textAlign: "center", cursor: "pointer" }}
+                  onClick={() => { setStep("login"); setMfaCode(""); setError(""); }}
+                >
+                  Back to Login
+                </p>
+
+                {error && (
+                  <p className="ui-smallText" style={{ marginTop: 6, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}>
+                    Need help? Contact the SERVE+ administrator or try again in a few minutes.
+                  </p>
+                )}
+              </form>
+            </div>
           </div>
         </div>
       )}
     </>
   );
 }
+
 
 export default Auth;

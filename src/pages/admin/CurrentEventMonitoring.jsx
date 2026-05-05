@@ -1,5 +1,6 @@
 
 import { collection, doc, getDoc, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
+import LoadingOverlay from "../../components/LoadingOverlay";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
@@ -143,7 +144,7 @@ export default function CurrentEventMonitoring() {
   }, [missionId]);
 
   if (loading) {
-    return <div className="loading">Loading event details...</div>;
+    return <LoadingOverlay />;
   }
 
   if (!mission || typeof mission !== 'object') {

@@ -1,6 +1,16 @@
 const admin = require("firebase-admin");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { Timestamp } = require("firebase-admin/firestore");
+const {
+  ROOT_COLLECTIONS_TO_BACKUP,
+  backupCollectionTree,
+} = require("./firestoreTree");
+const {
+  STORAGE_PREFIXES_TO_BACKUP,
+  archiveStoragePrefixes,
+  deleteArchivedStorageFiles,
+  getStorageArchivePrefix,
+} = require("./storageArchive");
 
 //Creates a backup of specified Firestore collections.
 //Stores backup data as JSON in Cloud Storage and metadata in Firestore.
@@ -21,39 +31,29 @@ const createBackup = async (request) => {
     console.error("Error fetching caller doc:", err);
     throw new HttpsError("internal", "Failed to verify user role.");
   }
-  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+  const callerRole = callerDoc.data()?.role;
+  if (!callerDoc.exists || callerRole !== "sysadmin") {
     throw new HttpsError(
       "permission-denied",
-      "Only administrators can create backups.",
+      "Only system administrators can create backups.",
     );
   }
 
   const { label } = request.data || {};
 
-  // Collections to back up
-  const collectionsToBackup = [
-    "users",
-    "projects",
-    "events",
-    "auditLogs",
-    "announcements",
-    "documents",
-  ];
+  const collectionsToBackup = ROOT_COLLECTIONS_TO_BACKUP;
 
   const timestamp = new Date();
   const backupId = `backup_${timestamp.getTime()}`;
   const backupData = {};
   let totalDocuments = 0;
+  const storageArchivePrefix = getStorageArchivePrefix(backupId);
 
   for (const collectionName of collectionsToBackup) {
     try {
-      const snapshot = await db.collection(collectionName).get();
-      const docs = {};
-      snapshot.forEach((doc) => {
-        docs[doc.id] = doc.data();
-      });
-      backupData[collectionName] = docs;
-      totalDocuments += snapshot.size;
+      const result = await backupCollectionTree(db.collection(collectionName));
+      backupData[collectionName] = result.documents;
+      totalDocuments += result.totalDocuments;
     } catch (err) {
       // If collection doesn't exist or is empty, skip
       backupData[collectionName] = {};
@@ -112,8 +112,15 @@ const createBackup = async (request) => {
 
   const filePath = `backups/${backupId}.json`;
   const file = bucket.file(filePath);
+  let totalStorageFiles = 0;
 
   try {
+    totalStorageFiles = await archiveStoragePrefixes(
+      bucket,
+      STORAGE_PREFIXES_TO_BACKUP,
+      storageArchivePrefix,
+    );
+
     await file.save(jsonData, {
       contentType: "application/json",
       metadata: {
@@ -125,6 +132,15 @@ const createBackup = async (request) => {
       },
     });
   } catch (err) {
+    try {
+      await deleteArchivedStorageFiles(bucket, storageArchivePrefix);
+    } catch (cleanupErr) {
+      console.warn(
+        "Could not clean up archived Storage backup files:",
+        cleanupErr.message,
+      );
+    }
+
     console.error("Error saving backup to Storage:", err);
     throw new HttpsError(
       "internal",
@@ -144,8 +160,11 @@ const createBackup = async (request) => {
     collections: collectionsToBackup,
     totalDocuments,
     totalAuthUsers: authUsers.length,
+    totalStorageFiles,
     sizeInBytes,
     storagePath: filePath,
+    storageArchivePrefix,
+    storagePrefixes: STORAGE_PREFIXES_TO_BACKUP,
     status: "completed",
   };
 
@@ -156,7 +175,8 @@ const createBackup = async (request) => {
     backupId,
     totalDocuments,
     sizeInBytes,
-    message: `Backup created successfully with ${totalDocuments} documents and ${authUsers.length} auth users.`,
+    totalStorageFiles,
+    message: `Backup created successfully with ${totalDocuments} documents, ${authUsers.length} auth users, and ${totalStorageFiles} storage files.`,
   };
 };
 

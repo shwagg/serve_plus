@@ -1,7 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, auth, storage } from '../../firebaseConfig';
+import { db, auth } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
 import { showToast } from '../../utils/toast';
 
@@ -19,50 +18,13 @@ function SummaryPanel({
   setLoading,
   onClearDraft,
   proposalId,
-  existingSignedDocUrl,
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
-  const [signedDoc, setSignedDoc] = useState(null);
-  const [signatureConfirmed, setSignatureConfirmed] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain'];
-  const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
-
-  const handleFileSelect = (file) => {
-    if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      showToast('Unsupported file type. Please upload a PDF, image, Word, or Excel file.');
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      showToast('File is too large. Maximum size is 50 MB.');
-      return;
-    }
-    setSignedDoc(file);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    handleFileSelect(file);
-  };
 
   /**
    * Handles form submission: creates a mission document in the unified missions collection.
    */
   const handleSubmit = async () => {
-    const hasDoc = signedDoc || (proposalId && existingSignedDocUrl);
-    if (!hasDoc) {
-      showToast('Please upload the signed scanned document before submitting.');
-      return;
-    }
     setLoading(true);
     try {
       const user = auth.currentUser;
@@ -72,20 +34,6 @@ function SummaryPanel({
         return;
       }
 
-      // Upload signed document to Firebase Storage (skip if editing and no new file)
-      let signedDocUrl = existingSignedDocUrl || '';
-      if (signedDoc) {
-        try {
-          const ext = signedDoc.name.split('.').pop();
-          const storageRef = ref(storage, `proposals/signed/${user.uid}_${Date.now()}.${ext}`);
-          const snapshot = await uploadBytes(storageRef, signedDoc);
-          signedDocUrl = await getDownloadURL(snapshot.ref);
-        } catch (uploadErr) {
-          console.error('Failed to upload signed document:', uploadErr);
-          showToast('Failed to upload document. Please try again.');
-          return;
-        }
-      }
       const now = serverTimestamp();
 
       // --- UPDATE MODE (editing existing proposal) ---
@@ -111,11 +59,10 @@ function SummaryPanel({
           studentOutcomes: formData.studentOutcomes || '',
           proponents: formData.proponents?.length ? formData.proponents : [formData.preparedBy],
           preparedBy: formData.proponents?.[0] || formData.preparedBy,
-          reviewedBy: formData.reviewedBy || '',
-          recommendedBy: formData.recommendedBy || '',
+          selectedReviewedBy: formData.reviewedBy || '',
+          selectedRecommendedBy: formData.recommendedBy || '',
           affiliatedDepartment: formData.affiliatedDepartment || '',
           partnerSchool: formData.partnerSchool || '',
-          signedDocUrl,
         };
         if (projectType === 'service-learning') {
           updateData.slFields = {
@@ -192,8 +139,12 @@ function SummaryPanel({
         proponents: formData.proponents?.length ? formData.proponents : [formData.preparedBy],
         preparedBy: formData.proponents?.[0] || formData.preparedBy,
         createdBy: user.uid,
-        reviewedBy,
-        recommendedBy,
+        // Signatory selections made by proponent (who should review/recommend)
+        selectedReviewedBy: reviewedBy,
+        selectedRecommendedBy: recommendedBy,
+        // Actual approval fields — filled only when each approver manually acts
+        reviewedBy: '',
+        recommendedBy: '',
         endorsedBy,
         approvedBy,
 
@@ -213,9 +164,6 @@ function SummaryPanel({
 
         // --- Add approval flow ---
         approvalFlow,
-
-        // Signed document uploaded by proponent
-        signedDocUrl,
       };
 
       // Add type-specific fields
@@ -428,130 +376,54 @@ function SummaryPanel({
         <div style={{ textAlign: 'center', padding: '2rem', color: '#a0aec0' }}>Generating preview…</div>
       )}
 
-      {/* Signature instruction */}
+      {/* Approval workflow info */}
       <div style={{
         margin: '1rem 0 0',
-        padding: '0.75rem 1rem',
-        background: '#fffbeb',
-        border: '1px solid #fcd34d',
+        padding: '0.85rem 1rem',
+        background: '#f0fdfc',
+        border: '1px solid #99f6e4',
         borderRadius: 8,
         fontSize: '0.85rem',
-        color: '#92400e',
-        lineHeight: 1.5,
+        color: '#0f766e',
+        lineHeight: 1.6,
       }}>
-        <strong>Before submitting:</strong> Export the PDF above, have it physically signed by your
-        <em> Reviewed By</em> and <em>Recommended By</em> signatories, then scan and upload the signed
-        document below. The Submit button will be enabled once a document is attached.
+        <strong style={{ display: 'block', marginBottom: '0.5rem' }}>What happens after submission?</strong>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[
+            { step: 1, label: 'Program Chair', desc: 'Reviews and approves the proposal' },
+            { step: 2, label: 'College Dean', desc: 'Recommends the proposal' },
+            { step: 3, label: 'Admin (CSCE)', desc: 'Endorses and forwards for final sign-off' },
+            { step: 4, label: 'Director', desc: 'Final approval — event becomes ready to publish' },
+          ].map(({ step, label, desc }) => (
+            <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                width: 20, height: 20, borderRadius: '50%',
+                background: '#0d9488', color: '#fff',
+                fontSize: '0.7rem', fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>{step}</span>
+              <span><strong>{label}</strong> — {desc}</span>
+            </div>
+          ))}
+        </div>
+        <p style={{ margin: '0.6rem 0 0', fontSize: '0.78rem', color: '#0d9488' }}>
+          You can track the approval progress from your proposals list at any time.
+        </p>
       </div>
-
-      {/* Upload bin */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-        onDragLeave={() => setIsDragOver(false)}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        style={{
-          marginTop: '1rem',
-          border: `2px dashed ${isDragOver ? '#30bdb7' : signedDoc ? '#30bdb7' : '#cbd5e0'}`,
-          borderRadius: 10,
-          background: isDragOver ? '#f0fdfc' : signedDoc ? '#f0fdfc' : '#f9fafb',
-          padding: '1.5rem 1rem',
-          textAlign: 'center',
-          cursor: 'pointer',
-          transition: 'border-color 0.2s, background 0.2s',
-        }}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt"
-          style={{ display: 'none' }}
-          onChange={(e) => handleFileSelect(e.target.files?.[0])}
-        />
-        {signedDoc ? (
-          <>
-            <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>📄</div>
-            <div style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>{signedDoc.name}</div>
-            <div style={{ color: '#718096', fontSize: '0.78rem', marginTop: 2 }}>
-              {(signedDoc.size / 1024).toFixed(0)} KB — click to replace
-            </div>
-          </>
-        ) : proposalId && existingSignedDocUrl ? (
-          <>
-            <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>📄</div>
-            <div style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>Previously uploaded document</div>
-            <div style={{ color: '#718096', fontSize: '0.78rem', marginTop: 2 }}>
-              <a href={existingSignedDocUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#30bdb7' }}>View current file</a> — click here to replace it
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: '2rem', color: '#cbd5e0', marginBottom: '0.5rem' }}>☁</div>
-            <div style={{ fontWeight: 600, color: '#4a5568', fontSize: '0.9rem' }}>
-              Choose a file or drag &amp; drop it here.
-            </div>
-            <div style={{ color: '#a0aec0', fontSize: '0.78rem', margin: '0.3rem 0 0.75rem' }}>
-              txt, docx, pdf, jpeg, xlsx — Up to 50MB
-            </div>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-              style={{
-                padding: '6px 20px',
-                borderRadius: 6,
-                border: '1.5px solid #cbd5e0',
-                background: '#fff',
-                color: '#4a5568',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Browse files
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Signature confirmation checkbox */}
-      {(signedDoc || (proposalId && existingSignedDocUrl)) && (
-        <label style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.6rem',
-          marginTop: '0.85rem',
-          cursor: 'pointer',
-          fontSize: '0.85rem',
-          color: '#4a5568',
-          lineHeight: 1.5,
-        }}>
-          <input
-            type="checkbox"
-            checked={signatureConfirmed}
-            onChange={(e) => setSignatureConfirmed(e.target.checked)}
-            style={{ marginTop: 2, accentColor: '#30bdb7', width: 16, height: 16, flexShrink: 0 }}
-          />
-          <span>
-            I confirm that the uploaded document has been physically signed by the{' '}
-            <strong>Reviewed By</strong> and <strong>Recommended By</strong> signatories.
-          </span>
-        </label>
-      )}
 
       <div className="form-actions" style={{ marginTop: '1rem' }}>
         <button type="button" className="btn-cancel" onClick={onBack}>Back</button>
-        {!signedDoc && (
-          <button type="button" className="btn-next" disabled={loading} onClick={handleExport}>
-            Export PDF
-          </button>
-        )}
+        <button type="button" className="btn-next" disabled={loading} onClick={handleExport}>
+          Export PDF
+        </button>
         <button
           type="button"
           className="btn-submit"
-          disabled={loading || !(signedDoc || (proposalId && existingSignedDocUrl)) || !signatureConfirmed}
+          disabled={loading}
           onClick={handleSubmit}
         >
-          {proposalId ? 'Update Proposal' : 'Submit to CSCE'}
+          {proposalId ? 'Update Proposal' : 'Submit for Review'}
         </button>
       </div>
     </div>

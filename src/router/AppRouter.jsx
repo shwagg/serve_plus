@@ -1,5 +1,6 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import React, { Suspense, lazy } from "react";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 // Eagerly loaded (main entry points)
 import AdminLayout from "../pages/admin/AdminLayout";
@@ -28,21 +29,11 @@ const PublicProfile = lazy(() => import("../pages/global/PublicProfile"));
 const ViewProposals = lazy(() => import("../pages/global/ViewProposals"));
 const ProjectProposal = lazy(() => import("../pages/global/proposal/ProjectProposal"));
 
-function PageLoader() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f6f7fb' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div className="page-spinner" />
-        <p style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>Loading...</p>
-      </div>
-    </div>
-  );
-}
 
 export default function AppRouter() {
   return (
     <Router>
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<LoadingOverlay />}>
         <Routes>
         {/* Student and event routes */}
         <Route path="/student" element={<StudentHome />} />

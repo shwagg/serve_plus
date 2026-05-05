@@ -1,6 +1,11 @@
 const admin = require("firebase-admin");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
+const {
+  getBackupCollectionNames,
+  restoreCollectionTree,
+} = require("./firestoreTree");
+const { restoreArchivedStorageFiles } = require("./storageArchive");
 
 //Restores Firestore data from a previously created backup.
 //Reads the backup JSON from Cloud Storage and writes documents back.
@@ -15,10 +20,11 @@ const restoreBackup = async (request) => {
   }
 
   const callerDoc = await db.collection("users").doc(callerUid).get();
-  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+  const callerRole = callerDoc.data()?.role;
+  if (!callerDoc.exists || callerRole !== "sysadmin") {
     throw new HttpsError(
       "permission-denied",
-      "Only administrators can restore backups.",
+      "Only system administrators can restore backups.",
     );
   }
 
@@ -50,7 +56,7 @@ const restoreBackup = async (request) => {
   const collectionsToRestore =
     collections && collections.length > 0
       ? collections
-      : Object.keys(backupData);
+      : getBackupCollectionNames(backupData);
 
   let restoredDocuments = 0;
   const errors = [];
@@ -59,33 +65,21 @@ const restoreBackup = async (request) => {
     const collectionData = backupData[collectionName];
     if (!collectionData) continue;
 
-    const docEntries = Object.entries(collectionData);
-
-    // Batch writes (max 500 per batch)
-    const batchSize = 450;
-    for (let i = 0; i < docEntries.length; i += batchSize) {
-      const batch = db.batch();
-      const slice = docEntries.slice(i, i + batchSize);
-
-      for (const [docId, docData] of slice) {
-        // Restore Firestore Timestamps
-        const restoredData = restoreTimestamps(docData);
-        const ref = db.collection(collectionName).doc(docId);
-        batch.set(ref, restoredData, { merge: true });
-      }
-
-      try {
-        await batch.commit();
-        restoredDocuments += slice.length;
-      } catch (err) {
-        errors.push(`Error restoring ${collectionName}: ${err.message}`);
-      }
+    try {
+      restoredDocuments += await restoreCollectionTree(
+        db.collection(collectionName),
+        collectionData,
+        restoreTimestamps,
+      );
+    } catch (err) {
+      errors.push(`Error restoring ${collectionName}: ${err.message}`);
     }
   }
 
   // Restore Firebase Auth users if backup contains them
   let authRestored = 0;
   let authDeleted = 0;
+  let storageFilesRestored = 0;
   const backupAuthUsers = backupData._authUsers || [];
 
   if (backupAuthUsers.length > 0) {
@@ -165,6 +159,17 @@ const restoreBackup = async (request) => {
     }
   }
 
+  if (backupMeta.storageArchivePrefix) {
+    try {
+      storageFilesRestored = await restoreArchivedStorageFiles(
+        bucket,
+        backupMeta.storageArchivePrefix,
+      );
+    } catch (err) {
+      errors.push("Failed to restore Storage files: " + err.message);
+    }
+  }
+
   // Log the restore action
   await db.collection("backups").doc(backupId).update({
     lastRestoredAt: FieldValue.serverTimestamp(),
@@ -176,12 +181,13 @@ const restoreBackup = async (request) => {
     action: "BACKUP_RESTORE",
     uid: callerUid,
     email: callerDoc.data().email || "",
-    role: "admin",
+    role: callerRole,
     backupId,
     collectionsRestored: collectionsToRestore,
     restoredDocuments,
     authUsersRestored: authRestored,
     authUsersDeleted: authDeleted,
+    storageFilesRestored,
     timestamp: FieldValue.serverTimestamp(),
   });
 
@@ -191,8 +197,9 @@ const restoreBackup = async (request) => {
     collectionsRestored: collectionsToRestore,
     authUsersRestored: authRestored,
     authUsersDeleted: authDeleted,
+    storageFilesRestored,
     errors,
-    message: `Restored ${restoredDocuments} documents from backup. Auth: ${authRestored} recreated, ${authDeleted} removed.`,
+    message: `Restored ${restoredDocuments} documents from backup. Auth: ${authRestored} recreated, ${authDeleted} removed. Storage: ${storageFilesRestored} files restored.`,
   };
 };
 

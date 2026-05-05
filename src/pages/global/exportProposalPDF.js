@@ -310,8 +310,10 @@ export async function exportSLProposalPDF({ formData, slFields, sdgOptions, retu
     form.flatten();
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    if (returnUrl) {
+      return URL.createObjectURL(blob);
+    }
     const url = URL.createObjectURL(blob);
-    if (returnUrl) return url;
     const a = document.createElement('a');
     a.href = url;
     a.download = `${formData.proposalTitle || 'proposal'}.pdf`;
@@ -511,8 +513,10 @@ export async function exportCEProposalPDF({ formData, ceFields, sdgOptions, retu
     form.flatten();
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    if (returnUrl) {
+      return URL.createObjectURL(blob);
+    }
     const url = URL.createObjectURL(blob);
-    if (returnUrl) return url;
     const a = document.createElement('a');
     a.href = url;
     a.download = `${formData.communityEngagementTitle || 'community_engagement_proposal'}.pdf`;

@@ -1,12 +1,20 @@
 const admin = require("firebase-admin");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-
+const {
+  ROOT_COLLECTIONS_TO_BACKUP,
+  backupCollectionTree,
+} = require("./firestoreTree");
+const {
+  STORAGE_PREFIXES_TO_BACKUP,
+  archiveStoragePrefixes,
+  deleteArchivedStorageFiles,
+  getStorageArchivePrefix,
+} = require("./storageArchive");
 
 //Scheduled backup that runs weekly (every Sunday at 2:00 AM).
-//Automatically backs up all critical Firestore collections.
 const scheduledBackup = onSchedule(
   {
-    schedule: "0 2 * * 0", // Every Sunday at 2:00 AM
+    schedule: "0 2 * * 0", // 0 = minute, 2 = hour, * = any day of month, * = any month, 0 = Sunday
     region: "asia-southeast1",
     timeZone: "Asia/Manila",
     timeoutSeconds: 540,
@@ -16,29 +24,21 @@ const scheduledBackup = onSchedule(
     const db = admin.firestore();
     const bucket = admin.storage().bucket();
 
-    const collectionsToBackup = [
-      "users",
-      "projects",
-      "events",
-      "auditLogs",
-      "announcements",
-      "documents",
-    ];
+    const collectionsToBackup = ROOT_COLLECTIONS_TO_BACKUP;
 
     const timestamp = new Date();
     const backupId = `scheduled_${timestamp.getTime()}`;
     const backupData = {};
     let totalDocuments = 0;
+    const storageArchivePrefix = getStorageArchivePrefix(backupId);
 
     for (const collectionName of collectionsToBackup) {
       try {
-        const snapshot = await db.collection(collectionName).get();
-        const docs = {};
-        snapshot.forEach((doc) => {
-          docs[doc.id] = doc.data();
-        });
-        backupData[collectionName] = docs;
-        totalDocuments += snapshot.size;
+        const result = await backupCollectionTree(
+          db.collection(collectionName),
+        );
+        backupData[collectionName] = result.documents;
+        totalDocuments += result.totalDocuments;
       } catch (err) {
         backupData[collectionName] = {};
       }
@@ -66,17 +66,37 @@ const scheduledBackup = onSchedule(
 
     const filePath = `backups/${backupId}.json`;
     const file = bucket.file(filePath);
+    let totalStorageFiles = 0;
 
-    await file.save(jsonData, {
-      contentType: "application/json",
-      metadata: {
+    try {
+      totalStorageFiles = await archiveStoragePrefixes(
+        bucket,
+        STORAGE_PREFIXES_TO_BACKUP,
+        storageArchivePrefix,
+      );
+
+      await file.save(jsonData, {
+        contentType: "application/json",
         metadata: {
-          backupId,
-          createdBy: "system-scheduled",
-          createdAt: timestamp.toISOString(),
+          metadata: {
+            backupId,
+            createdBy: "system-scheduled",
+            createdAt: timestamp.toISOString(),
+          },
         },
-      },
-    });
+      });
+    } catch (err) {
+      try {
+        await deleteArchivedStorageFiles(bucket, storageArchivePrefix);
+      } catch (cleanupErr) {
+        console.warn(
+          "Could not clean up scheduled Storage backup files:",
+          cleanupErr.message,
+        );
+      }
+
+      throw err;
+    }
 
     const sizeInBytes = Buffer.byteLength(jsonData, "utf8");
 
@@ -91,13 +111,16 @@ const scheduledBackup = onSchedule(
         createdByEmail: "System (Scheduled)",
         collections: collectionsToBackup,
         totalDocuments,
+        totalStorageFiles,
         sizeInBytes,
         storagePath: filePath,
+        storageArchivePrefix,
+        storagePrefixes: STORAGE_PREFIXES_TO_BACKUP,
         status: "completed",
       });
 
     console.log(
-      `Scheduled backup ${backupId} completed: ${totalDocuments} documents, ${sizeInBytes} bytes`,
+      `Scheduled backup ${backupId} completed: ${totalDocuments} documents, ${totalStorageFiles} storage files, ${sizeInBytes} bytes`,
     );
   },
 );

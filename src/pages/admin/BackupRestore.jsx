@@ -13,9 +13,11 @@ export default function BackupRestore() {
   const [confirmRestore, setConfirmRestore] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const fetchBackups = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const fetchBackups = useCallback(async ({ resetState = true } = {}) => {
+    if (resetState) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const listBackupsFn = httpsCallable(functions, "listBackups");
       const result = await listBackupsFn();
@@ -27,7 +29,9 @@ export default function BackupRestore() {
   }, []);
 
   useEffect(() => {
-    fetchBackups();
+    queueMicrotask(() => {
+      fetchBackups({ resetState: false });
+    });
   }, [fetchBackups]);
 
   const handleCreateBackup = async () => {
@@ -322,7 +326,7 @@ export default function BackupRestore() {
         <div className="backup-collections-grid">
           {[
             { name: "Users", desc: "Volunteer & staff accounts" },
-            { name: "Projects", desc: "Service-learning projects" },
+            { name: "Missions", desc: "CSCEprojects" },
             { name: "Events", desc: "Community events & activities" },
             { name: "Audit Logs", desc: "System activity records" },
             { name: "Announcements", desc: "Global announcements" },

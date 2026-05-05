@@ -13,10 +13,11 @@ const listBackups = async (request) => {
   }
 
   const callerDoc = await db.collection("users").doc(callerUid).get();
-  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+  const callerRole = callerDoc.data()?.role;
+  if (!callerDoc.exists || callerRole !== "sysadmin") {
     throw new HttpsError(
       "permission-denied",
-      "Only administrators can view backups.",
+      "Only system administrators can view backups.",
     );
   }
 

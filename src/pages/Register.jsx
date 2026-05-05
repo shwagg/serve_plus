@@ -4,9 +4,14 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
+import servePlusIcon from "../assets/serve_plus_icon.svg";
+import loginPoster from "../assets/login_poster.png";
+import "../styles/ui.css";
 
 function Register() {
-    const [name, setName] = useState("");
+    const [firstName, setFirstName] = useState("");
+    const [middleInitial, setMiddleInitial] = useState("");
+    const [lastName, setLastName] = useState("");
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -15,7 +20,20 @@ function Register() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [usernameStatus, setUsernameStatus] = useState(null); // null | "checking" | "taken" | "available"
     const navigate = useNavigate();
+
+    const handleUsernameBlur = async () => {
+        const input = username.trim();
+        if (!input) { setUsernameStatus(null); return; }
+        setUsernameStatus("checking");
+        try {
+            const snap = await getDocs(query(collection(db, "users"), where("username", "==", input)));
+            setUsernameStatus(snap.empty ? "available" : "taken");
+        } catch {
+            setUsernameStatus(null);
+        }
+    };
 
     const registerSubmit = async (e) => {
         e.preventDefault();
@@ -101,9 +119,12 @@ function Register() {
                 });
             }
 
+            const fullName = [firstName.trim(), middleInitial.trim() ? middleInitial.trim().toUpperCase() : null, lastName.trim()]
+                .filter(Boolean).join(" ");
+
             await setDoc(doc(db, "users", uid), {
                 uid,
-                name,
+                name: fullName,
                 username,
                 email,
                 role: "student", // Default role for new registrations
@@ -141,88 +162,126 @@ function Register() {
     };
 
     return (
-        <div className="ui-container">
-            <div className="ui-card">
-                <form className="ui-form" onSubmit={registerSubmit}>
-                    <h2 className="ui-title">
-                        SIGN UP <span className="ui-title-to">to</span> SERVE<span className="ui-title-plus">+</span>
-                    </h2>
+        <div className="auth-page">
+            <div className="auth-split">
+                {/* Left: poster */}
+                <div className="auth-poster-panel">
+                    <img src={loginPoster} alt="SERVE+ illustration" />
+                </div>
 
-                    {/* Link to Login Page if account exists */}
-                    <p className="ui-link">
-                        Already have an account?{" "}
-                        <Link to="/auth">Login here</Link>
-                    </p>
+                {/* Right: form */}
+                <div className="auth-form-panel">
+                    <form className="ui-form auth-login-form" onSubmit={registerSubmit}>
+                        <div className="auth-logo-row">
+                            <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
+                            <span className="auth-logo-text">
+                                SERVE<span className="auth-logo-plus">+</span>
+                            </span>
+                        </div>
 
-                    <input
-                        className="ui-input"
-                        type="text"
-                        placeholder="Name"
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                    />
+                        <p className="ui-link" style={{ margin: "2px 0 10px" }}>
+                            Already have an account?{" "}
+                            <Link to="/auth">Login here</Link>
+                        </p>
 
-                    <input
-                        className="ui-input"
-                        type="text"
-                        placeholder="Username"
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                    />
+                        <div className="reg-name-row">
+                            <input
+                                className="ui-input"
+                                type="text"
+                                placeholder="First Name"
+                                onChange={(e) => setFirstName(e.target.value)}
+                                required
+                            />
+                            <input
+                                className="ui-input"
+                                type="text"
+                                placeholder="Last Name"
+                                onChange={(e) => setLastName(e.target.value)}
+                                required
+                            />
+                            <input
+                                className="ui-input reg-mi"
+                                type="text"
+                                placeholder="M.I."
+                                maxLength={1}
+                                onChange={(e) => setMiddleInitial(e.target.value)}
+                            />
+                        </div>
 
-                    <input
-                        className="ui-input"
-                        type="email"
-                        placeholder="Email"
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
+                        <div style={{ width: "100%", maxWidth: 420 }}>
+                            <div className={`ui-input-prefix-wrap${usernameStatus === "taken" ? " ui-input--error" : ""}`}>
+                                <span className="ui-input-prefix">@</span>
+                                <input
+                                    className="ui-input-bare"
+                                    type="text"
+                                    placeholder="Username"
+                                    onChange={(e) => { setUsername(e.target.value); setUsernameStatus(null); }}
+                                    onBlur={handleUsernameBlur}
+                                    required
+                                />
+                            </div>
+                            {usernameStatus === "taken" && (
+                                <p className="field-hint error">Username has already been used.</p>
+                            )}
+                        </div>
 
-                    <div className="ui-input-pass-wrap">
                         <input
                             className="ui-input"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Password"
-                            onChange={(e) => setPassword(e.target.value)}
+                            style={{ width: "100%", maxWidth: 420, boxSizing: "border-box" }}
+                            type="email"
+                            placeholder="Email"
+                            onChange={(e) => setEmail(e.target.value)}
                             required
                         />
-                        {password.length > 0 && (
-                            <button
-                                type="button"
-                                className="ui-btn eye"
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                                onClick={() => setShowPassword((prev) => !prev)}
-                            >
-                                {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                            </button>
-                        )}
-                    </div>
 
-                    <div className="ui-input-pass-wrap">
-                        <input
-                            className="ui-input"
-                            type={showConfirmPassword ? "text" : "password"}
-                            placeholder="Confirm Password"
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                        />
-                        {confirmPassword.length > 0 && (
-                            <button
-                                type="button"
-                                className="ui-btn eye"
-                                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                                onClick={() => setShowConfirmPassword((prev) => !prev)}
-                            >
-                                {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                            </button>
-                        )}
-                    </div>
+                        <div className="ui-input-pass-wrap" style={{ maxWidth: 420 }}>
+                            <input
+                                className="ui-input pass"
+                                style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                            {password.length > 0 && (
+                                <button
+                                    type="button"
+                                    className="ui-btn eye"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                >
+                                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                </button>
+                            )}
+                        </div>
 
-                    <button className="ui-btn" type="submit" disabled={loading}>
-                        {loading ? "Creating Account..." : "Create Account"}
-                    </button>
-                    {error && <p className="ui-error">{error}</p>}
-                </form>
+                        <div className="ui-input-pass-wrap" style={{ maxWidth: 420 }}>
+                            <input
+                                className="ui-input pass"
+                                style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="Confirm Password"
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                            />
+                            {confirmPassword.length > 0 && (
+                                <button
+                                    type="button"
+                                    className="ui-btn eye"
+                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                >
+                                    {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                </button>
+                            )}
+                        </div>
+
+                        <button className="auth-login-btn" type="submit" disabled={loading}>
+                            {loading ? "Creating Account..." : "Create Account"}
+                        </button>
+                        {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
+                    </form>
+                </div>
             </div>
         </div>
     );

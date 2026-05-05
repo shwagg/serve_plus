@@ -7,9 +7,12 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import "../../styles/CurrentEvent.css";
+import LoadingOverlay from "../../components/LoadingOverlay";
 import "../../styles/ReviewProposal.css";
 import { createNotification } from "../../utils/notificationUtils";
 import { showToast, showConfirm } from "../../utils/toast";
+
+import MissionSubmissionsTable from "./MissionSubmissionsTable";
 
 // ── helpers ───────────────────────────────────────────────────────────
 function getDateUrgency(targetDate) {
@@ -137,11 +140,12 @@ export default function CurrentEvent() {
   const [missionTitle, setMissionTitle] = useState("");
   const [missionData, setMissionData] = useState(null);
   const [activeTab, setActiveTab] = useState("roster");
-  const [docLibVolunteers, setDocLibVolunteers] = useState([]);
-  const [docLibLoading, setDocLibLoading] = useState(false);
   const [flagging, setFlagging] = useState(false);
   const [flagResult, setFlagResult] = useState(null);
   const [togglingAttendance, setTogglingAttendance] = useState({});
+
+  // ── doc library answer modal state ────────────────────────────────
+  // (handled by MissionSubmissionsTable)
 
   const FLAG_DURATION_DAYS = 30;
 
@@ -266,46 +270,6 @@ export default function CurrentEvent() {
     if (!missionId) return;
     fetchMissionVolunteers();
   }, [missionId]);
-
-  // ── load document library tab data ────────────────────────────────
-  const loadDocLib = async () => {
-    if (docLibVolunteers.length > 0) return;
-    setDocLibLoading(true);
-    try {
-      const vRef = collection(db, "missions", missionId, "volunteer");
-      const snap = await getDocs(vRef);
-
-      const results = await Promise.all(snap.docs.map(async (d) => {
-        const userId = d.id;
-        const vData = d.data();
-        const userDoc = await getDoc(doc(db, "users", userId));
-        const uData = userDoc.exists() ? userDoc.data() : {};
-
-        let preSurvey = false, postSurvey = false;
-        try {
-          const preDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "preSurvey", "response"));
-          preSurvey = preDoc.exists();
-        } catch (_) {}
-        try {
-          const postDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "postSurvey", "response"));
-          postSurvey = postDoc.exists();
-        } catch (_) {}
-
-        return {
-          id: userId,
-          name: uData.name || "Unknown",
-          preSurvey,
-          consent: vData.progress?.consent === "submitted",
-          attendance: vData.progress?.attendance === "present",
-          postSurvey,
-        };
-      }));
-
-      setDocLibVolunteers(results);
-    } finally {
-      setDocLibLoading(false);
-    }
-  };
 
   // ── flagging helpers ──────────────────────────────────────────────
   const flagMission = async (missionDoc, now, todayStr, { allowReFlag = true } = {}) => {
@@ -930,7 +894,7 @@ export default function CurrentEvent() {
           {tabs.map(t => (
             <button
               key={t.key}
-              onClick={() => { setActiveTab(t.key); if (t.key === "docs") loadDocLib(); }}
+              onClick={() => setActiveTab(t.key)}
               style={{
                 padding: "10px 20px", background: "none", border: "none",
                 borderBottom: activeTab === t.key ? "2px solid #234e7b" : "2px solid transparent",
@@ -1124,72 +1088,7 @@ export default function CurrentEvent() {
 
         {/* ── Document Library tab ── */}
         {activeTab === "docs" && (
-          docLibLoading ? (
-            <div className="loading-message">Loading documents…</div>
-          ) : docLibVolunteers.length === 0 ? (
-            <div className="empty-label">No volunteers have joined yet.</div>
-          ) : (
-            <div style={{ overflowX: "auto", width: "100%" }}>
-              {/* Community feedback summary */}
-              {missionData?.feedback?.isActive === false && missionData.feedback.avgRating ? (
-                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 16px", marginBottom: 14, display: "flex", flexWrap: "wrap", gap: "10px 24px", alignItems: "center" }}>
-                  <span style={{ fontWeight: 700, color: "#15803d", fontSize: "0.85rem" }}>✓ Community Feedback Closed</span>
-                  <span style={{ fontSize: "0.82rem", color: "#374151" }}>
-                    Avg. Rating: <b>{missionData.feedback.avgRating}/5</b>
-                  </span>
-                  {missionData.feedback.multiplier != null && (
-                    <span style={{ fontSize: "0.82rem", color: "#374151" }}>
-                      Grade Multiplier: <b>×{missionData.feedback.multiplier}</b>
-                    </span>
-                  )}
-                  {missionData.points && missionData.feedback.multiplier != null && (
-                    <span style={{ fontSize: "0.82rem", color: "#374151" }}>
-                      Final Score per Volunteer: <b>{(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts</b>
-                    </span>
-                  )}
-                </div>
-              ) : !missionData?.feedback?.isActive && !missionData?.feedback?.avgRating ? (
-                <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: "0.82rem", color: "#92400e" }}>
-                  ⚠️ Community feedback form is not yet closed. Open and close the form to compute grades.
-                </div>
-              ) : null}
-              <p style={{ fontSize: "0.82rem", color: "#64748b", marginBottom: 12 }}>
-                Submission status per volunteer. ✓ = submitted / marked present.
-              </p>
-              <table className="admin-table" style={{ minWidth: 560 }}>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Pre-Survey</th>
-                    <th>Consent</th>
-                    <th>Attendance</th>
-                    <th>Post-Survey</th>
-                    {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && <th>Grade</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {docLibVolunteers.map(v => (
-                    <tr key={v.id}>
-                      <td style={{ fontWeight: 600 }}>{v.name}</td>
-                      <td><CheckBadge ok={v.preSurvey} /></td>
-                      <td><CheckBadge ok={v.consent} /></td>
-                      <td><CheckBadge ok={v.attendance} /></td>
-                      <td><CheckBadge ok={v.postSurvey} /></td>
-                      {missionData?.feedback?.isActive === false && missionData.feedback.avgRating && (
-                        <td>
-                          {v.attendance && missionData.feedback.multiplier != null && missionData.points
-                            ? <span style={{ color: "#15803d", fontWeight: 700 }}>
-                                {(Number(missionData.points) * Number(missionData.feedback.multiplier)).toFixed(1)} pts
-                              </span>
-                            : <span style={{ color: "#9ca3af" }}>—</span>}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
+          <MissionSubmissionsTable missionId={missionId} missionTitle={missionData?.title || missionTitle || ""} />
         )}
 
         {/* ── Location Picker Modal ── */}
@@ -1498,7 +1397,7 @@ export default function CurrentEvent() {
       <hr className="ap-divider" />
 
       {loading ? (
-        <div className="loading-message">Loading events…</div>
+        <LoadingOverlay />
       ) : filtered.length === 0 ? (
         <div className="rp-empty">
           <div className="rp-empty-icon">📅</div>

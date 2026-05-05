@@ -94,15 +94,19 @@ export default function ReviewProposal() {
           if (status === "draft" || status === "published") return true;
         }
         if (userApprovalField === "reviewedBy") {
-          // Show if not published/completed and this user is/was the reviewer
-          const isForApproval = !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy && (!status || (status !== "published" && status !== "completed"));
-          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
+          // Only show proposals designated for this specific Program Chair
+          const userName = userData?.name || "";
+          const isDesignated = !p.selectedReviewedBy || p.selectedReviewedBy === userName;
+          const isForApproval = isDesignated && !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy && (!status || (status !== "published" && status !== "completed"));
+          const isPending = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
           return isForApproval || isPending;
         }
         if (userApprovalField === "recommendedBy") {
-          // Show if not published/completed and this user is/was the recommender
-          const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
-          const isPending = typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
+          // Only show proposals designated for this specific College Dean
+          const userName = userData?.name || "";
+          const isDesignated = !p.selectedRecommendedBy || p.selectedRecommendedBy === userName;
+          const isForApproval = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
+          const isPending = isDesignated && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
           return isForApproval || isPending;
         }
         if (userApprovalField === "endorsedBy") {

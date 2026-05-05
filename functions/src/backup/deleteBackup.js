@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
+const { deleteArchivedStorageFiles } = require("./storageArchive");
 
 //Deletes a specific backup (both metadata and storage file).
 const deleteBackup = async (request) => {
@@ -14,10 +15,11 @@ const deleteBackup = async (request) => {
   }
 
   const callerDoc = await db.collection("users").doc(callerUid).get();
-  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+  const callerRole = callerDoc.data()?.role;
+  if (!callerDoc.exists || callerRole !== "sysadmin") {
     throw new HttpsError(
       "permission-denied",
-      "Only administrators can delete backups.",
+      "Only system administrators can delete backups.",
     );
   }
 
@@ -40,6 +42,10 @@ const deleteBackup = async (request) => {
     if (exists) {
       await file.delete();
     }
+
+    if (backupMeta.storageArchivePrefix) {
+      await deleteArchivedStorageFiles(bucket, backupMeta.storageArchivePrefix);
+    }
   } catch (err) {
     // Continue even if storage deletion fails
     console.warn("Could not delete backup file from storage:", err.message);
@@ -53,7 +59,7 @@ const deleteBackup = async (request) => {
     action: "BACKUP_DELETE",
     uid: callerUid,
     email: callerDoc.data().email || "",
-    role: "admin",
+    role: callerRole,
     backupId,
     timestamp: FieldValue.serverTimestamp(),
   });

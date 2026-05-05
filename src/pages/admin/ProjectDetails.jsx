@@ -27,13 +27,11 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   const [attendees, setAttendees] = useState([]);
   const [allVolunteers, setAllVolunteers] = useState([]);
   const [taskCount, setTaskCount] = useState(0);
-  const [specificActivities, setSpecificActivities] = useState([]);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showFeedbackQR, setShowFeedbackQR] = useState(false);
-  const [qrGenerating, setQrGenerating] = useState(false);
   const [showAttendanceReport, setShowAttendanceReport] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [taskParticipants, setTaskParticipants] = useState([]);
@@ -57,18 +55,18 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
               try {
                 const userSnap = await getDoc(doc(db, "users", v.uid));
                 if (userSnap.exists()) name = userSnap.data().name || userSnap.data().email || "Unknown";
-              } catch (_) { }
+              } catch (_) {}
             }
             let preSurveyAnswers = null;
             let postSurveyAnswers = null;
             try {
               const preDoc = await getDoc(doc(db, "missions", projectId, "volunteer", v.uid, "preSurvey", "response"));
               if (preDoc.exists()) preSurveyAnswers = preDoc.data();
-            } catch (e) { }
+            } catch (e) {}
             try {
               const postDoc = await getDoc(doc(db, "missions", projectId, "volunteer", v.uid, "postSurvey", "response"));
               if (postDoc.exists()) postSurveyAnswers = postDoc.data();
-            } catch (e) { }
+            } catch (e) {}
             return {
               ...v,
               name,
@@ -127,7 +125,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
         title: "Removed from Event",
         message: `You have been removed from "${project?.title || "an event"}".`,
         link: "/student",
-      }).catch(() => { });
+      }).catch(() => {});
       showToast(`${name} removed from this event.`);
     } catch (err) {
       showToast("Failed to remove volunteer. Please try again.");
@@ -135,65 +133,22 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   };
 
   //attendance re-generate timestamp for qr code
-  const generateNewQR = () => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        showToast("Geolocation is not supported by this browser.");
-        reject(new Error("No geolocation support"));
-        return;
-      }
-      setQrGenerating(true);
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          try {
-            const newTimestamp = Date.now();
-            const qrLocation = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              accuracy: pos.coords.accuracy
-            };
+  const generateNewQR = async () => {
+    const newTimestamp = Date.now();
 
-            // Reverse-geocode using Google Maps API
-            let qrLocationName = null;
-            try {
-              const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(qrLocation.lat)},${encodeURIComponent(qrLocation.lng)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
-              const geoResp = await fetch(geoUrl);
-              if (geoResp.ok) {
-                const geoJson = await geoResp.json();
-                qrLocationName = geoJson.results?.[0]?.formatted_address ?? null;
-              }
-            } catch (_) { /* non-critical, skip */ }
-
-            const updatePayload = {
-              validQRTimestamp: newTimestamp,
-              qrLocation,
-              updatedAt: serverTimestamp()
-            };
-            if (qrLocationName) updatePayload.qrLocationName = qrLocationName;
-
-            await updateDoc(doc(db, "missions", projectId), updatePayload);
-            await load(); // reload project (picks up new qrLocation + qrLocationName)
-            resolve();
-          } catch (err) {
-            showToast("Failed to save QR location. Please try again.");
-            reject(err);
-          } finally {
-            setQrGenerating(false);
-          }
-        },
-        (err) => {
-          setQrGenerating(false);
-          showToast("Could not get your location. Please allow GPS access and try again.");
-          reject(err);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
+    await updateDoc(doc(db, "missions", projectId), {
+      validQRTimestamp: newTimestamp,
+      updatedAt: serverTimestamp()
     });
+
+    await load(); // reload project
   };
   const generateQRValue = () => {
+    const expiresAt = Date.now() + (30 * 60 * 1000); // After 30 minutes
+
     return JSON.stringify({
       eventId: projectId,
-      location: project?.qrLocation ?? null
+      expiresAt
     });
   };
 
@@ -255,17 +210,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   useEffect(() => {
     load();
     loadTaskCount();
-    loadSpecificActivities();
   }, [projectId]);
-
-  const loadSpecificActivities = async () => {
-    try {
-      const snap = await getDocs(collection(db, "missions", projectId, "specificActivities"));
-      setSpecificActivities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) {
-      setSpecificActivities([]);
-    }
-  };
 
   const loadTaskCount = async () => {
     try {
@@ -336,9 +281,9 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   };
 
   const canPublish =
-    project?.status === "draft" &&
-    project?.approvals?.approvedBy?.approved === true &&
-    project?.approvals?.endorsedBy?.approved === true;
+    project?.status === "for_approval" &&
+    project?.approvals?.faculty?.approved === true &&
+    project?.approvals?.partner?.approved === true;
 
   if (loading) return <p>Loading…</p>;
   if (!project) return <p>Project not found.</p>;
@@ -428,21 +373,21 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
   // Sidebar style for overlay panel
   const sidebarStyle = sidebar
     ? {
-      position: 'fixed',
-      top: 0,
-      right: 0,
-      width: 420,
-      height: '100vh',
-      background: '#fff',
-      borderLeft: '1px solid #e5e7eb',
-      boxShadow: '-4px 0 20px rgba(0,0,0,0.08)',
-      zIndex: 1000,
-      overflowY: 'auto',
-      padding: 24,
-      color: '#111',
-      display: 'flex',
-      flexDirection: 'column',
-    }
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        width: 420,
+        height: '100vh',
+        background: '#fff',
+        borderLeft: '1px solid #e5e7eb',
+        boxShadow: '-4px 0 20px rgba(0,0,0,0.08)',
+        zIndex: 1000,
+        overflowY: 'auto',
+        padding: 24,
+        color: '#111',
+        display: 'flex',
+        flexDirection: 'column',
+      }
     : { color: '#111' };
 
   // Card style for analytics panels
@@ -525,39 +470,6 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
         </span>
       </div>
 
-
-      {/* Activities from specificActivities subcollection */}
-      {specificActivities.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <h3 style={{ color: '#111', fontWeight: 700, margin: '0 0 8px 0', fontSize: 15 }}>Activities</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {specificActivities.map((act, idx) => (
-              <div key={act.id || idx} style={{
-                background: '#f8fafc',
-                border: '1px solid #e5e7eb',
-                borderRadius: 10,
-                padding: '10px 14px',
-              }}>
-                <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 14 }}>
-                  {act.title || act.name || `Activity ${idx + 1}`}
-                </div>
-                {act.description && (
-                  <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>{act.description}</div>
-                )}
-                {act.date && (
-                  <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 4 }}>📅 {act.date}</div>
-                )}
-                {act.time && (
-                  <div style={{ color: '#94a3b8', fontSize: 12 }}>⏰ {act.time}</div>
-                )}
-                {act.location && (
-                  <div style={{ color: '#94a3b8', fontSize: 12 }}>📍 {act.location}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/*progress bar no. of joined */}
       <div className="mission-progress">
@@ -788,9 +700,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
 
           <div className="qr-actions">
             <button onClick={() => setShowQR(true)}>View</button>
-            <button onClick={() => generateNewQR().catch(() => {})} disabled={qrGenerating}>
-              {qrGenerating ? "Getting location…" : "Reset"}
-            </button>
+            <button onClick={generateNewQR}>Reset</button>
           </div>
 
         </div>
@@ -875,7 +785,7 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
           Delete
         </button>
 
-        <button onClick={() => setStatus("published")}>
+        <button disabled={!canPublish || saving} onClick={() => setStatus("published")}> 
           Publish
         </button>
       </div>
@@ -891,20 +801,13 @@ export default function ProjectDetails({ projectId: propProjectId, onClose, side
           <div style={{ marginTop: 8, fontSize: 12, color: "#555" }}>
             Scan this code to record attendance.
           </div>
-          {project?.qrLocationName && (
-            <div style={{ marginTop: 6, fontSize: 12, color: "#444", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-              <span>📍</span>
-              <span>{project.qrLocationName}</span>
-            </div>
-          )}
           <button
-            disabled={qrGenerating}
             onClick={async () => {
-              await generateNewQR().catch(() => {});
+              await generateNewQR();
               setShowQR(true);
             }}
           >
-            {qrGenerating ? "Getting location…" : "Generate Attendance QR"}
+            Generate Attendance QR
           </button>
         </div>
       )}
