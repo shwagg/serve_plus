@@ -5,6 +5,7 @@ import { auth, db } from "../firebaseConfig";
 import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
+import loginPoster from "../assets/login_poster.png";
 import "../styles/ui.css";
 
 function Register() {
@@ -161,116 +162,126 @@ function Register() {
     };
 
     return (
-        <div className="ui-container">
-            <div className="ui-card">
-                <form className="ui-form" onSubmit={registerSubmit}>
-                    <div className="auth-logo-row">
-                        <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
-                        <span className="auth-logo-text">
-                            SERVE<span className="auth-logo-plus">+</span>
-                        </span>
-                    </div>
+        <div className="auth-page">
+            <div className="auth-split">
+                {/* Left: poster */}
+                <div className="auth-poster-panel">
+                    <img src={loginPoster} alt="SERVE+ illustration" />
+                </div>
 
-                    <p className="ui-link" style={{ margin: "2px 0 10px" }}>
-                        Already have an account?{" "}
-                        <Link to="/auth">Login here</Link>
-                    </p>
+                {/* Right: form */}
+                <div className="auth-form-panel">
+                    <form className="ui-form auth-login-form" onSubmit={registerSubmit}>
+                        <div className="auth-logo-row">
+                            <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
+                            <span className="auth-logo-text">
+                                SERVE<span className="auth-logo-plus">+</span>
+                            </span>
+                        </div>
 
-                    <div className="reg-name-row">
-                        <input
-                            className="ui-input"
-                            type="text"
-                            placeholder="First Name"
-                            onChange={(e) => setFirstName(e.target.value)}
-                            required
-                        />
-                        
-                        <input
-                            className="ui-input"
-                            type="text"
-                            placeholder="Last Name"
-                            onChange={(e) => setLastName(e.target.value)}
-                            required
-                        />
-                        <input
-                            className="ui-input reg-mi"
-                            type="text"
-                            placeholder="M.I."
-                            maxLength={1}
-                            onChange={(e) => setMiddleInitial(e.target.value)}
-                        />
-                    </div>
+                        <p className="ui-link" style={{ margin: "2px 0 10px" }}>
+                            Already have an account?{" "}
+                            <Link to="/auth">Login here</Link>
+                        </p>
 
-                    <div style={{ width: "100%", maxWidth: 420 }}>
-                        <div className={`ui-input-prefix-wrap${usernameStatus === "taken" ? " ui-input--error" : ""}`}>
-                            <span className="ui-input-prefix">@</span>
+                        <div className="reg-name-row">
                             <input
-                                className="ui-input-bare"
+                                className="ui-input"
                                 type="text"
-                                placeholder="Username"
-                                onChange={(e) => { setUsername(e.target.value); setUsernameStatus(null); }}
-                                onBlur={handleUsernameBlur}
+                                placeholder="First Name"
+                                onChange={(e) => setFirstName(e.target.value)}
                                 required
                             />
+                            <input
+                                className="ui-input"
+                                type="text"
+                                placeholder="Last Name"
+                                onChange={(e) => setLastName(e.target.value)}
+                                required
+                            />
+                            <input
+                                className="ui-input reg-mi"
+                                type="text"
+                                placeholder="M.I."
+                                maxLength={1}
+                                onChange={(e) => setMiddleInitial(e.target.value)}
+                            />
                         </div>
-                        {usernameStatus === "taken" && (
-                            <p className="field-hint error">Username has already been used.</p>
-                        )}
-                    </div>
 
-                    <input
-                        className="ui-input"
-                        type="email"
-                        placeholder="Email"
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
+                        <div style={{ width: "100%", maxWidth: 420 }}>
+                            <div className={`ui-input-prefix-wrap${usernameStatus === "taken" ? " ui-input--error" : ""}`}>
+                                <span className="ui-input-prefix">@</span>
+                                <input
+                                    className="ui-input-bare"
+                                    type="text"
+                                    placeholder="Username"
+                                    onChange={(e) => { setUsername(e.target.value); setUsernameStatus(null); }}
+                                    onBlur={handleUsernameBlur}
+                                    required
+                                />
+                            </div>
+                            {usernameStatus === "taken" && (
+                                <p className="field-hint error">Username has already been used.</p>
+                            )}
+                        </div>
 
-                    <div className="ui-input-pass-wrap">
                         <input
                             className="ui-input"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Password"
-                            onChange={(e) => setPassword(e.target.value)}
+                            style={{ width: "100%", maxWidth: 420, boxSizing: "border-box" }}
+                            type="email"
+                            placeholder="Email"
+                            onChange={(e) => setEmail(e.target.value)}
                             required
                         />
-                        {password.length > 0 && (
-                            <button
-                                type="button"
-                                className="ui-btn eye"
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                                onClick={() => setShowPassword((prev) => !prev)}
-                            >
-                                {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                            </button>
-                        )}
-                    </div>
 
-                    <div className="ui-input-pass-wrap">
-                        <input
-                            className="ui-input"
-                            type={showConfirmPassword ? "text" : "password"}
-                            placeholder="Confirm Password"
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                        />
-                        {confirmPassword.length > 0 && (
-                            <button
-                                type="button"
-                                className="ui-btn eye"
-                                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                                onClick={() => setShowConfirmPassword((prev) => !prev)}
-                            >
-                                {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                            </button>
-                        )}
-                    </div>
+                        <div className="ui-input-pass-wrap" style={{ maxWidth: 420 }}>
+                            <input
+                                className="ui-input pass"
+                                style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                            {password.length > 0 && (
+                                <button
+                                    type="button"
+                                    className="ui-btn eye"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                >
+                                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                </button>
+                            )}
+                        </div>
 
-                    <button className="ui-btn" type="submit" disabled={loading}>
-                        {loading ? "Creating Account..." : "Create Account"}
-                    </button>
-                    {error && <p className="ui-error">{error}</p>}
-                </form>
+                        <div className="ui-input-pass-wrap" style={{ maxWidth: 420 }}>
+                            <input
+                                className="ui-input pass"
+                                style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="Confirm Password"
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                            />
+                            {confirmPassword.length > 0 && (
+                                <button
+                                    type="button"
+                                    className="ui-btn eye"
+                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                >
+                                    {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                </button>
+                            )}
+                        </div>
+
+                        <button className="auth-login-btn" type="submit" disabled={loading}>
+                            {loading ? "Creating Account..." : "Create Account"}
+                        </button>
+                        {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
+                    </form>
+                </div>
             </div>
         </div>
     );
