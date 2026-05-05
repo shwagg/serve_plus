@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import "../../styles/CurrentEvent.css";
+import LoadingOverlay from "../../components/LoadingOverlay";
 import "../../styles/ReviewProposal.css";
 import { createNotification } from "../../utils/notificationUtils";
 import { showToast, showConfirm } from "../../utils/toast";
@@ -1396,7 +1397,7 @@ export default function CurrentEvent() {
       <hr className="ap-divider" />
 
       {loading ? (
-        <div className="loading-message">Loading events…</div>
+        <LoadingOverlay />
       ) : filtered.length === 0 ? (
         <div className="rp-empty">
           <div className="rp-empty-icon">📅</div>

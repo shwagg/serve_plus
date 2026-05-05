@@ -37,9 +37,9 @@ export function SessionProvider({ children }) {
     const role = userDataRef.current?.role;
     const timeout = SESSION_TIMEOUTS[role] ?? DEFAULT_TIMEOUT;
 
-    inactivityTimerRef.current = setTimeout(() => {
-      handleSessionTimeout();
-    }, timeout);
+    //inactivityTimerRef.current = setTimeout(() => {
+      //handleSessionTimeout();
+    //}, timeout);
   };
 
   // Handle session timeout

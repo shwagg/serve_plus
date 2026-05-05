@@ -8,6 +8,7 @@ import Header from "../../../components/Header";
 import { showConfirm } from "../../../utils/toast";
 import { WestIcon, ModeRoundedIcon, DeleteRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
 import cloudsBg from '../../../assets/clouds-bg.jpg';
+import LoadingOverlay from '../../../components/LoadingOverlay';
 import mission1 from '../../../assets/mission1.jpg';
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
@@ -2477,10 +2478,7 @@ export default function EventActivity() {
               </div>
             </div>
           </section>
-          <div className="ea-slide-in ea-loading-screen">
-            <div className="ea-loading-spinner" />
-            <span>Loading event...</span>
-          </div>
+          <LoadingOverlay />
         </div>
       </div>
     );

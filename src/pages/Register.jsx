@@ -4,9 +4,13 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
+import servePlusIcon from "../assets/serve_plus_icon.svg";
+import "../styles/ui.css";
 
 function Register() {
-    const [name, setName] = useState("");
+    const [firstName, setFirstName] = useState("");
+    const [middleInitial, setMiddleInitial] = useState("");
+    const [lastName, setLastName] = useState("");
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -15,7 +19,20 @@ function Register() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [usernameStatus, setUsernameStatus] = useState(null); // null | "checking" | "taken" | "available"
     const navigate = useNavigate();
+
+    const handleUsernameBlur = async () => {
+        const input = username.trim();
+        if (!input) { setUsernameStatus(null); return; }
+        setUsernameStatus("checking");
+        try {
+            const snap = await getDocs(query(collection(db, "users"), where("username", "==", input)));
+            setUsernameStatus(snap.empty ? "available" : "taken");
+        } catch {
+            setUsernameStatus(null);
+        }
+    };
 
     const registerSubmit = async (e) => {
         e.preventDefault();
@@ -101,9 +118,12 @@ function Register() {
                 });
             }
 
+            const fullName = [firstName.trim(), middleInitial.trim() ? middleInitial.trim().toUpperCase() : null, lastName.trim()]
+                .filter(Boolean).join(" ");
+
             await setDoc(doc(db, "users", uid), {
                 uid,
-                name,
+                name: fullName,
                 username,
                 email,
                 role: "student", // Default role for new registrations
@@ -144,31 +164,59 @@ function Register() {
         <div className="ui-container">
             <div className="ui-card">
                 <form className="ui-form" onSubmit={registerSubmit}>
-                    <h2 className="ui-title">
-                        SIGN UP <span className="ui-title-to">to</span> SERVE<span className="ui-title-plus">+</span>
-                    </h2>
+                    <div className="auth-logo-row">
+                        <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
+                        <span className="auth-logo-text">
+                            SERVE<span className="auth-logo-plus">+</span>
+                        </span>
+                    </div>
 
-                    {/* Link to Login Page if account exists */}
-                    <p className="ui-link">
+                    <p className="ui-link" style={{ margin: "2px 0 10px" }}>
                         Already have an account?{" "}
                         <Link to="/auth">Login here</Link>
                     </p>
 
-                    <input
-                        className="ui-input"
-                        type="text"
-                        placeholder="Name"
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                    />
+                    <div className="reg-name-row">
+                        <input
+                            className="ui-input"
+                            type="text"
+                            placeholder="First Name"
+                            onChange={(e) => setFirstName(e.target.value)}
+                            required
+                        />
+                        
+                        <input
+                            className="ui-input"
+                            type="text"
+                            placeholder="Last Name"
+                            onChange={(e) => setLastName(e.target.value)}
+                            required
+                        />
+                        <input
+                            className="ui-input reg-mi"
+                            type="text"
+                            placeholder="M.I."
+                            maxLength={1}
+                            onChange={(e) => setMiddleInitial(e.target.value)}
+                        />
+                    </div>
 
-                    <input
-                        className="ui-input"
-                        type="text"
-                        placeholder="Username"
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                    />
+                    <div style={{ width: "100%", maxWidth: 420 }}>
+                        <div className={`ui-input-prefix-wrap${usernameStatus === "taken" ? " ui-input--error" : ""}`}>
+                            <span className="ui-input-prefix">@</span>
+                            <input
+                                className="ui-input-bare"
+                                type="text"
+                                placeholder="Username"
+                                onChange={(e) => { setUsername(e.target.value); setUsernameStatus(null); }}
+                                onBlur={handleUsernameBlur}
+                                required
+                            />
+                        </div>
+                        {usernameStatus === "taken" && (
+                            <p className="field-hint error">Username has already been used.</p>
+                        )}
+                    </div>
 
                     <input
                         className="ui-input"
