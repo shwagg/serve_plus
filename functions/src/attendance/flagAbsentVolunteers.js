@@ -149,11 +149,11 @@ async function runFlagCheck(db) {
 }
 
 /**
- * Scheduled: runs every day at 6 AM (Asia/Manila) to auto-flag absent volunteers.
+ * Scheduled: runs every day at 12 AM (midnight, Asia/Manila) to auto-flag absent volunteers.
  */
 const scheduledFlagAbsentVolunteers = onSchedule(
   {
-    schedule: "0 6 * * *",
+    schedule: "0 0 * * *",
     region: "asia-southeast1",
     timeZone: "Asia/Manila",
   },
