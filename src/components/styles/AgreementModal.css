@@ -54,31 +54,34 @@
 /* ── Tabs ── */
 .agreement-modal-tabs {
   display: flex;
-  border-bottom: 2px solid #e2e8f0;
-  padding: 0 1.5rem;
-  gap: 0;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 4px;
+  margin: 0 1.5rem 0.75rem;
+  gap: 4px;
 }
 
 .agreement-modal-tab {
   flex: 1;
-  padding: 0.65rem 0;
+  padding: 0.5rem 0;
   font-size: 0.92rem;
   font-weight: 600;
   text-align: center;
-  background: none;
+  background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-radius: 6px;
   color: #94a3b8;
   cursor: pointer;
   transition:
     color 0.2s,
-    border-color 0.2s;
-  margin-bottom: -2px;
+    background 0.2s,
+    box-shadow 0.2s;
 }
 
 .agreement-modal-tab.active {
-  color: #1976d2;
-  border-bottom-color: #1976d2;
+  background: #fff;
+  color: #1a1a2e;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .agreement-modal-tab:hover:not(.active) {

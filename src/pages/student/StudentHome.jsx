@@ -16,6 +16,30 @@ import banner from '../../assets/banner.jpg';
 import cloudsBg from '../../assets/clouds-bg.jpg';
 import mountainBg from '../../assets/mountain-bg.jpg';
 
+const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.max(0, Math.min(100, percent)) / 100) * circumference;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+      <circle
+        cx={size/2} cy={size/2} r={radius}
+        fill="none"
+        stroke="#30bdb7"
+        strokeWidth={stroke}
+        strokeDasharray={`${circumference}`}
+        strokeDashoffset={`${offset}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`}
+      />
+      <text x={size/2} y={size/2 + 5} textAnchor="middle" fontSize="12" fontWeight="700" fill="#1f2937">
+        {percent}%
+      </text>
+    </svg>
+  );
+};
+
 const landingPromos = [
   {
     id: 1,
@@ -64,6 +88,8 @@ const StudentHome = () => {
   const [proposalRefreshKey, setProposalRefreshKey] = useState(0);
   const [proposalCards, setProposalCards] = useState([]);
   const [volunteerInfo, setVolunteerInfo] = useState({});
+  const [studentAvatar, setStudentAvatar] = useState('');
+  const [enrollmentDetails, setEnrollmentDetails] = useState({});
 
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = landingPromos.length;
@@ -143,16 +169,24 @@ const StudentHome = () => {
         setVolunteerInfo(infoMap);
 
         const enrollmentMap = {};
+        const enrollmentDetailsMap = {};
         let completed = 0;
         if (user) {
           missions.forEach((m, i) => {
             const snap = enrollmentSnaps[i];
-            enrollmentMap[m.id] = snap.exists() ? (snap.data().registrationStatus || "pending") : null;
-            if (snap.exists() && snap.data().completionStatus === "completed") completed++;
+            if (snap.exists()) {
+              const data = snap.data();
+              enrollmentMap[m.id] = data.registrationStatus || "pending";
+              enrollmentDetailsMap[m.id] = data;
+              if (data.completionStatus === "completed") completed++;
+            } else {
+              enrollmentMap[m.id] = null;
+            }
           });
         }
 
         setEnrolledMissions(enrollmentMap);
+        setEnrollmentDetails(enrollmentDetailsMap);
         setCompletedMissions(completed);
       } catch (error) {
         console.error("Error fetching missions:", error);
@@ -226,6 +260,7 @@ const StudentHome = () => {
             const userData = userDoc.data();
             setStudentUsername(userData.username || "");
             setStudentName(userData.name || resolvedName);
+            setStudentAvatar(userData.avatar || '');
             const totalPoints = userData.totalPoints || 0;
             setCurrentPoints(totalPoints);
             const calculatedLevel = Math.floor(totalPoints / 100) + 1;
@@ -376,6 +411,24 @@ const StudentHome = () => {
     return missionCards;
   }, [activeTab, missionCards, enrolledMissions]);
 
+  // Active (approved) missions shown in the CURRENT section
+  const activeMissions = useMemo(() =>
+    missionCards.filter(m => enrolledMissions[m.id] === 'approved'),
+    [missionCards, enrolledMissions]
+  );
+
+  const getMissionProgress = useCallback((missionId) => {
+    const detail = enrollmentDetails[missionId];
+    if (!detail?.progress) return 0;
+    const p = detail.progress;
+    const steps = [
+      p.consent !== 'locked',
+      p.preSurvey !== 'locked',
+      p.attendance === 'checked_in',
+    ];
+    return Math.round((steps.filter(Boolean).length / steps.length) * 100);
+  }, [enrollmentDetails]);
+
   return (
     <>
     <div className="full-page">
@@ -450,26 +503,72 @@ const StudentHome = () => {
         {/* PROFILE LEVEL RANK */}
         <section className="player-strip" aria-label="Player stats">
           <div className="player-strip-inner">
-            <div className="player-profile">
-              <span className="player-greeting">
-                Hi, {(studentName || studentUsername || '').trim().split(/\s+/)[0] || (currentUser?.email ? currentUser.email.split('@')[0] : 'Student')}!
-              </span>
-            </div>
-
-            <div className="player-missions">
-              <span className="missions-label">Missions Completed</span>
-              <span className="missions-count">{completedMissions}</span>
-            </div>
-
-            <div className="player-level">
-              <span className="level-label">Level {level}</span>
-              <div className="level-bar" role="progressbar" aria-valuenow={currentPoints % 100} aria-valuemin={0} aria-valuemax={100}>
-                <div className="level-bar-fill" style={{ width: `${currentPoints % 100}%` }}></div>
+            <div className="strip-compact-row">
+              <span className="strip-level-text">Lv. {level}</span>
+              <div className="strip-xp-chip">{currentPoints}</div>
+              <div
+                className="level-bar strip-progress-bar"
+                role="progressbar"
+                aria-valuenow={currentPoints % 100}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div className="level-bar-fill" style={{ width: `${currentPoints % 100}%` }} />
               </div>
-              <span className="level-points">{currentPoints} pts ({currentPoints % 100}/100)</span>
+              <span className="strip-divider">|</span>
+              <span className="strip-missions-text">Missions <span className="strip-pipe">|</span> {completedMissions}</span>
             </div>
           </div>
         </section>
+        {/* CURRENT ACTIVE MISSIONS */}
+        {activeMissions.length > 0 && (
+          <section className="current-section" aria-label="Current missions">
+            <h2 className="current-section-title">Current</h2>
+            <div className="current-mission-list">
+              {activeMissions.map((mission) => {
+                const progressPct = getMissionProgress(mission.id);
+                const info = volunteerInfo[mission.id];
+                const count = info?.count ?? 0;
+                const preview = info?.preview ?? [];
+                const extra = count - preview.length;
+                return (
+                  <div
+                    key={mission.id}
+                    className="current-mission-card"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/event/${mission.id}/activity`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/event/${mission.id}/activity`); } }}
+                  >
+                    <div className="current-card-image">
+                      <img src={mission.img || mission1} alt={mission.title} loading="lazy" />
+                    </div>
+                    <div className="current-card-body">
+                      <h3 className="current-card-title">{mission.title}</h3>
+                      <span className="current-card-date">{formatDate(mission.targetDate || mission.targetDates) || 'Date TBA'}</span>
+                      {count > 0 && (
+                        <div className="vol-preview">
+                          {preview.map((vol, i) => (
+                            <div key={i} className="vol-bubble" style={{ zIndex: preview.length - i, background: vol.avatar ? undefined : '#30bdb7' }}>
+                              {vol.avatar ? <img src={vol.avatar} alt="" /> : <span>{getInitials(vol.name)}</span>}
+                            </div>
+                          ))}
+                          {extra > 0 && <div className="vol-bubble vol-bubble-extra">+{extra}</div>}
+                          <span className="vol-joined-text">joined</span>
+                        </div>
+                      )}
+                      <span className="current-card-status">Status: {mission.status === 'published' ? 'Open' : mission.status}</span>
+                    </div>
+                    <div className="current-card-progress">
+                      <ProgressRing percent={progressPct} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* MISSION */}
         <section ref={missionsSectionRef} className="mission-section" aria-label="Missions" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat' }}>
           <div className="mission-section-header">

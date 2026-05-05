@@ -102,6 +102,7 @@ export function SessionProvider({ children }) {
   // Monitor auth state changes and fetch user data
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      setAuthLoading(true);
       try {
         if (user) {
           // On successful login clear auto-logout marker and any popstate handler

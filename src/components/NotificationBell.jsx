@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebaseConfig";
+import { useSession } from "../context/SessionContext";
 import notificationIcon from "../assets/headassets/Notification Icon.svg";
 import {
   subscribeToNotifications,
@@ -10,6 +11,8 @@ import {
 import "./styles/NotificationBell.css";
 
 export default function NotificationBell() {
+  const { userData } = useSession();
+  const notifEnabled = userData?.globalNotificationsEnabled !== false;
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -108,7 +111,7 @@ export default function NotificationBell() {
         aria-haspopup="dialog"
       >
         <img src={notificationIcon} alt="" width="24" height="24" aria-hidden="true" />
-        {unreadCount > 0 && (
+        {notifEnabled && unreadCount > 0 && (
           <span className="notification-badge" aria-hidden="true">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
@@ -154,7 +157,15 @@ export default function NotificationBell() {
             aria-live="polite"
             aria-label="Notification items"
           >
-            {notifications.length === 0 ? (
+            {!notifEnabled ? (
+              <div className="no-notifications" role="status">
+                <span className="no-notifications-icon">🔕</span>
+                <p>Notifications are disabled</p>
+                <p className="no-notifications-sub">
+                  Enable them in Settings → Notifications
+                </p>
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="no-notifications" role="status">
                 <span className="no-notifications-icon">🔔</span>
                 <p>You're all caught up!</p>

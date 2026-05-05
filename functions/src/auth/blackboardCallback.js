@@ -36,7 +36,9 @@ exports.blackboardCallback = onRequest(
       // Exchange code for access token
       console.log("Exchanging authorization code for access token...");
       const tokenData = await exchangeCodeForToken(code);
-      const { access_token, user_id } = tokenData;
+      console.log("Token data keys:", Object.keys(tokenData));
+      console.log("access_token present:", !!tokenData.access_token);
+      const { access_token } = tokenData;
 
       // Fetch user profile from Blackboard
       console.log("Fetching user profile from Blackboard...");
@@ -58,11 +60,9 @@ exports.blackboardCallback = onRequest(
       return res.redirect(callbackUrl);
     } catch (error) {
       console.error("Blackboard callback error:", error.message);
-      const errorMsg = encodeURIComponent(
-        error.message || "Authentication failed",
-      );
+      const errorMsg = encodeURIComponent(error.message || "Authentication failed");
       return res.redirect(
-        `${process.env.FRONTEND_URL}/auth?error=${errorMsg}`,
+        `${process.env.FRONTEND_URL}/auth?error=${errorMsg}&debug=1`,
       );
     }
   },
@@ -74,4 +74,4 @@ function validateOAuthState(sessionState, queryState) {
   }
 }
 
-module.exports = { validateOAuthState };
+exports.validateOAuthState = validateOAuthState;

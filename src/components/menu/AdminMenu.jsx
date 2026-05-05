@@ -4,7 +4,6 @@ import infoIcon from "../../assets/menuassets/Info.svg";
 import privacyPol from "../../assets/menuassets/PrivacyPolicy.svg";
 import settingsIcon from "../../assets/menuassets/Settings.svg";
 import supportIcon from "../../assets/menuassets/Support.svg";
-import viewIcon from "../../assets/menuassets/View.svg";
 import "../styles/Menu.css";
 export default function AdminMenu({
   userName,
@@ -14,7 +13,7 @@ export default function AdminMenu({
   onLogout,
   onClose,
   onCreateProposal,
-  onOpenCertificateQR,
+  onOpenSettings,
 }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -55,7 +54,7 @@ export default function AdminMenu({
         </button>
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/global/menu/settings")}
+          onClick={() => { onClose(); onOpenSettings(); }}
         >
           <img src={settingsIcon} alt="Settings" className="menu-icon" />
           Settings
@@ -83,16 +82,6 @@ export default function AdminMenu({
         </button>
       </div>
       <div className="menu-divider"></div>
-      <button
-        className="menu-item"
-        onClick={() => {
-          onClose();
-          navigate("/verify-certificate");
-        }}
-      >
-        <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
-        Verify Certificate
-      </button>
       <button className="logout-btn" onClick={onLogout}>
         Log Out
       </button>

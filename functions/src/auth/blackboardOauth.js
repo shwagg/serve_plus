@@ -11,16 +11,25 @@ const BLACKBOARD_REDIRECT_URI = process.env.BLACKBOARD_REDIRECT_URI;
 
 async function exchangeCodeForToken(code) {
   try {
-    const response = await axios.post(BLACKBOARD_TOKEN_URL, null, {
-      params: {
-        grant_type: "authorization_code",
-        code: code,
-        client_id: BLACKBOARD_CLIENT_ID,
-        client_secret: BLACKBOARD_CLIENT_SECRET,
-        redirect_uri: BLACKBOARD_REDIRECT_URI,
+    const credentials = Buffer.from(
+      `${BLACKBOARD_CLIENT_ID}:${BLACKBOARD_CLIENT_SECRET}`
+    ).toString("base64");
+
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: code,
+      redirect_uri: BLACKBOARD_REDIRECT_URI,
+    }).toString();
+
+    const response = await axios.post(BLACKBOARD_TOKEN_URL, body, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Basic ${credentials}`,
       },
     });
 
+    console.log("Token response fields:", Object.keys(response.data));
+    console.log("Token response data:", JSON.stringify(response.data));
     return response.data;
   } catch (error) {
     console.error(
@@ -41,11 +50,14 @@ async function fetchBlackboardUserProfile(accessToken) {
 
     return response.data;
   } catch (error) {
-    console.error(
-      "Failed to fetch user profile:",
-      error.response?.data || error.message,
-    );
-    throw new Error("Failed to fetch user profile from Blackboard");
+    const status = error.response?.status;
+    const data = error.response?.data;
+    console.error("fetchBlackboardUserProfile failed:");
+    console.error("  URL:", BLACKBOARD_USER_URL);
+    console.error("  Status:", status);
+    console.error("  Response:", JSON.stringify(data));
+    console.error("  Message:", error.message);
+    throw new Error(`Blackboard /me failed [${status}]: ${JSON.stringify(data) || error.message}`);
   }
 }
 

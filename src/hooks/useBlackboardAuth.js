@@ -21,7 +21,6 @@ export function useBlackboardAuth() {
       client_id: BLACKBOARD_CLIENT_ID,
       response_type: "code",
       redirect_uri: BLACKBOARD_REDIRECT_URI,
-      scope: "openid profile email", // Request specific scopes
       state: state,
     });
 

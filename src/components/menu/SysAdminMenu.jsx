@@ -14,6 +14,7 @@ export default function SysAdminMenu({
   userAvatar,
   onLogout,
   onClose,
+  onOpenSettings,
 }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -84,6 +85,13 @@ export default function SysAdminMenu({
         >
           <img src={infoIcon} alt="About Us" className="menu-icon" />
           About Us
+        </button>
+        <button
+          className="menu-item"
+          onClick={() => { onClose(); onOpenSettings(); }}
+        >
+          <img src={settingsIcon} alt="Settings" className="menu-icon" />
+          Settings
         </button>
       </div>
       <div className="menu-divider"></div>

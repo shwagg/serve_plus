@@ -18,6 +18,7 @@ function Register() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [confirmPasswordError, setConfirmPasswordError] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [usernameStatus, setUsernameStatus] = useState(null); // null | "checking" | "taken" | "available"
@@ -41,7 +42,7 @@ function Register() {
         setLoading(true);
 
         if (password !== confirmPassword) {
-            setError("Password does not match");
+            setConfirmPasswordError("Passwords do not match.");
             setLoading(false);
             return;
         }
@@ -255,26 +256,40 @@ function Register() {
                             )}
                         </div>
 
-                        <div className="ui-input-pass-wrap" style={{ maxWidth: 420 }}>
-                            <input
-                                className="ui-input pass"
-                                style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
-                                type={showConfirmPassword ? "text" : "password"}
-                                placeholder="Confirm Password"
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                            />
-                            {confirmPassword.length > 0 && (
-                                <button
-                                    type="button"
-                                    className="ui-btn eye"
-                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                                >
-                                    {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                </button>
+                        <div style={{ width: "100%", maxWidth: 420 }}>
+                            <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
+                                <input
+                                    className={`ui-input pass${confirmPasswordError ? " ui-input--error" : ""}`}
+                                    style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    placeholder="Confirm Password"
+                                    onChange={(e) => { setConfirmPassword(e.target.value); setConfirmPasswordError(""); }}
+                                    onBlur={() => {
+                                        if (confirmPassword && confirmPassword !== password) {
+                                            setConfirmPasswordError("Passwords do not match.");
+                                        } else {
+                                            setConfirmPasswordError("");
+                                        }
+                                    }}
+                                    required
+                                />
+                                {confirmPassword.length > 0 && (
+                                    <button
+                                        type="button"
+                                        className="ui-btn eye"
+                                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                    >
+                                        {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                    </button>
+                                )}
+                            </div>
+                            {confirmPasswordError && (
+                                <p className="field-hint error">{confirmPasswordError}</p>
                             )}
+                            <br />
                         </div>
+                        
 
                         <button className="auth-login-btn" type="submit" disabled={loading}>
                             {loading ? "Creating Account..." : "Create Account"}

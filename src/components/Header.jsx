@@ -14,6 +14,7 @@ import AdminMenu from './menu/AdminMenu';
 import PartnerMenu from './menu/PartnerMenu';
 import SysAdminMenu from './menu/SysAdminMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
+import SettingsModal from './SettingsModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
 import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon } from './icons';
 import ChatModal from './ChatModal';
@@ -81,6 +82,7 @@ export default function Header() {
   const [selectedProjectType, setSelectedProjectType] = useState('');
   const [isCheckingPendingProposal, setIsCheckingPendingProposal] = useState(false);
   const [showCertificateQRModal, setShowCertificateQRModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const menuRef = useRef(null);
@@ -186,18 +188,29 @@ export default function Header() {
     setSelectedProjectType('');
   };
 
+  const handleOpenSettings = () => {
+    setShowMenu(false);
+    setShowSettings(true);
+  };
+
   const renderMenu = () => {
+    const commonProps = {
+      userName, userEmail, userUsername, userAvatar,
+      onLogout: handleLogout,
+      onClose: () => setShowMenu(false),
+      onOpenSettings: handleOpenSettings,
+    };
     switch (userRole) {
       case 'student':
-        return <StudentMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} onOpenCertificateQR={() => setShowCertificateQRModal(true)} />;
+        return <StudentMenu {...commonProps} onCreateProposal={handleOpenProposalModal} />;
       case 'faculty':
-        return <FacultyMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} onOpenCertificateQR={() => setShowCertificateQRModal(true)} />;
+        return <FacultyMenu {...commonProps} onCreateProposal={handleOpenProposalModal} />;
       case 'admin':
-        return <AdminMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} onCreateProposal={handleOpenProposalModal} onOpenCertificateQR={() => setShowCertificateQRModal(true)} />;
+        return <AdminMenu {...commonProps} onCreateProposal={handleOpenProposalModal} />;
       case 'partner':
-        return <PartnerMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
+        return <PartnerMenu {...commonProps} />;
       case 'sysadmin':
-        return <SysAdminMenu userName={userName} userEmail={userEmail} userUsername={userUsername} userAvatar={userAvatar} onLogout={handleLogout} onClose={() => setShowMenu(false)} />;
+        return <SysAdminMenu {...commonProps} />;
       default:
         return null;
     }
@@ -225,17 +238,22 @@ export default function Header() {
                   title={userName || 'Profile'}
                   onClick={() => setShowMenu(!showMenu)}
                 >
-                  {userAvatar ? (
-                    <img src={userAvatar} alt="Profile" className="header-avatar" />
-                  ) : (
-                    <div className="header-avatar-initials">
-                      {(() => {
-                        const parts = (userName || '?').trim().split(/\s+/);
-                        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-                        return (userName?.slice(0, 2) || '?').toUpperCase();
-                      })()}
-                    </div>
-                  )}
+                  <div className="header-profile-wrap">
+                    {userAvatar ? (
+                      <img src={userAvatar} alt="Profile" className="header-avatar" />
+                    ) : (
+                      <div className="header-avatar-initials">
+                        {(() => {
+                          const parts = (userName || '?').trim().split(/\s+/);
+                          if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+                          return (userName?.slice(0, 2) || '?').toUpperCase();
+                        })()}
+                      </div>
+                    )}
+                    {userName && (
+                      <span className="header-greeting">Hi, {userName.trim().split(/\s+/)[0]}!</span>
+                    )}
+                  </div>
                 </button>
               )}
               {showMenu && renderMenu()}
@@ -283,6 +301,10 @@ export default function Header() {
       <CertificateQRScannerModal
         isOpen={showCertificateQRModal}
         onClose={() => setShowCertificateQRModal(false)}
+      />
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
       />
     </>
   );
