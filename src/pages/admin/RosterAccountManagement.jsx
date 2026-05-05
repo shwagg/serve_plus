@@ -5,13 +5,16 @@ import {
   getDocs,
   updateDoc,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import ChangeIcon from "../../components/icons/Change.svg";
 import { db } from "../../firebaseConfig";
 import { showToast } from "../../utils/toast";
+import { logAudit } from "../../utils/auditLogger";
+import { SessionContext } from "../../context/SessionContext";
 import "../../styles/RosterAccountManagement.css";
 
 export default function RosterAccountManagement({ readOnly = false }) {
+  const { userData: actorData } = useContext(SessionContext);
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -209,6 +212,21 @@ export default function RosterAccountManagement({ readOnly = false }) {
       }
 
       await updateDoc(userRef, updateData);
+
+      logAudit({
+        action: "ROLE_CHANGED",
+        category: "account",
+        actorName: actorData?.name || "",
+        details: {
+          targetUserId: userId,
+          targetUserName: currentUser.name || "",
+          targetUserEmail: currentUser.email || "",
+          previousRole: currentUser.role || "",
+          newRole: selectedRole,
+          newPosition: selectedPosition || "",
+          newDepartment: selectedDepartment || "",
+        },
+      });
 
       // Update local state
       setUsers(

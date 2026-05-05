@@ -5,6 +5,7 @@ import { db } from "../../firebaseConfig";
 import { getAuth } from "firebase/auth";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { checkAndAssignBadges } from "../../hooks/badgeSystem";
+import { logAudit } from "../../utils/auditLogger";
 
 export const releaseMissionPoints = async (missionId) => {
     const volunteerSnap = await getDocs(
@@ -111,6 +112,18 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         completionStatus: "graded",
         releasedAt: serverTimestamp(),
         releasedBy: adminName,
+    });
+
+    logAudit({
+      action: "POINTS_RELEASED",
+      category: "reward",
+      actorName: adminName,
+      details: {
+        missionId,
+        targetUserId: volunteerId,
+        targetUserName: volunteerData.displayName || volunteerData.name || "",
+        pointsEarned: finalPoints,
+      },
     });
 
     // Check and assign any newly earned badges after grading

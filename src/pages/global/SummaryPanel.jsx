@@ -3,6 +3,7 @@ import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from 'fir
 import { db, auth } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
 import { showToast } from '../../utils/toast';
+import { logAudit } from '../../utils/auditLogger';
 
 import { exportProposalPDF } from './exportProposalPDF';
 
@@ -80,6 +81,11 @@ function SummaryPanel({
           };
         }
         await updateDoc(doc(db, 'missions', proposalId), updateData);
+        logAudit({
+          action: "PROPOSAL_UPDATED",
+          category: "proposal",
+          details: { proposalId, proposalTitle: formData.title || "" },
+        });
         showToast('Proposal updated successfully!');
         onClearDraft?.();
         onClose();
@@ -185,6 +191,16 @@ function SummaryPanel({
 
       // Save to missions collection
       const docRef = await addDoc(collection(db, 'missions'), missionData);
+
+      logAudit({
+        action: "PROPOSAL_SUBMITTED",
+        category: "proposal",
+        details: {
+          proposalId: docRef.id,
+          proposalTitle: formData.title || "",
+          projectType: projectType,
+        },
+      });
 
       // Create task subcollection documents from specific activities
       const activities = Array.isArray(formData.specificActivities) ? formData.specificActivities : [];

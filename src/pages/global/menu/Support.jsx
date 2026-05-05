@@ -7,6 +7,7 @@ import {
   orderBy, onSnapshot, doc, updateDoc,
 } from "firebase/firestore";
 import "./Support.css";
+import { logAudit } from "../../../utils/auditLogger";
 
 const TYPES = [
   { value: "Suggestion", icon: "💡", desc: "Share an idea or improvement" },
@@ -120,6 +121,16 @@ export default function Support() {
         senderName: user?.displayName || user?.email || "You",
         sentAt: serverTimestamp(),
       });
+      logAudit({
+        action: "SUPPORT_TICKET_CREATED",
+        category: "system",
+        actorName: user?.displayName || user?.email || "",
+        details: {
+          ticketId: ticketRef.id,
+          ticketType: type,
+          ticketPreview: message.trim().slice(0, 120),
+        },
+      });
       setSuccess(true);
       setMessage("");
       setType("Suggestion");
@@ -145,6 +156,16 @@ export default function Support() {
       await updateDoc(doc(db, "support", ticketId), {
         lastMessageAt: serverTimestamp(),
         status: "open",
+      });
+      logAudit({
+        action: "SUPPORT_MESSAGE_SENT",
+        category: "system",
+        actorName: user?.displayName || user?.email || "",
+        details: {
+          ticketId,
+          messagePreview: text.slice(0, 120),
+          sentBy: "user",
+        },
       });
       setReplyText((prev) => ({ ...prev, [ticketId]: "" }));
     } catch (err) {

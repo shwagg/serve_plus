@@ -44,6 +44,7 @@ export const adminLinks = [
     label: "System",
     children: [
       { label: "Announcements & Banner", to: "/admin/system/announcements" },
+      { label: "Audit Logs", to: "/admin/audit-logs" },
     ],
   },
 ];

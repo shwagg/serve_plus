@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { showToast, showConfirm } from "../../utils/toast";
+import { logAudit } from "../../utils/auditLogger";
 import ProjectDetailSidebar from "./ProjectDetailSidebar";
 import ProjectProposal from "../global/proposal/ProjectProposal";
 import "../../styles/ReviewProposal.css";
@@ -176,6 +177,12 @@ export default function AdminProjects() {
         publishedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      logAudit({
+        action: "PROPOSAL_PUBLISHED",
+        category: "proposal",
+        actorName: userData?.name || "",
+        details: { proposalId: project.id, proposalTitle: project.title || "" },
+      });
       showToast("Event published.");
       fetchProjects();
     } catch {
@@ -188,6 +195,12 @@ export default function AdminProjects() {
     if (!await showConfirm(`Delete "${project.title}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, "missions", project.id));
+      logAudit({
+        action: "PROPOSAL_DELETED",
+        category: "proposal",
+        actorName: userData?.name || "",
+        details: { proposalTitle: project.title || "" },
+      });
       showToast("Proposal deleted.");
       fetchProjects();
     } catch {
@@ -203,6 +216,12 @@ export default function AdminProjects() {
         status: "archived",
         archivedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+      logAudit({
+        action: "PROPOSAL_ARCHIVED",
+        category: "proposal",
+        actorName: userData?.name || "",
+        details: { proposalId: project.id, proposalTitle: project.title || "" },
       });
       showToast("Proposal archived.");
       fetchProjects();

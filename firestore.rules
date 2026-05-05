@@ -16,6 +16,7 @@ service cloud.firestore {
         allow create: if request.auth != null && (
           request.auth.uid == userId ||
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin" ||
           request.resource.data.type in [
             "proposal_submitted",
             "proposal_status",
@@ -34,6 +35,19 @@ service cloud.firestore {
       match /rewards/{rewardId} {
         allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Badges subcollection — awarded by admin/sysadmin or Cloud Functions
+      match /badges/{badgeId} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+        );
+        allow delete: if request.auth != null && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+        );
+      }
     }
 
     // Settings collection - admins and sysadmins can manage platform settings (agreements, etc.)
@@ -49,7 +63,47 @@ service cloud.firestore {
       );
     }
 
-    // Allow open read access for development
+    // Audit Logs — any authenticated user can create; only admin/sysadmin can read
+    match /auditLogs/{logId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+      );
+      allow update, delete: if false;
+    }
+
+    // Announcements — admin/sysadmin can post and delete; any authenticated user can read
+    match /adminAnnouncements/{announcementId} {
+      allow read: if request.auth != null;
+      allow create, delete: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+      );
+      allow update: if false;
+    }
+
+    // System config (banner, etc.) — admin/sysadmin can write; public read
+    match /systemConfig/{configId} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+      );
+    }
+
+    // Login attempt records — written by Cloud Functions (service account bypasses rules)
+    // Only admin/sysadmin should read these via AuditLogs
+    match /loginAttempts/{email} {
+      allow read: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+      );
+      allow write: if false; // Cloud Functions use Admin SDK, bypasses this
+    }
+
+    // Fallback — allow read on anything not explicitly covered above
+    // Write is denied unless a specific rule above grants it
     match /{document=**} {
       allow read: if true;
       allow write: if false;
@@ -89,10 +143,12 @@ service cloud.firestore {
       // Allow authenticated users to create proposals
       allow create: if request.auth != null;
 
-      // ADMIN (based on users collection) - can update and delete
+      // ADMIN / SYSADMIN - can update and delete
       allow update, delete: if
-        request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+        request.auth != null && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+        );
 
       // PROPOSAL CREATOR - can update their own proposal only while it's still 'for_approval' (not yet reviewed)
       allow update: if

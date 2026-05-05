@@ -5,6 +5,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import ProposalTimeline from "../../components/ProposalTimeline";
 import { SessionContext } from "../../context/SessionContext";
 import { createNotification, notifyUsersByRoles } from "../../utils/notificationUtils";
+import { logAudit } from "../../utils/auditLogger";
 import mission1 from "../../assets/mission1.jpg";
 import "../../styles/ProjectDetailSidebar.css";
 
@@ -172,6 +173,17 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         "approvals.recommendedBy": null,
         "approvals.endorsedBy": null,
         "approvals.approvedBy": null,
+      });
+      logAudit({
+        action: "PROPOSAL_REJECTED",
+        category: "proposal",
+        actorName: name,
+        details: {
+          proposalId: project.id,
+          proposalTitle: project.title || "",
+          rejectionReason: rejectText,
+          rejectedByRole: approvalLevel,
+        },
       });
       setActionMsg("Returned to proposer. All approvals cleared.");
       if (onApprovalChange) onApprovalChange();

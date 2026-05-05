@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { showToast, showConfirm } from "../../utils/toast";
+import { logAudit } from "../../utils/auditLogger";
 
 import "../../styles/admin.css";
 
@@ -111,6 +112,18 @@ export default function ProjectTasks() {
       
       await setDoc(taskRef, taskData);
 
+      logAudit({
+        action: "TASK_CREATED",
+        category: "event",
+        details: {
+          missionId: projectId,
+          missionTitle: project?.title || "",
+          taskTitle: formData.title,
+          taskType: formData.type,
+          taskPoints: parseInt(formData.points) || 0,
+        },
+      });
+
       // Reset form
       setFormData({
         title: "",
@@ -159,6 +172,17 @@ export default function ProjectTasks() {
       
       await updateDoc(taskRef, updateData);
 
+      logAudit({
+        action: "TASK_UPDATED",
+        category: "event",
+        details: {
+          missionId: projectId,
+          missionTitle: project?.title || "",
+          taskId: editingTaskId,
+          taskTitle: formData.title,
+        },
+      });
+
       // Reset form
       setFormData({
         title: "",
@@ -185,7 +209,18 @@ export default function ProjectTasks() {
     setSaving(true);
     try {
       const taskRef = doc(db, "missions", projectId, "task", taskId);
+      const taskSnap = tasks.find(t => t.id === taskId);
       await deleteDoc(taskRef);
+      logAudit({
+        action: "TASK_DELETED",
+        category: "event",
+        details: {
+          missionId: projectId,
+          missionTitle: project?.title || "",
+          taskId,
+          taskTitle: taskSnap?.title || "",
+        },
+      });
       await loadTasks();
     } catch (e) {
       console.error("Error deleting task:", e);

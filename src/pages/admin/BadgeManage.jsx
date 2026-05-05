@@ -15,6 +15,7 @@ import { awardBadge, getStudentBadges } from "../../hooks/badgeSystem";
 import BadgeIcon from "../../components/badges/BadgeIcon";
 import { useContext } from "react";
 import { SessionContext } from "../../context/SessionContext";
+import { logAudit } from "../../utils/auditLogger";
 import "../../styles/Badge.css";
 
 const INSTITUTIONAL_IDS = ["csce-recognition-award", "outstanding-volunteer"];
@@ -102,6 +103,16 @@ function AwardBadgesTab() {
       const awarded = await awardBadge(selected.uid, badgeId, user?.uid ?? "admin");
       if (awarded) {
         setToast(`"${BADGE_BY_ID[badgeId].name}" awarded to ${selected.displayName}!`);
+        logAudit({
+          action: "BADGE_AWARDED_MANUAL",
+          category: "reward",
+          details: {
+            targetUserId: selected.uid,
+            targetUserName: selected.displayName,
+            badgeId,
+            badgeName: BADGE_BY_ID[badgeId]?.name || badgeId,
+          },
+        });
         // Refresh badges
         const badges = await getStudentBadges(selected.uid);
         setStudentBadges(badges);

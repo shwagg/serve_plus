@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { AUTO_BADGE_RULES, BADGE_BY_ID } from "../constants/badgeDefinitions";
+import { logAudit } from "../utils/auditLogger";
 import { createNotification } from "../utils/notificationUtils";
 
 /**
@@ -76,6 +77,20 @@ export const checkAndAssignBadges = async (userId) => {
       const statValue = stats[rule.statField] ?? 0;
       if (statValue >= rule.threshold && !existingIds.has(rule.badgeId)) {
         await awardBadge(userId, rule.badgeId);
+        logAudit({
+          action: "BADGE_AWARDED_AUTO",
+          category: "reward",
+          actorUid: null,
+          actorEmail: null,
+          actorName: "System",
+          details: {
+            targetUserId: userId,
+            badgeId: rule.badgeId,
+            badgeName: BADGE_BY_ID[rule.badgeId]?.name || rule.badgeId,
+            triggerStat: rule.statField,
+            triggerValue: statValue,
+          },
+        });
         newlyEarned.push(rule.badgeId);
       }
     }

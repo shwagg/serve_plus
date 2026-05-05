@@ -5,6 +5,7 @@ import {
   addDoc, updateDoc, doc, serverTimestamp,
 } from "firebase/firestore";
 import "../../styles/adminSupport.css";
+import { logAudit } from "../../utils/auditLogger";
 
 const STATUS_FILTERS = ["All", "Open", "Resolved"];
 const TYPE_FILTERS  = ["All", "Suggestion", "Bug Report", "Question"];
@@ -107,6 +108,12 @@ export default function AdminSupport() {
         lastMessageAt: serverTimestamp(),
         status: "open",
       });
+      logAudit({
+        action: "SUPPORT_ADMIN_REPLIED",
+        category: "system",
+        actorEmail: user?.email || "",
+        details: { ticketId: selectedTicket.id },
+      });
       setReplyText("");
     } catch (err) {
       console.error(err);
@@ -117,6 +124,12 @@ export default function AdminSupport() {
   const toggleResolved = async (ticket) => {
     const newStatus = ticket.status === "resolved" ? "open" : "resolved";
     await updateDoc(doc(db, "support", ticket.id), { status: newStatus });
+    logAudit({
+      action: "SUPPORT_TICKET_STATUS_CHANGED",
+      category: "system",
+      actorEmail: user?.email || "",
+      details: { ticketId: ticket.id, newStatus },
+    });
   };
 
   // Filtered ticket list

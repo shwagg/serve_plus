@@ -5,6 +5,7 @@ import {
   doc, setDoc, getDoc, serverTimestamp, orderBy, query,
 } from "firebase/firestore";
 import { showToast } from "../../utils/toast";
+import { logAudit } from "../../utils/auditLogger";
 
 export default function AnnouncementsManager() {
   // Banner
@@ -37,6 +38,11 @@ export default function AnnouncementsManager() {
     setBannerSaving(true);
     try {
       await setDoc(doc(db, "systemConfig", "banner"), banner);
+      logAudit({
+        action: "BANNER_UPDATED",
+        category: "system",
+        details: { bannerTitle: banner.title || "" },
+      });
       showToast("Banner saved!", "success");
     } catch {
       showToast("Failed to save banner.", "error");
@@ -54,6 +60,11 @@ export default function AnnouncementsManager() {
         body: form.body.trim(),
         createdAt: serverTimestamp(),
       });
+      logAudit({
+        action: "ANNOUNCEMENT_POSTED",
+        category: "system",
+        details: { announcementTitle: form.title.trim() },
+      });
       setForm({ title: "", body: "" });
       showToast("Announcement posted!", "success");
       loadAnnouncements();
@@ -67,6 +78,11 @@ export default function AnnouncementsManager() {
   const deleteAnnouncement = async (id) => {
     try {
       await deleteDoc(doc(db, "adminAnnouncements", id));
+      logAudit({
+        action: "ANNOUNCEMENT_DELETED",
+        category: "system",
+        details: { announcementTitle: announcements.find(a => a.id === id)?.title || "" },
+      });
       showToast("Deleted.", "success");
       setAnnouncements((prev) => prev.filter((a) => a.id !== id));
     } catch {

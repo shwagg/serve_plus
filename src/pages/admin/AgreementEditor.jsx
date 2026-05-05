@@ -3,6 +3,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
 import { db } from "../../firebaseConfig";
+import { logAudit } from "../../utils/auditLogger";
 import "../../styles/AgreementEditor.css";
 
 // Default content used to seed Firestore on first load
@@ -203,6 +204,11 @@ export default function AgreementEditor() {
       });
       setVersion(newVersion);
       setSuccess(`Agreements published! Version updated to ${newVersion}.`);
+      logAudit({
+        action: "AGREEMENTS_PUBLISHED",
+        category: "system",
+        details: { version: newVersion, updatedTab: activeTab },
+      });
     } catch (err) {
       console.error("Failed to publish agreements:", err);
       setError("Failed to publish. Please try again.");

@@ -5,6 +5,7 @@ import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
 import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
 import { showToast } from "../../utils/toast";
+import { logAudit } from "../../utils/auditLogger";
 
 function toTitleCase(str) {
   if (!str) return str;
@@ -104,6 +105,16 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
   const handleParticipationChange = async (volunteerId, value) => {
     try {
       await updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId), { participationStatus: value });
+      logAudit({
+        action: "VOLUNTEER_PARTICIPATION_UPDATED",
+        category: "event",
+        details: {
+          missionId,
+          targetUserId: volunteerId,
+          targetUserName: volunteers.find(v => v.id === volunteerId)?.name || "",
+          participationStatus: value,
+        },
+      });
       setVolunteers(prev => prev.map(v => v.id === volunteerId ? { ...v, participationStatus: value } : v));
     } catch (_) {
       showToast("Failed to update participation status.");

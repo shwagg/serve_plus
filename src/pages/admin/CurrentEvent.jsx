@@ -11,6 +11,7 @@ import LoadingOverlay from "../../components/LoadingOverlay";
 import "../../styles/ReviewProposal.css";
 import { createNotification } from "../../utils/notificationUtils";
 import { showToast, showConfirm } from "../../utils/toast";
+import { logAudit } from "../../utils/auditLogger";
 
 import MissionSubmissionsTable from "./MissionSubmissionsTable";
 
@@ -390,6 +391,14 @@ export default function CurrentEvent() {
           read: false,
           createdAt: serverTimestamp(),
         });
+        logAudit({
+          action: "VOLUNTEER_UNFLAGGED",
+          category: "event",
+          details: {
+            targetUserId: userId,
+            targetUserName: flaggedStudents.find(s => s.id === userId)?.name || rosterVolunteers.find(v => v.id === userId)?.name || "",
+          },
+        });
         setFlaggedStudents(prev => prev.filter(s => s.id !== userId));
         if (missionId) {
           setRosterVolunteers(prev => prev.map(v =>
@@ -413,6 +422,15 @@ export default function CurrentEvent() {
           read: false,
           createdAt: serverTimestamp(),
         });
+        logAudit({
+          action: "VOLUNTEER_FLAGGED",
+          category: "event",
+          details: {
+            targetUserId: userId,
+            targetUserName: rosterVolunteers.find(v => v.id === userId)?.name || "",
+            reason: "Manual flag by admin",
+          },
+        });
         if (showFlaggedModal) await fetchFlaggedStudents();
         if (missionId) {
           setRosterVolunteers(prev => prev.map(v =>
@@ -433,6 +451,19 @@ export default function CurrentEvent() {
         ? { "progress.attendance": null, "scanAttendance.scannedAt": null, "scanAttendance.markedManually": false }
         : { "progress.attendance": "present", "scanAttendance.scannedAt": serverTimestamp(), "scanAttendance.markedManually": true };
       await updateDoc(doc(db, "missions", missionId, "volunteer", userId), payload);
+      const newStatus = isPresent ? null : "present";
+      logAudit({
+        action: "VOLUNTEER_ATTENDANCE_TOGGLED",
+        category: "event",
+        details: {
+          missionId,
+          missionTitle: missionData?.title || "",
+          targetUserId: userId,
+          targetUserName: rosterVolunteers.find(v => v.id === userId)?.name || "",
+          newStatus: isPresent ? "absent" : "present",
+          markedManually: true,
+        },
+      });
       setRosterVolunteers(prev => prev.map(v =>
         v.id === userId
           ? { ...v, attendanceStatus: isPresent ? null : "present", tookAttendanceAt: isPresent ? null : new Date() }
