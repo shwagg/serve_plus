@@ -13,6 +13,7 @@ import mission1 from '../../../assets/mission1.jpg';
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
+import { logAudit } from "../../../utils/auditLogger";
 import { useSession } from '../../../context/SessionContext';
 import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
 import { computeFinalPoints } from "../../../hooks/rewardSystem";
@@ -171,20 +172,29 @@ export default function EventActivity() {
         `Attendance recorded — scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`
       );
 
-      // Reverse geocode BEFORE closing so the name appears in the status
-      try {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(locData.lat)},${encodeURIComponent(locData.lng)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
-        const resp = await fetch(url);
-        if (resp.ok) {
-          const json = await resp.json();
-          const locationName = (json.results && json.results[0]?.formatted_address) || null;
-          if (locationName) {
-            await updateDoc(volunteerRef, { "scanAttendance.locationName": locationName });
-            locData.name = locationName;
+      // Reverse-geocode volunteer location AND QR target location in parallel
+      const geocode = async (lat, lng) => {
+        try {
+          const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const json = await resp.json();
+            return json.results?.[0]?.formatted_address || null;
           }
-        }
-      } catch (e) {
-        console.warn('Reverse geocoding failed:', e);
+        } catch { /* non-fatal */ }
+        return null;
+      };
+
+      const [scannedName, resolvedTargetName] = await Promise.all([
+        geocode(locData.lat, locData.lng),
+        (event?.qrLocationName || !parsed.location)
+          ? Promise.resolve(event?.qrLocationName || null)
+          : geocode(parsed.location.lat, parsed.location.lng),
+      ]);
+
+      if (scannedName) {
+        await updateDoc(volunteerRef, { "scanAttendance.locationName": scannedName });
+        locData.name = scannedName;
       }
 
       // Final status — show location name on a new line if available
@@ -196,10 +206,16 @@ export default function EventActivity() {
       setScanSuccess(true);
       setScannedLocation(locData);
 
-      // Close modal after user has time to read the location
-      setTimeout(() => {
-        setShowQRModal(false);
-      }, 3000);
+      // Audit-log every successful scan (overwrites are intentional and both entries remain)
+      logAudit({
+        action: "QR_ATTENDANCE_SCANNED",
+        category: "event",
+        details: {
+          missionName: event?.title || projectId,
+          targetLocation: resolvedTargetName || null,
+          scannedLocation: locData.name || null,
+        },
+      });
 
     } catch (e) {
       console.warn("Failed to save scan location or mark attendance:", e);
@@ -3132,7 +3148,18 @@ export default function EventActivity() {
                                     step.previewable ? (
                                       <button className="req-view-btn" onClick={step.onPreview}>View</button>
                                     ) : (
-                                      <span className="req-done-badge">Done</span>
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span className="req-done-badge">Done</span>
+                                        {step.type === 'qr' && isEventDay && isEditable && (
+                                          <button
+                                            className="req-action-btn"
+                                            onClick={() => setShowQRModal(true)}
+                                            title="Scan again to update attendance"
+                                          >
+                                            Rescan
+                                          </button>
+                                        )}
+                                      </span>
                                     )
                                   ) : (
                                     <button
@@ -3172,8 +3199,21 @@ export default function EventActivity() {
               {qrStatus && (
                 <div>
                   <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`} style={{ whiteSpace: "pre-line" }}>{qrStatus}</div>
-                  {!scanSuccess && (
-                    <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                    {scanSuccess && (
+                      <button
+                        className="ea-retry-btn"
+                        onClick={() => {
+                          setQRStatus("");
+                          setScannedLocation(null);
+                          setScanSuccess(false);
+                          setScannerKey(k => k + 1);
+                        }}
+                      >
+                        📷 Scan Another
+                      </button>
+                    )}
+                    {!scanSuccess && (
                       <button
                         className="ea-retry-btn"
                         onClick={() => {
@@ -3185,8 +3225,8 @@ export default function EventActivity() {
                       >
                         🔄 Retry
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>

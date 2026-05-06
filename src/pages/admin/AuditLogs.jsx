@@ -60,8 +60,11 @@ function LoginSessionsTab() {
         const q = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"));
         const snap = await getDocs(q);
 
-        // Collect unique UIDs that are missing a name
-        const rawRows = snap.docs.map((d) => {
+        // Only keep login/logout events in this tab
+        const rawRows = snap.docs.filter((d) => {
+          const a = d.data().action;
+          return a === "LOGIN" || a === "LOGOUT";
+        }).map((d) => {
           const data = d.data();
           return {
             id: d.id,
@@ -533,6 +536,12 @@ function formatDetails(row) {
       return d.proposalTitle || d.proposalId || "—";
     case "PROPOSAL_REJECTED":
       return `${d.proposalTitle || d.proposalId || "—"}${d.rejectionReason ? ` — "${d.rejectionReason}"` : ""}`;
+    case "QR_ATTENDANCE_SCANNED":
+      return [
+        d.missionName || "—",
+        d.targetLocation ? `Target: ${d.targetLocation}` : null,
+        d.scannedLocation ? `Scanned at: ${d.scannedLocation}` : null,
+      ].filter(Boolean).join(" | ");
     case "VOLUNTEER_ATTENDANCE_TOGGLED":
       return `${d.targetUserName || d.targetUserId || "User"} → ${d.newStatus || "?"}${d.missionTitle ? ` (${d.missionTitle})` : ""}`;
     case "VOLUNTEER_FLAGGED":
