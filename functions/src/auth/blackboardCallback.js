@@ -36,8 +36,7 @@ exports.blackboardCallback = onRequest(
       // Exchange code for access token
       console.log("Exchanging authorization code for access token...");
       const tokenData = await exchangeCodeForToken(code);
-      console.log("Token data keys:", Object.keys(tokenData));
-      console.log("access_token present:", !!tokenData.access_token);
+      console.log("Full token response:", JSON.stringify(tokenData));
       const { access_token } = tokenData;
 
       // Fetch user profile from Blackboard

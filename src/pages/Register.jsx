@@ -183,7 +183,7 @@ function Register() {
                         <p className="ui-link" style={{ margin: "2px 0 10px" }}>
                             Already have an account?{" "}
                             <Link to="/auth">Login here</Link>
-                        </p>
+                        </p><br />
 
                         <div className="reg-name-row">
                             <input
@@ -209,7 +209,7 @@ function Register() {
                             />
                         </div>
 
-                        <div style={{ width: "100%", maxWidth: 420 }}>
+                        <div style={{ width: "85%", maxWidth: 420 }}>
                             <div className={`ui-input-prefix-wrap${usernameStatus === "taken" ? " ui-input--error" : ""}`}>
                                 <span className="ui-input-prefix">@</span>
                                 <input
@@ -228,14 +228,14 @@ function Register() {
 
                         <input
                             className="ui-input"
-                            style={{ width: "100%", maxWidth: 420, boxSizing: "border-box" }}
+                            style={{ width: "85%", maxWidth: 420, boxSizing: "border-box" }}
                             type="email"
                             placeholder="Email"
                             onChange={(e) => setEmail(e.target.value)}
                             required
                         />
 
-                        <div className="ui-input-pass-wrap" style={{ maxWidth: 420 }}>
+                        <div className="ui-input-pass-wrap" style={{ width: "85%", maxWidth: 420 }}>
                             <input
                                 className="ui-input pass"
                                 style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
@@ -256,7 +256,7 @@ function Register() {
                             )}
                         </div>
 
-                        <div style={{ width: "100%", maxWidth: 420 }}>
+                        <div style={{ width: "85%", maxWidth: 420 }}>
                             <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
                                 <input
                                     className={`ui-input pass${confirmPasswordError ? " ui-input--error" : ""}`}

@@ -25,7 +25,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
 }
 
 /* Partner layout — no sidebar, so only offset by header height */
