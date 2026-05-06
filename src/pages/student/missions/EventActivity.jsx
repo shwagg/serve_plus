@@ -2799,7 +2799,7 @@ export default function EventActivity() {
                       <p className="ea-leaderboard-empty">No participants yet.</p>
                     ) : (
                       <div className="ea-leaderboard-list" ref={leaderboardListRef}>
-                        {sortedLeaderboard.map((user, index) => {
+                        {sortedLeaderboard.slice(0, 10).map((user, index) => {
                           const rank = index + 1;
                           const isCurrent = user.uid === currentUserId;
                           return (
@@ -3278,6 +3278,8 @@ export default function EventActivity() {
                 initialName={userData?.name || ''}
                 initialEngagementType={event?.projectType || ""}
                 initialTitle={event?.title || ""}
+                initialCollege={userData?.department || ''}
+                initialProgram={userData?.program || ''}
                 onProgressChange={setSurveyProgress}
 
                 onSubmit={async (form) => {

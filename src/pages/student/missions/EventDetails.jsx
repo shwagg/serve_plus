@@ -26,6 +26,7 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const [consentUploading, setConsentUploading] = useState(false);
   const [surveyError, setSurveyError] = useState('');
   const [userName, setUserName] = useState('');
+  const [userDepartment, setUserDepartment] = useState('');
   const [attendanceFlag, setAttendanceFlag] = useState(null); // { flagged: bool, expiry: Date, missionTitle: string }
   const defaultBanner = mission1;
 
@@ -100,6 +101,12 @@ export default function EventDetails({ onClose = null, missionId = null }) {
             const volunteerSnap = await getDoc(volunteerRef);
             if (volunteerSnap.exists()) {
               setVolunteer(volunteerSnap.data());
+            }
+            const userSnap = await getDoc(doc(db, 'users', user.uid));
+            if (userSnap.exists()) {
+              const uData = userSnap.data();
+              setUserName(uData.name || '');
+              setUserDepartment(uData.department || '');
             }
           }
         } else {
@@ -411,6 +418,7 @@ export default function EventDetails({ onClose = null, missionId = null }) {
             <PreActivitySurvey
               initialName={userName}
               initialTitle={mission?.title || ''}
+              initialCollege={userDepartment}
               onSubmit={async (form) => {
                 // Validate consent file
                 if (!consentFile) {

@@ -23,6 +23,20 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
   const [email, setEmail] = useState(profile.email || "");
   const [username, setUsername] = useState(profile.username || "");
   const [organizationName, setOrganizationName] = useState(profile.organizationName || "");
+  const [department, setDepartment] = useState(profile.department || "");
+  const [program, setProgram] = useState(profile.program || "");
+  const departmentPrograms = {
+    'College of Arts and Science (CAS)': ['COMM', 'BMMA'],
+    'College of Computer and Information Science (CCIS)': ['IT', 'CS'],
+    'College of Health Sciences (CHS)': ['BIO', 'MDT', 'PH', 'PT', 'PSY'],
+    'College of Nursing (CN)': ['Nursing'],
+    'College of Maritime Education and Training (CMET)': ['MARE', 'MT', 'MSSB'],
+    'E.T. Yuchengco College of Business (ETYCB)': ['ACT', 'AIS', 'BA OM', 'BA FM', 'BA MM', 'BIA', 'GM', 'HM', 'MKT', 'TM'],
+    'Mapua-Laguna Institute of Aviation (MIA)': ['AEE', 'AM', 'AMT'],
+    'Mapua Institute of Technology at Laguna (MITL)': ['AR', 'CHE', 'CE', 'CPE', 'EE', 'ECE', 'IE', 'ME'],
+    'Mapua MCL Senior High School (SHS)': ['ABM', 'STEM', 'HUMSS', 'ICT'],
+    'Non-Academic Organization': [],
+  };
   const [skills, setSkills] = useState(profile.skills || []);
   const [interests, setInterests] = useState(profile.interests || []);
   const [uploading, setUploading] = useState(false);
@@ -36,6 +50,8 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
       setEmail(profile.email || "");
       setUsername(profile.username || "");
       setOrganizationName(profile.organizationName || "");
+      setDepartment(profile.department || "");
+      setProgram(profile.program || "");
       setSkills(profile.skills || []);
       setInterests(profile.interests || []);
     }
@@ -171,6 +187,33 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="profile-modal-input" />
           </div>
           <div>
+            <label className="profile-modal-label">Department</label><br />
+            <select value={department} onChange={e => { setDepartment(e.target.value); setProgram(""); }} className="profile-modal-input">
+              <option value="">Select department</option>
+              <option value="College of Arts and Science (CAS)">College of Arts and Science (CAS)</option>
+              <option value="College of Computer and Information Science (CCIS)">College of Computer and Information Science (CCIS)</option>
+              <option value="College of Health Sciences (CHS)">College of Health Sciences (CHS)</option>
+              <option value="College of Nursing (CN)">College of Nursing (CN)</option>
+              <option value="College of Maritime Education and Training (CMET)">College of Maritime Education and Training (CMET)</option>
+              <option value="E.T. Yuchengco College of Business (ETYCB)">E.T. Yuchengco College of Business (ETYCB)</option>
+              <option value="Mapua-Laguna Institute of Aviation (MIA)">Mapua-Laguna Institute of Aviation (MIA)</option>
+              <option value="Mapua Institute of Technology at Laguna (MITL)">Mapua Institute of Technology at Laguna (MITL)</option>
+              <option value="Mapua MCL Senior High School (SHS)">Mapua MCL Senior High School (SHS)</option>
+              <option value="Non-Academic Organization">Non-Academic Organization</option>
+            </select>
+          </div>
+          {department && departmentPrograms[department] && departmentPrograms[department].length > 0 && (
+            <div>
+              <label className="profile-modal-label">Program</label><br />
+              <select value={program} onChange={e => setProgram(e.target.value)} className="profile-modal-input">
+                <option value="">Select program</option>
+                {departmentPrograms[department].map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
             <label className="profile-modal-label">Skills</label><br />
             <div className="profile-modal-skill-section">
               <div className="profile-modal-skill-section-title">Soft Skills</div>
@@ -236,7 +279,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
-          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
+          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, department, program, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
