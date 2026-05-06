@@ -11,6 +11,15 @@ service firebase.storage {
       allow read: if request.auth != null;
     }
 
+    // Mission cover photos: only admins can upload; authenticated users can read
+    match /mission-covers/{missionId}/{fileName} {
+      allow write: if request.auth != null
+                   && request.auth.token.role == "admin"
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow read: if request.auth != null;
+    }
+
     // Profile pictures: allow users to upload their own profile pictures (max 5MB)
     match /profile-pictures/{userId}/{fileName} {
       allow write: if request.auth != null 

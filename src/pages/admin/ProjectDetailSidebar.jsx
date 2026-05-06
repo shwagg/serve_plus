@@ -1,6 +1,7 @@
-import { useState, useEffect, useContext } from "react";
-import { db } from "../../firebaseConfig";
+import { useState, useEffect, useContext, useRef } from "react";
+import { db, storage } from "../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, collection, getDocs, getDoc } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { QRCodeCanvas } from "qrcode.react";
 import ProposalTimeline from "../../components/ProposalTimeline";
 import { SessionContext } from "../../context/SessionContext";
@@ -55,6 +56,9 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const [approveNote, setApproveNote] = useState("");
   const [rejectText, setRejectText] = useState("");
   const [actionMsg, setActionMsg] = useState("");
+  const [coverUrl, setCoverUrl] = useState(project?.img || null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef(null);
 
   const statusStr = (project?.status || "").toLowerCase();
   const isApprovalStage = isForApproval(statusStr) || statusStr === "draft";
@@ -103,6 +107,40 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     return null;
   }
   const approvalLevel = getApprovalLevel();
+  const isAdmin = role === "admin";
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !project?.id) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      alert("Please select a valid image file (JPG, PNG, WEBP, GIF).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be smaller than 5 MB.");
+      return;
+    }
+    setUploadingCover(true);
+    try {
+      const fileRef = storageRef(storage, `mission-covers/${project.id}/${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+      await updateDoc(doc(db, "missions", project.id), { img: url, updatedAt: serverTimestamp() });
+      setCoverUrl(url);
+      logAudit({
+        action: "PROPOSAL_COVER_UPDATED",
+        category: "proposal",
+        actorName: userData?.name || userData?.email || "",
+        details: { proposalId: project.id, proposalTitle: project.title || "" },
+      });
+    } catch {
+      alert("Failed to upload cover photo. Please try again.");
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  };
 
   function canApprove() {
     if (!approvalLevel || !project) return false;
@@ -227,7 +265,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     } catch { return "N/A"; }
   };
 
-  const bannerSrc = project.img || mission1;
+  const bannerSrc = coverUrl || project.img || mission1;
   const adviserName = project.adviser || project.facultyAdviser || project.projectAdviser || null;
   const activities = project.activities || project.agenda || project.programOfActivities || null;
 
@@ -239,6 +277,32 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         {/* ── Banner ── */}
         <div className="pds-banner">
           <img src={bannerSrc} alt={project.title || "Project banner"} className="pds-banner-img" />
+          {isAdmin && (
+            <>
+              <button
+                className="pds-cover-btn"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={uploadingCover}
+                title="Change cover photo"
+              >
+                {uploadingCover ? (
+                  <span className="pds-cover-spinner" />
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Change Cover
+                  </>
+                )}
+              </button>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                style={{ display: "none" }}
+                onChange={handleCoverUpload}
+              />
+            </>
+          )}
         </div>
 
         {/* ── Header ── */}

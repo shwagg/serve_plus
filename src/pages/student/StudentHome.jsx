@@ -5,7 +5,7 @@ import ReviewModal from "../global/proposal/ReviewModal";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
-import { collection, getDocs, doc, getDoc, query, orderBy, limit, where, getCountFromServer } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, orderBy, limit, where, getCountFromServer, onSnapshot } from "firebase/firestore";
 import Header from "../../components/Header";
 import "../../styles/student.css";
 import "../../styles/ui.css";
@@ -195,6 +195,25 @@ const StudentHome = () => {
 
     fetchMissions();
   }, [enrollmentRefreshKey, currentUser]);
+
+  // Real-time listener: patch missionCards when any mission document changes (e.g. cover photo)
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "missions"), (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "modified") {
+          const updated = { id: change.doc.id, ...change.doc.data() };
+          setMissionCards((prev) =>
+            prev.map((m) =>
+              m.id === updated.id
+                ? { ...m, img: updated.img, title: updated.title, status: updated.status }
+                : m
+            )
+          );
+        }
+      });
+    });
+    return () => unsub();
+  }, []);
 
   // Fetch proposals created by the current user
   useEffect(() => {
@@ -541,7 +560,7 @@ const StudentHome = () => {
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/event/${mission.id}/activity`); } }}
                   >
                     <div className="current-card-image">
-                      <img src={mission.img || mission1} alt={mission.title} loading="lazy" />
+                      <img src={mission.img || mission1} alt={mission.title} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = mission1; }} />
                     </div>
                     <div className="current-card-body">
                       <h3 className="current-card-title">{mission.title}</h3>
@@ -634,7 +653,7 @@ const StudentHome = () => {
                         {statusInfo.label}
                       </span>
                       <div className="mission-card-image">
-                        <img src={proposal.img || mission1} alt={proposal.alt || proposal.title} loading="lazy" />
+                        <img src={proposal.img || mission1} alt={proposal.alt || proposal.title} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = mission1; }} />
                       </div>
                       <div className="mission-card-body">
                         <h3 className="mission-card-title">{proposal.title}</h3>
@@ -691,7 +710,7 @@ const StudentHome = () => {
                     <span className="mission-enrolled-badge">Enrolled</span>
                   )}
                   <div className="mission-card-image">
-                    <img src={mission.img || mission1} alt={mission.alt || mission.title} loading="lazy" />
+                    <img src={mission.img || mission1} alt={mission.alt || mission.title} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = mission1; }} />
                   </div>
                   <div className="mission-card-body">
                     <h3 className="mission-card-title">{mission.title}</h3>

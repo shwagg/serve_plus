@@ -220,6 +220,7 @@ export default function EventDetails({ onClose = null, missionId = null }) {
             <img
               src={mission.img && mission.img.trim() !== "" ? mission.img : defaultBanner}
               alt={mission.alt || "Event image"}
+              onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = defaultBanner; }}
             />
             {onClose && (
               <button
