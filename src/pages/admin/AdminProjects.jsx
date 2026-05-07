@@ -4,9 +4,11 @@ import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { showToast, showConfirm } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
+import { createNotification } from "../../utils/notificationUtils";
 import ProjectDetailSidebar from "./ProjectDetailSidebar";
 import ProjectProposal from "../global/proposal/ProjectProposal";
 import "../../styles/ReviewProposal.css";
+import "../../styles/AdminProjects.css";
 import { SessionContext } from "../../context/SessionContext";
 
 const FILTER_OPTIONS = [
@@ -71,6 +73,10 @@ export default function AdminProjects() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editProject, setEditProject] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelProject, setCancelProject] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   const dropdownRef = useRef(null);
 
   const fetchProjects = async () => {
@@ -190,21 +196,52 @@ export default function AdminProjects() {
     }
   };
 
-  const handleDelete = async (e, project) => {
+  const handleCancelClick = (e, project) => {
     e.stopPropagation();
-    if (!await showConfirm(`Delete "${project.title}"? This cannot be undone.`)) return;
+    setCancelProject(project);
+    setCancelReason("");
+    setShowCancelModal(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!cancelReason.trim()) return;
+    setCancelling(true);
     try {
-      await deleteDoc(doc(db, "missions", project.id));
+      await updateDoc(doc(db, "missions", cancelProject.id), {
+        status: "cancelled",
+        cancellationReason: cancelReason.trim(),
+        cancelledAt: serverTimestamp(),
+        cancelledBy: userData?.name || userData?.email || "",
+        updatedAt: serverTimestamp(),
+      });
       logAudit({
-        action: "PROPOSAL_DELETED",
+        action: "PROPOSAL_CANCELLED",
         category: "proposal",
         actorName: userData?.name || "",
-        details: { proposalTitle: project.title || "" },
+        details: {
+          proposalId: cancelProject.id,
+          proposalTitle: cancelProject.title || "",
+          reason: cancelReason.trim(),
+        },
       });
-      showToast("Proposal deleted.");
+      if (cancelProject.createdBy) {
+        await createNotification(cancelProject.createdBy, {
+          type: "proposal_cancelled",
+          title: "Proposal Cancelled",
+          message: `Your proposal "${cancelProject.title || "Untitled"}" has been cancelled. Reason: ${cancelReason.trim()}`,
+          link: "/global/review-proposals",
+          proposalId: cancelProject.id,
+        }).catch(() => {});
+      }
+      showToast("Proposal cancelled and student notified.");
+      setShowCancelModal(false);
+      setCancelProject(null);
+      setCancelReason("");
       fetchProjects();
     } catch {
-      showToast("Failed to delete. Try again.");
+      showToast("Failed to cancel. Try again.");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -262,7 +299,7 @@ export default function AdminProjects() {
           {project.preparedBy && <span>By {project.preparedBy}</span>}
           {project.targetDate && <span>Target: {project.targetDate}</span>}
         </div>
-        <div className="rp-card-footer" style={{ flexWrap: "wrap", gap: 6 }}>
+        <div className="rp-card-footer">
           <button
             className={`rp-review-btn${needsAction ? " rp-review-btn--primary" : ""}`}
             onClick={e => { e.stopPropagation(); openSidebar(project); }}
@@ -279,27 +316,24 @@ export default function AdminProjects() {
           )}
           {project.status === "draft" && role === "admin" && (
             <button
-              className="rp-review-btn"
+              className="rp-review-btn rp-btn-publish"
               onClick={e => handlePublish(e, project)}
-              style={{ background: "#15803d", color: "#fff", borderColor: "transparent" }}
             >
               ✓ Publish
             </button>
           )}
           {project.status === "draft" && role === "admin" && (
             <button
-              className="rp-review-btn"
-              onClick={e => handleDelete(e, project)}
-              style={{ background: "#dc2626", color: "#fff", borderColor: "transparent" }}
+              className="rp-review-btn rp-btn-cancel-proposal"
+              onClick={e => handleCancelClick(e, project)}
             >
-              🗑 Delete
+              ✕ Cancel
             </button>
           )}
           {project.status === "completed" && role === "admin" && (
             <button
-              className="rp-review-btn"
+              className="rp-review-btn rp-btn-archive"
               onClick={e => handleArchive(e, project)}
-              style={{ background: "#6b7280", color: "#fff", borderColor: "transparent" }}
             >
               📦 Archive
             </button>
@@ -406,51 +440,87 @@ export default function AdminProjects() {
         />
       )}
 
+      {showCancelModal && cancelProject && (
+        <div
+          className="ap-modal-overlay ap-modal-overlay--cancel"
+          onClick={() => { if (!cancelling) { setShowCancelModal(false); setCancelProject(null); setCancelReason(""); } }}
+        >
+          <div className="ap-cancel-modal" onClick={e => e.stopPropagation()}>
+            <div className="ap-cancel-modal__header">
+              <h3 className="ap-cancel-modal__title">Cancel Proposal</h3>
+              <button
+                className="ap-cancel-modal__close"
+                onClick={() => { setShowCancelModal(false); setCancelProject(null); setCancelReason(""); }}
+                disabled={cancelling}
+              >✕</button>
+            </div>
+            <p className="ap-cancel-modal__body">
+              You are cancelling <strong>{cancelProject.title || "Untitled"}</strong>.
+              The student will be notified with the reason you provide below.
+            </p>
+            <div className="ap-cancel-modal__field">
+              <label className="ap-cancel-modal__label">
+                Reason for Cancellation <span className="ap-cancel-modal__required">*</span>
+              </label>
+              <textarea
+                className="ap-cancel-modal__textarea"
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                placeholder="State the reason why this proposal is being cancelled…"
+                rows={4}
+                disabled={cancelling}
+              />
+            </div>
+            <div className="ap-cancel-modal__actions">
+              <button
+                className="ap-cancel-modal__btn-back"
+                onClick={() => { setShowCancelModal(false); setCancelProject(null); setCancelReason(""); }}
+                disabled={cancelling}
+              >
+                Go Back
+              </button>
+              <button
+                className="ap-cancel-modal__btn-confirm"
+                onClick={handleCancelConfirm}
+                disabled={cancelling || !cancelReason.trim()}
+              >
+                {cancelling ? "Cancelling…" : "Confirm Cancellation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showEditModal && editProject && (() => {
         const allSigned = !!(editProject.reviewedBy && editProject.recommendedBy && editProject.endorsedBy && editProject.approvedBy);
         const canEditForm = role === "admin";
         return (
           <div
+            className="ap-modal-overlay ap-modal-overlay--edit"
             onClick={() => { setShowEditModal(false); setEditProject(null); }}
-            style={{
-              position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-              zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center",
-            }}
           >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{
-                background: "#fff", borderRadius: 18, width: "min(700px, 95vw)",
-                maxHeight: "90vh", display: "flex", flexDirection: "column",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.2)", overflow: "hidden",
-              }}
-            >
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "16px 20px", borderBottom: "1px solid #e5e7eb", flexShrink: 0,
-              }}>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+            <div className="ap-edit-modal" onClick={e => e.stopPropagation()}>
+              <div className="ap-edit-modal__header">
+                <h3 className="ap-edit-modal__title">
                   {editProject.projectType === "sl" ? "📝 Service Learning Proposal" : "📝 Community Engagement Proposal"}
                 </h3>
                 <button
+                  className="ap-edit-modal__close"
                   onClick={() => { setShowEditModal(false); setEditProject(null); }}
-                  style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}
                 >✕</button>
               </div>
               {allSigned && !canEditForm ? (
-                <div style={{ padding: 32, textAlign: "center", color: "#64748b" }}>
-                  <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>🔒</div>
-                  <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 8 }}>
-                    Editing Locked
-                  </div>
-                  <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                <div className="ap-edit-modal__locked">
+                  <div className="ap-edit-modal__lock-icon">🔒</div>
+                  <div className="ap-edit-modal__lock-title">Editing Locked</div>
+                  <p className="ap-edit-modal__lock-text">
                     All signatories have approved this proposal. Only an admin can make changes at this stage.
                   </p>
                 </div>
               ) : (
-                <div style={{ overflowY: "auto", flex: 1 }}>
+                <div className="ap-edit-modal__body">
                   {allSigned && (
-                    <div style={{ background: "#fef3c7", borderBottom: "1px solid #fde68a", padding: "10px 20px", fontSize: "0.82rem", color: "#92400e", display: "flex", alignItems: "center", gap: 6 }}>
+                    <div className="ap-edit-modal__warning">
                       <span>⚠️</span>
                       <span>All signatories have approved — changes here are admin-only edits before publishing.</span>
                     </div>
