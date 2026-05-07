@@ -158,7 +158,7 @@ export default function AdminProjects() {
 
   function formatStatus(status = "") {
     if (!status) return "Draft";
-    if (isForApproval(status)) return "For Approval";
+    if (isForApproval(status)) return "Pending";
     if (status === "archived") return "Archived";
     return status.charAt(0).toUpperCase() + status.slice(1);
   }
@@ -409,7 +409,7 @@ export default function AdminProjects() {
               {/* For Approval section (only in "All Projects" view) */}
               {statusFilter === "all" && forApprovalList.length > 0 && (
                 <div className="ap-section">
-                  <span className="ap-section-heading">For Approval</span>
+                  <span className="ap-section-heading">Pending Approvals</span>
                   <div className="rp-card-grid">
                     {forApprovalList.map(renderCard)}
                   </div>
@@ -420,7 +420,7 @@ export default function AdminProjects() {
               {otherList.length > 0 && (
                 <div className="ap-section">
                   {statusFilter === "all" && (
-                    <span className="ap-section-heading">Other Projects</span>
+                    <span className="ap-section-heading">Published Projects</span>
                   )}
                   <div className="rp-card-grid">
                     {otherList.map(renderCard)}
