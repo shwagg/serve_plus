@@ -14,7 +14,7 @@ import { SessionContext } from "../../context/SessionContext";
 const FILTER_OPTIONS = [
   { key: "all",         label: "All Projects" },
   { key: "for_approval", label: "For Approval" },
-  { key: "draft",       label: "Draft" },
+  { key: "draft",       label: "Ready for Publishing" },
   { key: "published",   label: "Published" },
   { key: "completed",   label: "Completed" },
   { key: "archived",    label: "Archived" },
@@ -137,10 +137,15 @@ export default function AdminProjects() {
     [filtered, statusFilter]
   );
 
+  const forPublishingList = useMemo(
+    () => (statusFilter === "all" ? filtered.filter(p => (p.status || "").toLowerCase() === "draft") : []),
+    [filtered, statusFilter]
+  );
+
   const otherList = useMemo(
     () => sortByDate(
       statusFilter === "all"
-        ? filtered.filter(p => !isForApproval(p.status))
+        ? filtered.filter(p => !isForApproval(p.status) && (p.status || "").toLowerCase() !== "draft")
         : filtered
     ),
     [filtered, statusFilter]
@@ -157,7 +162,8 @@ export default function AdminProjects() {
   }
 
   function formatStatus(status = "") {
-    if (!status) return "Draft";
+    if (!status) return "Ready for Publishing";
+    if (status.toLowerCase() === "draft") return "Ready for Publishing";
     if (isForApproval(status)) return "Pending";
     if (status === "archived") return "Archived";
     return status.charAt(0).toUpperCase() + status.slice(1);
@@ -344,7 +350,7 @@ export default function AdminProjects() {
   }
 
   const currentLabel = FILTER_OPTIONS.find(f => f.key === statusFilter)?.label ?? "All Projects";
-  const isEmpty = forApprovalList.length === 0 && otherList.length === 0;
+  const isEmpty = forApprovalList.length === 0 && forPublishingList.length === 0 && otherList.length === 0;
 
   return (
     <div className="admin-projects-page">
@@ -412,6 +418,16 @@ export default function AdminProjects() {
                   <span className="ap-section-heading">Pending Approvals</span>
                   <div className="rp-card-grid">
                     {forApprovalList.map(renderCard)}
+                  </div>
+                </div>
+              )}
+
+              {/* For Publishing section (only in "All Projects" view) */}
+              {statusFilter === "all" && forPublishingList.length > 0 && (
+                <div className="ap-section">
+                  <span className="ap-section-heading">For Publishing</span>
+                  <div className="rp-card-grid">
+                    {forPublishingList.map(renderCard)}
                   </div>
                 </div>
               )}

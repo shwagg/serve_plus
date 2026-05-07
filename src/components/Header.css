@@ -110,7 +110,7 @@
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   flex: 0 0 auto;
   flex-shrink: 0;
   flex-wrap: nowrap;
@@ -151,6 +151,14 @@
 }
 .icon-button:active {
   transform: scale(0.95);
+}
+/* Profile button overrides — must come after .icon-button to win specificity order */
+button.icon-button.profile-btn {
+  width: auto;
+  height: auto;
+  min-width: unset;
+  min-height: unset;
+  border-radius: 20px;
 }
 /* Responsive Design */
 @media (max-width: 768px) {
