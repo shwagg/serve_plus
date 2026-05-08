@@ -3,14 +3,7 @@
 //as approving, publishing, issuing certificates, and other high impact actions.
 
 import { signInWithEmailAndPassword } from "firebase/auth";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -294,7 +287,7 @@ function Auth() {
     setShowAgreement(false);
     if (!pendingNavigation) return;
 
-    const { role, email: pendingEmail, userCred } = pendingNavigation;
+    const { role, email: userCred } = pendingNavigation;
 
     if (role === "admin" || role === "sysadmin") {
       try {
