@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
+import { getLevelInfo } from "../../hooks/rewardSystem";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
   const softSkills = [
@@ -469,8 +470,11 @@ export default function Profile() {
 
         const totalPoints = profileData.totalPoints || 0;
         profileData.totalPoints = totalPoints;
-        profileData.level = Math.floor(totalPoints / 100) + 1;
-        profileData.levelProgress = totalPoints % 100;
+        const _li = getLevelInfo(totalPoints);
+        profileData.level = _li.level;
+        profileData.levelProgress = _li.progress;
+        profileData.levelPointsInLevel = _li.pointsInLevel;
+        profileData.levelPointsForLevel = _li.pointsForLevel;
         profileData.registeredEvents = [];
 
         setProfile(profileData);
@@ -645,7 +649,7 @@ export default function Profile() {
             <div className="profile-level-bar-bg">
               <div className="profile-level-bar-fill" style={{ width: `${profile.levelProgress}%` }}></div>
               <div className="profile-level-bar-label">
-                {profile.totalPoints || 0} pts ({profile.levelProgress || 0}/100 to next level)
+                {profile.totalPoints || 0} pts ({profile.levelPointsInLevel || 0}/{profile.levelPointsForLevel || 0} to next level)
               </div>
             </div>
           </div>
