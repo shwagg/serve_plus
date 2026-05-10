@@ -1,4 +1,4 @@
-/* extra space so content doesnt hide behind header */
+﻿/* extra space so content doesnt hide behind header */
 .header-spacer{
     height: 60px; /* height of header */
 }
@@ -518,8 +518,8 @@
   /*to keep title to 3 lines max*/
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  line-clamp: 3;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
 }
 .mission-card-meta {
@@ -779,6 +779,13 @@
 }
 
 .leaderboard-list {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 6%,
+    black 88%,
+    transparent 100%
+  );
   mask-image: linear-gradient(
     to bottom,
     transparent 0%,
@@ -855,6 +862,7 @@
 /*GLOBAL NOTIFICATION*/
 .global-feed-toggle {
   position: fixed;
+  top: 100px;
   right: 0;
   z-index: 1600;
 
@@ -1024,8 +1032,7 @@
 .event-details-bg {
   background: linear-gradient(135deg, #a6e4c9 0%, #8dd4b5 100%);
   min-height: 100vh;
-  min-width: 100vw;
-  width: 100vw;
+  width: 100%;
   font-family: 'Inter', sans-serif;
   overflow: visible;
   padding: 0;
@@ -1078,7 +1085,6 @@
   padding-bottom: 30px;
 }
 .event-details-card:hover {
-  transform: translateY(-5px);
   box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
 }
 .event-details-grid {
@@ -1282,7 +1288,7 @@
 @media (max-width: 768px) {
   .event-details-cta {
     justify-content: center;
-    min-height: auto;
+    min-height: 0;
   }
 
   .volunteer-avatars {
