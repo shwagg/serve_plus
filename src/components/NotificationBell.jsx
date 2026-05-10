@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useSession } from "../context/SessionContext";
 import notificationIcon from "../assets/headassets/Notification Icon.svg";
 import {
   subscribeToNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  createNotification,
 } from "../utils/notificationUtils";
 import "./styles/NotificationBell.css";
 
@@ -20,6 +22,7 @@ export default function NotificationBell() {
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const bellButtonRef = useRef(null);
+  const prevPointsRef = useRef(null);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
@@ -40,6 +43,27 @@ export default function NotificationBell() {
       setUnreadCount(items.filter((n) => !n.read).length);
     });
 
+    return () => unsubscribe();
+  }, [userId]);
+
+  // Watch totalPoints for admin-released mission points
+  useEffect(() => {
+    if (!userId) return;
+    const userRef = doc(db, "users", userId);
+    const unsubscribe = onSnapshot(userRef, (snap) => {
+      if (!snap.exists()) return;
+      const pts = snap.data().totalPoints || 0;
+      if (prevPointsRef.current !== null && pts > prevPointsRef.current) {
+        const gained = pts - prevPointsRef.current;
+        createNotification(userId, {
+          type: "points_earned",
+          title: "Points Awarded!",
+          message: `You received ${gained} point${gained !== 1 ? "s" : ""} from a completed mission.`,
+          link: "/student",
+        });
+      }
+      prevPointsRef.current = pts;
+    });
     return () => unsubscribe();
   }, [userId]);
 

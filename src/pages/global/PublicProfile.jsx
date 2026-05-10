@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { auth, db } from "../../firebaseConfig";
+import { getLevelInfo } from "../../hooks/rewardSystem";
 import Header from "../../components/Header";
 import BadgeShelf from "../../components/badges/BadgeShelf";
 import "../../styles/Profile.css";
@@ -41,8 +42,11 @@ export default function PublicProfile() {
         const totalPoints = profileData.totalPoints || 0;
 
         profileData.totalPoints = totalPoints;
-        profileData.level = Math.floor(totalPoints / 100) + 1;
-        profileData.levelProgress = totalPoints % 100;
+        const _li = getLevelInfo(totalPoints);
+        profileData.level = _li.level;
+        profileData.levelProgress = _li.progress;
+        profileData.levelPointsInLevel = _li.pointsInLevel;
+        profileData.levelPointsForLevel = _li.pointsForLevel;
 
         // Fetch events the user is registered in (volunteer subcollection)
         const missionsSnap = await getDocs(collection(db, "missions"));
@@ -213,7 +217,7 @@ export default function PublicProfile() {
                 <div className="profile-level-bar-bg">
                   <div className="profile-level-bar-fill" style={{ width: `${profile.levelProgress}%` }}></div>
                   <div className="profile-level-bar-label">
-                    {profile.totalPoints || 0} pts ({profile.levelProgress || 0}/100 to next level)
+                    {profile.totalPoints || 0} pts ({profile.levelPointsInLevel || 0}/{profile.levelPointsForLevel || 0} to next level)
                   </div>
                 </div>
               </div>

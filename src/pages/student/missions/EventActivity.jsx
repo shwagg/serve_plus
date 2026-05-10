@@ -16,7 +16,7 @@ import { createNotification } from "../../../utils/notificationUtils";
 import { logAudit } from "../../../utils/auditLogger";
 import { useSession } from '../../../context/SessionContext';
 import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
-import { computeFinalPoints } from "../../../hooks/rewardSystem";
+import { computeFinalPoints, getLevelInfo } from "../../../hooks/rewardSystem";
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
@@ -696,9 +696,9 @@ export default function EventActivity() {
           }
         }
 
-        // Calculate old and new level (every 100 points = 1 level)
-        const oldLevel = Math.floor((totalPointsAllMissions - pointsToAward) / 100) + 1;
-        const newLevel = Math.floor(totalPointsAllMissions / 100) + 1;
+        // Calculate old and new level (progressive thresholds)
+        const oldLevel = getLevelInfo(totalPointsAllMissions - pointsToAward).level;
+        const newLevel = getLevelInfo(totalPointsAllMissions).level;
 
         // Send level up notification if level increased
         if (newLevel > oldLevel) {
@@ -2490,11 +2490,13 @@ export default function EventActivity() {
                 <span className="missions-count">{completedMissions}</span>
               </div>
               <div className="player-level">
-                <span className="level-label">Level {Math.floor((userData?.totalPoints || 0) / 100) + 1}</span>
-                <div className="level-bar" role="progressbar" aria-valuenow={(userData?.totalPoints || 0) % 100} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="level-bar-fill" style={{ width: `${(userData?.totalPoints || 0) % 100}%` }}></div>
+                {(() => { const li = getLevelInfo(userData?.totalPoints); return (<>
+                <span className="level-label">Level {li.level}</span>
+                <div className="level-bar" role="progressbar" aria-valuenow={li.progress} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="level-bar-fill" style={{ width: `${li.progress}%` }}></div>
                 </div>
-                <span className="level-points">{userData?.totalPoints || 0} pts ({(userData?.totalPoints || 0) % 100}/100)</span>
+                <span className="level-points">{userData?.totalPoints || 0} pts ({li.pointsInLevel}/{li.pointsForLevel} to next level)</span>
+                </>); })()}
               </div>
             </div>
           </section>
@@ -2576,11 +2578,13 @@ export default function EventActivity() {
               <span className="missions-count">{completedMissions}</span>
             </div>
             <div className="player-level">
-              <span className="level-label">Level {Math.floor((userData?.totalPoints || 0) / 100) + 1}</span>
-              <div className="level-bar" role="progressbar" aria-valuenow={(userData?.totalPoints || 0) % 100} aria-valuemin={0} aria-valuemax={100}>
-                <div className="level-bar-fill" style={{ width: `${(userData?.totalPoints || 0) % 100}%` }}></div>
+              {(() => { const li = getLevelInfo(userData?.totalPoints); return (<>
+              <span className="level-label">Level {li.level}</span>
+              <div className="level-bar" role="progressbar" aria-valuenow={li.progress} aria-valuemin={0} aria-valuemax={100}>
+                <div className="level-bar-fill" style={{ width: `${li.progress}%` }}></div>
               </div>
-              <span className="level-points">{userData?.totalPoints || 0} pts ({(userData?.totalPoints || 0) % 100}/100)</span>
+              <span className="level-points">{userData?.totalPoints || 0} pts ({li.pointsInLevel}/{li.pointsForLevel} to next level)</span>
+              </>); })()}
             </div>
           </div>
         </section>

@@ -6,6 +6,7 @@ import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
 import { collection, getDocs, doc, getDoc, query, orderBy, limit, where, getCountFromServer, onSnapshot } from "firebase/firestore";
+import { getLevelInfo } from "../../hooks/rewardSystem";
 import Header from "../../components/Header";
 import "../../styles/student.css";
 import "../../styles/ui.css";
@@ -282,7 +283,7 @@ const StudentHome = () => {
             setStudentAvatar(userData.avatar || '');
             const totalPoints = userData.totalPoints || 0;
             setCurrentPoints(totalPoints);
-            const calculatedLevel = Math.floor(totalPoints / 100) + 1;
+            const calculatedLevel = getLevelInfo(totalPoints).level;
             setLevel(calculatedLevel);
           }
 
@@ -528,11 +529,11 @@ const StudentHome = () => {
               <div
                 className="level-bar strip-progress-bar"
                 role="progressbar"
-                aria-valuenow={currentPoints % 100}
+                aria-valuenow={getLevelInfo(currentPoints).progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
               >
-                <div className="level-bar-fill" style={{ width: `${currentPoints % 100}%` }} />
+                <div className="level-bar-fill" style={{ width: `${getLevelInfo(currentPoints).progress}%` }} />
               </div>
               <span className="strip-divider">|</span>
               <span className="strip-missions-text">Missions <span className="strip-pipe">|</span> {completedMissions}</span>
