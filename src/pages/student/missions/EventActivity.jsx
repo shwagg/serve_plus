@@ -247,20 +247,19 @@ export default function EventActivity() {
         alert("File must be less than 10MB.");
         return;
       }
-      const fileRef = ref(
-        storage,
-        `consents/${id}/${user.uid}/${selectedConsentFile.name}`
-      );
+      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+      const fileRef = ref(storage, `consents/${id}/${user.uid}/activity-consent.pdf`);
       // Upload to Storage
       await uploadBytes(fileRef, selectedConsentFile);
       const downloadURL = await getDownloadURL(fileRef);
       // Save metadata to Firestore
       await setDoc(
-        doc(db, "missions", id, "volunteer", user.uid),
+        volunteerRef,
         {
           consentSubmission: {
             fileUrl: downloadURL,
             filePath: fileRef.fullPath,
+            fileName: selectedConsentFile.name,
             fileType: selectedConsentFile.type,
             submittedAt: serverTimestamp()
           },
@@ -270,7 +269,18 @@ export default function EventActivity() {
         },
         { merge: true }
       );
+      await updateDoc(volunteerRef, {
+        "consentSubmission.reviewStatus": deleteField(),
+      });
       setConsentSubmitted(true);
+      setConsentReviewStatus("");
+      setConsentFileUrl(downloadURL);
+      setVolunteerProgress((prev) => ({
+        ...(prev || {}),
+        consent: "submitted",
+      }));
+      setSelectedConsentFile(null);
+      setShowConsentModal(false);
       alert("Consent uploaded successfully!");
     } catch (error) {
       console.error("Upload error:", error);
@@ -2101,6 +2111,7 @@ export default function EventActivity() {
   const [preSurveyData, setPreSurveyData] = useState(null);
   const [preSurveyFullData, setPreSurveyFullData] = useState(null);
   const [consentFileUrl, setConsentFileUrl] = useState(null);
+  const [consentReviewStatus, setConsentReviewStatus] = useState("");
   const [showPreSurveyPreview, setShowPreSurveyPreview] = useState(false);
   const [volunteerRole, setVolunteerRole] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2211,25 +2222,46 @@ export default function EventActivity() {
             const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
             const volunteerSnap = await getDoc(volunteerRef);
             let consentSubmitted = false;
+            let consentStatus = "";
             let progress = {};
             let pointsEarned = 0;
             if (volunteerSnap.exists()) {
               const data = volunteerSnap.data();
               progress = data.progress || {};
               pointsEarned = data.pointsEarned || 0;
-              // Check for consentSubmission field
-              if (data.consentSubmission && data.consentSubmission.fileUrl) {
-                consentSubmitted = true;
+              const reviewStatus = data.consentSubmission?.reviewStatus || "";
+              const hasConsentFile = Boolean(data.consentSubmission?.fileUrl);
+              setConsentReviewStatus(reviewStatus);
+              if (hasConsentFile) {
                 setConsentFileUrl(data.consentSubmission.fileUrl);
+              } else {
+                setConsentFileUrl(null);
               }
+
+              if (reviewStatus === "approved") {
+                consentSubmitted = true;
+                consentStatus = "verified";
+              } else if (reviewStatus === "rejected") {
+                consentSubmitted = false;
+                consentStatus = "rejected";
+              } else if (hasConsentFile) {
+                consentSubmitted = true;
+                consentStatus = "submitted";
+              } else {
+                consentStatus = progress.consent || "";
+              }
+            } else {
+              setConsentFileUrl(null);
+              setConsentReviewStatus("");
             }
+            setConsentSubmitted(consentSubmitted);
 
             // Set volunteerProgress state based on Firestore records
-            setVolunteerProgress((prev) => ({
+            setVolunteerProgress({
               ...progress,
               preSurvey: preSurveySubmitted ? "submitted" : progress.preSurvey,
-              consent: consentSubmitted ? "submitted" : progress.consent,
-            }));
+              consent: consentStatus,
+            });
             setTotalPointsEarned(pointsEarned);
 
             // Enrollment status for each task
@@ -2533,6 +2565,7 @@ export default function EventActivity() {
   );
   const currentUserRank =
     currentUserIndex !== -1 ? currentUserIndex + 1 : null;
+  const consentRejected = volunteerProgress?.consent === 'rejected';
 
   const getOrdinal = (rank) => {
     if (!rank) return "";
@@ -3094,12 +3127,16 @@ export default function EventActivity() {
                         },
                         {
                           label: 'Parent Consent Form',
-                          desc: !isEditable ? 'Closed after the event date' : 'Upload the signed consent form',
+                          desc: !isEditable
+                            ? 'Closed after the event date'
+                            : consentRejected
+                              ? 'Previous consent was rejected. Upload a new signed consent form'
+                              : 'Upload the signed consent form',
                           done: consentDone,
                           locked: !isEditable,
                           onOpen: isEditable ? () => setShowConsentModal(true) : null,
                           type: 'upload',
-                          previewable: consentDone && !!consentFileUrl,
+                          previewable: !!consentFileUrl,
                           onPreview: () => window.open(consentFileUrl, '_blank'),
                         },
                         {
@@ -3473,6 +3510,7 @@ export default function EventActivity() {
                     <li>Volunteers without a submitted consent form will <strong>not</strong> be allowed to join the event.</li>
                     <li>Download the form, fill it out, have your parent/guardian sign it, then upload the signed copy below.</li>
                     <li>You will be notified once your consent form has been approved or rejected.</li>
+                    <li>If it is rejected, you can upload a new signed copy and it will replace your previous submission for another review.</li>
                   </ul>
                 </div>
 
@@ -3558,7 +3596,7 @@ export default function EventActivity() {
                 disabled={!isEditable || !selectedConsentFile || consentSubmitted}
                 onClick={handleConsentSubmit}
               >
-                Submit
+                {consentReviewStatus === 'rejected' ? 'Resubmit' : 'Submit'}
               </button>
             </div>
           </div>
