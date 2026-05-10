@@ -6,6 +6,7 @@ import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
+import { createNotification } from "../../utils/notificationUtils";
 
 function toTitleCase(str) {
   if (!str) return str;
@@ -80,12 +81,16 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
         try {
           const preDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "preSurvey", "response"));
           if (preDoc.exists()) preSurveyAnswers = preDoc.data();
-        } catch (_) {}
+        } catch {
+          preSurveyAnswers = null;
+        }
 
         try {
           const postDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "postSurvey", "response"));
           if (postDoc.exists()) postSurveyAnswers = postDoc.data();
-        } catch (_) {}
+        } catch {
+          postSurveyAnswers = null;
+        }
 
         return {
           ...vData,
@@ -116,8 +121,54 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
         },
       });
       setVolunteers(prev => prev.map(v => v.id === volunteerId ? { ...v, participationStatus: value } : v));
-    } catch (_) {
+    } catch {
       showToast("Failed to update participation status.");
+    }
+  };
+
+  const handleConsentReviewChange = async (volunteerId, value) => {
+    try {
+      const selectedVolunteer = volunteers.find(v => v.id === volunteerId);
+      await updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId), {
+        "consentSubmission.reviewStatus": value,
+      });
+      logAudit({
+        action: "VOLUNTEER_CONSENT_REVIEW_UPDATED",
+        category: "event",
+        details: {
+          missionId,
+          targetUserId: volunteerId,
+          targetUserName: volunteers.find(v => v.id === volunteerId)?.name || "",
+          reviewStatus: value,
+        },
+      });
+      setVolunteers(prev => prev.map(v => (
+        v.id === volunteerId
+          ? {
+              ...v,
+              consentSubmission: {
+                ...(v.consentSubmission || {}),
+                reviewStatus: value,
+              },
+            }
+          : v
+      )));
+
+      if (value === "approved" || value === "rejected") {
+        try {
+          const reviewLabel = value === "approved" ? "approved" : "rejected";
+          await createNotification(volunteerId, {
+            type: value === "approved" ? "consent_approved" : "consent_rejected",
+            title: `Consent Form ${value === "approved" ? "Approved" : "Rejected"}`,
+            message: `Your activity consent form for "${missionTitle || "this mission"}" has been ${reviewLabel}.`,
+            link: `/event/${missionId}/activity`,
+          });
+        } catch {
+          showToast(`Consent review saved for ${selectedVolunteer?.name || "the volunteer"}, but notification could not be sent.`, "error");
+        }
+      }
+    } catch {
+      showToast("Failed to update consent review status.");
     }
   };
 
@@ -165,10 +216,13 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
               const rawRoles = v.preSurveyAnswers?.engagement?.participation || [];
               const normalizedRoles = rawRoles.map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
               const isDonorOnly = normalizedRoles.includes("donor") && !normalizedRoles.includes("participant");
+              const hasConsentSubmission = Boolean(v.consentSubmission?.fileUrl);
+              const consentReviewStatus = v.consentSubmission?.reviewStatus || "";
+              const isConsentApproved = consentReviewStatus === "approved";
 
               const requiredItems = isDonorOnly
                 ? [v.participationStatus]
-                : [v.preSurveyAnswers, v.postSurveyAnswers, v.progress?.consent === "submitted", v.progress?.attendance === "present", v.participationStatus];
+                : [v.preSurveyAnswers, v.postSurveyAnswers, isConsentApproved, v.progress?.attendance === "present", v.participationStatus];
 
               const completedItems = requiredItems.filter(Boolean).length;
               const individualCompletion = Math.round((completedItems / requiredItems.length) * 100);
@@ -200,9 +254,28 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                       : ""}
                   </td>
                   <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center" }}>
-                    {v.progress?.consent === "submitted" && v.consentSubmission?.fileUrl
-                      ? <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #30bdb7", background: "#f3f4f8", color: "#23335b", cursor: "pointer", fontWeight: 600 }} onClick={() => window.open(v.consentSubmission.fileUrl, "_blank")}>View PDF</button>
-                      : ""}
+                    {hasConsentSubmission ? (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                        <select
+                          className="participation-select"
+                          value={consentReviewStatus}
+                          disabled={!!v.releasedAt}
+                          onChange={e => handleConsentReviewChange(v.id, e.target.value)}
+                        >
+                          <option value="">Select</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                        <a
+                          href={v.consentSubmission.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: "#30bdb7", fontSize: "0.6rem", fontWeight: 600, textDecoration: "none", lineHeight: 1.1 }}
+                        >
+                          View PDF
+                        </a>
+                      </div>
+                    ) : ""}
                   </td>
                   <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center" }}>
                     {v.postSurveyAnswers

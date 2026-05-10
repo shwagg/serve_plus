@@ -3472,6 +3472,7 @@ export default function EventActivity() {
                   <ul className="consent-note-list">
                     <li>Volunteers without a submitted consent form will <strong>not</strong> be allowed to join the event.</li>
                     <li>Download the form, fill it out, have your parent/guardian sign it, then upload the signed copy below.</li>
+                    <li>You will be notified once your consent form has been approved or rejected.</li>
                   </ul>
                 </div>
 
