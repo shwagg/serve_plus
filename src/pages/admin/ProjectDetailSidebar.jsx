@@ -414,7 +414,11 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                         style={{ marginBottom: 8 }}
                       />
                       <button className="pds-btn-approve" onClick={handleApprove} disabled={approving}>
-                        {approving ? "Approving…" : "✓ Approve"}
+                        {approving
+                          ? "Submitting…"
+                          : approvalLevel === "endorsedBy"
+                            ? "✓ Endorse"
+                            : "✓ Approve"}
                       </button>
                       <div className="pds-return-label" style={{ marginTop: 16 }}>Reject / Return to proposer</div>
                       <textarea

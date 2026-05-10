@@ -666,7 +666,17 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
                       onClick={handleApprove}
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? "Approving…" : "✓ Approve"}
+                      {isSubmitting
+                        ? "Submitting…"
+                        : approvalLevel === "reviewedBy"
+                          ? "✓ Reviewed"
+                          : approvalLevel === "recommendedBy"
+                            ? "✓ Recommended"
+                            : approvalLevel === "endorsedBy"
+                            ? "✓ Endorsed" 
+                            : approvalLevel === "approvedBy"
+                              ? "✓ Approved"
+                            : "✓ Approve"}
                     </button>
                     <div className="rm-return-label">Return to proposer</div>
                     <textarea
