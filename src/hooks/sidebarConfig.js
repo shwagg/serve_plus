@@ -84,11 +84,17 @@ export const partnerLinks = [
 //faculty side
 export const facultyLinks = [
   {
+    key: "events",
+    label: "Events",
+    children: [
+      { label: "Current Event", to: "/faculty/current-event" },
+    ],
+  },
+  {
     key: "project",
     label: "Project",
     children: [
-      { label: "Project List", to: "/faculty/projects" },
-      { label: "Review Proposals", to: "/global/review-proposals" },
+      { label: "Review Proposals", to: "/faculty/review-proposals" },
     ],
   },
 ];

@@ -9,7 +9,7 @@ import { SessionContext } from "../../../context/SessionContext";
 
 export default function ReviewProposal() {
   const location = useLocation();
-  const isAdminRoute = location.pathname.startsWith("/admin/");
+  const isAdminRoute = location.pathname.startsWith("/admin/") || location.pathname.startsWith("/faculty/");
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

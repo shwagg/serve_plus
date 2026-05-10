@@ -184,7 +184,7 @@ function Auth() {
         setCooldown(30);
         return;
       } else if (role === "faculty") {
-        navigate(intendedPath || "/faculty/projects", { replace: true });
+        navigate(intendedPath || "/faculty/current-event", { replace: true });
       } else if (role === "partner") {
         navigate(intendedPath || "/partner/dashboard", { replace: true });
       } else {
@@ -320,7 +320,7 @@ function Auth() {
       setStep("mfa");
       setCooldown(30);
     } else if (role === "faculty") {
-      navigate("/faculty/projects", { replace: true });
+      navigate("/faculty/current-event", { replace: true });
     } else if (role === "partner") {
       navigate("/partner/projects", { replace: true });
     } else {

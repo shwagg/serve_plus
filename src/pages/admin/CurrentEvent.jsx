@@ -3,8 +3,9 @@ import {
   query, where, serverTimestamp, Timestamp, onSnapshot,
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useContext } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { SessionContext } from "../../context/SessionContext";
 import { QRCodeCanvas } from "qrcode.react";
 import "../../styles/CurrentEvent.css";
 import LoadingOverlay from "../../components/LoadingOverlay";
@@ -120,6 +121,8 @@ export default function CurrentEvent() {
   const { missionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { userData } = useContext(SessionContext);
+  const isFaculty = (userData?.role || userData?.userRole || "").toLowerCase() === "faculty";
 
   // ── list view state ───────────────────────────────────────────────
   const [missions, setMissions] = useState([]);
@@ -778,7 +781,7 @@ export default function CurrentEvent() {
     const tabs = [
       { key: "roster",  label: "Roster" },
       { key: "details", label: "Project Details" },
-      { key: "docs",    label: "Document Library" },
+      ...(!isFaculty ? [{ key: "docs", label: "Document Library" }] : []),
     ];
 
     const typeLabel =
@@ -791,7 +794,7 @@ export default function CurrentEvent() {
 
         {/* ── back link ── */}
         <button
-          onClick={() => navigate("/admin/current-event")}
+          onClick={() => navigate(isFaculty ? "/faculty/current-event" : "/admin/current-event")}
           style={{
             background: "none", border: "none", color: "#64748b",
             fontSize: "0.82rem", cursor: "pointer", marginBottom: 16,
@@ -848,7 +851,7 @@ export default function CurrentEvent() {
         </div>
 
         {/* ── action strip ── */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+        {!isFaculty && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
           <button
             onClick={() => setShowAttQR(true)}
             style={{
@@ -918,7 +921,7 @@ export default function CurrentEvent() {
               {flagResult.ok ? `${flagResult.count} flagged` : `Error: ${flagResult.error}`}
             </span>
           )}
-        </div>
+        </div>}
 
         {/* ── tab navigation ── */}
         <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb", marginBottom: 20 }}>
@@ -962,8 +965,8 @@ export default function CurrentEvent() {
                     <th>Name</th>
                     <th>Level</th>
                     <th>Joined</th>
-                    <th>Attendance</th>
-                    <th>Actions</th>
+                    {!isFaculty && <th>Attendance</th>}
+                    {!isFaculty && <th>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -978,19 +981,21 @@ export default function CurrentEvent() {
                           {v.isFlagged && (
                             <>
                               <span title={`Flagged${v.flagExpiry ? " until " + v.flagExpiry.toLocaleDateString() : ""}`}>🚩</span>
-                              <button
-                                disabled={!!togglingFlag[v.id]}
-                                onClick={() => handleToggleFlag(v.id, true)}
-                                style={{
-                                  padding: "2px 8px",
-                                  background: togglingFlag[v.id] ? "#9ca3af" : "#16a34a",
-                                  color: "#fff", border: "none", borderRadius: 4,
-                                  fontSize: 11, fontWeight: 600,
-                                  cursor: togglingFlag[v.id] ? "not-allowed" : "pointer",
-                                }}
-                              >
-                                {togglingFlag[v.id] ? "…" : "Unflag"}
-                              </button>
+                              {!isFaculty && (
+                                <button
+                                  disabled={!!togglingFlag[v.id]}
+                                  onClick={() => handleToggleFlag(v.id, true)}
+                                  style={{
+                                    padding: "2px 8px",
+                                    background: togglingFlag[v.id] ? "#9ca3af" : "#16a34a",
+                                    color: "#fff", border: "none", borderRadius: 4,
+                                    fontSize: 11, fontWeight: 600,
+                                    cursor: togglingFlag[v.id] ? "not-allowed" : "pointer",
+                                  }}
+                                >
+                                  {togglingFlag[v.id] ? "…" : "Unflag"}
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -999,27 +1004,31 @@ export default function CurrentEvent() {
                       <td style={{ fontSize: "0.82rem", color: "#64748b" }}>
                         {v.joinedAt ? new Date(v.joinedAt).toLocaleDateString() : "—"}
                       </td>
-                      <td>
-                        {v.attendanceStatus === "present"
-                          ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Present</span>
-                          : <span style={{ color: "#9ca3af" }}>—</span>}
-                      </td>
-                      <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <button
-                          disabled={!!togglingAttendance[v.id]}
-                          onClick={() => handleToggleAttendance(v.id, v.attendanceStatus)}
-                          style={{
-                            padding: "3px 8px",
-                            background: v.attendanceStatus === "present" ? "#fff3cd" : "#d4edda",
-                            color: v.attendanceStatus === "present" ? "#856404" : "#155724",
-                            border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600,
-                            cursor: togglingAttendance[v.id] ? "not-allowed" : "pointer",
-                            opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
-                          }}
-                        >
-                          {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
-                        </button>
-                      </td>
+                      {!isFaculty && (
+                        <td>
+                          {v.attendanceStatus === "present"
+                            ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Present</span>
+                            : <span style={{ color: "#9ca3af" }}>—</span>}
+                        </td>
+                      )}
+                      {!isFaculty && (
+                        <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            disabled={!!togglingAttendance[v.id]}
+                            onClick={() => handleToggleAttendance(v.id, v.attendanceStatus)}
+                            style={{
+                              padding: "3px 8px",
+                              background: v.attendanceStatus === "present" ? "#fff3cd" : "#d4edda",
+                              color: v.attendanceStatus === "present" ? "#856404" : "#155724",
+                              border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                              cursor: togglingAttendance[v.id] ? "not-allowed" : "pointer",
+                              opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
+                            }}
+                          >
+                            {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1440,7 +1449,7 @@ export default function CurrentEvent() {
             <EventCard
               key={m.id}
               mission={m}
-              onClick={() => navigate(`/admin/current-event/${m.id}`, { state: { missionTitle: m.title } })}
+              onClick={() => navigate(`${isFaculty ? "/faculty" : "/admin"}/current-event/${m.id}`, { state: { missionTitle: m.title } })}
             />
           ))}
         </div>
