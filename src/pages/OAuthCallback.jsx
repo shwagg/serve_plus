@@ -53,7 +53,7 @@ function OAuthCallback() {
         // Redirect based on role
         const redirectMap = {
           admin: "/admin/dashboard",
-          faculty: "/faculty/projects",
+          faculty: "/faculty/current-event",
           partner: "/partner/projects",
           student: "/student/home",
         };

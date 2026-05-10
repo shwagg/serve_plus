@@ -169,6 +169,9 @@ function App() {
             }
           >
             <Route path="projects" element={<ProjectList mode="faculty" />} />
+            <Route path="review-proposals" element={<ReviewProposal />} />
+            <Route path="current-event" element={<CurrentEvent />} />
+            <Route path="current-event/:missionId" element={<CurrentEvent />} />
           </Route>
 
           {/* Partner Routes */}

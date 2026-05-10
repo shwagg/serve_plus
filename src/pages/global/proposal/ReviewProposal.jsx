@@ -9,7 +9,7 @@ import { SessionContext } from "../../../context/SessionContext";
 
 export default function ReviewProposal() {
   const location = useLocation();
-  const isAdminRoute = location.pathname.startsWith("/admin/");
+  const isAdminRoute = location.pathname.startsWith("/admin/") || location.pathname.startsWith("/faculty/");
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -57,6 +57,15 @@ export default function ReviewProposal() {
     return null;
   }
   const userApprovalField = getUserApprovalField();
+
+  const formatStatus = (status = "") => {
+    if (!status) return "Draft";
+    const s = status.toLowerCase();
+    if (s === "for_approval" || s === "for-approval") return "For Approval";
+    if (s === "pending") return "Pending";
+    if (s === "draft") return "Ready for Publishing";
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
 
   // Helper: context-aware status label for each row
   function getContextStatusLabel(proposal) {
@@ -128,7 +137,13 @@ export default function ReviewProposal() {
       data = data.filter(p => (p.title || "").toLowerCase().includes(term));
     }
     if (statusFilter !== "overall") {
-      data = data.filter(p => (p.status || "").toLowerCase() === statusFilter);
+      if (statusFilter === "for-approval") {
+        data = data.filter(p => getContextStatusLabel(p) === "For Approval");
+      } else if (statusFilter === "pending") {
+        data = data.filter(p => getContextStatusLabel(p) === "Pending");
+      } else {
+        data = data.filter(p => (p.status || "").toLowerCase() === statusFilter);
+      }
     }
     return data;
   }, [proposals, searchTerm, statusFilter, userApprovalField, isPartner, userData]);
@@ -141,15 +156,6 @@ export default function ReviewProposal() {
     if (s === "published") return "published";
     if (s === "completed") return "completed";
     return "draft";
-  };
-
-  const formatStatus = (status = "") => {
-    if (!status) return "Draft";
-    const s = status.toLowerCase();
-    if (s === "for_approval" || s === "for-approval") return "For Approval";
-    if (s === "pending") return "Pending";
-    if (s === "draft") return "Ready for Publishing";
-    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const handleOpenModal = (proposal) => {
