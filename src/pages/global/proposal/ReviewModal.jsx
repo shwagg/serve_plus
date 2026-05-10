@@ -208,6 +208,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     const s = status.toLowerCase();
     if (s === "for_approval" || s === "for-approval") return "For Approval";
     if (s === "pending") return "For Approval";
+    if (s === "draft") return "Ready for Publishing";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
