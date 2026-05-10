@@ -229,6 +229,10 @@ export default function EventActivity() {
         alert("You must be logged in.");
         return;
       }
+      if (!isEditable) {
+        alert("Consent submission is closed because this event has ended.");
+        return;
+      }
       if (!selectedConsentFile) {
         alert("Please select a PDF file.");
         return;
@@ -2515,24 +2519,6 @@ export default function EventActivity() {
       </div>
     );
   }
-  if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-    return (
-      <div className="full-page">
-        <Header />
-        <div className="header-spacer" />
-        <div className="ea-fullpage-center">
-          <span style={{ fontSize: 48 }}>📋</span>
-          <h2 style={{ color: '#374151', marginTop: 12 }}>No tasks yet</h2>
-          <p style={{ color: '#6b7280' }}>No tasks have been added to this event.</p>
-          <button className="ui-btn" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>Go Back</button>
-        </div>
-      </div>
-    );
-    return (
-      <div style={{ display: 'none' }}>
-      </div>
-    );
-  }
 
   const sortedLeaderboard = [...leaderboard].sort(
     (a, b) => b.points - a.points
@@ -3053,6 +3039,16 @@ export default function EventActivity() {
                           );
                         };
 
+                        if (withIdx.length === 0) {
+                          return (
+                            <div className="ea-empty-state" style={{ padding: '24px 0', textAlign: 'center' }}>
+                              <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>📋</span>
+                              <h4 style={{ color: '#374151', margin: 0 }}>No tasks yet</h4>
+                              <p style={{ color: '#6b7280', margin: '8px 0 0' }}>You can still complete the event requirements while waiting for tasks to be added.</p>
+                            </div>
+                          );
+                        }
+
                         return (
                           <>
                             {joinedList.length > 0 && (
@@ -3088,20 +3084,20 @@ export default function EventActivity() {
                       const steps = [
                         {
                           label: 'Pre-Activity Survey',
-                          desc: 'Fill out before the event',
+                          desc: !isEditable ? 'Closed after the event date' : 'Fill out before the event',
                           done: preSurveyDone,
-                          locked: false,
-                          onOpen: () => setShowPreSurveyModal(true),
+                          locked: !isEditable,
+                          onOpen: isEditable ? () => setShowPreSurveyModal(true) : null,
                           type: 'survey',
                           previewable: preSurveyDone && !!preSurveyFullData,
                           onPreview: () => setShowPreSurveyPreview(true),
                         },
                         {
                           label: 'Parent Consent Form',
-                          desc: 'Upload the signed consent form',
+                          desc: !isEditable ? 'Closed after the event date' : 'Upload the signed consent form',
                           done: consentDone,
-                          locked: false,
-                          onOpen: () => setShowConsentModal(true),
+                          locked: !isEditable,
+                          onOpen: isEditable ? () => setShowConsentModal(true) : null,
                           type: 'upload',
                           previewable: consentDone && !!consentFileUrl,
                           onPreview: () => window.open(consentFileUrl, '_blank'),
@@ -3290,6 +3286,10 @@ export default function EventActivity() {
                   const user = auth.currentUser;
                   if (!user) {
                     alert("You must be logged in.");
+                    return;
+                  }
+                  if (!isEditable) {
+                    alert("Pre-Activity Survey submission is closed because this event has ended.");
                     return;
                   }
                   await setDoc(
@@ -3554,7 +3554,7 @@ export default function EventActivity() {
               {/* Submit button */}
               <button
                 className={`consent-submit-btn${selectedConsentFile && !consentSubmitted ? '' : ' consent-submit-btn--disabled'}`}
-                disabled={!selectedConsentFile || consentSubmitted}
+                disabled={!isEditable || !selectedConsentFile || consentSubmitted}
                 onClick={handleConsentSubmit}
               >
                 Submit

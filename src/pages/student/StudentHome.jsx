@@ -631,7 +631,7 @@ const StudentHome = () => {
                 proposalCards.map((proposal) => {
                   const statusLabels = {
                     for_approval: { label: '📋 For Approval', color: '#d97706' },
-                    draft: { label: '✏️ Draft', color: '#64748b' },
+                    draft: { label: '📝 For Publishing', color: '#64748b' },
                     rejected: { label: '❌ Rejected', color: '#dc2626' },
                     approved: { label: '✅ Approved', color: '#16a34a' },
                   };
