@@ -10,7 +10,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
 import googleIcon from "../assets/google_icon.svg";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
-import loginPoster from "../assets/login_poster.png";
+import loginPosterGif from "../assets/login_poster_loop.gif";
+import loginPosterFallback from "../assets/login_poster_img.svg";
 import AgreementModal, {
   fetchCurrentAgreementVersion,
 } from "../components/AgreementModal";
@@ -406,7 +407,7 @@ function Auth() {
           <div className="auth-split">
             {/* Left: poster */}
             <div className="auth-poster-panel">
-              <img src={loginPoster} alt="SERVE+ illustration" />
+              <img src={loginPosterGif} alt="SERVE+ illustration" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = loginPosterFallback; }} />
             </div>
 
             {/* Right: form */}
@@ -534,7 +535,7 @@ function Auth() {
         <div className="auth-page">
           <div className="auth-split">
             <div className="auth-poster-panel">
-              <img src={loginPoster} alt="SERVE+ illustration" />
+              <img src={loginPosterGif} alt="SERVE+ illustration" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = loginPosterFallback; }} />
             </div>
             <div className="auth-form-panel">
               <form className="ui-form auth-login-form" onSubmit={handleVerifyMfa}>

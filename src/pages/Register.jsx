@@ -5,7 +5,8 @@ import { auth, db } from "../firebaseConfig";
 import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
-import loginPoster from "../assets/login_poster.png";
+import loginPosterGif from "../assets/login_poster_loop.gif";
+import loginPosterFallback from "../assets/login_poster_img.svg";
 import "../styles/ui.css";
 
 function Register() {
@@ -167,7 +168,7 @@ function Register() {
             <div className="auth-split">
                 {/* Left: poster */}
                 <div className="auth-poster-panel">
-                    <img src={loginPoster} alt="SERVE+ illustration" />
+                    <img src={loginPosterGif} alt="SERVE+ illustration" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = loginPosterFallback; }} />
                 </div>
 
                 {/* Right: form */}

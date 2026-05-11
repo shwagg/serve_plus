@@ -441,7 +441,7 @@ input {
 }
 
 .auth-poster-panel img {
-  width: 100%;
+  width: 115%;
   max-height: 180vh;
   object-fit: contain;
   display: block;
