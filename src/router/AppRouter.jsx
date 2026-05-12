@@ -1,4 +1,4 @@
-import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { Route, BrowserRouter as Router, Routes, Navigate } from "react-router-dom";
 import React, { Suspense, lazy } from "react";
 import LoadingOverlay from "../components/LoadingOverlay";
 
@@ -17,7 +17,6 @@ const AgreementEditor = lazy(() => import("../pages/admin/AgreementEditor"));
 const AuditLogs = lazy(() => import("../pages/admin/AuditLogs"));
 const BackupRestore = lazy(() => import("../pages/admin/BackupRestore"));
 const CurrentEvent = lazy(() => import("../pages/admin/CurrentEvent"));
-const ProjectDetails = lazy(() => import("../pages/admin/ProjectDetails"));
 const ProjectTasks = lazy(() => import("../pages/admin/ProjectTasks"));
 const RosterAccountManagement = lazy(() => import("../pages/admin/RosterAccountManagement"));
 
@@ -51,7 +50,7 @@ export default function AppRouter() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="projects" element={<AdminProjects />} />
           <Route path="projects/new" element={<CreateProject />} />
-          <Route path="projects/:projectId" element={<ProjectDetails />} />
+          <Route path="projects/:projectId" element={<Navigate to="/admin/projects" replace />} />
           <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
           <Route path="current-event" element={<CurrentEvent />} />
           <Route path="current-event/:missionId" element={<CurrentEvent />} />

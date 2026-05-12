@@ -1387,6 +1387,7 @@ export default function CurrentEvent() {
               className="search-input"
             />
           </div>
+          {!isFaculty && (
           <div className="ce-tooltip-wrap">
             <button
               onClick={() => { setShowFlaggedModal(true); fetchFlaggedStudents(); }}
@@ -1400,6 +1401,8 @@ export default function CurrentEvent() {
             </button>
             <span className="ce-tooltip">Shows a list of all volunteers currently flagged for absence. You can manually remove flags from here.</span>
           </div>
+          )}
+          {!isFaculty && (
           <div className="ce-tooltip-wrap">
             <button
               onClick={handleFlagAllEvents}
@@ -1415,6 +1418,7 @@ export default function CurrentEvent() {
             </button>
             <span className="ce-tooltip">Scans every past event and flags volunteers who missed attendance. This may take a while.</span>
           </div>
+          )}
         </div>
       </div>
 

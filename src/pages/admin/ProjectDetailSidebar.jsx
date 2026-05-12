@@ -1,13 +1,15 @@
 import { useState, useEffect, useContext, useRef } from "react";
 import { db, storage } from "../../firebaseConfig";
-import { doc, updateDoc, serverTimestamp, collection, getDocs, getDoc } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, collection, getDocs, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { QRCodeCanvas } from "qrcode.react";
 import ProposalTimeline from "../../components/ProposalTimeline";
 import { SessionContext } from "../../context/SessionContext";
 import { createNotification, notifyUsersByRoles } from "../../utils/notificationUtils";
 import { logAudit } from "../../utils/auditLogger";
+import { showToast, showConfirm } from "../../utils/toast";
 import mission1 from "../../assets/mission1.jpg";
+import ImpactMetrics from "./ImpactMetrics";
 import "../../styles/ProjectDetailSidebar.css";
 
 function isForApproval(status = "") {
@@ -59,6 +61,25 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const [coverUrl, setCoverUrl] = useState(project?.img || null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef(null);
+  const [showRosterModal, setShowRosterModal] = useState(false);
+  const [impactModalOpen, setImpactModalOpen] = useState(false);
+  const [impactModalType, setImpactModalType] = useState(null); // 'pre' or 'post'
+  const [volunteersWithSurveys, setVolunteersWithSurveys] = useState([]);
+
+  // Task management
+  const [tasks, setTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [savingTask, setSavingTask] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [taskFormData, setTaskFormData] = useState({
+    title: "",
+    description: "",
+    enrollmentDeadline: "",
+    points: 0,
+    type: "individual",
+    maxParticipants: 5,
+  });
 
   const statusStr = (project?.status || "").toLowerCase();
   const isApprovalStage = isForApproval(statusStr) || statusStr === "draft";
@@ -75,19 +96,40 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       const profileSnaps = await Promise.all(
         volData.map(v => getDoc(doc(db, "users", v.uid)))
       );
-      const enriched = volData.map((v, i) => {
-        const p = profileSnaps[i].exists() ? profileSnaps[i].data() : {};
-        return {
-          ...v,
-          displayName: p.name || p.username || p.email?.split("@")[0] || "Unknown",
-          role: p.role || "",
-          avatar: p.avatar && !p.avatar.includes("ui-avatars.com") ? p.avatar : null,
-        };
-      });
+      const enriched = await Promise.all(
+        volData.map(async (v, i) => {
+          const p = profileSnaps[i].exists() ? profileSnaps[i].data() : {};
+          let preSurveyAnswers = null;
+          let postSurveyAnswers = null;
+          try {
+            const preDoc = await getDoc(doc(db, "missions", project.id, "volunteer", v.uid, "preSurvey", "response"));
+            if (preDoc.exists()) preSurveyAnswers = preDoc.data();
+          } catch (_) {}
+          try {
+            const postDoc = await getDoc(doc(db, "missions", project.id, "volunteer", v.uid, "postSurvey", "response"));
+            if (postDoc.exists()) postSurveyAnswers = postDoc.data();
+          } catch (_) {}
+          return {
+            ...v,
+            name: p.name || p.username || p.email?.split("@")[0] || "Unknown",
+            displayName: p.name || p.username || p.email?.split("@")[0] || "Unknown",
+            role: p.role || "",
+            avatar: p.avatar && !p.avatar.includes("ui-avatars.com") ? p.avatar : null,
+            preSurveyAnswers,
+            postSurveyAnswers,
+          };
+        })
+      );
       setVolunteers(enriched);
+      setVolunteersWithSurveys(enriched);
       setFeedbackCount(fbSnap.size);
     }).catch(() => {}).finally(() => setLoadingData(false));
   }, [project?.id, isPublishedOrDone]);
+
+  useEffect(() => {
+    if (project?.id) loadTasks();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
 
   // Approval role logic
   const role = (userData?.role || "").toLowerCase();
@@ -231,6 +273,87 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     } finally {
       setApproving(false);
     }
+  };
+
+  // ── Task management ──────────────────────────────────────────────
+  const loadTasks = async () => {
+    if (!project?.id) return;
+    setLoadingTasks(true);
+    try {
+      const snap = await getDocs(collection(db, "missions", project.id, "task"));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
+      setTasks(list);
+    } catch (_) {}
+    finally { setLoadingTasks(false); }
+  };
+
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+    if (!taskFormData.title.trim()) { showToast("Task title is required."); return; }
+    setSavingTask(true);
+    try {
+      const snap = await getDocs(collection(db, "missions", project.id, "task"));
+      const nextId = snap.size.toString();
+      const taskData = {
+        title: taskFormData.title,
+        description: taskFormData.description,
+        enrollmentDeadline: taskFormData.enrollmentDeadline,
+        points: parseInt(taskFormData.points) || 0,
+        type: taskFormData.type || "individual",
+        createdAt: new Date().toISOString(),
+      };
+      if (taskFormData.type === "grouped") taskData.maxParticipants = parseInt(taskFormData.maxParticipants) || 5;
+      await setDoc(doc(db, "missions", project.id, "task", nextId), taskData);
+      logAudit({ action: "TASK_CREATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskTitle: taskFormData.title } });
+      cancelTaskForm();
+      await loadTasks();
+    } catch (_) { showToast("Failed to create task."); }
+    finally { setSavingTask(false); }
+  };
+
+  const handleEditTask = async (e) => {
+    e.preventDefault();
+    if (!taskFormData.title.trim()) { showToast("Task title is required."); return; }
+    setSavingTask(true);
+    try {
+      const updateData = {
+        title: taskFormData.title,
+        description: taskFormData.description,
+        enrollmentDeadline: taskFormData.enrollmentDeadline,
+        points: parseInt(taskFormData.points) || 0,
+        type: taskFormData.type || "individual",
+      };
+      if (taskFormData.type === "grouped") updateData.maxParticipants = parseInt(taskFormData.maxParticipants) || 5;
+      await updateDoc(doc(db, "missions", project.id, "task", editingTaskId), updateData);
+      logAudit({ action: "TASK_UPDATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId: editingTaskId, taskTitle: taskFormData.title } });
+      cancelTaskForm();
+      await loadTasks();
+    } catch (_) { showToast("Failed to update task."); }
+    finally { setSavingTask(false); }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!await showConfirm("Delete this task? This cannot be undone.")) return;
+    setSavingTask(true);
+    try {
+      await deleteDoc(doc(db, "missions", project.id, "task", taskId));
+      logAudit({ action: "TASK_DELETED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId } });
+      await loadTasks();
+    } catch (_) { showToast("Failed to delete task."); }
+    finally { setSavingTask(false); }
+  };
+
+  const startEditTask = (task) => {
+    setEditingTaskId(task.id);
+    setTaskFormData({ title: task.title || "", description: task.description || "", enrollmentDeadline: task.enrollmentDeadline || "", points: task.points || 0, type: task.type || "individual", maxParticipants: task.maxParticipants || 5 });
+    setShowTaskForm(true);
+  };
+
+  const cancelTaskForm = () => {
+    setShowTaskForm(false);
+    setEditingTaskId(null);
+    setTaskFormData({ title: "", description: "", enrollmentDeadline: "", points: 0, type: "individual", maxParticipants: 5 });
   };
 
   if (!project) return null;
@@ -543,6 +666,130 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                 </div>
               )}
 
+              {/* View Full Roster button */}
+              {!loadingData && volunteers.length > 0 && (
+                <div className="pds-section">
+                  <button
+                    className="pds-btn-pdf"
+                    style={{ background: "#1f3b73", color: "#fff", border: "none", borderRadius: 10, padding: "9px 20px", fontWeight: 600, fontSize: 15, cursor: "pointer", width: "100%" }}
+                    onClick={() => setShowRosterModal(true)}
+                  >
+                    👥 View Full Roster
+                  </button>
+                </div>
+              )}
+
+              {/* Roster Modal */}
+              {showRosterModal && (
+                <div
+                  style={{ position: "fixed", inset: 0, background: "rgba(44,62,80,0.25)", zIndex: 12000, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  onClick={() => setShowRosterModal(false)}
+                >
+                  <div
+                    style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 400, maxWidth: "92vw", boxShadow: "0 4px 24px #0003", position: "relative", color: "#111", maxHeight: "80vh", overflowY: "auto" }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button
+                      style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#23335b", fontWeight: 700 }}
+                      onClick={() => setShowRosterModal(false)}
+                    >×</button>
+                    <h2 style={{ textAlign: "center", marginBottom: 6, color: "#1f3b73", fontSize: 20 }}>Volunteer Roster</h2>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: 13, marginBottom: 20 }}>
+                      {project.title} — {volunteers.length} registered
+                    </p>
+                    {/* Summary bar */}
+                    <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 20 }}>
+                      <div style={{ background: "#eef9f8", borderRadius: 10, padding: "8px 20px", textAlign: "center" }}>
+                        <div style={{ fontWeight: 700, fontSize: 22, color: "#30bdb7" }}>{volunteers.length}</div>
+                        <div style={{ fontSize: 12, color: "#666" }}>Registered</div>
+                      </div>
+                      <div style={{ background: "#e8f0fe", borderRadius: 10, padding: "8px 20px", textAlign: "center" }}>
+                        <div style={{ fontWeight: 700, fontSize: 22, color: "#1f3b73" }}>{attended}</div>
+                        <div style={{ fontSize: 12, color: "#666" }}>Present</div>
+                      </div>
+                      <div style={{ background: "#fef3e8", borderRadius: 10, padding: "8px 20px", textAlign: "center" }}>
+                        <div style={{ fontWeight: 700, fontSize: 22, color: "#e07b2a" }}>{volunteers.length - attended}</div>
+                        <div style={{ fontSize: 12, color: "#666" }}>Absent</div>
+                      </div>
+                    </div>
+                    <table style={{ width: "100%", borderCollapse: "collapse", borderRadius: 10, overflow: "hidden" }}>
+                      <thead>
+                        <tr style={{ background: "#f3f4f8", color: "#23335b" }}>
+                          <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700 }}>Name</th>
+                          <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700 }}>Role</th>
+                          <th style={{ padding: "10px 12px", textAlign: "center", fontWeight: 700 }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {volunteers.map((v, idx) => {
+                          const isPresent = v.progress?.attendance === "present";
+                          return (
+                            <tr key={v.uid || idx} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                              <td style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e8f0fe", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#1f3b73", fontSize: 13, flexShrink: 0, overflow: "hidden" }}>
+                                  {v.avatar ? <img src={v.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : getInitials(v.displayName)}
+                                </div>
+                                <span style={{ color: "#111", fontWeight: 500 }}>{v.displayName}</span>
+                              </td>
+                              <td style={{ padding: "10px 12px", color: "#555", fontSize: 13 }}>
+                                {v.role === "faculty" ? "Adviser" : "Volunteer"}
+                              </td>
+                              <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                                <span style={{ background: isPresent ? "#d4f5ef" : "#f5f5f5", color: isPresent ? "#1a7a6e" : "#888", borderRadius: 20, padding: "3px 14px", fontSize: 13, fontWeight: 600 }}>
+                                  {isPresent ? "Present" : "Absent"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Pre/Post Survey Analytics */}
+              {!loadingData && volunteersWithSurveys.length > 0 && (
+                <div className="pds-section">
+                  <div className="pds-section-label">Survey Analytics</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, color: "#555" }}>
+                      Pre-Survey: <strong>{volunteersWithSurveys.filter(v => v.preSurveyAnswers).length}</strong> submitted
+                    </span>
+                    <span style={{ fontSize: 13, color: "#aaa" }}>·</span>
+                    <span style={{ fontSize: 13, color: "#555" }}>
+                      Post-Survey: <strong>{volunteersWithSurveys.filter(v => v.postSurveyAnswers).length}</strong> submitted
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <button
+                      className="pds-btn-pdf"
+                      style={{ flex: 1, background: "#1f3b73", color: "#fff", border: "none", borderRadius: 10, padding: "8px 10px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                      onClick={() => { setImpactModalType("pre"); setImpactModalOpen(true); }}
+                    >
+                      View Pre-Survey Analytics
+                    </button>
+                    <button
+                      className="pds-btn-pdf"
+                      style={{ flex: 1, background: "#30bdb7", color: "#fff", border: "none", borderRadius: 10, padding: "8px 10px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                      onClick={() => { setImpactModalType("post"); setImpactModalOpen(true); }}
+                    >
+                      View Post-Survey Analytics
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ImpactMetrics Modal */}
+              {impactModalOpen && (
+                <ImpactMetrics
+                  open={impactModalOpen}
+                  onClose={() => setImpactModalOpen(false)}
+                  volunteers={volunteersWithSurveys}
+                  showType={impactModalType}
+                />
+              )}
+
               {/* PDF link */}
               {project.signedDocUrl && (
                 <div className="pds-section">
@@ -571,6 +818,111 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
               <div className="pds-section">
                 <div className="pds-section-label">Signatory Flow</div>
                 <ProposalTimeline proposal={project} />
+              </div>
+
+              {/* ── Tasks section ── */}
+              <div className="pds-section">
+                <div className="pds-section-label" style={{ marginBottom: 10 }}>
+                  Tasks ({tasks.length})
+                </div>
+
+                {!showTaskForm ? (
+                  <button
+                    onClick={() => setShowTaskForm(true)}
+                    style={{ background: "#007bff", color: "#fff", padding: "8px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 14, marginBottom: 12 }}
+                  >
+                    + Create New Task
+                  </button>
+                ) : (
+                  <div style={{ border: "1px solid #ddd", padding: 16, borderRadius: 10, background: "#f9f9f9", marginBottom: 14 }}>
+                    <h4 style={{ margin: "0 0 12px 0", color: "#111" }}>
+                      {editingTaskId ? "Edit Task" : "Create New Task"}
+                    </h4>
+                    <form onSubmit={editingTaskId ? handleEditTask : handleCreateTask}>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Title *</label>
+                        <input type="text" value={taskFormData.title} onChange={e => setTaskFormData(p => ({ ...p, title: e.target.value }))} required style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Description</label>
+                        <textarea value={taskFormData.description} onChange={e => setTaskFormData(p => ({ ...p, description: e.target.value }))} rows={3} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", resize: "vertical" }} />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Enrollment Deadline Time</label>
+                        <input type="time" value={taskFormData.enrollmentDeadline} onChange={e => setTaskFormData(p => ({ ...p, enrollmentDeadline: e.target.value }))} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Points (0–1000)</label>
+                        <input type="number" value={taskFormData.points} onChange={e => setTaskFormData(p => ({ ...p, points: e.target.value }))} min="0" max="1000" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Task Type</label>
+                        <div style={{ display: "flex", gap: 20 }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#111", fontSize: 14 }}>
+                            <input type="radio" value="individual" checked={taskFormData.type === "individual"} onChange={() => setTaskFormData(p => ({ ...p, type: "individual" }))} /> Individual
+                          </label>
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#111", fontSize: 14 }}>
+                            <input type="radio" value="grouped" checked={taskFormData.type === "grouped"} onChange={() => setTaskFormData(p => ({ ...p, type: "grouped" }))} /> Grouped
+                          </label>
+                        </div>
+                      </div>
+                      {taskFormData.type === "grouped" && (
+                        <div style={{ marginBottom: 10 }}>
+                          <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Max Members per Group</label>
+                          <input type="number" value={taskFormData.maxParticipants} onChange={e => setTaskFormData(p => ({ ...p, maxParticipants: e.target.value }))} min="2" max="50" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                        <button type="submit" disabled={savingTask} style={{ background: "#28a745", color: "#fff", padding: "8px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+                          {savingTask ? "Saving…" : editingTaskId ? "Update Task" : "Create Task"}
+                        </button>
+                        <button type="button" onClick={cancelTaskForm} disabled={savingTask} style={{ background: "#6c757d", color: "#fff", padding: "8px 16px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 14 }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {loadingTasks ? (
+                  <p style={{ color: "#888", fontSize: 13 }}>Loading tasks…</p>
+                ) : tasks.length === 0 ? (
+                  <p style={{ color: "#aaa", fontSize: 13 }}>No tasks yet. Create one above.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {tasks.map(task => (
+                      <div key={task.id} style={{ border: "1px solid #e0e4ea", borderRadius: 8, padding: "12px 14px", background: "#fff" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, color: "#111", fontSize: 14, marginBottom: 4 }}>{task.title}</div>
+                            {task.description && <p style={{ margin: "0 0 6px 0", color: "#555", fontSize: 13 }}>{task.description}</p>}
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 12 }}>
+                              <span style={{ color: "#007bff", fontWeight: 600 }}>
+                                Type: {task.type === "grouped" ? "Grouped" : "Individual"}
+                              </span>
+                              {task.type === "grouped" && task.maxParticipants && (
+                                <span style={{ color: "#1976d2", fontWeight: 600 }}>Max/Group: {task.maxParticipants}</span>
+                              )}
+                              {task.points !== undefined && (
+                                <span style={{ color: "#388e3c", fontWeight: 600 }}>Points: {task.points}</span>
+                              )}
+                              {task.enrollmentDeadline && (
+                                <span style={{ color: "#555" }}>Deadline: {task.enrollmentDeadline}</span>
+                              )}
+                              {task.createdAt && (
+                                <span style={{ color: "#aaa" }}>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                            <button onClick={() => startEditTask(task)} disabled={savingTask} style={{ background: "#007bff", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Edit</button>
+                            <button onClick={() => handleDeleteTask(task.id)} disabled={savingTask} style={{ background: "#dc3545", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}

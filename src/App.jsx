@@ -29,7 +29,6 @@ import AuditLogs from "./pages/admin/AuditLogs";
 import BackupRestore from "./pages/admin/BackupRestore";
 import CurrentEvent from "./pages/admin/CurrentEvent";
 import DocumentLibrary from "./pages/admin/DocumentLibrary";
-import ProjectDetails from "./pages/admin/ProjectDetails";
 import ProjectTasks from "./pages/admin/ProjectTasks";
 import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import FacultyHome from "./pages/faculty/FacultyHome";
@@ -100,7 +99,7 @@ function App() {
             <Route path="projects/proposal" element={<ProposeProject />} />
             <Route
               path="projects/:projectId"
-              element={<ProjectDetails mode="admin" />}
+              element={<Navigate to="/admin/projects" replace />}
             />
             <Route
               path="projects/:projectId/tasks"

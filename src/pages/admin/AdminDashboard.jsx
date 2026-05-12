@@ -1,5 +1,6 @@
 //first page for admin after login
 import { collection, getDocs } from "firebase/firestore";
+import ProjectDetailSidebar from "./ProjectDetailSidebar";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
@@ -218,6 +219,8 @@ export default function AdminDashboard() {
 
   // Real-time Student Engagement metrics for each mission
   const [engagement, setEngagement] = useState([]);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
   useEffect(() => {
     const fetchEngagement = async () => {
       try {
@@ -242,7 +245,8 @@ export default function AdminDashboard() {
           engagementArr.push({
             id: mission.id,
             label: mission.title || mission.alt || mission.name || "Untitled Mission",
-            value: percent
+            value: percent,
+            data: mission,
           });
         }
         setEngagement(engagementArr);
@@ -365,7 +369,7 @@ export default function AdminDashboard() {
                   <div
                     key={x.label}
                     style={{ marginBottom: 2, cursor: 'pointer' }}
-                    onClick={() => x.id && navigate(`/admin/projects/${x.id}`)}
+                    onClick={() => { if (x.data) { setSelectedProject(x.data); setShowSidebar(true); } }}
                     title="View Project Details"
                   >
                     <div style={{ fontWeight: 600, color: '#1f3b73', fontSize: 15, marginBottom: 6 }}>{x.label}</div>
@@ -685,6 +689,14 @@ export default function AdminDashboard() {
           </div>
         </section>
       </div>
+
+      {showSidebar && selectedProject && (
+        <ProjectDetailSidebar
+          project={selectedProject}
+          onClose={() => { setShowSidebar(false); setSelectedProject(null); }}
+          onApprovalChange={() => {}}
+        />
+      )}
     </div>
   );
 }
