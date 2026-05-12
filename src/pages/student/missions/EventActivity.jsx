@@ -3,10 +3,11 @@ import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Header";
 import { showConfirm } from "../../../utils/toast";
-import { WestIcon, ModeRoundedIcon, DeleteRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
+import { WestIcon, ModeRoundedIcon, DeleteRoundedIcon, DeleteForeverRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
 import cloudsBg from '../../../assets/clouds-bg.jpg';
 import LoadingOverlay from '../../../components/LoadingOverlay';
 import mission1 from '../../../assets/mission1.jpg';
@@ -160,12 +161,17 @@ export default function EventActivity() {
       };
 
       const volunteerRef = doc(db, "missions", projectId, "volunteer", user.uid);
+      const attendanceIsFirst = volunteerProgress?.attendance !== "present";
 
       await updateDoc(volunteerRef, {
         "scanAttendance.location": locData,
         "scanAttendance.scannedAt": serverTimestamp(),
-        "progress.attendance": "present"
+        "progress.attendance": "present",
+        ...(attendanceIsFirst ? { "requirementBonus.attendance": 5 } : {}),
       });
+      if (attendanceIsFirst) {
+        await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+      }
 
       // Show quick feedback while geocoding runs
       setQRStatus(
@@ -247,6 +253,7 @@ export default function EventActivity() {
         alert("File must be less than 10MB.");
         return;
       }
+      const consentIsFirst = !["submitted", "verified"].includes(volunteerProgress?.consent);
       const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
       const fileRef = ref(storage, `consents/${id}/${user.uid}/activity-consent.pdf`);
       // Upload to Storage
@@ -265,13 +272,17 @@ export default function EventActivity() {
           },
           progress: {
             consent: "submitted"
-          }
+          },
+          ...(consentIsFirst ? { "requirementBonus.consent": 5 } : {}),
         },
         { merge: true }
       );
       await updateDoc(volunteerRef, {
         "consentSubmission.reviewStatus": deleteField(),
       });
+      if (consentIsFirst) {
+        await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+      }
       setConsentSubmitted(true);
       setConsentReviewStatus("");
       setConsentFileUrl(downloadURL);
@@ -281,7 +292,7 @@ export default function EventActivity() {
       }));
       setSelectedConsentFile(null);
       setShowConsentModal(false);
-      alert("Consent uploaded successfully!");
+      alert(consentIsFirst ? "Consent uploaded successfully! +5 points earned." : "Consent uploaded successfully!");
     } catch (error) {
       console.error("Upload error:", error);
       alert("Upload failed.");
@@ -352,6 +363,8 @@ export default function EventActivity() {
   const [selectedTaskForGroups, setSelectedTaskForGroups] = useState(null);
   const [groupModalMode, setGroupModalMode] = useState("view");
   const [timerNow, setTimerNow] = useState(Date.now());
+  const [playerStripPortal, setPlayerStripPortal] = useState(null);
+  const [activeNav, setActiveNav] = useState('content');
 
   const compareParticipantsByEnrollment = useCallback((a, b) => {
     const aData = a?.data ? a.data() : a;
@@ -384,6 +397,11 @@ export default function EventActivity() {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const el = document.getElementById('header-center-slot');
+    if (el) setPlayerStripPortal(el);
   }, []);
 
   const canJoinActivities = true;
@@ -2600,29 +2618,32 @@ export default function EventActivity() {
       <div className="header-spacer"></div>
       <div className="content-page" style={{ overflow: 'hidden' }}>
 
-        {/* PLAYER STRIP — persistent, no animation */}
-        <section className="player-strip" aria-label="Player stats">
+        {/* Portal: level/pts strip into header center slot */}
+        {playerStripPortal && createPortal(
           <div className="player-strip-inner">
-            <div className="player-profile">
-              <span className="player-greeting">Hi, {(userData?.name || userData?.username || '').trim().split(/\s+/)[0] || 'Student'}!</span>
-            </div>
-            <div className="player-missions">
-              <span className="missions-label">Missions Completed</span>
-              <span className="missions-count">{completedMissions}</span>
-            </div>
-            <div className="player-level">
-              {(() => { const li = getLevelInfo(userData?.totalPoints); return (<>
-              <span className="level-label">Level {li.level}</span>
-              <div className="level-bar" role="progressbar" aria-valuenow={li.progress} aria-valuemin={0} aria-valuemax={100}>
-                <div className="level-bar-fill" style={{ width: `${li.progress}%` }}></div>
+            <div className="strip-compact-row">
+              <span className="strip-level-text">Lv. {getLevelInfo(userData?.totalPoints).level}</span>
+              <div className="strip-pts-bar-wrap">
+                <div
+                  className="strip-pts-bar"
+                  role="progressbar"
+                  aria-valuenow={(userData?.totalPoints || 0) % 100}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${userData?.totalPoints || 0} points`}
+                >
+                  <div className="strip-pts-fill" style={{ width: `${(userData?.totalPoints || 0) % 100}%` }} />
+                  <span className="strip-pts-text">{userData?.totalPoints || 0} pts 💎</span>
+                </div>
               </div>
-              <span className="level-points">{userData?.totalPoints || 0} pts ({li.pointsInLevel}/{li.pointsForLevel} to next level)</span>
-              </>); })()}
+              <span className="strip-sep" aria-hidden="true">|</span>
+              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">Missions</span></span>
             </div>
-          </div>
-        </section>
+          </div>,
+          playerStripPortal
+        )}
 
-        {/* STICKY PROGRESS STRIP — outside animation so it never gets clipped */}
+        {/* PROGRESS STRIP — back | event title | compact progress bar */}
         {(() => {
           const enrolledTaskIds = Object.keys(enrolledTasks).filter(tid => enrolledTasks[tid]);
           const totalItems = 4 + enrolledTaskIds.length;
@@ -2649,67 +2670,51 @@ export default function EventActivity() {
                   <span className="ea-progress-back-circle"><WestIcon sx={{ fontSize: 16 }} /></span>
                   <span className="ea-progress-back-label">Back</span>
                 </button>
-                <span className="ea-progress-card__title">Progress</span>
-                <div className="ea-progress-bar-wrap">
+                <span className="ea-strip-event-title" title={event.title}>{event.title}</span>
+                <div className="ea-strip-progress-bar-wrap">
                   <div className="ea-progress-bar-fill" style={{ width: `${pct}%` }} />
                 </div>
                 <span className="ea-progress-card__pct">{pct}%</span>
-                <button className="ea-progress-toggle" onClick={() => setShowProgressDetails(v => !v)} aria-label={showProgressDetails ? 'Collapse progress' : 'Expand progress'}>
-                  {showProgressDetails
-                    ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} />
-                    : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
-                </button>
-                <button
-                  style={{
-                    marginLeft: 'auto',
-                    background: 'transparent',
-                    color: '#dc2626',
-                    border: '1.5px solid #fca5a5',
-                    borderRadius: 8,
-                    padding: '4px 12px',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                  onClick={async () => {
-                    if (!await showConfirm('Are you sure you want to un-enroll from this event?')) return;
-                    const user = auth.currentUser;
-                    if (!user) return;
-                    try {
-                      await deleteDoc(doc(db, 'missions', id, 'volunteer', user.uid));
-                      deleteDoc(doc(db, 'userMissions', user.uid, 'missions', id)).catch(() => {});
-                      navigate('/student', { state: { scrollTo: 'missions' } });
-                    } catch (err) {
-                      alert('Failed to un-enroll. Please try again.');
-                    }
-                  }}
-                >
-                  Un-enroll
-                </button>
               </div>
-              {showProgressDetails && (
-                <div className="ea-progress-items">
-                  {[
-                    { label: 'Pre-Activity Survey', done: volunteerProgress?.preSurvey === 'submitted' },
-                    { label: 'Parent Consent', done: volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified' },
-                    { label: 'Attendance (QR)', done: volunteerProgress?.attendance === 'present' },
-                    ...enrolledTaskIds.map(tid => {
-                      const task = tasks.find(t => t.id === tid);
-                      return { label: `Journal · ${task?.title || tid}`, done: task && userJournals.some(j => j.activityId === task.title) };
-                    }),
-                    { label: 'Post-Activity Survey', done: volunteerProgress?.postSurvey === 'submitted' },
-                  ].map((item, i) => (
-                    <div key={i} className={`ea-progress-item${item.done ? ' done' : ''}`}>
-                      <span className="ea-progress-item__dot">{item.done ? '✓' : '○'}</span>
-                      <span className="ea-progress-item__label">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })()}
+
+        {/* HORIZONTAL NAVIGATION */}
+        <div className="ea-nav-tabs">
+          {[
+            { id: 'content', label: 'Content' },
+            { id: 'requirements', label: 'Requirements' },
+            { id: 'tasks', label: 'Task Assignment' },
+            { id: 'leaderboard', label: 'Leaderboard' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              className={`ea-nav-tab${activeNav === tab.id ? ' active' : ''}`}
+              onClick={() => setActiveNav(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <button
+            className="ea-nav-unenroll"
+            title="Un-enroll from this event"
+            onClick={async () => {
+              if (!await showConfirm('Are you sure you want to un-enroll from this event?')) return;
+              const user = auth.currentUser;
+              if (!user) return;
+              try {
+                await deleteDoc(doc(db, 'missions', id, 'volunteer', user.uid));
+                deleteDoc(doc(db, 'userMissions', user.uid, 'missions', id)).catch(() => {});
+                navigate('/student', { state: { scrollTo: 'missions' } });
+              } catch (err) {
+                alert('Failed to un-enroll. Please try again.');
+              }
+            }}
+          >
+            <DeleteForeverRoundedIcon sx={{ fontSize: 20 }} />
+          </button>
+        </div>
 
         {/* Only the content below slides in/out */}
         <div className={isLeaving ? 'ea-slide-out' : 'ea-slide-in'} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -2718,394 +2723,147 @@ export default function EventActivity() {
           <div className="ea-scrollable-body" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat', backgroundColor: '#d1efff' }}>
             <div className="event-activity-bg">
 
+              {/* Announcement */}
               {!isEditable && (
                 <div className="ea-past-event-banner">
                   This event has already ended. Task joining and attendance are no longer available.
                 </div>
               )}
 
-
-
-              <div className="event-activity-container">
-                {/* Left Side: Event Summary */}
-                <div className="event-left-panel">
-                  <div className="event-summary-card">
-                    {/* Banner image */}
-                    <div className="event-summary-image">
-                      <img
-                        src={event.img && event.img.trim() !== "" ? event.img : mission1}
-                        alt={event.alt || "Event"}
-                      />
-                    </div>
-
-                    <div className="event-summary-body">
-                      <h2 className="event-summary-title">{event.title}</h2>
-                      <p className="event-summary-description">{event.description}</p>
-
-                      {/* Rewards row: badge left (if exists), points right */}
-                      <div className={`event-rewards-row${!event.badge ? ' no-badge' : ''}`}>
-                        {event.badge && (
-                          <div className="event-badge-col">
-                            <img
-                              src={event.badge}
-                              alt="Event Badge"
-                              className="image-badge"
-                            />
-                            <span className="event-badge-label">Event badge</span>
-                          </div>
-                        )}
-                        <div className="event-points-col">
-                          {(() => {
-                            // Mission pts: role × best multiplier (1.3 = ≥4.5 rating) × verified (1.0)
-                            const role = volunteerRole || ['participant'];
-                            const { finalPoints: missionPts } = computeFinalPoints(role, 4.5, 'verified');
-                            const taskPts = tasks.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
-                            const totalPts = Number((missionPts + taskPts).toFixed(2));
-                            const roleLabel = volunteerRole
-                              ? (Array.isArray(volunteerRole) ? volunteerRole : [volunteerRole])
-                                .map(r => r.replace(/_/g, ' ')).join(', ')
-                              : null;
-                            return (
-                              <>
-                                <span className="event-points-big">{totalPts} <span className="event-points-unit">PTS</span></span>
-                                <span className="event-points-label">Potential points to earn</span>
-                                <button className="event-points-see-details" onClick={() => setShowPointsDetails(v => !v)}>
-                                  {showPointsDetails ? 'hide' : 'see details'}
-                                </button>
-                                {showPointsDetails && (
-                                  <span className="event-points-note">
-                                    <span className="event-points-note-row">
-                                      <span className="event-points-note-pill">{missionPts} {roleLabel || 'participant'} pts</span>
-                                      <span className="event-points-note-op">+</span>
-                                      <span className="event-points-note-pill">{taskPts} task pts</span>
-                                    </span>
-                                    <span className="event-points-note-sub">
-                                      Role pts × your post-event rating (×1.0 – ×1.3)
-                                    </span>
-                                  </span>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Location & Date/Time tags */}
-                      <div className="event-info-box">
-                        {event.location && (
-                          <span className="event-info-tag">📍 {event.location}</span>
-                        )}
-                        {eventDate && (
-                          <span className="event-info-tag">📅 {formatDate(eventDate) || eventDate}{event.time ? ` · ${event.time}` : ""}</span>
-                        )}
-                        {volunteerCount !== null && volunteerCount > 0 && (
-                          <div className="event-info-tag event-volunteer-tag">
-                            <div className="event-volunteer-stack">
-                              {volunteerAvatars.map((src, i) => (
-                                <img key={i} src={src} alt="" className="event-volunteer-avatar" style={{ zIndex: volunteerAvatars.length - i }} />
-                              ))}
-                              {volunteerCount > 3 && (
-                                <div className="event-volunteer-extra" style={{ zIndex: 0 }}>+{volunteerCount - 3}</div>
-                              )}
-                            </div>
-                            <span className="event-volunteer-label">joined</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* LEADERBOARD */}
-                  <div className="event-leaderboard-card">
-                    <h3 className="ea-leaderboard-title">Activity Leaderboard</h3>
-                    {sortedLeaderboard.length === 0 ? (
-                      <p className="ea-leaderboard-empty">No participants yet.</p>
-                    ) : (
-                      <div className="ea-leaderboard-list" ref={leaderboardListRef}>
-                        {sortedLeaderboard.slice(0, 10).map((user, index) => {
-                          const rank = index + 1;
-                          const isCurrent = user.uid === currentUserId;
-                          return (
-                            <div
-                              key={user.uid}
-                              ref={isCurrent ? currentUserRef : null}
-                              className={`ea-leaderboard-row${isCurrent ? ' is-current-user' : ''}`}
-                              role="button"
-                              tabIndex={0}
-                              aria-label={`Open profile for ${user.name}`}
-                              onClick={() => openUserProfile(user.uid)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  openUserProfile(user.uid);
-                                  e.preventDefault();
-                                }
-                              }}
-                            >
-                              <span className="ea-rank-num">{rank}</span>
-                              {user.avatar
-                                ? <img src={user.avatar} alt={user.name} className="ea-rank-avatar" />
-                                : <span className="ea-rank-avatar ea-rank-initials">
-                                  {(user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                                </span>
-                              }
-                              <span className="ea-rank-name">{user.name}</span>
-                              <span className="ea-rank-pts">{user.points} PTS</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+              {/* Always-visible event banner: image with title + description overlay in lower-left */}
+              <div className="ea-event-banner">
+                <img
+                  src={event.img && event.img.trim() !== '' ? event.img : mission1}
+                  alt={event.alt || event.title}
+                  className="ea-event-banner-img"
+                />
+                <div className="ea-event-banner-overlay">
+                  <h2 className="ea-event-banner-title">{event.title}</h2>
+                  {event.description && <p className="ea-event-banner-desc">{event.description}</p>}
                 </div>
+              </div>
 
-                {/* Right Side: Activity Section & Requirement */}
-                <div className="event-right-panel">
+              {/* Tab content area */}
+              <div className="ea-tab-content">
 
-
-                  <div className={`event-activities-panel${!isEditable ? ' event-activities-panel--ended' : ''}`}>
-                    <h2 className="event-activities-title">Task Assignment</h2>
-                    <p className="event-activities-desc">Pick an extra role you want to take on for this event</p>
-                    {isEventDay && volunteerProgress?.attendance !== 'present' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', marginBottom: 4, fontSize: 13, color: '#92400e' }}>
-                        🔒 Scan your attendance QR code first to unlock task assignment.
-                      </div>
-                    )}
-                    <p className="event-activities-subtitle">
-                      {tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined
-                    </p>
-                    {/*TASKS AVAILABLE FOR THIS SPECIFIC EVENT*/}
-                    <div className="task-list-scroll">
-                      {tasks && (() => {
-                        const withIdx = tasks.map((t, i) => [t, i]);
-                        const joinedList = withIdx.filter(([t]) => !!enrolledTasks[t.id]);
-                        const unjoinedList = withIdx.filter(([t]) => !enrolledTasks[t.id]);
-
-                        const renderTaskCard = (activity, idx) => {
-                          const isEnrolled = !!enrolledTasks[activity.id];
-                          const isGrouped = activity.type === 'grouped';
-                          const filledSlots = taskParticipantCounts[activity.id] || 0;
-                          const groupedSlots = taskGroupCounts[activity.id] || 0;
-                          const participantsText = isGrouped
-                            ? `${groupedSlots}`
-                            : `${filledSlots}`;
-                          const maxSlots = Number.isFinite(Number(activity.maxParticipants))
-                            ? Number(activity.maxParticipants)
-                            : null;
-                          const isTaskCapacityFull = !isGrouped && maxSlots !== null && filledSlots >= maxSlots;
-                          const isDeadlineClosed = isEnrollmentClosed(activity);
-                          const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
-                          const hasSubmittedJournal = journalsForActivity.length > 0;
-                          const enrollmentCountdown = getEnrollmentCountdown(activity);
-
-                          const attendanceDone = volunteerProgress?.attendance === 'present';
-                          if (!isEnrolled && (!isEventDay || !attendanceDone)) {
-                            return (
-                              <div key={idx} className="task-card task-card--locked">
-                                <span className="task-card__title-only">{activity.title}</span>
-                                {isEventDay && !attendanceDone && (
-                                  <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to unlock</span>
-                                )}
-                              </div>
-                            );
-                          }
-
-                          const isExpanded = expandedTasks[activity.id] !== false; // default open
-                          const isEndedEnrolled = !isEditable && isEnrolled;
-
-                          return (
-                            <div key={idx} className={`task-card${isEnrolled ? ' task-card--enrolled' : ''}${isEndedEnrolled ? ' task-card--ended' : ''}`}>
-                              <div className="task-card__row" style={isEnrolled && !isEndedEnrolled ? { cursor: 'pointer' } : {}} onClick={isEnrolled && !isEndedEnrolled ? () => toggleTaskExpand(activity.id) : undefined}>
-                                <span className="task-card__emoji">{activity.emoji || '🎯'}</span>
-                                <div className="task-card__info">
-                                  <span className="task-card__title">{activity.title}</span>
-                                  <div className="task-card__meta">
-                                    <span className="task-card__pts">{activity.points} PTS</span>
-                                    {isEventDay && (
-                                      <button
-                                        className="task-participants-indicator"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (isGrouped) {
-                                            setGroupModalMode("view");
-                                            setSelectedTaskForGroups(activity);
-                                          } else {
-                                            setSelectedTaskForParticipants(activity);
-                                          }
-                                        }}
-                                        aria-label={`View ${isGrouped ? "groups" : "participants"} for ${activity.title}`}
-                                      >
-                                        {isGrouped ? "Groups" : "Participants"}: {participantsText}
-                                      </button>
-                                    )}
-                                    {enrollmentCountdown && (
-                                      <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
-                                        {enrollmentCountdown.label}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="task-card__action">
-                                  {isEnrolled ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <button
-                                        className="task-enrolled-badge"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleUnjoinActivity(activity.id, activity);
-                                        }}
-                                        disabled={!isEditable}
-                                      >
-                                        <span className="joined-text">Joined</span>
-                                        <span className="remove-text">✕</span>
-                                      </button>
-
-                                      {!isEndedEnrolled && (
-                                        <button
-                                          className="task-collapse-btn"
-                                          onClick={(e) => { e.stopPropagation(); toggleTaskExpand(activity.id); }}
-                                          aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                                        >
-                                          {isExpanded
-                                            ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} />
-                                            : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
-                                        </button>
-                                      )}
-                                    </div>
-                                  ) : isTaskCapacityFull ? (
-                                    <span className="task-slot-full-badge">Full</span>
-                                  ) : isDeadlineClosed ? (
-                                    <span className="req-status locked">Closed</span>
-                                  ) : !isEditable ? (
-                                    <span className="req-status locked">Ended</span>
-                                  ) : canJoinActivities ? (
-                                    <button className="task-join-btn" onClick={() => handleJoinActivity(activity.id, activity)} disabled={!isEditable}>Join</button>
-                                  ) : (
-                                    <span className="req-status locked">Closed</span>
-                                  )}
-                                </div>
-                              </div>
-                              {isEnrolled && isExpanded && !isEndedEnrolled && (
-                                <div className="task-journal-section">
-                                  {/* Journal text / edit textarea */}
-                                  {journalsForActivity.map((journal) => (
-                                    <div key={journal.id} className="journal-card">
-                                      {editingJournalId === journal.taskId ? (
-                                        <>
-                                          <textarea value={editingJournalText} onChange={(e) => setEditingJournalText(e.target.value)} className="journal-edit-textarea" />
-                                          <div className="journal-card-actions">
-                                            <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
-                                            <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <div className="journal-text">{journal.reflection}</div>
-                                      )}
-                                    </div>
-                                  ))}
-
-                                  {/* Bottom action row — same position as the submit button */}
-                                  {hasSubmittedJournal ? (
-                                    <div className="journal-submit-row">
-                                      <span className="journal-submitted-badge">Submitted</span>
-                                      {isGrouped ? (
-                                        <>
-                                          <button
-                                            onClick={() => handleEditJournal(journalsForActivity[0])}
-                                            className="journal-edit-icon-btn"
-                                            title="Edit group reflection"
-                                          >
-                                            <ModeRoundedIcon sx={{ fontSize: 15 }} />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)}
-                                            className="journal-edit-icon-btn journal-delete-icon-btn"
-                                            title="Delete group reflection"
-                                          >
-                                            <DeleteRoundedIcon sx={{ fontSize: 15 }} />
-                                          </button>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <button
-                                            onClick={() => handleEditJournal(journalsForActivity[0])}
-                                            className="journal-edit-icon-btn"
-                                            title="Edit reflection"
-                                          >
-                                            <ModeRoundedIcon sx={{ fontSize: 15 }} />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)}
-                                            className="journal-edit-icon-btn journal-delete-icon-btn"
-                                            title="Delete reflection"
-                                          >
-                                            <DeleteRoundedIcon sx={{ fontSize: 15 }} />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <textarea
-                                        placeholder={!isHalfwayDone
-                                          ? 'Journal will unlock once the event has started'
-                                          : isGrouped
-                                            ? 'Only one member needs to submit this reflection for your group.'
-                                            : 'Write your reflection for this task…'}
-                                        className="journal-textarea"
-                                        value={journalReflections[idx] || ''}
-                                        onChange={(e) => handleJournalChange(idx, e.target.value)}
-                                        disabled={!isHalfwayDone}
-                                      />
-                                      <div className="journal-submit-row">
-                                        {submitStatus[idx] && (
-                                          <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
-                                        )}
-                                        <button className="activity-submit-button journal-submit-compact" disabled={!isHalfwayDone || !journalReflections[idx]?.trim()} onClick={() => handleJournalSubmit(idx, activity)}>
-                                          {!isHalfwayDone ? 'LOCKED' : isGrouped ? 'SUBMIT FOR GROUP' : 'SUBMIT'}
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              )}
+                {/* CONTENT TAB */}
+                {activeNav === 'content' && (
+                  <div className="ea-content-tab">
+                    <div className="ea-info-list">
+                      {event.location && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">📍</span>
+                          <div>
+                            <div className="ea-info-label">Location</div>
+                            <div className="ea-info-value">{event.location}</div>
+                          </div>
+                        </div>
+                      )}
+                      {eventDate && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">📅</span>
+                          <div>
+                            <div className="ea-info-label">Date &amp; Time</div>
+                            <div className="ea-info-value">{formatDate(eventDate)}{event.time ? ` · ${event.time}` : ''}</div>
+                          </div>
+                        </div>
+                      )}
+                      {event.projectType && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">🏷️</span>
+                          <div>
+                            <div className="ea-info-label">Project Type</div>
+                            <div className="ea-info-value">{event.projectType === 'sl' ? 'Service Learning' : event.projectType === 'ce' ? 'Community Engagement' : event.projectType}</div>
+                          </div>
+                        </div>
+                      )}
+                      {event.volunteerHours && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">⏱️</span>
+                          <div>
+                            <div className="ea-info-label">Volunteer Hours</div>
+                            <div className="ea-info-value">{event.volunteerHours}</div>
+                          </div>
+                        </div>
+                      )}
+                      {(event.partnerSchool || event.beneficiary || event.implementingAgency) && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">🏫</span>
+                          <div>
+                            <div className="ea-info-label">Partner School / Beneficiary</div>
+                            <div className="ea-info-value">{event.partnerSchool || event.beneficiary || event.implementingAgency}</div>
+                          </div>
+                        </div>
+                      )}
+                      {event.objectives && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">🎯</span>
+                          <div>
+                            <div className="ea-info-label">Objectives</div>
+                            <div className="ea-info-value" style={{ whiteSpace: 'pre-line' }}>{Array.isArray(event.objectives) ? event.objectives.join('\n') : event.objectives}</div>
+                          </div>
+                        </div>
+                      )}
+                      {Array.isArray(event.stakeholders) && event.stakeholders.length > 0 && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">👥</span>
+                          <div>
+                            <div className="ea-info-label">Stakeholders</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                              {event.stakeholders.map((s, i) => <span key={i} className="mission-tag">{s}</span>)}
                             </div>
-                          );
-                        };
-
-                        if (withIdx.length === 0) {
-                          return (
-                            <div className="ea-empty-state" style={{ padding: '24px 0', textAlign: 'center' }}>
-                              <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>📋</span>
-                              <h4 style={{ color: '#374151', margin: 0 }}>No tasks yet</h4>
-                              <p style={{ color: '#6b7280', margin: '8px 0 0' }}>You can still complete the event requirements while waiting for tasks to be added.</p>
+                          </div>
+                        </div>
+                      )}
+                      {(event.sdg || event.sdgGoals) && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">🌐</span>
+                          <div>
+                            <div className="ea-info-label">SDG Goals</div>
+                            <div className="ea-info-value">{Array.isArray(event.sdg || event.sdgGoals) ? (event.sdg || event.sdgGoals).join(', ') : (event.sdg || event.sdgGoals)}</div>
+                          </div>
+                        </div>
+                      )}
+                      {(event.specificActivities || event.activities) && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">📋</span>
+                          <div>
+                            <div className="ea-info-label">Specific Activities</div>
+                            <div className="ea-info-value">
+                              {Array.isArray(event.specificActivities || event.activities)
+                                ? (event.specificActivities || event.activities).map((a, i) => (
+                                    <span key={i} style={{ display: 'block' }}>{typeof a === 'string' ? a : (a.name || a.title || '')}</span>
+                                  ))
+                                : (event.specificActivities || event.activities)
+                              }
                             </div>
-                          );
-                        }
-
-                        return (
-                          <>
-                            {joinedList.length > 0 && (
-                              <div className="task-section">
-                                <span className="task-section-label">Joined</span>
-                                {joinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
+                          </div>
+                        </div>
+                      )}
+                      {volunteerCount !== null && volunteerCount > 0 && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">👤</span>
+                          <div>
+                            <div className="ea-info-label">Participants</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                              <div className="event-volunteer-stack">
+                                {volunteerAvatars.map((src, i) => (
+                                  <img key={i} src={src} alt="" className="event-volunteer-avatar" style={{ zIndex: volunteerAvatars.length - i }} />
+                                ))}
+                                {volunteerCount > 3 && <div className="event-volunteer-extra" style={{ zIndex: 0 }}>+{volunteerCount - 3}</div>}
                               </div>
-                            )}
-                            {joinedList.length > 0 && unjoinedList.length > 0 && (
-                              <div className="task-section-divider" />
-                            )}
-                            {unjoinedList.length > 0 && (
-                              <div className="task-section">
-                                {joinedList.length > 0 && <span className="task-section-label">Available</span>}
-                                {unjoinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
+                              <span className="ea-info-value">{volunteerCount} joined</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {/*REQUIREMENTS SECTION*/}
-                  <div className="event-activities-panel" style={{ order: -1 }}>
+                )}
+
+                {/* REQUIREMENTS TAB */}
+                {activeNav === 'requirements' && (
+                  <div className="event-activities-panel">
                     <h3 className="event-activities-title">Requirements</h3>
                     {(() => {
                       const preSurveyDone = volunteerProgress?.preSurvey === 'submitted';
@@ -3113,7 +2871,6 @@ export default function EventActivity() {
                       const attendanceDone = volunteerProgress?.attendance === 'present';
                       const postSurveyDone = volunteerProgress?.postSurvey === 'submitted';
                       const postLocked = !preSurveyDone || !consentDone || !attendanceDone;
-
                       const steps = [
                         {
                           label: 'Pre-Activity Survey',
@@ -3158,9 +2915,7 @@ export default function EventActivity() {
                           previewable: false,
                         },
                       ];
-
                       const activeIndex = steps.findIndex(s => !s.done);
-
                       return (
                         <div className="req-timeline">
                           {steps.map((step, i) => {
@@ -3169,12 +2924,8 @@ export default function EventActivity() {
                             return (
                               <div key={i} className={`req-timeline-item${step.done ? ' done' : isActive ? ' active' : step.locked ? ' locked' : ''}`}>
                                 <div className="req-timeline-left">
-                                  <div className={`req-timeline-dot${isActive ? ' req-timeline-dot--active' : ''}`}>
-                                    {i + 1}
-                                  </div>
-                                  {i < steps.length - 1 && (
-                                    <div className={`req-timeline-line${lineTeal ? ' req-timeline-line--teal' : ''}`} />
-                                  )}
+                                  <div className={`req-timeline-dot${isActive ? ' req-timeline-dot--active' : ''}`}>{i + 1}</div>
+                                  {i < steps.length - 1 && <div className={`req-timeline-line${lineTeal ? ' req-timeline-line--teal' : ''}`} />}
                                 </div>
                                 <div className="req-timeline-body">
                                   <span className="req-timeline-label">{step.label}</span>
@@ -3188,13 +2939,7 @@ export default function EventActivity() {
                                       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span className="req-done-badge">Done</span>
                                         {step.type === 'qr' && isEventDay && isEditable && (
-                                          <button
-                                            className="req-action-btn"
-                                            onClick={() => setShowQRModal(true)}
-                                            title="Scan again to update attendance"
-                                          >
-                                            Rescan
-                                          </button>
+                                          <button className="req-action-btn" onClick={() => setShowQRModal(true)} title="Scan again to update attendance">Rescan</button>
                                         )}
                                       </span>
                                     )
@@ -3215,13 +2960,236 @@ export default function EventActivity() {
                       );
                     })()}
                   </div>
-                </div>
+                )}
+
+                {/* TASK ASSIGNMENT TAB */}
+                {activeNav === 'tasks' && (
+                  <div className={`event-activities-panel${!isEditable ? ' event-activities-panel--ended' : ''}`}>
+                    <h2 className="event-activities-title">Task Assignment</h2>
+                    <p className="event-activities-desc">Pick an extra role you want to take on for this event</p>
+                    {isEventDay && volunteerProgress?.attendance !== 'present' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', marginBottom: 4, fontSize: 13, color: '#92400e' }}>
+                        🔒 Scan your attendance QR code first to unlock task assignment.
+                      </div>
+                    )}
+                    <p className="event-activities-subtitle">
+                      {tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined
+                    </p>
+                    <div className="task-list-scroll">
+                      {tasks && (() => {
+                        const withIdx = tasks.map((t, i) => [t, i]);
+                        const joinedList = withIdx.filter(([t]) => !!enrolledTasks[t.id]);
+                        const unjoinedList = withIdx.filter(([t]) => !enrolledTasks[t.id]);
+
+                        const renderTaskCard = (activity, idx) => {
+                          const isEnrolled = !!enrolledTasks[activity.id];
+                          const isGrouped = activity.type === 'grouped';
+                          const filledSlots = taskParticipantCounts[activity.id] || 0;
+                          const groupedSlots = taskGroupCounts[activity.id] || 0;
+                          const participantsText = isGrouped ? `${groupedSlots}` : `${filledSlots}`;
+                          const maxSlots = Number.isFinite(Number(activity.maxParticipants)) ? Number(activity.maxParticipants) : null;
+                          const isTaskCapacityFull = !isGrouped && maxSlots !== null && filledSlots >= maxSlots;
+                          const isDeadlineClosed = isEnrollmentClosed(activity);
+                          const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
+                          const hasSubmittedJournal = journalsForActivity.length > 0;
+                          const enrollmentCountdown = getEnrollmentCountdown(activity);
+
+                          const attendanceDone = volunteerProgress?.attendance === 'present';
+                          if (!isEnrolled && (!isEventDay || !attendanceDone)) {
+                            return (
+                              <div key={idx} className="task-card task-card--locked">
+                                <span className="task-card__title-only">{activity.title}</span>
+                                {isEventDay && !attendanceDone && (
+                                  <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to unlock</span>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          const isExpanded = expandedTasks[activity.id] !== false;
+                          const isEndedEnrolled = !isEditable && isEnrolled;
+
+                          return (
+                            <div key={idx} className={`task-card${isEnrolled ? ' task-card--enrolled' : ''}${isEndedEnrolled ? ' task-card--ended' : ''}`}>
+                              <div className="task-card__row" style={isEnrolled && !isEndedEnrolled ? { cursor: 'pointer' } : {}} onClick={isEnrolled && !isEndedEnrolled ? () => toggleTaskExpand(activity.id) : undefined}>
+                                <span className="task-card__emoji">{activity.emoji || '🎯'}</span>
+                                <div className="task-card__info">
+                                  <span className="task-card__title">{activity.title}</span>
+                                  <div className="task-card__meta">
+                                    <span className="task-card__pts">{activity.points} PTS</span>
+                                    {isEventDay && (
+                                      <button
+                                        className="task-participants-indicator"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isGrouped) { setGroupModalMode('view'); setSelectedTaskForGroups(activity); } else { setSelectedTaskForParticipants(activity); }
+                                        }}
+                                        aria-label={`View ${isGrouped ? 'groups' : 'participants'} for ${activity.title}`}
+                                      >
+                                        {isGrouped ? 'Groups' : 'Participants'}: {participantsText}
+                                      </button>
+                                    )}
+                                    {enrollmentCountdown && (
+                                      <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
+                                        {enrollmentCountdown.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="task-card__action">
+                                  {isEnrolled ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={!isEditable}>
+                                        <span className="joined-text">Joined</span><span className="remove-text">✕</span>
+                                      </button>
+                                      {!isEndedEnrolled && (
+                                        <button className="task-collapse-btn" onClick={(e) => { e.stopPropagation(); toggleTaskExpand(activity.id); }} aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+                                          {isExpanded ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} /> : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : isTaskCapacityFull ? (
+                                    <span className="task-slot-full-badge">Full</span>
+                                  ) : isDeadlineClosed ? (
+                                    <span className="req-status locked">Closed</span>
+                                  ) : !isEditable ? (
+                                    <span className="req-status locked">Ended</span>
+                                  ) : canJoinActivities ? (
+                                    <button className="task-join-btn" onClick={() => handleJoinActivity(activity.id, activity)} disabled={!isEditable}>Join</button>
+                                  ) : (
+                                    <span className="req-status locked">Closed</span>
+                                  )}
+                                </div>
+                              </div>
+                              {isEnrolled && isExpanded && !isEndedEnrolled && (
+                                <div className="task-journal-section">
+                                  {journalsForActivity.map((journal) => (
+                                    <div key={journal.id} className="journal-card">
+                                      {editingJournalId === journal.taskId ? (
+                                        <>
+                                          <textarea value={editingJournalText} onChange={(e) => setEditingJournalText(e.target.value)} className="journal-edit-textarea" />
+                                          <div className="journal-card-actions">
+                                            <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
+                                            <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <div className="journal-text">{journal.reflection}</div>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {hasSubmittedJournal ? (
+                                    <div className="journal-submit-row">
+                                      <span className="journal-submitted-badge">Submitted</span>
+                                      <>
+                                        <button onClick={() => handleEditJournal(journalsForActivity[0])} className="journal-edit-icon-btn" title={isGrouped ? 'Edit group reflection' : 'Edit reflection'}>
+                                          <ModeRoundedIcon sx={{ fontSize: 15 }} />
+                                        </button>
+                                        <button onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)} className="journal-edit-icon-btn journal-delete-icon-btn" title={isGrouped ? 'Delete group reflection' : 'Delete reflection'}>
+                                          <DeleteRoundedIcon sx={{ fontSize: 15 }} />
+                                        </button>
+                                      </>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <textarea
+                                        placeholder={!isHalfwayDone ? 'Journal will unlock once the event has started' : isGrouped ? 'Only one member needs to submit this reflection for your group.' : 'Write your reflection for this task...'}
+                                        className="journal-textarea"
+                                        value={journalReflections[idx] || ''}
+                                        onChange={(e) => handleJournalChange(idx, e.target.value)}
+                                        disabled={!isHalfwayDone}
+                                      />
+                                      <div className="journal-submit-row">
+                                        {submitStatus[idx] && (
+                                          <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
+                                        )}
+                                        <button className="activity-submit-button journal-submit-compact" disabled={!isHalfwayDone || !journalReflections[idx]?.trim()} onClick={() => handleJournalSubmit(idx, activity)}>
+                                          {!isHalfwayDone ? 'LOCKED' : isGrouped ? 'SUBMIT FOR GROUP' : 'SUBMIT'}
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        };
+
+                        if (withIdx.length === 0) {
+                          return (
+                            <div className="ea-empty-state" style={{ padding: '24px 0', textAlign: 'center' }}>
+                              <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>📋</span>
+                              <h4 style={{ color: '#374151', margin: 0 }}>No tasks yet</h4>
+                              <p style={{ color: '#6b7280', margin: '8px 0 0' }}>You can still complete the event requirements while waiting for tasks to be added.</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <>
+                            {joinedList.length > 0 && (
+                              <div className="task-section">
+                                <span className="task-section-label">Joined</span>
+                                {joinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
+                              </div>
+                            )}
+                            {joinedList.length > 0 && unjoinedList.length > 0 && <div className="task-section-divider" />}
+                            {unjoinedList.length > 0 && (
+                              <div className="task-section">
+                                {joinedList.length > 0 && <span className="task-section-label">Available</span>}
+                                {unjoinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* LEADERBOARD TAB */}
+                {activeNav === 'leaderboard' && (
+                  <div className="event-leaderboard-card">
+                    <h3 className="ea-leaderboard-title">Activity Leaderboard</h3>
+                    {sortedLeaderboard.length === 0 ? (
+                      <p className="ea-leaderboard-empty">No participants yet.</p>
+                    ) : (
+                      <div className="ea-leaderboard-list" ref={leaderboardListRef}>
+                        {sortedLeaderboard.slice(0, 10).map((user, index) => {
+                          const rank = index + 1;
+                          const isCurrent = user.uid === currentUserId;
+                          return (
+                            <div
+                              key={user.uid}
+                              ref={isCurrent ? currentUserRef : null}
+                              className={`ea-leaderboard-row${isCurrent ? ' is-current-user' : ''}`}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Open profile for ${user.name}`}
+                              onClick={() => openUserProfile(user.uid)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { openUserProfile(user.uid); e.preventDefault(); } }}
+                            >
+                              <span className="ea-rank-num">{rank}</span>
+                              {user.avatar
+                                ? <img src={user.avatar} alt={user.name} className="ea-rank-avatar" />
+                                : <span className="ea-rank-avatar ea-rank-initials">{(user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
+                              }
+                              <span className="ea-rank-name">{user.name}</span>
+                              <span className="ea-rank-pts">{user.points} PTS</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
               </div>
-            </div>{/* closes event-activity-bg */}
-          </div>{/* closes ea-scrollable-body */}
-        </div>{/* closes ea-slide-in */}
-      </div>{/* closes content-page */}
+            </div>
+          </div>
+        </div>
+      </div>
+
 
       {/* QR Modal - at root level to prevent flickering */}
       {showQRModal && (
@@ -3369,13 +3337,18 @@ export default function EventActivity() {
                       }
                     }
                   );
+                  const preSurveyIsFirst = volunteerProgress?.preSurvey !== "submitted";
                   await updateDoc(
                     doc(db, "missions", id, "volunteer", user.uid),
                     {
                       "progress.preSurvey": "submitted",
-                      "progress.consent": "open"
+                      "progress.consent": "open",
+                      ...(preSurveyIsFirst ? { "requirementBonus.preSurvey": 5 } : {}),
                     }
                   );
+                  if (preSurveyIsFirst) {
+                    await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                  }
 
                   setVolunteerProgress((prev) => ({
                     ...prev,
@@ -3383,7 +3356,7 @@ export default function EventActivity() {
                     consent: "open"
                   }));
                   setShowPreSurveyModal(false);
-                  alert("Pre-Activity Survey submitted!");
+                  alert("Pre-Activity Survey submitted! +5 points earned.");
                   window.location.reload();
                 }}
               />
@@ -3456,12 +3429,17 @@ export default function EventActivity() {
                     }
                   }
                 );
+                const postSurveyIsFirst = volunteerProgress?.postSurvey !== "submitted";
                 await updateDoc(
                   doc(db, "missions", id, "volunteer", user.uid),
                   {
-                    "progress.postSurvey": "submitted"
+                    "progress.postSurvey": "submitted",
+                    ...(postSurveyIsFirst ? { "requirementBonus.postSurvey": 5 } : {}),
                   }
                 );
+                if (postSurveyIsFirst) {
+                  await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                }
                 setVolunteerProgress(prev => ({
                   ...prev,
                   postSurvey: "submitted",
@@ -3469,7 +3447,7 @@ export default function EventActivity() {
                 }));
 
                 setShowPostSurveyModal(false);
-                alert("Post-Activity Survey submitted!");
+                alert(postSurveyIsFirst ? "Post-Activity Survey submitted! +5 points earned." : "Post-Activity Survey submitted!");
                 window.location.reload();
               }}
             />

@@ -31,6 +31,7 @@ import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
 import ModeRoundedIcon from '@mui/icons-material/ModeRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
+import DeleteForeverRoundedIcon from '@mui/icons-material/DeleteForeverRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 //under proposal type selection icons
@@ -38,6 +39,11 @@ import VolunteerActivismOutlinedIcon from '@mui/icons-material/VolunteerActivism
 import LocalLibraryOutlinedIcon from '@mui/icons-material/LocalLibraryOutlined';
 import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined';
 import HelpOutlineRoundedIcon from '@mui/icons-material/HelpOutlineRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
+import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
+import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
 
 
 export {
@@ -70,10 +76,16 @@ export {
     MenuRoundedIcon,
     ModeRoundedIcon,
     DeleteRoundedIcon,
+    DeleteForeverRoundedIcon,
     ExpandMoreRoundedIcon,
     ExpandLessRoundedIcon,
     VolunteerActivismOutlinedIcon,
     LocalLibraryOutlinedIcon,
     CloudSyncOutlinedIcon,
     HelpOutlineRoundedIcon,
+    SearchRoundedIcon,
+    CalendarTodayOutlinedIcon,
+    PlaceOutlinedIcon,
+    PeopleOutlinedIcon,
+    IosShareRoundedIcon,
 };

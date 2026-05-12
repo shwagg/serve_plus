@@ -46,23 +46,24 @@
 }
 
 .settings-close {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   border: none;
-  background: #f3f4f6;
-  border-radius: 8px;
+  background: #1f2937;
+  border-radius: 50%;
   cursor: pointer;
-  color: #6b7280;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, transform 0.15s;
   flex-shrink: 0;
 }
 
 .settings-close:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: #374151;
+  transform: scale(1.05);
 }
 
 /* ── Body (sidebar + content) ── */

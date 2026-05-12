@@ -1,8 +1,8 @@
 .serve-header {
   width: 100%;
   height: 60px; /* fixed height of header */
-  background-color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  background-color: #d0edfc;
+  box-shadow: none;
   position: fixed;
   top: 0;
   z-index: 1000;
@@ -51,15 +51,20 @@
   text-overflow: ellipsis;
 }
 .header-container {
-  max-width: 100%;
   width: 100%;
-  margin: 0 auto;
   padding: 0 16px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
   height: 100%;
   box-sizing: border-box;
+}
+.header-center-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
 }
 /* Logo Section */
 .header-logo {
@@ -89,16 +94,13 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  height: 100%;
   min-width: 0;
-  overflow: hidden;
 }
 .logo-icon img {
   object-fit: contain;
-  height: 80px;
+  height: 28px;
   width: auto;
-  max-width: 100%;
-  flex-shrink: 1;
+  flex-shrink: 0;
 }
 .logo-text {
   font-size: 1.5rem;
@@ -109,6 +111,16 @@
 .plus-sign {
   color: #8BC34A;
   font-weight: 700;
+}
+.header-logo-text {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.header-logo-plus {
+  color: #30bdb7;
 }
 /* Header Actions */
 .header-actions {
@@ -170,13 +182,6 @@
   .header-actions {
     gap: 6px;
   }
-  .header-logo {
-    max-width: 50%;
-  }
-  .logo-icon img {
-    height: 70px;
-    max-width: 100%;
-  }
   .icon-button {
     width: 34px;
     height: 34px;
@@ -191,9 +196,15 @@
   }
 }
 @media (max-width: 540px) {
-  /* Hide greeting text on small screens to prevent overflow */
+  /* Hide greeting and logo text on small screens to maximise header space */
   .header-greeting {
     display: none;
+  }
+  .header-logo-text {
+    display: none;
+  }
+  .header-logo {
+    max-width: unset;
   }
   .profile-btn {
     padding: 4px;
@@ -218,13 +229,6 @@
 @media (max-width: 480px) {
   .header-container {
     padding: 0 10px;
-  }
-  .header-logo {
-    max-width: 45%;
-  }
-  .logo-icon img {
-    height: 60px;
-    max-width: 100%;
   }
   .header-actions {
     gap: 2px;
@@ -287,18 +291,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
+  background: #1f2937;
   border: none;
-  border-radius: 6px;
-  padding: 4px;
-  color: #9ca3af;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  color: #fff;
   cursor: pointer;
-  transition: background 0.18s, color 0.18s;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.15s;
 }
 
 .cp-close-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: #374151;
+  transform: scale(1.05);
 }
 
 .cp-body {

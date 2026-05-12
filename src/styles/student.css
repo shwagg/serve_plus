@@ -9,20 +9,30 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #d0edfc;
+  background: #ffffff;
 }
 .content-page{
     height: calc(100vh - 60px);
     display: flex;
     overflow-y: auto;
     flex-direction: column;
+    flex: 1;
     scroll-behavior: smooth;
-    background-color: #d0edfc;
-    background-image: url('../assets/clouds-bg.jpg'), url('../assets/mountain-bg.jpg');
-    background-repeat: no-repeat, no-repeat;
-    background-position: top center, bottom center;
-    background-size: 100% 50%, 100% 50%;
-    background-attachment: fixed;
+    background: linear-gradient(to bottom, #d0edfc 0px, #ffffff 35px);
+}
+
+/* Sticky gradient overlay — content scrolling up fades into the header */
+.scroll-fade-top {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  flex-shrink: 0;
+  background: linear-gradient(to bottom, #d0edfc 0%, rgba(208, 237, 252, 0) 100%);
+  pointer-events: none;
+  z-index: 100;
+  margin-bottom: -60px;
 }
 
 /* ====== LOGOUT POPUP (extracted from inline styles) ====== */
@@ -201,16 +211,6 @@
 }
 
 /*USER PROFILE*/
-.player-strip {
-  position: sticky;
-  top: 1px;
-  width: 100%;
-  z-index: 5;
-  background: transparent;
-  display: flex;
-  justify-content: center;
-  padding: 10px 16px;
-}
 .player-strip-inner {
   display: inline-flex;
   align-items: center;
@@ -284,20 +284,6 @@
 .strip-missions-label {
   font-weight: 400;
   color: #6b7280;
-}
-/* Desktop: lift player strip into the header center */
-@media (min-width: 769px) {
-  .player-strip {
-    position: fixed;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    height: 60px;
-    width: auto;
-    padding: 0;
-    z-index: 1001;
-    align-items: center;
-  }
 }
 /* keep .level-bar for backward compat on other pages */
 .level-bar {
@@ -460,6 +446,42 @@
 }
 
 
+/* ====== MISSION SEARCH BAR — bridges leaderboard and mission section ====== */
+.missions-search-section {
+  padding: 0 80px;
+  position: relative;
+  z-index: 5;
+  margin-top: -20px;
+  margin-bottom: -20px;
+}
+.missions-search-bar-wrap {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 40px;
+  box-shadow: 0 4px 20px rgba(48,189,183,0.35);
+  padding: 18px 24px;
+  gap: 12px;
+  border: 1.5px solid #f0f0f0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.missions-search-bar-wrap:focus-within {
+  border-color: #30bdb7;
+  box-shadow: 0 4px 24px rgba(48,189,183,0.55);
+}
+.missions-search-bar-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  color: #374151;
+  background: transparent;
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
+}
+.missions-search-bar-input::placeholder {
+  color: #9ca3af;
+}
+
 /*MISSION*/
 .mission-section {
   height: auto;
@@ -468,12 +490,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 35px 0 80px 0;
+  padding: 48px 0 80px 0;
   animation: slideUp 0.4s ease;
   background: #fff;
   border-radius: 16px;
   margin: 0 16px 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.10);
 }
 .mission-section-header {
   display: flex;
@@ -485,7 +507,7 @@
 }
 .mission-section-title {
   font-family: 'Inter', Helvetica, Arial, sans-serif;
-  font-size: 38px;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: #111827;
@@ -690,6 +712,36 @@
 }
 
 .mission-card-date {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.mission-card-location {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.mission-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.mission-tag {
+  display: inline-block;
+  background: #f0fdfb;
+  color: #0d9488;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -763,9 +815,10 @@
 }
 .leaderboard-rank-text {
   font-family: 'Inter', Helvetica, Arial, sans-serif;
-  color: #9ca3af;
-  font-size: 18px;
-  font-weight: 400;
+  /*color: #9ca3af;*/
+  color: #000;
+  font-size: 14px;
+  font-weight: 300;
   margin: 0;
   line-height: 1.2;
 }
@@ -1018,11 +1071,11 @@
 
 /* ====== COMPACT LEADERBOARD SECTION ====== */
 .leaderboard-compact-section {
-  background: #fff;
+  background: url('../assets/leaderboard-bg.jpg') center bottom / cover no-repeat;
   border-radius: 16px;
-  margin: 12px 16px;
-  padding: 20px 20px 16px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  margin: 40px 16px 12px;
+  padding: 16px 20px 28px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.10);
   box-sizing: border-box;
 }
 .leaderboard-compact-header {
@@ -1034,7 +1087,7 @@
 }
 .leaderboard-compact-title {
   font-family: 'Inter', Helvetica, Arial, sans-serif;
-  font-size: 38px;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: #111827;
@@ -1058,13 +1111,17 @@
 }
 .leaderboard-compact-podium-wrap {
   flex: 0 0 auto;
+  background: #f9fafb;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  padding: 8px 6px 0;
 }
 .leaderboard-compact-podium {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   gap: 0;
-  padding-top: 36px;
+  padding-top: 32px;
   position: relative;
 }
 .leaderboard-compact-rank-col {
@@ -1073,55 +1130,57 @@
   flex-direction: column;
   gap: 0;
   align-self: center;
+  font-size: 0.93em;
 }
-/* Scale-down overrides for podium inside compact section */
+/* Scale-down overrides for podium inside compact section (~10% smaller) */
 .leaderboard-compact-podium-wrap .podium-item {
-  width: 72px;
-  height: auto;
+  width: 65px;
+  height: 140px;
 }
 .leaderboard-compact-podium-wrap .podium-avatar-wrap img {
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
 }
 .leaderboard-compact-podium-wrap .podium-item.rank-1 .podium-top img {
-  width: 64px;
-  height: 64px;
+  width: 58px;
+  height: 58px;
   box-shadow: 0 0 0 3px #facc15;
 }
 .leaderboard-compact-podium-wrap .podium-item.rank-1 {
-  transform: translateY(-20px);
+  transform: translateY(-18px);
 }
 .leaderboard-compact-podium-wrap .podium-item.rank-1 .podium-top {
-  padding-bottom: 6px;
+  padding-bottom: 5px;
 }
 .leaderboard-compact-podium-wrap .podium-item.rank-1 .podium-top::before {
-  font-size: 22px;
-  top: -24px;
+  font-size: 20px;
+  top: -22px;
 }
 .leaderboard-compact-podium-wrap .podium-item.rank-2,
 .leaderboard-compact-podium-wrap .podium-item.rank-3 {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 .leaderboard-compact-podium-wrap .podium-base {
-  width: 60px;
-  border-radius: 8px 8px 0 0;
+  width: 54px;
+  border-radius: 7px 7px 0 0;
 }
-.leaderboard-compact-podium-wrap .podium-base.rank-1 { height: 28px; }
+.leaderboard-compact-podium-wrap .podium-base.rank-1 { height: 35px; }
 .leaderboard-compact-podium-wrap .podium-base.rank-2,
-.leaderboard-compact-podium-wrap .podium-base.rank-3 { height: 16px; }
+.leaderboard-compact-podium-wrap .podium-base.rank-3 { height: 24px; }
 .leaderboard-compact-podium-wrap .podium-name {
   font-size: 11px;
-  max-width: 70px;
+  max-width: 64px;
 }
 .leaderboard-compact-podium-wrap .podium-points { font-size: 10px; }
-.leaderboard-compact-podium-wrap .podium-info { margin-top: 6px; }
+.leaderboard-compact-podium-wrap .podium-info { margin-top: 5px; }
 .leaderboard-see-all-btn {
   background: none;
   border: none;
-  color: #30bdb7;
+  /*color: #30bdb7;*/
+  color: #000;
   font-family: 'Inter', Helvetica, Arial, sans-serif;
-  font-weight: 400;
-  font-size: 18px;
+  font-weight: 500;
+  font-size: 14px;
   padding: 0;
   cursor: pointer;
   white-space: nowrap;
@@ -1985,12 +2044,18 @@
     min-height: 7px;
   }
 
-  /* Player strip */
+  /* Player strip — compact pill in the header center slot */
   .player-strip-inner {
-    padding: 8px 16px;
+    padding: 6px 10px;
   }
   .strip-compact-row {
-    gap: 10px;
+    gap: 6px;
+  }
+  .strip-sep {
+    display: none;
+  }
+  .strip-pts-bar {
+    width: 72px;
   }
   .strip-xp-chip {
     padding: 3px 10px;
@@ -2006,7 +2071,20 @@
     margin: 8px 8px;
   }
   .leaderboard-compact-section {
-    margin: 8px 8px;
+    margin: 30px 8px 8px;
+    width: auto;
+  }
+  .leaderboard-see-all-btn{
+    width:fit-content;
+  }
+  .missions-search-section {
+    padding: 0 35px;
+  }
+  .missions-search-bar-wrap {
+    padding: 12px 16px;
+  }
+  .missions-search-bar-input {
+    font-size: 14px;
   }
   .leaderboard-compact-body {
     flex-direction: column;

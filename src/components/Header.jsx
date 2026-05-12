@@ -7,7 +7,7 @@ import { httpsCallable } from 'firebase/functions';
 import { useSession } from '../context/SessionContext';
 import './Header.css';
 import NotificationBell from './NotificationBell';
-import serveIcon from '../assets/serve_plus_logo_black.svg';
+import servePlusIcon from '../assets/serve_plus_icon.svg';
 import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
@@ -224,9 +224,12 @@ export default function Header() {
           {/* Logo */}
           <button className="header-logo" onClick={handleLogoClick}>
             <div className="logo-icon">
-              <img src={serveIcon} alt="Serve Plus Logo" width="32" height="32" />
+              <img src={servePlusIcon} alt="SERVE+" width="32" height="32" />
             </div>
+            <span className="header-logo-text">SERVE<span className="header-logo-plus">+</span></span>
           </button>
+          {/* Center slot — student home portals the player strip here */}
+          <div className="header-center-slot" id="header-center-slot" />
           {/* Right Side Icons */}
           <div className="header-actions">
             {userRole === 'student' && (
