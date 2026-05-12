@@ -1,4 +1,5 @@
-import { useNavigate, useLocation } from "react-router-dom";
+﻿import { useNavigate, useLocation } from "react-router-dom";
+import { createPortal } from "react-dom";
 import EventDetails from "./missions/EventDetails";
 import ProjectProposal from "../global/proposal/ProjectProposal";
 import ReviewModal from "../global/proposal/ReviewModal";
@@ -10,12 +11,10 @@ import { getLevelInfo } from "../../hooks/rewardSystem";
 import Header from "../../components/Header";
 import "../../styles/student.css";
 import "../../styles/ui.css";
-import { WestIcon, EastIcon } from "../../components/icons";
+import { WestIcon, EastIcon, SearchRoundedIcon, CalendarTodayOutlinedIcon, PlaceOutlinedIcon, PeopleOutlinedIcon } from "../../components/icons";
 import mission1 from '../../assets/mission1.jpg';
 import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
-import cloudsBg from '../../assets/clouds-bg.jpg';
-import mountainBg from '../../assets/mountain-bg.jpg';
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
   const radius = (size - stroke) / 2;
@@ -73,6 +72,11 @@ const StudentHome = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
 
+  const [playerStripPortal, setPlayerStripPortal] = useState(null);
+  useEffect(() => {
+    setPlayerStripPortal(document.getElementById('header-center-slot'));
+  }, []);
+
   const [level, setLevel] = useState(1);
   const [currentPoints, setCurrentPoints] = useState(0);
   const [studentName, setStudentName] = useState("");
@@ -91,6 +95,9 @@ const StudentHome = () => {
   const [volunteerInfo, setVolunteerInfo] = useState({});
   const [studentAvatar, setStudentAvatar] = useState('');
   const [enrollmentDetails, setEnrollmentDetails] = useState({});
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [leaderboardSearch, setLeaderboardSearch] = useState('');
+  const [missionSearch, setMissionSearch] = useState('');
 
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = landingPromos.length;
@@ -123,7 +130,7 @@ const StudentHome = () => {
 
         setMissionCards(missions);
 
-        // Fetch total count, preview volunteers (first 4), and current user enrollment — all in parallel
+        // Fetch total count, preview volunteers (first 4), and current user enrollment â€" all in parallel
         const [countSnaps, previewSnaps, enrollmentSnaps] = await Promise.all([
           Promise.all(missions.map((m) =>
             getCountFromServer(collection(db, "missions", m.id, "volunteer"))
@@ -244,7 +251,6 @@ const StudentHome = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const missionsSectionRef = useRef(null);
-  const leaderboardSectionRef = useRef(null);
 
   useLayoutEffect(() => {
     if (location.state?.scrollTo === 'missions' && missionsSectionRef.current) {
@@ -346,11 +352,6 @@ const StudentHome = () => {
   // leaderboard is already sorted by fetchLeaderboard
   const sortedLeaderboard = leaderboard;
 
-  const top1 = sortedLeaderboard[0];
-  const top2 = sortedLeaderboard[1];
-  const top3 = sortedLeaderboard[2];
-  const podium = useMemo(() => [top2, top1, top3].filter(Boolean), [top1, top2, top3]);
-
   const currentUserId = currentUser?.uid;
   const currentUserIndex = sortedLeaderboard.findIndex(
     (user) => user.uid === currentUserId
@@ -388,12 +389,12 @@ const StudentHome = () => {
       return `Returned for revision${rejectedByUser ? ` by ${rejectedByUser}` : ''}`;
     }
     if (approvedBy && recommendedBy && endorsedBy && reviewedBy) {
-      return 'All approvals complete · Ready to publish';
+      return 'All approvals complete Â· Ready to publish';
     }
-    if (endorsedBy) return `Endorsed by Admin · Awaiting Director approval`;
-    if (recommendedBy) return `Recommended by ${recommendedBy} · Awaiting Admin (CSCE) endorsement`;
-    if (reviewedBy) return `Reviewed by ${reviewedBy} · Awaiting College Dean recommendation`;
-    return 'Submitted · Awaiting Program Chair review';
+    if (endorsedBy) return `Endorsed by Admin Â· Awaiting Director approval`;
+    if (recommendedBy) return `Recommended by ${recommendedBy} Â· Awaiting Admin (CSCE) endorsement`;
+    if (reviewedBy) return `Reviewed by ${reviewedBy} Â· Awaiting College Dean recommendation`;
+    return 'Submitted Â· Awaiting Program Chair review';
   };
 
   const formatDate = (dateStr) => {
@@ -423,13 +424,28 @@ const StudentHome = () => {
     return `${rank}th`;
   };
 
-  // Filtered missions based on active tab
+  // Unique departments from published missions for filter tabs
+  const uniqueDepts = useMemo(() => {
+    const depts = new Set(missionCards.map(m => m.department).filter(Boolean));
+    return [...depts].sort();
+  }, [missionCards]);
+
+  // Filtered missions based on active tab + search
   const filteredMissions = useMemo(() => {
-    if (activeTab === "your") {
-      return missionCards.filter(m => enrolledMissions[m.id]);
+    let result = missionCards;
+    const q = missionSearch.trim().toLowerCase();
+    if (q) result = result.filter(m =>
+      m.title?.toLowerCase().includes(q) ||
+      m.location?.toLowerCase().includes(q) ||
+      (Array.isArray(m.stakeholders) && m.stakeholders.some(s => s.toLowerCase().includes(q)))
+    );
+    if (activeTab === "your") return result.filter(m => enrolledMissions[m.id]);
+    if (activeTab.startsWith("dept:")) {
+      const dept = activeTab.slice(5);
+      return result.filter(m => m.department === dept);
     }
-    return missionCards;
-  }, [activeTab, missionCards, enrolledMissions]);
+    return result;
+  }, [activeTab, missionCards, enrolledMissions, missionSearch]);
 
   // Active (approved) missions shown in the CURRENT section
   const activeMissions = useMemo(() =>
@@ -467,6 +483,8 @@ const StudentHome = () => {
 
       <div className="header-spacer"></div>
       <div className="content-page">
+        {/* Sticky gradient overlay — fades scrolled content into the header */}
+        <div className="scroll-fade-top" aria-hidden="true" />
 
         {/* LANDING or PROMO POSTER PAGE */}
         {/*<section className="landing-section" aria-label="Featured programs">
@@ -520,13 +538,11 @@ const StudentHome = () => {
           </div>
         </section>*/}
 
-        {/* PROFILE LEVEL RANK */}
-        <section className="player-strip" aria-label="Player stats">
+        {/* PROFILE LEVEL RANK — portalled into header center slot */}
+        {playerStripPortal && createPortal(
           <div className="player-strip-inner">
             <div className="strip-compact-row">
-              {/* Level */}
               <span className="strip-level-text">Lv. {level}</span>
-              {/* Progress bar with pts label inside */}
               <div className="strip-pts-bar-wrap">
                 <div
                   className="strip-pts-bar"
@@ -537,113 +553,207 @@ const StudentHome = () => {
                   aria-label={`${currentPoints} points`}
                 >
                   <div className="strip-pts-fill" style={{ width: `${currentPoints % 100}%` }} />
-                  <span className="strip-pts-text">{currentPoints} pts</span>
+                  <span className="strip-pts-text">{currentPoints} pts 💎</span>
                 </div>
               </div>
-              <span className="strip-sep" aria-hidden="true">•</span>
-              {/* Mission count */}
+              <span className="strip-sep" aria-hidden="true">|</span>
               <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">Missions</span></span>
+            </div>
+          </div>,
+          playerStripPortal
+        )}
+
+        {/* COMPACT LEADERBOARD */}
+        <section className="leaderboard-compact-section" aria-label="Leaderboard">
+          <div className="leaderboard-compact-header">
+            <div>
+              <h2 className="leaderboard-compact-title">Leaderboard</h2>
+              <p className="leaderboard-rank-text">
+                {currentUserRank ? `You are in ${getOrdinal(currentUserRank)} place` : "Join a mission to get ranked!"}
+              </p>
+            </div>
+            <button
+              className="leaderboard-see-all-btn"
+              onClick={() => setShowLeaderboardModal(true)}
+            >
+              View more
+            </button>
+          </div><br />
+          <div className="leaderboard-compact-body">
+            {/* LEFT: compact podium */}
+            <div className="leaderboard-compact-podium-wrap">
+              <div className="leaderboard-compact-podium">
+                {[
+                  sortedLeaderboard[1] ? { ...sortedLeaderboard[1], rank: 2 } : null,
+                  sortedLeaderboard[0] ? { ...sortedLeaderboard[0], rank: 1 } : null,
+                  sortedLeaderboard[2] ? { ...sortedLeaderboard[2], rank: 3 } : null,
+                ].filter(Boolean).map((user) => {
+                  const avatarSize = user.rank === 1 ? 64 : 52;
+                  return (
+                    <div
+                      key={user.uid}
+                      className={`podium-item rank-${user.rank}`}
+                      onClick={() => navigate(`/profile/${user.uid}`)}
+                    >
+                      <div className="podium-top">
+                        <div className="podium-avatar-wrap">
+                          {user.avatar ? (
+                            <img src={user.avatar} alt={user.name} />
+                          ) : (
+                            <div style={{
+                              width: avatarSize, height: avatarSize,
+                              borderRadius: '50%', background: '#30bdb7', color: '#fff',
+                              fontSize: user.rank === 1 ? 14 : 12, fontWeight: 700,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              ...(user.rank === 1 ? { boxShadow: '0 0 0 3px #facc15' } : {}),
+                            }}>
+                              {getInitials(user.name)}
+                            </div>
+                          )}
+                          <span className="podium-rank">{user.rank}</span>
+                        </div>
+                        <div className="podium-info">
+                          <div className="podium-name">{user.name}</div>
+                          <div className="podium-points">{user.points} pts</div>
+                        </div>
+                      </div>
+                      <div className={`podium-base rank-${user.rank}`} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* RIGHT: 3-user window â€" logged-in user in the middle */}
+            <div className="leaderboard-compact-rank-col">
+              {(() => {
+                if (sortedLeaderboard.length === 0) {
+                  return (
+                    <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>
+                      No rankings yet.
+                    </div>
+                  );
+                }
+                let start;
+                if (currentUserIndex === -1) {
+                  start = 0;
+                } else {
+                  start = currentUserIndex - 1;
+                  if (start < 0) start = 0;
+                  if (start + 3 > sortedLeaderboard.length) {
+                    start = Math.max(0, sortedLeaderboard.length - 3);
+                  }
+                }
+                const windowUsers = sortedLeaderboard
+                  .slice(start, start + 3)
+                  .map((u, i) => ({ ...u, rank: start + i + 1 }));
+                return windowUsers.map((user) => (
+                  <div
+                    key={user.uid}
+                    className={`leaderboard-row ${user.uid === currentUserId ? 'is-current-user' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/profile/${user.uid}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') navigate(`/profile/${user.uid}`);
+                    }}
+                  >
+                    <span className="rank-num">{user.rank}</span>
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={`${user.name}'s avatar`} className="leaderboard-avatar" />
+                    ) : (
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: '#30bdb7', color: '#fff',
+                        fontSize: 11, fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        userSelect: 'none', flexShrink: 0,
+                      }}>
+                        {getInitials(user.name)}
+                      </div>
+                    )}
+                    <span className="rank-name">{user.name}</span>
+                    <span className="rank-points">{user.points} pts</span>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         </section>
-        {/* CURRENT ACTIVE MISSIONS */}
-        {activeMissions.length > 0 && (
-          <section className="current-section" aria-label="Current missions">
-            <h2 className="current-section-title">Current</h2>
-            <div className="current-mission-list">
-              {activeMissions.map((mission) => {
-                const progressPct = getMissionProgress(mission.id);
-                const info = volunteerInfo[mission.id];
-                const count = info?.count ?? 0;
-                const preview = info?.preview ?? [];
-                const extra = count - preview.length;
-                return (
-                  <div
-                    key={mission.id}
-                    className="current-mission-card"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/event/${mission.id}/activity`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/event/${mission.id}/activity`); } }}
-                  >
-                    <div className="current-card-image">
-                      <img src={mission.img || mission1} alt={mission.title} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = mission1; }} />
-                    </div>
-                    <div className="current-card-body">
-                      <h3 className="current-card-title">{mission.title}</h3>
-                      <span className="current-card-date">{formatDate(mission.targetDate || mission.targetDates) || 'Date TBA'}</span>
-                      {(() => {
-                        const detail = enrollmentDetails[mission.id];
-                        const p = detail?.progress || {};
-                        const consentDone = p.consent && p.consent !== 'locked';
-                        const preSurveyDone = p.preSurvey && p.preSurvey !== 'locked';
-                        return (
-                          <div className="current-card-steps">
-                            <span className={`step-badge ${consentDone ? 'done' : ''}`}>
-                              {consentDone ? '✓' : '○'} Consent
-                            </span>
-                            <span className={`step-badge ${preSurveyDone ? 'done' : ''}`}>
-                              {preSurveyDone ? '✓' : '○'} Pre-Survey
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    <div className="current-card-progress">
-                      <ProgressRing percent={progressPct} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+
+        {/* SEARCH BAR — bridges leaderboard and mission section */}
+        <div className="missions-search-section">
+          <div className="missions-search-bar-wrap">
+            <SearchRoundedIcon style={{ fontSize: 22, color: '#9ca3af', flexShrink: 0 }} />
+            <input
+              type="text"
+              className="missions-search-bar-input"
+              placeholder="Search missions, tags"
+              value={missionSearch}
+              onChange={(e) => setMissionSearch(e.target.value)}
+              aria-label="Search missions and tags"
+            />
+          </div>
+        </div>
 
         {/* MISSION */}
-        <section ref={missionsSectionRef} className="mission-section" aria-label="Missions" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat' }}>
+        <section ref={missionsSectionRef} className="mission-section" aria-label="Missions">
           <div className="mission-section-header">
-            <h2 className="mission-section-title">Find Your Next Mission</h2>
-            <div className="mission-tabs" role="tablist">
-              <button
-                role="tab"
-                aria-selected={activeTab === "all"}
-                className={`mission-tab ${activeTab === "all" ? "active" : ""}`}
-                onClick={() => setActiveTab("all")}
-              >
-                All Missions
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === "your"}
-                className={`mission-tab ${activeTab === "your" ? "active" : ""}`}
-                onClick={() => setActiveTab("your")}
-              >
-                Your Missions
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === "proposals"}
-                className={`mission-tab ${activeTab === "proposals" ? "active" : ""}`}
-                onClick={() => setActiveTab("proposals")}
-              >
-                Your Proposals
-              </button>
+            <h2 className="mission-section-title">Mission</h2>
+            <p className="leaderboard-rank-text" style={{ marginBottom: 12 }}>Find your next activity here</p>
+            <div className="mission-filter-bar">
+              <div className="mission-tabs" role="tablist">
+                <button
+                  role="tab"
+                  aria-selected={activeTab === "all"}
+                  className={`mission-tab ${activeTab === "all" ? "active" : ""}`}
+                  onClick={() => setActiveTab("all")}
+                >
+                  All
+                </button>
+                {uniqueDepts.map(dept => (
+                  <button
+                    key={dept}
+                    role="tab"
+                    aria-selected={activeTab === ('dept:' + dept)}
+                    className={`mission-tab ${activeTab === ('dept:' + dept) ? "active" : ""}`}
+                    onClick={() => setActiveTab('dept:' + dept)}
+                  >
+                    {dept}
+                  </button>
+                ))}
+                <button
+                  role="tab"
+                  aria-selected={activeTab === "your"}
+                  className={`mission-tab ${activeTab === "your" ? "active" : ""}`}
+                  onClick={() => setActiveTab("your")}
+                >
+                  Enrolled
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={activeTab === "proposals"}
+                  className={`mission-tab ${activeTab === "proposals" ? "active" : ""}`}
+                  onClick={() => setActiveTab("proposals")}
+                >
+                  Proposals
+                </button>
+              </div>
             </div>
           </div>
           <div className="mission-list" role="tabpanel">
             {activeTab === "proposals" ? (
               proposalCards.length === 0 ? (
                 <div className="mission-empty-state">
-                  <span className="mission-empty-icon">📝</span>
+                  <span className="mission-empty-icon">&#128269;</span>
                   <p>You haven't created any proposals yet.</p>
                 </div>
               ) : (
                 proposalCards.map((proposal) => {
                   const statusLabels = {
-                    for_approval: { label: '📋 For Approval', color: '#d97706' },
-                    draft: { label: '📝 For Publishing', color: '#64748b' },
-                    rejected: { label: '❌ Rejected', color: '#dc2626' },
-                    approved: { label: '✅ Approved', color: '#16a34a' },
+                    for_approval: { label: 'ðŸ"‹ For Approval', color: '#d97706' },
+                    draft: { label: 'ðŸ" For Publishing', color: '#64748b' },
+                    rejected: { label: 'âŒ Rejected', color: '#dc2626' },
+                    approved: { label: 'âœ… Approved', color: '#16a34a' },
                   };
                   const statusInfo = statusLabels[proposal.status] || { label: proposal.status, color: '#64748b' };
                   const typeLabel = proposal.projectType === 'sl' ? 'Service Learning' : proposal.projectType === 'ce' ? 'Community Engagement' : '';
@@ -670,12 +780,26 @@ const StudentHome = () => {
                         <h3 className="mission-card-title">{proposal.title}</h3>
                         <div className="mission-card-meta">
                           {typeLabel && (
-                            <span className="mission-card-date">🗂️ {typeLabel}</span>
+                            <span className="mission-card-date">{typeLabel}</span>
                           )}
                           <span className="mission-card-date">
-                            📅 {formatDate(proposal.targetDate) || "Date TBA"}
+                            <CalendarTodayOutlinedIcon style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 3 }} />
+                            {formatDate(proposal.targetDate) || "Date TBA"}
                           </span>
+                          {proposal.location && (
+                            <span className="mission-card-location">
+                              <PlaceOutlinedIcon style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 3 }} />
+                              {proposal.location}
+                            </span>
+                          )}
                         </div>
+                        {Array.isArray(proposal.stakeholders) && proposal.stakeholders.length > 0 && (
+                          <div className="mission-tags-row">
+                            {proposal.stakeholders.map((s, i) => (
+                              <span key={i} className="mission-tag">{s}</span>
+                            ))}
+                          </div>
+                        )}
                         <div style={{ marginTop: 6, fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic' }}>
                           {getProposalStatusLine(proposal)}
                         </div>
@@ -686,7 +810,7 @@ const StudentHome = () => {
               )
             ) : filteredMissions.length === 0 ? (
               <div className="mission-empty-state">
-                <span className="mission-empty-icon">🔍</span>
+                <span className="mission-empty-icon">&#128269;</span>
                 <p>{activeTab === "your" ? "You haven't joined any missions yet." : "No missions available right now."}</p>
               </div>
             ) : (
@@ -715,7 +839,7 @@ const StudentHome = () => {
                   }}
                 >
                   {enrolledMissions[mission.id] === "pending" && (
-                    <span className="mission-enrolled-badge pending">⏳ Requesting</span>
+                    <span className="mission-enrolled-badge pending">Requesting</span>
                   )}
                   {enrolledMissions[mission.id] === "approved" && (
                     <span className="mission-enrolled-badge">Enrolled</span>
@@ -727,8 +851,15 @@ const StudentHome = () => {
                     <h3 className="mission-card-title">{mission.title}</h3>
                     <div className="mission-card-meta">
                       <span className="mission-card-date">
-                        📅 {formatDate(mission.targetDate || mission.targetDates) || "Date TBA"}
+                        <CalendarTodayOutlinedIcon style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 3 }} />
+                        {formatDate(mission.targetDate || mission.targetDates) || "Date TBA"}
                       </span>
+                      {mission.location && (
+                        <span className="mission-card-location">
+                          <PlaceOutlinedIcon style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 3 }} />
+                          {mission.location}
+                        </span>
+                      )}
                       {(() => {
                         const info = volunteerInfo[mission.id];
                         const count = info?.count ?? 0;
@@ -737,6 +868,7 @@ const StudentHome = () => {
                         if (count === 0) return null;
                         return (
                           <div className="vol-preview">
+                            
                             {preview.map((vol, i) => (
                               <div
                                 key={i}
@@ -752,105 +884,25 @@ const StudentHome = () => {
                             {extra > 0 && (
                               <div className="vol-bubble vol-bubble-extra">+{extra}</div>
                             )}
-                            <span className="vol-joined-text">joined</span>
+                            <span className="vol-joined-text">{count} joined</span>
                           </div>
                         );
                       })()}
                     </div>
+                    {Array.isArray(mission.stakeholders) && mission.stakeholders.length > 0 && (
+                      <div className="mission-tags-row">
+                        {mission.stakeholders.map((s, i) => (
+                          <span key={i} className="mission-tag">{s}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
             )}
           </div>
         </section>
-        {/* LEADERBOARD */}
-        <section id="leaderboard-section" ref={leaderboardSectionRef} className="leaderboard-section" aria-label="Leaderboard" style={{ backgroundImage: `linear-gradient(to bottom, #d1efff 10%, transparent 10%), url(${cloudsBg})`, backgroundSize: '100% 100%, 100% auto', backgroundPosition: '0 0, center top', backgroundRepeat: 'no-repeat, no-repeat', backgroundColor: '#d1efff' }}>
-          <div className="leaderboard-body">
-            <div className="leaderboard-podium-col">
-              <h2 className="mission-section-title">Leaderboard</h2>
-              <p className="leaderboard-rank-text">
-                {currentUserRank ? `You are in ${getOrdinal(currentUserRank)} place.` : "Join a mission to get ranked!"}
-              </p>
-              <div className="leaderboard-podium">
-                {podium.map((user) => {
-                  const rank =
-                    user.uid === top1?.uid ? 1 :
-                      user.uid === top2?.uid ? 2 :
-                        3;
 
-                  return (
-                    <div
-                      key={user.uid}
-                      className={`podium-item rank-${rank}`}
-                    >
-                      <div className="podium-top">
-                        <div
-                          className="podium-avatar-wrap"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            navigate(`/profile/${user.uid}`);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              navigate(`/profile/${user.uid}`);
-                            }
-                          }}
-                        >
-                          {user.avatar ? <img src={user.avatar} alt={user.name} /> : (
-                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#30bdb7', color: '#fff', fontSize: 28, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}>
-                              {getInitials(user.name)}
-                            </div>
-                          )}
-                          <span className="podium-rank">{rank}</span>
-
-                        </div>
-
-                        <div className="podium-info">
-                          <div className="podium-name">{user.name}</div>
-                          <div className="podium-points">{user.points} pts</div>
-                        </div>
-                      </div>
-                      <div className={`podium-base rank-${rank}`}></div>
-                    </div>
-                  );
-                })}
-
-              </div>
-            </div>
-            <div className="leaderboard-list" ref={leaderboardListRef}>
-              {sortedLeaderboard.map((user, index) => {
-                const rank = index + 1;
-                return (
-                  <div
-                    key={user.uid}
-                    ref={user.uid === currentUserId ? currentUserRef : null}
-                    className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/profile/${user.uid}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        navigate(`/profile/${user.uid}`);
-                      }
-                    }}
-                  >
-                    <span className="rank-num">{rank}</span>
-                    {user.avatar
-                      ? <img src={user.avatar} alt={`${user.name}'s avatar`} className="leaderboard-avatar" />
-                      : <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#30bdb7', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', flexShrink: 0 }}>{getInitials(user.name)}</div>
-                    }
-                    <span className="rank-name">{user.name}</span>
-                    <span className="rank-points">{user.points} pts</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* MOUNTAIN - no content overlapping, sits at the very bottom */}
-          <img src={mountainBg} alt="" className="mountain-bg-div" />
-        </section>
 
       </div>
     </div>
@@ -883,12 +935,12 @@ const StudentHome = () => {
             <>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1f3b73' }}>
-                  {selectedProposalForView.projectType === 'sl' ? '📝 Service Learning Proposal' : '📝 Community Engagement Proposal'}
+                  {selectedProposalForView.projectType === 'sl' ? 'ðŸ" Service Learning Proposal' : 'ðŸ" Community Engagement Proposal'}
                 </h3>
                 <button
                   onClick={() => setSelectedProposalForView(null)}
                   style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#64748b', lineHeight: 1 }}
-                >✕</button>
+                >âœ•</button>
               </div>
               <div style={{ overflowY: 'auto', flex: 1 }}>
                 <ProjectProposal
@@ -939,8 +991,80 @@ const StudentHome = () => {
         </div>
       </div>
     )}
+
+    {/* Leaderboard See-All Modal */}
+    {showLeaderboardModal && (
+      <div
+        className="leaderboard-modal-overlay"
+        onClick={(e) => { if (e.target === e.currentTarget) { setShowLeaderboardModal(false); setLeaderboardSearch(''); } }}
+      >
+        <div className="leaderboard-modal">
+          <div className="leaderboard-modal-header">
+            <h3>Leaderboard</h3>
+            <button
+              onClick={() => { setShowLeaderboardModal(false); setLeaderboardSearch(''); }}
+              aria-label="Close leaderboard"
+            >x</button>
+          </div>
+          <div className="leaderboard-modal-search-wrap">
+            <input
+              className="leaderboard-search-input"
+              type="text"
+              placeholder="Search students..."
+              value={leaderboardSearch}
+              onChange={(e) => setLeaderboardSearch(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="leaderboard-modal-list">
+            {(() => {
+              const q = leaderboardSearch.toLowerCase().trim();
+              const filtered = sortedLeaderboard
+                .map((user, i) => ({ ...user, rank: i + 1 }))
+                .filter(u => !q || u.name.toLowerCase().includes(q));
+              if (filtered.length === 0) {
+                return (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
+                    No students found.
+                  </div>
+                );
+              }
+              return filtered.map((user) => (
+                <div
+                  key={user.uid}
+                  className={`leaderboard-row ${user.uid === currentUserId ? "is-current-user" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { navigate(`/profile/${user.uid}`); setShowLeaderboardModal(false); setLeaderboardSearch(''); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      navigate(`/profile/${user.uid}`);
+                      setShowLeaderboardModal(false);
+                      setLeaderboardSearch('');
+                    }
+                  }}
+                >
+                  <span className="rank-num">{user.rank}</span>
+                  {user.avatar ? (
+                    <img src={user.avatar} alt={`${user.name}'s avatar`} className="leaderboard-avatar" />
+                  ) : (
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#30bdb7', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', flexShrink: 0 }}>
+                      {getInitials(user.name)}
+                    </div>
+                  )}
+                  <span className="rank-name">{user.name}</span>
+                  <span className="rank-points">{user.points} pts</span>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
 
 export default StudentHome;
+
+

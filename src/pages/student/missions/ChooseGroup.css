@@ -31,16 +31,24 @@
 .choose-group-modal-close {
 	position: absolute;
 	top: 14px;
-	right: 18px;
-	background: none;
+	right: 14px;
+	background: #1f2937;
 	border: none;
-	font-size: 1.3rem;
+	border-radius: 50%;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 16px;
+	font-weight: 700;
 	cursor: pointer;
-	color: #888;
-	transition: color 0.2s;
+	color: #fff;
+	transition: background 0.15s, transform 0.15s;
 }
 .choose-group-modal-close:hover {
-	color: #222;
+	background: #374151;
+	transform: scale(1.05);
 }
 
 .choose-group-modal-actions {
