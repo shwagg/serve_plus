@@ -4,6 +4,7 @@ import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
 
+import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
 import Header from '../../../components/Header';
 import '../../../styles/student.css';
 import PreActivitySurvey from '../../../forms/PreActivitySurvey';
@@ -28,7 +29,16 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const [userName, setUserName] = useState('');
   const [userDepartment, setUserDepartment] = useState('');
   const [attendanceFlag, setAttendanceFlag] = useState(null); // { flagged: bool, expiry: Date, missionTitle: string }
+  const [copySuccess, setCopySuccess] = useState(false);
   const defaultBanner = mission1;
+
+  const handleShare = () => {
+    const url = `${window.location.origin}/event/${id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }).catch(() => {});
+  };
 
 
   // Fetch user's attendance flag status
@@ -229,25 +239,40 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               alt={mission.alt || "Event image"}
               onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = defaultBanner; }}
             />
-            {onClose && (
+            <div style={{ position: 'absolute', top: 10, right: 12, display: 'flex', gap: 8, alignItems: 'center', zIndex: 20 }}>
               <button
-                onClick={onClose}
+                onClick={handleShare}
                 style={{
-                  position: 'absolute', top: 10, right: 12,
-                  background: 'rgba(0,0,0,0.45)',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: 18,
-                  cursor: 'pointer', zIndex: 20,
-                  width: 32, height: 32,
-                  borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.55)',
+                  border: 'none', color: '#fff',
+                  cursor: 'pointer',
+                  width: 32, height: 32, borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  lineHeight: 1, fontWeight: 700,
-                  backdropFilter: 'blur(4px)',
+                  backdropFilter: 'blur(4px)', flexShrink: 0,
                 }}
-                aria-label="Close"
-              >✕</button>
-            )}
+                aria-label={copySuccess ? 'Copied!' : 'Copy event link'}
+                title={copySuccess ? 'Copied!' : 'Copy event link'}
+              >
+                {copySuccess
+                  ? <span style={{ fontSize: 15, fontWeight: 700 }}>✓</span>
+                  : <IosShareRoundedIcon sx={{ fontSize: 17 }} />}
+              </button>
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  style={{
+                    background: 'rgba(0,0,0,0.55)',
+                    border: 'none', color: '#fff',
+                    fontSize: 16, cursor: 'pointer',
+                    width: 32, height: 32, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1, fontWeight: 700,
+                    backdropFilter: 'blur(4px)', flexShrink: 0,
+                  }}
+                  aria-label="Close"
+                >✕</button>
+              )}
+            </div>
           </div>
           <div className="event-details-card" style={onClose ? { marginTop: -16, padding: '16px 28px 20px', transform: 'none', boxShadow: 'none' } : undefined}>
             <div className="event-details-grid" style={onClose ? { padding: '0', gap: '12px' } : undefined}>
@@ -401,18 +426,14 @@ export default function EventDetails({ onClose = null, missionId = null }) {
           <button
             onClick={() => setShowSurveyModal(false)}
             style={{
-              position: 'absolute',
-              top: 12,
-              right: 18,
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              color: '#888',
-              cursor: 'pointer',
-              zIndex: 10,
+              position: 'absolute', top: 12, right: 14,
+              background: '#1f2937', border: 'none', color: '#fff',
+              width: 32, height: 32, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 16, fontWeight: 700, cursor: 'pointer', zIndex: 10,
             }}
             aria-label="Close survey modal"
-          >×</button>
+          >✕</button>
           <div style={{ padding: '32px 24px 24px 24px' }}>
             <h2 style={{ color: '#23235b', fontWeight: 700, fontSize: 22, marginBottom: 18 }}>Before Joining: Pre-Activity Survey & Consent</h2>
             <PreActivitySurvey
