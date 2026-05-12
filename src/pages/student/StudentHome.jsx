@@ -469,7 +469,7 @@ const StudentHome = () => {
       <div className="content-page">
 
         {/* LANDING or PROMO POSTER PAGE */}
-        <section className="landing-section" aria-label="Featured programs">
+        {/*<section className="landing-section" aria-label="Featured programs">
           <div className="landing-promo-page">
             <img
               src={currentPromo.image}
@@ -518,25 +518,31 @@ const StudentHome = () => {
               <EastIcon />
             </button>
           </div>
-        </section>
+        </section>*/}
 
         {/* PROFILE LEVEL RANK */}
         <section className="player-strip" aria-label="Player stats">
           <div className="player-strip-inner">
             <div className="strip-compact-row">
+              {/* Level */}
               <span className="strip-level-text">Lv. {level}</span>
-              <div className="strip-xp-chip">{currentPoints}</div>
-              <div
-                className="level-bar strip-progress-bar"
-                role="progressbar"
-                aria-valuenow={getLevelInfo(currentPoints).progress}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div className="level-bar-fill" style={{ width: `${getLevelInfo(currentPoints).progress}%` }} />
+              {/* Progress bar with pts label inside */}
+              <div className="strip-pts-bar-wrap">
+                <div
+                  className="strip-pts-bar"
+                  role="progressbar"
+                  aria-valuenow={currentPoints % 100}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${currentPoints} points`}
+                >
+                  <div className="strip-pts-fill" style={{ width: `${currentPoints % 100}%` }} />
+                  <span className="strip-pts-text">{currentPoints} pts</span>
+                </div>
               </div>
-              <span className="strip-divider">|</span>
-              <span className="strip-missions-text">Missions <span className="strip-pipe">|</span> {completedMissions}</span>
+              <span className="strip-sep" aria-hidden="true">•</span>
+              {/* Mission count */}
+              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">Missions</span></span>
             </div>
           </div>
         </section>
@@ -566,18 +572,22 @@ const StudentHome = () => {
                     <div className="current-card-body">
                       <h3 className="current-card-title">{mission.title}</h3>
                       <span className="current-card-date">{formatDate(mission.targetDate || mission.targetDates) || 'Date TBA'}</span>
-                      {count > 0 && (
-                        <div className="vol-preview">
-                          {preview.map((vol, i) => (
-                            <div key={i} className="vol-bubble" style={{ zIndex: preview.length - i, background: vol.avatar ? undefined : '#30bdb7' }}>
-                              {vol.avatar ? <img src={vol.avatar} alt="" /> : <span>{getInitials(vol.name)}</span>}
-                            </div>
-                          ))}
-                          {extra > 0 && <div className="vol-bubble vol-bubble-extra">+{extra}</div>}
-                          <span className="vol-joined-text">joined</span>
-                        </div>
-                      )}
-                      <span className="current-card-status">Status: {mission.status === 'published' ? 'Open' : mission.status}</span>
+                      {(() => {
+                        const detail = enrollmentDetails[mission.id];
+                        const p = detail?.progress || {};
+                        const consentDone = p.consent && p.consent !== 'locked';
+                        const preSurveyDone = p.preSurvey && p.preSurvey !== 'locked';
+                        return (
+                          <div className="current-card-steps">
+                            <span className={`step-badge ${consentDone ? 'done' : ''}`}>
+                              {consentDone ? '✓' : '○'} Consent
+                            </span>
+                            <span className={`step-badge ${preSurveyDone ? 'done' : ''}`}>
+                              {preSurveyDone ? '✓' : '○'} Pre-Survey
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="current-card-progress">
                       <ProgressRing percent={progressPct} />

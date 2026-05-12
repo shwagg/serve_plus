@@ -538,7 +538,7 @@
 .cert-link:hover { background: #d97706; }
 
 /* PDF layout moved into CSS for off-DOM capture */
-.portfolio-pdf { position: fixed; left: -9999px; top: 0; width: 794px; background: #fff; font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; padding: 0; }
+.portfolio-pdf { position: fixed; left: -9999px; top: 0; width: 794px; background: #fff; font-family: 'Inter', Helvetica, Arial, sans-serif; color: #1a1a2e; padding: 0; }
 .pdf-header-banner { background: linear-gradient(135deg, #234e7b 0%, #30bdb7 100%); padding: 36px 40px 28px; }
 .pdf-header-banner img { object-fit: cover; }
 .pdf-header-meta { margin-left: auto; text-align: right; }

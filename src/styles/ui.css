@@ -83,7 +83,7 @@
   /*color: #1f2937;*/
   color: #1f3c88;
   text-align: center;
-  font-family: 'Inter', system-ui, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
 }
 .ui-title-to { /*"login 'TO' serve"*/
   color: #9fa1a4;
@@ -148,7 +148,7 @@ input {
 .ui-btn {
   width: 180px;
   height: 38px;
-  border-radius: 32px; /*modern roundness*/
+  border-radius: 10px; /*modern roundness*/
   background: #30bdb7;
   border: 1.5px solid #30bdb7; 
   color: #ffffff;
@@ -396,7 +396,7 @@ input {
 .reg-name-row {
   display: flex;
   gap: 8px;
-  width: 100%;
+  width: 85%;
   max-width: 420px;
 }
 
@@ -467,10 +467,15 @@ input {
   height: 40px;
   font-size: 13px;
   max-width: 340px;
+  border-radius: 10px;
 }
 
 .auth-form-panel .ui-input-pass-wrap {
   max-width: 340px;
+}
+
+.auth-form-panel .ui-input-prefix-wrap {
+  border-radius: 10px;
 }
 
 .auth-form-panel .ui-form {
@@ -496,40 +501,44 @@ input {
   font-weight: 800;
   color: #1e293b;
   letter-spacing: -0.5px;
-  font-family: 'Inter', system-ui, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
 }
 
 .auth-logo-plus {
   color: #93bc3c;
 }
 
-/* Blackboard button */
+/* Blackboard / Google SSO buttons */
 .auth-bbl-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   width: 100%;
   max-width: 340px;
-  height: 40px;
-  border-radius: 50px;
-  border: 1.5px solid #e2e8f0;
-  background: #f1f5f9;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
   color: #1e293b;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
-.auth-bbl-btn img {
-  width: 18px;
-  height: 18px;
+.auth-sso-icon {
+  position: absolute;
+  left: 14px;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .auth-bbl-btn:hover {
-  background: #e8edf3;
-  border-color: #cbd5e1;
+  background: #e9ecef;
+  border-color: #d1d5db;
 }
 
 .auth-bbl-btn:focus {
@@ -542,7 +551,7 @@ input {
   width: 100%;
   max-width: 340px;
   height: 42px;
-  border-radius: 50px;
+  border-radius: 10px;
   background: #30bdb7;
   border: none;
   color: #fff;
@@ -558,6 +567,30 @@ input {
 }
 
 .auth-login-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(48, 189, 183, 0.25);
+}
+
+/* Continue with email button */
+.auth-email-btn {
+  width: 100%;
+  max-width: 340px;
+  height: 44px;
+  border-radius: 10px;
+  background: #30bdb7;
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.auth-email-btn:hover {
+  filter: brightness(0.95);
+}
+
+.auth-email-btn:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(48, 189, 183, 0.25);
 }

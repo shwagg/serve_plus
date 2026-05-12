@@ -46,6 +46,9 @@
   font-weight: 600;
   color: #111827;
   white-space: nowrap;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .header-container {
   max-width: 100%;
@@ -63,7 +66,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   background: none;
   border: none;
   cursor: pointer;
@@ -91,7 +95,7 @@
 }
 .logo-icon img {
   object-fit: contain;
-  height: 46px;
+  height: 80px;
   width: auto;
   max-width: 100%;
   flex-shrink: 1;
@@ -110,6 +114,7 @@
 .header-actions {
   display: flex;
   align-items: center;
+  gap: 8px;
   gap: 8px;
   flex: 0 0 auto;
   flex-shrink: 0;
@@ -152,22 +157,56 @@
 .icon-button:active {
   transform: scale(0.95);
 }
-/* Profile button overrides — must come after .icon-button to win specificity order */
-button.icon-button.profile-btn {
+/* Profile button is wider than a plain icon — override the fixed 36px width */
+.icon-button.profile-btn {
   width: auto;
-  height: auto;
-  min-width: unset;
-  min-height: unset;
-  border-radius: 20px;
+  min-width: 36px;
 }
 /* Responsive Design */
 @media (max-width: 768px) {
+  .header-container {
+    padding: 0 12px;
+  }
+  .header-actions {
+    gap: 6px;
+  }
+  .header-logo {
+    max-width: 50%;
+  }
   .logo-icon img {
-    height: 38px;
+    height: 70px;
+    max-width: 100%;
+  }
+  .icon-button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+  .notification-bell-button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+}
+@media (max-width: 540px) {
+  /* Hide greeting text on small screens to prevent overflow */
+  .header-greeting {
+    display: none;
+  }
+  .profile-btn {
+    padding: 4px;
+    min-width: 36px;
+  }
+  .header-actions {
+    gap: 4px;
   }
   .icon-button {
     width: 32px;
     height: 32px;
+    min-width: 32px;
+    min-height: 32px;
   }
   .notification-bell-button {
     width: 32px;
@@ -177,18 +216,30 @@ button.icon-button.profile-btn {
   }
 }
 @media (max-width: 480px) {
+  .header-container {
+    padding: 0 10px;
+  }
+  .header-logo {
+    max-width: 45%;
+  }
   .logo-icon img {
-    height: 34px;
+    height: 60px;
+    max-width: 100%;
+  }
+  .header-actions {
+    gap: 2px;
   }
   .icon-button {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
   }
   .notification-bell-button {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    min-height: 28px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
   }
 }
 
@@ -212,7 +263,7 @@ button.icon-button.profile-btn {
   max-width: 460px;
   width: 90%;
   box-shadow: 0 2px 16px rgba(44, 62, 80, 0.08), 0 1.5px 4px rgba(44, 62, 80, 0.04);
-  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
   overflow: hidden;
 }
 

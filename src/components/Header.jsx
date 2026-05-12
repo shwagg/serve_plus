@@ -7,7 +7,7 @@ import { httpsCallable } from 'firebase/functions';
 import { useSession } from '../context/SessionContext';
 import './Header.css';
 import NotificationBell from './NotificationBell';
-import serveIcon from '../assets/serve_plus_logo.svg';
+import serveIcon from '../assets/serve_plus_logo_black.svg';
 import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';

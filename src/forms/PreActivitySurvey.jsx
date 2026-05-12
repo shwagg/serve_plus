@@ -206,7 +206,7 @@ const PreActivitySurvey = ({
           flex-direction: column;
           gap: 22px;
           color: #222;
-          font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+          font-family: 'Inter', Helvetica, Arial, sans-serif;
         }
         .pre-activity-survey-form h2 {
           font-size: 1.25rem;

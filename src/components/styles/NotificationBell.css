@@ -39,8 +39,14 @@
   box-sizing: border-box;
 }
 
+.notification-bell-button img {
+  filter: brightness(0) opacity(0.8);
+}
 .notification-bell-button:hover {
   background: rgba(0, 188, 212, 0.1);
+}
+.notification-bell-button:hover img {
+  filter: brightness(0) opacity(1);
 }
 
 .notification-bell-button:focus-visible {
