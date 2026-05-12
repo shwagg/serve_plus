@@ -78,13 +78,25 @@
 }
 
 .ap-cancel-modal__close {
-  background: none;
+  background: #1f2937;
   border: none;
-  font-size: 20px;
-  cursor: pointer;
-  color: #6b7280;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.15s;
 }
+.ap-cancel-modal__close:hover { background: #374151; transform: scale(1.05); }
 .ap-cancel-modal__close:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -191,13 +203,25 @@
 }
 
 .ap-edit-modal__close {
-  background: none;
+  background: #1f2937;
   border: none;
-  font-size: 20px;
-  cursor: pointer;
-  color: #6b7280;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.15s;
 }
+.ap-edit-modal__close:hover { background: #374151; transform: scale(1.05); }
 
 .ap-edit-modal__locked {
   padding: 32px;

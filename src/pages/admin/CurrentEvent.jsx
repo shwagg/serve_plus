@@ -148,6 +148,11 @@ export default function CurrentEvent() {
   const [flagResult, setFlagResult] = useState(null);
   const [togglingAttendance, setTogglingAttendance] = useState({});
 
+  // ── edit details state ────────────────────────────────────────────
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editDetailsData, setEditDetailsData] = useState({});
+  const [savingDetails, setSavingDetails] = useState(false);
+
   // ── doc library answer modal state ────────────────────────────────
   // (handled by MissionSubmissionsTable)
 
@@ -210,11 +215,65 @@ export default function CurrentEvent() {
     if (!missionId) return;
     getDoc(doc(db, "missions", missionId)).then(d => {
       if (d.exists()) {
-        setMissionTitle(d.data().title || "Event");
-        setMissionData({ id: d.id, ...d.data() });
+        const data = d.data();
+        setMissionTitle(data.title || "Event");
+        setMissionData({ id: d.id, ...data });
+        setEditDetailsData({
+          title: data.title || "",
+          description: data.description || "",
+          objectives: data.objectives || "",
+          location: data.location || "",
+          targetDate: data.targetDate || "",
+          volunteerHours: data.volunteerHours ? String(data.volunteerHours) : "",
+          budget: data.budget || "",
+          stakeholdersText: Array.isArray(data.stakeholders)
+            ? data.stakeholders.join("\n") : (data.stakeholders || ""),
+          partnerSchool: data.partnerSchool || data.partnerName || "",
+          affiliatedDepartment: data.affiliatedDepartment || data.department || "",
+          studentOutcomes: data.studentOutcomes || "",
+        });
       }
     });
   }, [missionId]);
+
+  const handleSaveDetails = async () => {
+    if (!editDetailsData.title.trim()) { showToast("Title is required."); return; }
+    setSavingDetails(true);
+    try {
+      const stakeholdersArr = editDetailsData.stakeholdersText
+        .split("\n").map(s => s.trim()).filter(Boolean);
+      await updateDoc(doc(db, "missions", missionId), {
+        title: editDetailsData.title.trim(),
+        description: editDetailsData.description,
+        objectives: editDetailsData.objectives,
+        location: editDetailsData.location,
+        targetDate: editDetailsData.targetDate,
+        volunteerHours: parseInt(editDetailsData.volunteerHours) || 0,
+        budget: editDetailsData.budget,
+        stakeholders: stakeholdersArr,
+        partnerSchool: editDetailsData.partnerSchool,
+        affiliatedDepartment: editDetailsData.affiliatedDepartment,
+        studentOutcomes: editDetailsData.studentOutcomes,
+        updatedAt: serverTimestamp(),
+      });
+      logAudit({
+        action: "EVENT_DETAILS_UPDATED",
+        category: "event",
+        details: { missionId, missionTitle: editDetailsData.title },
+      });
+      const refreshed = await getDoc(doc(db, "missions", missionId));
+      if (refreshed.exists()) {
+        setMissionData({ id: refreshed.id, ...refreshed.data() });
+        setMissionTitle(refreshed.data().title || "Event");
+      }
+      showToast("Event details saved.");
+      setEditingDetails(false);
+    } catch {
+      showToast("Failed to save. Try again.");
+    } finally {
+      setSavingDetails(false);
+    }
+  };
 
   // ── auto-flag on list page load ───────────────────────────────────
   useEffect(() => {
@@ -1041,19 +1100,88 @@ export default function CurrentEvent() {
         {activeTab === "details" && (
           missionData ? (
             <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "0 28px" }}>
-                <DetailField label="Type"           value={typeLabel} />
-                <DetailField label="Target Date"    value={missionData.targetDate} />
-                <DetailField label="Start Time"     value={missionData.startTime} />
-                <DetailField label="Location"       value={missionData.location} />
-                <DetailField label="Department"     value={missionData.affiliatedDepartment || missionData.department} />
-                <DetailField label="Partner"        value={missionData.partnerSchool} />
-                <DetailField label="Prepared By"    value={missionData.preparedBy} />
-                <DetailField label="Max Volunteers" value={missionData.maxStudents} />
-                <DetailField label="Volunteer Hours" value={missionData.volunteerHours} />
-                <DetailField label="Points"         value={missionData.points} />
-                <DetailField label="Budget"         value={missionData.budget} />
-              </div>
+              {/* Edit / Save controls */}
+              {!isFaculty && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
+                  {!editingDetails ? (
+                    <button onClick={() => setEditingDetails(true)}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "#1f3b73", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                      Edit Details
+                    </button>
+                  ) : (
+                    <>
+                      <button onClick={handleSaveDetails} disabled={savingDetails}
+                        style={{ padding: "8px 20px", background: savingDetails ? "#9ca3af" : "#0D9488", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: "0.85rem", cursor: savingDetails ? "not-allowed" : "pointer" }}>
+                        {savingDetails ? "Saving…" : "✓ Save Changes"}
+                      </button>
+                      <button onClick={() => setEditingDetails(false)} disabled={savingDetails}
+                        style={{ padding: "8px 16px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 9, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {editingDetails ? (
+                /* ── Edit form ── */
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "0 32px" }}>
+                  {[
+                    { label: "Title *", key: "title", type: "text" },
+                    { label: "Location", key: "location", type: "text" },
+                    { label: "Target Date", key: "targetDate", type: "date" },
+                    { label: "Volunteer Hours", key: "volunteerHours", type: "number" },
+                    { label: "Partner School / Organization", key: "partnerSchool", type: "text" },
+                    { label: "Affiliated Department", key: "affiliatedDepartment", type: "text" },
+                  ].map(({ label, key, type }) => (
+                    <div key={key} style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 5 }}>{label}</div>
+                      <input type={type} value={editDetailsData[key] || ""}
+                        onChange={e => setEditDetailsData(p => ({ ...p, [key]: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: "0.9rem", fontFamily: "inherit", color: "#1e293b", outline: "none", boxSizing: "border-box" }}
+                        onFocus={e => e.target.style.borderColor = "#1f3b73"}
+                        onBlur={e => e.target.style.borderColor = "#e2e8f0"}
+                      />
+                    </div>
+                  ))}
+                  {[
+                    { label: "Description", key: "description", rows: 4 },
+                    { label: "Objectives", key: "objectives", rows: 4 },
+                    { label: "Budget", key: "budget", rows: 3 },
+                    { label: "Student Outcomes", key: "studentOutcomes", rows: 2 },
+                    { label: "Stakeholders (one per line)", key: "stakeholdersText", rows: 3 },
+                  ].map(({ label, key, rows }) => (
+                    <div key={key} style={{ marginBottom: 14, gridColumn: "1 / -1" }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 5 }}>{label}</div>
+                      <textarea rows={rows} value={editDetailsData[key] || ""}
+                        onChange={e => setEditDetailsData(p => ({ ...p, [key]: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: "0.9rem", fontFamily: "inherit", color: "#1e293b", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                        onFocus={e => e.target.style.borderColor = "#1f3b73"}
+                        onBlur={e => e.target.style.borderColor = "#e2e8f0"}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* ── Display view ── */
+                <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "0 28px" }}>
+                  <DetailField label="Type"           value={typeLabel} />
+                  <DetailField label="Target Date"    value={missionData.targetDate} />
+                  <DetailField label="Start Time"     value={missionData.startTime} />
+                  <DetailField label="Location"       value={missionData.location} />
+                  <DetailField label="Department"     value={missionData.affiliatedDepartment || missionData.department} />
+                  <DetailField label="Partner"        value={missionData.partnerSchool} />
+                  <DetailField label="Prepared By"    value={missionData.preparedBy} />
+                  <DetailField label="Max Volunteers" value={missionData.maxStudents} />
+                  <DetailField label="Volunteer Hours" value={missionData.volunteerHours} />
+                  <DetailField label="Points"         value={missionData.points} />
+                  <DetailField label="Budget"         value={missionData.budget} />
+                </div>
 
               {missionData.description && (
                 <div style={{ marginTop: 16, marginBottom: 12 }}>
@@ -1120,6 +1248,8 @@ export default function CurrentEvent() {
                   </div>
                 </div>
               )}
+              </>
+              )}
             </div>
           ) : (
             <div className="loading-message">Loading details…</div>
@@ -1144,7 +1274,7 @@ export default function CurrentEvent() {
               {/* header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #e5e7eb" }}>
                 <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#1e293b" }}>📍 Pick Attendance Location</h3>
-                <button onClick={() => setShowLocationPicker(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748b", lineHeight: 1 }}>✕</button>
+                <button onClick={() => setShowLocationPicker(false)} style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}>✕</button>
               </div>
               {/* hint */}
               <div style={{ padding: "8px 18px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: "0.78rem", color: "#475569" }}>
@@ -1204,7 +1334,7 @@ export default function CurrentEvent() {
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
                 <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📱 Attendance QR</h3>
-                <button onClick={() => setShowAttQR(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748b", lineHeight: 1 }}>✕</button>
+                <button onClick={() => setShowAttQR(false)} style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}>✕</button>
               </div>
               <div style={{ padding: "24px 20px", textAlign: "center" }}>
                 {missionData?.validQRTimestamp ? (
@@ -1283,7 +1413,7 @@ export default function CurrentEvent() {
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
                 <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📋 Partner Feedback QR</h3>
-                <button onClick={() => setShowFeedbackQR(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748b", lineHeight: 1 }}>✕</button>
+                <button onClick={() => setShowFeedbackQR(false)} style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}>✕</button>
               </div>
               <div style={{ padding: "20px", textAlign: "center" }}>
                 {/* status pill */}
@@ -1481,8 +1611,8 @@ export default function CurrentEvent() {
               <h3 style={{ margin: 0, fontSize: "1.1rem" }}>🚩 Flagged Absent Volunteers</h3>
               <button
                 onClick={() => setShowFlaggedModal(false)}
-                style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}
-              >×</button>
+                style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}
+              >✕</button>
             </div>
             {flaggedLoading ? (
               <div style={{ color: "#6b7280", padding: 16 }}>Loading…</div>

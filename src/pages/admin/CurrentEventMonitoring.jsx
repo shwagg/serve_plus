@@ -417,18 +417,14 @@ export default function CurrentEventMonitoring() {
                       >
                         <button
                           style={{
-                            position: 'absolute',
-                            top: 16,
-                            right: 16,
-                            background: 'none',
-                            border: 'none',
-                            fontSize: 22,
-                            cursor: 'pointer',
-                            color: '#23335b',
+                            position: 'absolute', top: 14, right: 14,
+                            background: '#1f2937', border: 'none', borderRadius: '50%',
+                            width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 16, fontWeight: 700, color: '#fff', cursor: 'pointer',
                           }}
                           onClick={() => setShowRosterModal(false)}
                         >
-                          ×
+                          ✕
                         </button>
                         <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Registered Volunteers</h2>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
@@ -557,18 +553,14 @@ export default function CurrentEventMonitoring() {
                         >
                           <button
                             style={{
-                              position: 'absolute',
-                              top: 16,
-                              right: 16,
-                              background: 'none',
-                              border: 'none',
-                              fontSize: 22,
-                              cursor: 'pointer',
-                              color: '#23335b',
+                              position: 'absolute', top: 14, right: 14,
+                              background: '#1f2937', border: 'none', borderRadius: '50%',
+                              width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 16, fontWeight: 700, color: '#fff', cursor: 'pointer',
                             }}
                             onClick={() => setShowPreSurveyAnalytics(false)}
                           >
-                            ×
+                            ✕
                           </button>
                           <ImpactMetrics
                             open={showPreSurveyAnalytics}
