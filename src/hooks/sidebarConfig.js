@@ -33,13 +33,6 @@ export const adminLinks = [
     ],
   },
   {
-    key: "forms",
-    label: "Forms",
-    children: [
-      { label: "Document Library", to: "/admin/documents" },
-    ],
-  },
-  {
     key: "system",
     label: "System",
     children: [
