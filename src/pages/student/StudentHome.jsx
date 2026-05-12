@@ -15,6 +15,7 @@ import { WestIcon, EastIcon, SearchRoundedIcon, CalendarTodayOutlinedIcon, Place
 import mission1 from '../../assets/mission1.jpg';
 import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
+import emptyFile from '../../assets/empty_file.svg';
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
   const radius = (size - stroke) / 2;
@@ -744,7 +745,7 @@ const StudentHome = () => {
             {activeTab === "proposals" ? (
               proposalCards.length === 0 ? (
                 <div className="mission-empty-state">
-                  <span className="mission-empty-icon">&#128269;</span>
+                  <img className="proposal-empty-image" src={emptyFile} alt="" aria-hidden="true" />
                   <p>You haven't created any proposals yet.</p>
                 </div>
               ) : (
