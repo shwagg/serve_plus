@@ -36,7 +36,7 @@ const STEPS = [
   },
 ];
 
-export default function OnboardingTutorial() {
+export default function OnboardingTutorial({ forceOpen = false, onClose }) {
   const { userData } = useContext(SessionContext);
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
@@ -53,6 +53,13 @@ export default function OnboardingTutorial() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (forceOpen) {
+      setStep(0);
+      setVisible(true);
+    }
+  }, [forceOpen]);
+
   // Only show for students/volunteers
   const role = userData?.role;
   if (role && role !== 'student') return null;
@@ -61,6 +68,7 @@ export default function OnboardingTutorial() {
     const user = auth.currentUser;
     if (user) localStorage.setItem(`serve_tutorial_seen_${user.uid}`, '1');
     setVisible(false);
+    onClose?.();
   };
 
   if (!visible) return null;

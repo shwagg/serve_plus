@@ -16,7 +16,7 @@ import SysAdminMenu from './menu/SysAdminMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
 import SettingsModal from './SettingsModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
-import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon } from './icons';
+import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon, HelpOutlineRoundedIcon } from './icons';
 import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 import OnboardingTutorial from './OnboardingTutorial';
@@ -83,6 +83,7 @@ export default function Header() {
   const [isCheckingPendingProposal, setIsCheckingPendingProposal] = useState(false);
   const [showCertificateQRModal, setShowCertificateQRModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const menuRef = useRef(null);
@@ -217,7 +218,7 @@ export default function Header() {
   };
   return (
     <>
-      <OnboardingTutorial />
+      <OnboardingTutorial forceOpen={showTutorial} onClose={() => setShowTutorial(false)} />
       <header className="serve-header">
         <div className="header-container">
           {/* Logo */}
@@ -228,6 +229,16 @@ export default function Header() {
           </button>
           {/* Right Side Icons */}
           <div className="header-actions">
+            {userRole === 'student' && (
+              <button
+                className="notification-bell-button"
+                aria-label="Help / Tutorial"
+                title="Help"
+                onClick={() => setShowTutorial(true)}
+              >
+                <HelpOutlineRoundedIcon style={{ fontSize: 24, color: '#000' }} />
+              </button>
+            )}
             <ChatModal />
             <NotificationBell />
             <div className="menu-container" ref={menuRef}>

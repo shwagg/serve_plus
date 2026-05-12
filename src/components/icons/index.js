@@ -37,6 +37,7 @@ import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import VolunteerActivismOutlinedIcon from '@mui/icons-material/VolunteerActivismOutlined';
 import LocalLibraryOutlinedIcon from '@mui/icons-material/LocalLibraryOutlined';
 import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined';
+import HelpOutlineRoundedIcon from '@mui/icons-material/HelpOutlineRounded';
 
 
 export {
@@ -74,4 +75,5 @@ export {
     VolunteerActivismOutlinedIcon,
     LocalLibraryOutlinedIcon,
     CloudSyncOutlinedIcon,
+    HelpOutlineRoundedIcon,
 };
