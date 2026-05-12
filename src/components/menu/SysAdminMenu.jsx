@@ -81,6 +81,13 @@ export default function SysAdminMenu({
         </button>
         <button
           className="menu-item"
+          onClick={() => handleMenuClick("/verify-certificate")}
+        >
+          <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
+          Verify Certificate
+        </button>
+        <button
+          className="menu-item"
           onClick={() => handleMenuClick("/global/menu/about")}
         >
           <img src={infoIcon} alt="About Us" className="menu-icon" />

@@ -1,347 +1,335 @@
-import React, { useState, useEffect } from "react";
-import { PDFDocument } from 'pdf-lib';
+﻿import React, { useState, useEffect, useRef, useCallback } from "react";
+import { PDFDocument } from "pdf-lib";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { app, db } from "../firebaseConfig";
 import { doc, collection, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import QRCode from 'qrcode';
+import QRCode from "qrcode";
 import { showToast } from "../utils/toast";
 import "./certificateGenerator.css";
 
-const today = new Date();
-const formattedDate = today.toLocaleDateString(undefined, {
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const courseOptions = [
-  "Service Learning Initiative",
-  "Community Engagement Event",
-  // Add more as needed
-];
+function generateCertificateId() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
+async function buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId }) {
+  const response = await fetch("/assets/SERVE+ Certificate.pdf");
+  if (!response.ok) throw new Error("Failed to fetch certificate template PDF.");
+  const existingPdfBytes = await response.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(existingPdfBytes);
+  const form = pdfDoc.getForm();
+
+  form.getTextField("text_1jfkq").setText(recipient || "");
+  form.getTextField("text_2rpme").setText(course || "");
+  form.getTextField("text_3ptnr").setText(date || "");
+  form.getTextField("text_4kyth").setText(loc || "");
+  form.getTextField("text_5nqbl").setText(day || "");
+  form.getTextField("text_6iyng").setText(month || "");
+  form.getTextField("text_7dgil").setText(year || "");
+  form.getTextField("text_10gqgh").setText(certId || "");
+  form.flatten();
+
+  const qrValue = JSON.stringify({ recipient, course, date, loc, day, month, year, certificateId: certId });
+  const qrDataUrl = await QRCode.toDataURL(qrValue, {
+    margin: 1,
+    width: 120,
+    color: { dark: "#000", light: "#0000" },
+  });
+  const pngImageBytes = await fetch(qrDataUrl).then((r) => r.arrayBuffer());
+  const pngImage = await pdfDoc.embedPng(pngImageBytes);
+  const page = pdfDoc.getPages()[0];
+  page.drawImage(pngImage, { x: 382, y: 55, width: 90, height: 90 });
+
+  const pdfBytes = await pdfDoc.save();
+  return new Blob([pdfBytes], { type: "application/pdf" });
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CertificateGenerator() {
   const location = useLocation();
   const navigate = useNavigate();
-  // Get userID and optionally recipient from navigation state (admin flow)
+
   const userID = location.state?.userID || "";
-  const initialRecipient = location.state?.recipient || "";
-  const [recipient, setRecipient] = useState(initialRecipient);
-  const [course, setCourse] = useState("");
+  const [recipient, setRecipient] = useState(location.state?.recipient || "");
+  const [course, setCourse] = useState(location.state?.course || "");
   const [date, setDate] = useState("");
   const [loc, setLoc] = useState("");
   const [day, setDay] = useState("");
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
 
-  // Pre-fill from navigation state if available
-  useEffect(() => {
-    if (location.state) {
-      if (location.state.recipient) setRecipient(location.state.recipient);
-      if (location.state.course) setCourse(location.state.course);
-    }
-  }, [location.state]);
+  // Live preview state
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const previewBlobRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  // Modal state for PDF preview
+  // Modal state (for fullscreen view)
   const [showModal, setShowModal] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState(null);
-  // Certificate ID state
-  const [certificateId, setCertificateId] = useState(null);
+  const [modalUrl, setModalUrl] = useState(null);
 
-  // Helper: Generate a unique certificate ID (UUID v4)
-  function generateCertificateId() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      var r = (Math.random() * 16) | 0,
-        v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  }
-
-  const fillCertificatePdfBlob = async (customCertId) => {
-    let existingPdfBytes;
+  // ── Live preview — debounced PDF generation ─────────────────────────────────
+  const generatePreview = useCallback(async () => {
+    setPreviewLoading(true);
     try {
-      const response = await fetch('/assets/SERVE+ Certificate.pdf');
-      if (!response.ok) {
-        throw new Error('Failed to fetch certificate template PDF.');
-      }
-      existingPdfBytes = await response.arrayBuffer();
+      const tempId = generateCertificateId();
+      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: tempId });
+      // Revoke previous blob URL
+      if (previewBlobRef.current) URL.revokeObjectURL(previewBlobRef.current);
+      const url = URL.createObjectURL(blob);
+      previewBlobRef.current = url;
+      setPreviewUrl(url);
     } catch (err) {
-      showToast('Error loading certificate template PDF. Please check the file path and try a hard refresh.');
-      throw err;
+      // Keep showing old preview on error
+    } finally {
+      setPreviewLoading(false);
     }
-    let pdfDoc;
+  }, [recipient, course, date, loc, day, month, year]);
+
+  useEffect(() => {
+    // Only auto-preview if at least recipient or course has a value
+    if (!recipient && !course && !loc && !day && !month && !year && !date) {
+      return;
+    }
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(generatePreview, 600);
+    return () => clearTimeout(debounceRef.current);
+  }, [generatePreview]);
+
+  // Cleanup blob on unmount
+  useEffect(() => {
+    return () => {
+      if (previewBlobRef.current) URL.revokeObjectURL(previewBlobRef.current);
+    };
+  }, []);
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
+
+  const handleOpenFullscreen = async () => {
     try {
-      pdfDoc = await PDFDocument.load(existingPdfBytes);
+      const tempId = generateCertificateId();
+      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: tempId });
+      if (modalUrl) URL.revokeObjectURL(modalUrl);
+      const url = URL.createObjectURL(blob);
+      setModalUrl(url);
+      setShowModal(true);
     } catch (err) {
-      showToast('Error parsing certificate template PDF. The file may be corrupted or not a valid PDF.');
-      throw err;
+      showToast("Error generating certificate preview: " + err.message);
     }
-    const form = pdfDoc.getForm();
-    try {
-      form.getTextField('text_1jfkq').setText(recipient || '');
-      form.getTextField('text_2rpme').setText(course || '');
-      form.getTextField('text_3ptnr').setText(date || '');
-      form.getTextField('text_4kyth').setText(loc || '');
-      form.getTextField('text_5nqbl').setText(day || '');
-      form.getTextField('text_6iyng').setText(month || '');
-      form.getTextField('text_7dgil').setText(year || '');
-      // Fill the certificate ID field
-      form.getTextField('text_10gqgh').setText(customCertId || '');
-      form.flatten();
-    } catch (err) {
-      showToast('Error filling certificate fields. Please check the field names in the PDF template.');
-      throw err;
-    }
-
-    // Generate QR code (encode certificate info or a verification URL)
-    const qrValue = JSON.stringify({ recipient, course, date, loc, day, month, year, certificateId: customCertId });
-    const qrDataUrl = await QRCode.toDataURL(qrValue, {
-      margin: 1,
-      width: 120,
-      color: {
-        dark: '#000', // QR code color (black)
-        light: '#0000' // Transparent background
-      }
-    });
-    const pngImageBytes = await fetch(qrDataUrl).then(res => res.arrayBuffer());
-    const pngImage = await pdfDoc.embedPng(pngImageBytes);
-
-    const pages = pdfDoc.getPages();
-    const page = pages[0];
-    
-    const qrX = 382; // Adjusted for 90x90 size
-    const qrY = 55;  // Adjusted for 90x90 size
-    const qrSize = 90; // Set QR code size to 90x90
-    page.drawImage(pngImage, {
-      x: qrX,
-      y: qrY,
-      width: qrSize,
-      height: qrSize,
-    });
-
-    const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: 'application/pdf' });
   };
 
-  // Helper: Fill PDF and return URL for preview
-  const fillCertificatePdf = async (customCertId) => {
-    const blob = await fillCertificatePdfBlob(customCertId);
-    return URL.createObjectURL(blob);
+  const handleCloseModal = () => {
+    setShowModal(false);
+    if (modalUrl) {
+      URL.revokeObjectURL(modalUrl);
+      setModalUrl(null);
+    }
   };
 
-  const handleDownload = async () => {
-    // Generate a certificate ID for preview (not saved)
-    const tempCertId = generateCertificateId();
-    setCertificateId(tempCertId);
-    const url = await fillCertificatePdf(tempCertId);
-    setPdfUrl(url);
-    setShowModal(true);
-  };
-
-  // Handler: Release to Student (save to Storage)
   const handleReleaseToStudent = async () => {
+    if (!userID) {
+      showToast("No volunteer selected. Please select a volunteer.");
+      return;
+    }
     try {
-      // Use userID from navigation state (admin flow)
-      if (!userID) {
-        showToast("No volunteer selected. Please select a volunteer.");
-        return;
-      }
-      // Generate a unique certificate ID
       const certId = generateCertificateId();
-      setCertificateId(certId);
-      // Compose file name: volunteername_eventname.pdf
       const safeRecipient = (recipient || "recipient").replace(/[^a-zA-Z0-9_\-]/g, "_");
       const safeCourse = (course || "event").replace(/[^a-zA-Z0-9_\-]/g, "_");
       const fileName = `${safeRecipient}_${safeCourse}.pdf`;
-      // Prepare certificate metadata for Firestore
-      const certData = {
-        fileName,
-        recipient,
-        course,
-        date,
-        loc,
-        day,
-        month,
-        year,
-        certificateId: certId,
-        releasedAt: serverTimestamp(),
-      };
-      // Save certificate metadata to Firestore under users/{userID}/certificates and get the doc ref
+
+      const certData = { fileName, recipient, course, date, loc, day, month, year, certificateId: certId, releasedAt: serverTimestamp() };
       const certDocRef = await addDoc(collection(doc(db, "users", userID), "certificates"), certData);
-      // Generate the PDF Blob with the Firestore certificate ID (use certDocRef.id if you want Firestore's auto ID, or certId if you want your generated one)
-      const blob = await fillCertificatePdfBlob(certId);
-      // Get Firebase Storage instance (emulator)
+
+      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId });
       const storage = getStorage(app);
       const storageRef = ref(storage, `event-certificates/${userID}/${fileName}`);
       await uploadBytes(storageRef, blob);
-      // Get download URL
       const downloadURL = await getDownloadURL(storageRef);
-      // Update Firestore doc with downloadURL
       await updateDoc(certDocRef, { downloadURL });
 
-      // Create notification for the student
       await addDoc(collection(doc(db, "users", userID), "notifications"), {
         type: "certificate_obtained",
         message: `Congratulations! A certificate has been obtained for event "${course}".`,
         event: course,
         createdAt: serverTimestamp(),
-        read: false
+        read: false,
       });
 
-      showToast("Certificate released to volunteer, saved to Storage, and recorded in Firestore!");
+      showToast("Certificate released to volunteer and recorded successfully!");
     } catch (err) {
       showToast("Failed to release certificate: " + err.message);
     }
   };
-  const handleCloseModal = () => {
-    setShowModal(false);
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
-      setPdfUrl(null);
-    }
-  };
+
+  const hasContent = recipient || course || date || loc || day || month || year;
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="certificate-generator-centered-container">
-      {/* Back Button */}
-      <div className="certificate-back-row">
-        <button className="certificate-back-btn" onClick={() => navigate(-1)}>
+    <div className="certgen-page">
+      {/* Top bar */}
+      <div className="certgen-topbar">
+        <button className="certgen-back-btn" onClick={() => navigate(-1)}>
           ← Back
         </button>
-        <div className="certificate-back-spacer" />
+        <span className="certgen-topbar-title">Certificate Generator</span>
       </div>
-      {/* Sample Preview Title at the very top */}
-      <div className="certificate-preview-title-row">
-        <span className="certificate-preview-title">Sample Preview</span>
-      </div>
-      {/* Modal Popup for PDF Preview */}
-      {showModal && pdfUrl && (
-        <div className="certificate-modal-overlay">
-          <div className="certificate-modal-content">
-            <button className="certificate-modal-close-btn" onClick={handleCloseModal}>X</button>
-            <h2 className="certificate-modal-title">SERVE+ Certificate PDF Preview</h2>
-            <iframe
-              src={pdfUrl}
-              title="Certificate PDF"
-              className="certificate-modal-iframe"
-            />
-            <a href={pdfUrl} download="Filled_CERTIFICATE.pdf" className="certificate-modal-download-link">Download PDF</a>
+
+      {/* Fullscreen modal */}
+      {showModal && modalUrl && (
+        <div className="certgen-modal-overlay" onClick={handleCloseModal}>
+          <div className="certgen-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="certgen-modal-header">
+              <h3>Certificate Preview</h3>
+              <button className="certgen-modal-close-btn" onClick={handleCloseModal}>✕</button>
+            </div>
+            <iframe src={modalUrl} title="Certificate PDF" className="certgen-modal-iframe" />
+            <div className="certgen-modal-footer">
+              <a href={modalUrl} download="SERVE+_Certificate.pdf" className="certgen-modal-download-link">
+                ↓ Download PDF
+              </a>
+            </div>
           </div>
         </div>
       )}
-      <div className="certificate-details-main-content">
-        <div className="certificate-details-form-container">
-          <h2>Certificate Details</h2>
 
-          <label>Recipient Name</label>
-          <input
-            type="text"
-            maxLength={50}
-            placeholder="Enter recipient name"
-            value={recipient}
-            onChange={e => setRecipient(e.target.value)}
-            className="text_4lt"
-          />
-          <div className="char-count">{recipient.length}/50 characters</div>
+      {/* Body */}
+      <div className="certgen-body">
+        {/* ── Left: Form card ── */}
+        <div className="certgen-form-card">
+          <div className="certgen-card-header">
+            <h2>Certificate Details</h2>
+          </div>
+          <div className="certgen-form-body">
+            {/* Recipient */}
+            <div className="certgen-field">
+              <label>Recipient Name</label>
+              <input
+                type="text"
+                maxLength={50}
+                placeholder="Enter recipient name"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+              />
+              <span className="certgen-char-count">{recipient.length}/50 characters</span>
+            </div>
 
-          <label>Mission Title</label>
-          <input
-            type="text"
-            placeholder="Enter mission title"
-            value={course}
-            onChange={e => setCourse(e.target.value)}
-            className="text_5ablb"
-          />
+            {/* Mission Title */}
+            <div className="certgen-field">
+              <label>Mission Title</label>
+              <input
+                type="text"
+                placeholder="Enter mission title"
+                value={course}
+                onChange={(e) => setCourse(e.target.value)}
+              />
+            </div>
 
-          <label>Date</label>
-          <input
-            type="date"
-            className="text_6sfji"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-          />
+            {/* Date */}
+            <div className="certgen-field">
+              <label>Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
 
-          <label>Location</label>
-          <input
-            type="text"
-            placeholder="Enter location"
-            className="text_7mfui"
-            value={loc}
-            onChange={e => setLoc(e.target.value)}
-          />
+            {/* Location */}
+            <div className="certgen-field">
+              <label>Location</label>
+              <input
+                type="text"
+                placeholder="Enter location"
+                value={loc}
+                onChange={(e) => setLoc(e.target.value)}
+              />
+            </div>
 
-          <label>Day</label>
-          <input
-            type="text"
-            placeholder="Day"
-            className="text_8bhoi"
-            value={day}
-            onChange={e => setDay(e.target.value)}
-          />
-
-          <label>Month</label>
-          <input
-            type="text"
-            placeholder="Month"
-            className="text_9gtoh"
-            value={month}
-            onChange={e => setMonth(e.target.value)}
-          />
-
-          <label>Year</label>
-          <input
-            type="text"
-            placeholder="Year"
-            className="text_10fuuc"
-            value={year}
-            onChange={e => setYear(e.target.value)}
-          />
-
-          <button className="download-btn" onClick={handleDownload}>
-            Download Certificate
-          </button>
-          <button className="release-btn" onClick={handleReleaseToStudent}>
-            Release to Volunteer
-          </button>
-        </div>
-        <div className="certificate-preview-panel">
-          <div className="certificate-border">
-            <div className="certificate-inner-border">
-              <div className="certificate-content" style={{ fontFamily: 'Georgia, serif', color: '#000' }}>
-                <h1 style={{ color: '#1a3764', fontSize: '2.5rem', fontWeight: 700, margin: 0, letterSpacing: 2 }}>CERTIFICATE</h1>
-                <h2 style={{ color: '#1a3764', fontSize: '2rem', fontWeight: 400, margin: 0, letterSpacing: 2 }}>OF PARTICIPATION</h2>
-                <div style={{ margin: '24px 0 12px 0', fontWeight: 700, fontSize: '1.3rem' }}>This certificate is proudly presented to</div>
-                <div style={{ borderTop: '3px solid #3ec6e0', width: '80%', margin: '0 auto 18px auto' }}></div>
-                <div className="cert-recipient text_4lt" style={{ fontSize: '1.5rem', fontWeight: 700, margin: '12px 0' }}>
-                  {recipient || "Recipient Name"}
-                </div>
-                <div style={{ borderTop: '1.5px solid #222', width: '80%', margin: '0 auto 18px auto' }}></div>
-                <div style={{ fontSize: '1.1rem', marginBottom: 8 }}>for actively participating in the</div>
-                <div className="text_5ablb" style={{ fontWeight: 600, fontSize: '1.1rem', marginBottom: 4 }}>
-                  {course || "[Mission Title / Event Name]"}
-                </div>
-                <div style={{ fontSize: '1rem', marginBottom: 8 }}>
-                  organized by the Center for Service Learning and Community engagement (CSCE)
-                </div>
-                <div style={{ fontSize: '1rem', marginBottom: 8 }}>
-                  held on <span className="text_6sfji">{date || '[Date]'}</span> at <span className="text_7mfui">{loc || '[Location]'}</span>.
-                </div>
-                <div style={{ fontSize: '1rem', marginBottom: 8 }}>
-                  Your dedication to service learning and commitment to making a positive impact in the community are truly commendable.
-                </div>
-                <div style={{ fontSize: '1rem', marginBottom: 24 }}>
-                  Given this <span className="text_8bhoi">{day || '[Day]'}</span> of <span className="text_9gtoh">{month || '[Month]'}</span>, <span className="text_10fuuc">{year || '[Year]'}</span>.
-                </div>
-                {/* Decorative seal placeholder */}
-                <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
-                  <div style={{ width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, #ffd700 60%, #e6a700 100%)', border: '4px solid #e6a700', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, color: '#b8860b' }}>★</div>
-                </div>
-                <div style={{ borderTop: '3px solid #3ec6e0', width: '80%', margin: '0 auto 18px auto' }}></div>
+            {/* Day / Month / Year row */}
+            <div className="certgen-row">
+              <div className="certgen-field">
+                <label>Day</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 12"
+                  value={day}
+                  onChange={(e) => setDay(e.target.value)}
+                />
+              </div>
+              <div className="certgen-field">
+                <label>Month</label>
+                <input
+                  type="text"
+                  placeholder="e.g. May"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                />
+              </div>
+              <div className="certgen-field">
+                <label>Year</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 2026"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                />
               </div>
             </div>
+
+            <hr className="certgen-divider" />
+
+            {/* Actions */}
+            <div className="certgen-actions">
+              <button className="certgen-btn-primary" onClick={handleOpenFullscreen}>
+                ↗ View Fullscreen
+              </button>
+              <button className="certgen-btn-success" onClick={handleReleaseToStudent}>
+                ✓ Release to Volunteer
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right: Live preview card ── */}
+        <div className="certgen-preview-card">
+          <div className="certgen-preview-header">
+            <h2>Live Preview</h2>
+            <span className="certgen-preview-badge">Real PDF</span>
+          </div>
+          <div className="certgen-preview-body">
+            {!hasContent && !previewUrl ? (
+              <div className="certgen-preview-placeholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                <p>Fill in the certificate details on the left<br/>to see a live PDF preview here.</p>
+              </div>
+            ) : previewLoading ? (
+              <div className="certgen-preview-loading">
+                <div className="certgen-spinner" />
+                <span>Generating preview…</span>
+              </div>
+            ) : previewUrl ? (
+              <iframe
+                key={previewUrl}
+                src={previewUrl}
+                title="Certificate Live Preview"
+                className="certgen-preview-iframe"
+              />
+            ) : null}
           </div>
         </div>
       </div>

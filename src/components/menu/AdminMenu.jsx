@@ -4,6 +4,7 @@ import infoIcon from "../../assets/menuassets/Info.svg";
 import privacyPol from "../../assets/menuassets/PrivacyPolicy.svg";
 import settingsIcon from "../../assets/menuassets/Settings.svg";
 import supportIcon from "../../assets/menuassets/Support.svg";
+import viewIcon from "../../assets/menuassets/View.svg";
 import "../styles/Menu.css";
 export default function AdminMenu({
   userName,
@@ -65,6 +66,13 @@ export default function AdminMenu({
         >
           <img src={supportIcon} alt="Support" className="menu-icon" />
           Support
+        </button>
+        <button
+          className="menu-item"
+          onClick={() => handleMenuClick("/verify-certificate")}
+        >
+          <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
+          Verify Certificate
         </button>
         <button
           className="menu-item"
