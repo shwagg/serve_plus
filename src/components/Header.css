@@ -247,6 +247,18 @@
   }
 }
 
+/* Gradient fade below the header — same effect as scroll-fade-top in StudentHome */
+.header-fade-gradient {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: linear-gradient(to bottom, #d0edfc 8%, rgba(208, 237, 252, 0) 100%);
+  pointer-events: none;
+  z-index: 999;
+}
+
 /* Modal Styles */
 .cp-overlay {
   position: fixed;

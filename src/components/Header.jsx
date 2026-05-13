@@ -275,6 +275,7 @@ export default function Header() {
           </div>
         </div>
       </header>
+      <div className="header-fade-gradient" aria-hidden="true" />
       {userRole !== 'admin' && (
         <>
           <GlobalNotificationButton
