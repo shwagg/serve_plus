@@ -19,6 +19,7 @@ const sharedStyle = {
 export default function ToastContainer() {
   const [toasts, setToasts] = useState([]);
   const [confirm, setConfirm] = useState(null); // { message, resolve }
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const toastHandler = (e) => {
@@ -46,6 +47,14 @@ export default function ToastContainer() {
     };
   }, []);
 
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 600px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
+
   const removeToast = (id) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
@@ -56,23 +65,27 @@ export default function ToastContainer() {
   };
 
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', bottom: isMobile ? 14 : 32, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, pointerEvents: 'none', width: isMobile ? 'calc(100vw - 24px)' : 'auto', maxWidth: isMobile ? 'calc(100vw - 24px)' : 'none' }}>
 
       {/* Confirm dialog — shown above toasts */}
       {confirm && (
         <div style={{
           ...sharedStyle,
           padding: '10px 14px',
+          width: isMobile ? '100%' : undefined,
+          minWidth: isMobile ? 0 : sharedStyle.minWidth,
+          maxWidth: isMobile ? '100%' : sharedStyle.maxWidth,
           color: '#1a1a1a',
           pointerEvents: 'auto',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: isMobile ? 'stretch' : 'center',
+          flexDirection: isMobile ? 'column' : 'row',
           gap: 12,
         }}>
           <span style={{ flex: 1, lineHeight: 1.5, wordBreak: 'break-word', fontSize: 14 }}>
             {confirm.message}
           </span>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'flex-end' : 'initial' }}>
             <button
               onClick={() => handleConfirm(false)}
               onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
@@ -120,7 +133,11 @@ export default function ToastContainer() {
           style={{
             ...sharedStyle,
             color: '#1a1a1a',
-            padding: '14px 18px',
+            padding: isMobile ? '12px 14px' : '14px 18px',
+            width: isMobile ? '100%' : undefined,
+            minWidth: isMobile ? 0 : sharedStyle.minWidth,
+            maxWidth: isMobile ? '100%' : sharedStyle.maxWidth,
+            boxSizing: 'border-box',
             transform: t.visible ? 'translateY(0)' : 'translateY(20px)',
             opacity: t.visible ? 1 : 0,
             transition: 'transform 0.3s cubic-bezier(.2,.8,.4,1), opacity 0.25s',

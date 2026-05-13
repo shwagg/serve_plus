@@ -4,7 +4,7 @@ import jsQR from "jsqr";
 import { showToast } from "../utils/toast";
 import "./QRScanner.css";
 
-export default function QRScanner({ onScan }) {
+export default function QRScanner({ onScan, statusOverride }) {
   const scannerRef   = useRef(null);
   const html5QrRef   = useRef(null);
   const runningRef   = useRef(false);
@@ -115,6 +115,7 @@ export default function QRScanner({ onScan }) {
     active:       "Scanning…",
     error:        "Camera unavailable",
   }[cameraStatus] ?? cameraStatus;
+  const displayStatusLabel = statusOverride || statusLabel;
 
   return (
     <div className="qrs-wrapper">
@@ -123,7 +124,7 @@ export default function QRScanner({ onScan }) {
       <div className="qrs-status-bar">
         <span className={`qrs-status-dot ${cameraStatus}`} />
         <span className="qrs-status-label">Status</span>
-        <span className="qrs-status-text">{statusLabel}</span>
+        <span className="qrs-status-text">{displayStatusLabel}</span>
       </div>
 
       {/* Error */}
