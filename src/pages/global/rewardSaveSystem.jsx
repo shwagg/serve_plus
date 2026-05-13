@@ -59,16 +59,14 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     }
 
     const preData = preDoc.data();
-    const rawRole = preData.engagement?.participation || [];
+    const rawRole = preData.engagement?.participation;
 
-    if (!rawRole) {
+    if (!rawRole || (Array.isArray(rawRole) && rawRole.length === 0)) {
         throw new Error("Role not found.");
     }
 
-    const role = rawRole
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, "_");
+    // computeFinalPoints handles both string and array roles
+    const role = rawRole;
 
     const normalizedParticipation =
         volunteerData.participationStatus?.toLowerCase();
