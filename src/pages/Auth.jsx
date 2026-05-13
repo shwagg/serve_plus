@@ -2,8 +2,8 @@
 //After logging in, MFA are placed for admin since it has sensitive role such
 //as approving, publishing, issuing certificates, and other high impact actions.
 
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { getRedirectResult, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -18,6 +18,14 @@ import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import { auth, db, functions } from "../firebaseConfig";
 import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
+
+function getBlackboardRedirectPath(role) {
+  if (role === "admin") return "/admin/dashboard";
+  if (role === "sysadmin") return "/sysadmin/roster";
+  if (role === "faculty") return "/faculty/current-event";
+  if (role === "partner") return "/partner/dashboard";
+  return "/student/home";
+}
 
 function Auth() {
   const [loginId, setLoginId] = useState(""); // email or username
@@ -41,6 +49,71 @@ function Auth() {
   // Agreement modal state
   const [showAgreement, setShowAgreement] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(null); // stores role, uid, email, userCred
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const handleBlackboardRedirectResult = async () => {
+      try {
+        const userCred = await getRedirectResult(auth);
+        if (!userCred || cancelled) return;
+
+        const uid = userCred.user.uid;
+        const email = userCred.user.email || "";
+        console.log("Blackboard OIDC sign-in successful, uid:", uid);
+
+        const userRef = doc(db, "users", uid);
+        let userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            uid,
+            email,
+            name: userCred.user.displayName || email || "Blackboard User",
+            role: "student",
+            status: "active",
+            authProvider: "blackboard",
+            createdAt: new Date(),
+          });
+
+          userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) {
+            setError("Failed to create user profile.");
+            return;
+          }
+        }
+
+        const { role, status } = userSnap.data();
+        if (status !== "active") {
+          setError("Your account is blocked.");
+          return;
+        }
+
+        const logLogin = httpsCallable(functions, "logLogin");
+        logLogin({ uid }).catch((err) => console.warn("Audit log failed:", err));
+
+        const userAgreementVersion = userSnap.data().agreementVersion || null;
+        const currentVersion = await fetchCurrentAgreementVersion();
+        if (userAgreementVersion !== currentVersion) {
+          setPendingNavigation({ role, uid, email, userCred, authProvider: "blackboard" });
+          setShowAgreement(true);
+          return;
+        }
+
+        navigate(getBlackboardRedirectPath(role), { replace: true });
+      } catch (err) {
+        if (cancelled) return;
+        if (isDev) console.error("Blackboard OIDC login error:", err);
+        setError("Blackboard sign-in failed. Please try again.");
+      }
+    };
+
+    handleBlackboardRedirectResult();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDev, navigate]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -69,6 +142,16 @@ function Auth() {
       setEmailStatus(snap.empty ? "not-found" : "found");
     } catch {
       setEmailStatus(null);
+    }
+  };
+
+  const handleBlackboardLogin = async () => {
+    setError("");
+    try {
+      await initiateBlackboardAuth();
+    } catch (err) {
+      if (isDev) console.error("Blackboard OIDC redirect error:", err);
+      setError("Blackboard sign-in could not start. Please try again.");
     }
   };
 
@@ -348,6 +431,12 @@ function Auth() {
     setShowAgreement(false);
     if (!pendingNavigation) return;
 
+    if (pendingNavigation.authProvider === "blackboard") {
+      navigate(getBlackboardRedirectPath(pendingNavigation.role), { replace: true });
+      setPendingNavigation(null);
+      return;
+    }
+
     const { role, email: userCred } = pendingNavigation;
 
     if (role === "admin" || role === "sysadmin") {
@@ -418,7 +507,7 @@ function Auth() {
                   </span> 
                 </div><br />
 
-                <button className="auth-bbl-btn" type="button" onClick={initiateBlackboardAuth}>
+                <button className="auth-bbl-btn" type="button" onClick={handleBlackboardLogin}>
                   <img src={bbl_icon} alt="" className="auth-sso-icon" />
                   Login with Blackboard
                 </button>
