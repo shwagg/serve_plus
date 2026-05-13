@@ -598,25 +598,30 @@ input {
 }
 
 
-/* Responsive: poster becomes full background, form becomes a white card */
+/* Responsive auth layout for phones */
 @media (max-width: 768px) {
   .auth-page {
-    background: #f6eedc;
+    min-height: 100dvh;
+    height: auto;
+    overflow-y: auto;
+    background: #f8fafc;
     align-items: center;
     justify-content: center;
+    padding: 18px;
   }
 
   .auth-split {
     position: relative;
     width: 100%;
-    height: 100vh;
+    min-height: calc(100dvh - 36px);
+    height: auto;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .auth-poster-panel {
-    display: block;
+    display: none;
     position: absolute;
     inset: 0;
     margin: 0;
@@ -639,12 +644,77 @@ input {
     position: relative;
     z-index: 1;
     flex: none;
-    width: calc(100% - 2.5rem);
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
-    padding: 1.5rem;
-    max-height: 90vh;
-    overflow-y: auto;
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 22px 18px;
+    max-height: none;
+    overflow: visible;
+    box-shadow: 0 16px 45px rgba(15, 23, 42, 0.12);
+  }
+
+  .auth-login-form {
+    max-width: none;
+    gap: 12px;
+  }
+
+  .auth-logo-row {
+    margin-bottom: 2px;
+  }
+
+  .auth-logo-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .auth-logo-text {
+    font-size: 19px;
+  }
+
+  .auth-form-panel .ui-input,
+  .auth-form-panel .ui-input-pass-wrap,
+  .auth-bbl-btn,
+  .auth-login-btn,
+  .auth-email-btn,
+  .auth-form-panel .divider {
+    max-width: 100%;
+  }
+
+  .auth-bbl-btn,
+  .auth-login-btn,
+  .auth-email-btn {
+    min-height: 44px;
+  }
+
+  .divider {
+    margin: 10px 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .auth-page {
+    padding: 10px;
+  }
+
+  .auth-form-panel {
+    padding: 18px 14px;
+    border-radius: 14px;
+  }
+
+  .auth-sso-icon {
+    left: 10px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .auth-poster-panel {
+    margin: 0 18px;
+    padding-left: 1rem;
+  }
+
+  .auth-form-panel {
+    flex-basis: 54%;
   }
 }
 
