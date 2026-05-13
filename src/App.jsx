@@ -5,7 +5,8 @@ import {
   Routes,
 } from "react-router-dom";
 import { SessionProvider, SessionContext } from "./context/SessionContext";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useOverdueReflectionNotifications } from "./hooks/useOverdueReflectionNotifications";
 import { useUpcomingEventNotifications } from "./hooks/useUpcomingEventNotifications";
 import PrivacyPolicy from "./pages/global/agreement/PrivacyPolicy";
@@ -54,10 +55,14 @@ import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import StudentHome from "./pages/student/StudentHome";
 import VerifyCertificatePage from "./pages/VerifyCertificatePage";
 
-/** Renders the badge earned popup; must live inside SessionProvider to access context */
+/** Renders the badge earned popup; subscribes to Firebase Auth state for the UID */
 function BadgePopupManager() {
-  const { user } = useContext(SessionContext);
-  const { badgeQueue, dismissBadge } = useBadgeEarnedPopup(user?.uid);
+  const [uid, setUid] = useState(null);
+  useEffect(() => {
+    const auth = getAuth();
+    return onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null));
+  }, []);
+  const { badgeQueue, dismissBadge } = useBadgeEarnedPopup(uid);
   return <BadgeEarnedModal badgeQueue={badgeQueue} onDismiss={dismissBadge} />;
 }
 

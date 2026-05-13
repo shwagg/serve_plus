@@ -45,7 +45,7 @@ export default function EventActivity() {
 
     return (
       <div className={`requirement-item ${status}`} role="listitem">
-        <span className="req-label">{label}</span>
+        <span className="req-label">{label} <span style={{ color: '#aaa', fontSize: '0.82em', fontWeight: 500 }}>+5</span></span>
 
         {isLocked && <span className="req-status muted" aria-label="Locked">🔒 Locked</span>}
         {status === "pending" && <span className="req-status pending">Pending</span>}
@@ -349,6 +349,7 @@ export default function EventActivity() {
   const [editingJournalId, setEditingJournalId] = useState(null);
   const [editingJournalText, setEditingJournalText] = useState("");
   const [enrolledTasks, setEnrolledTasks] = useState({});
+  const [tasks, setTasks] = useState([]);
   const [volunteerProgress, setVolunteerProgress] = useState(null);
   const [volunteerCount, setVolunteerCount] = useState(null);
   const [volunteerAvatars, setVolunteerAvatars] = useState([]);
@@ -361,6 +362,8 @@ export default function EventActivity() {
   const [timerNow, setTimerNow] = useState(Date.now());
   const [playerStripPortal, setPlayerStripPortal] = useState(null);
   const [activeNav, setActiveNav] = useState('content');
+  const [requirementBonusEarned, setRequirementBonusEarned] = useState({});
+  const hasAwardedPendingRef = useRef(false);
 
   const compareParticipantsByEnrollment = useCallback((a, b) => {
     const aData = a?.data ? a.data() : a;
@@ -399,6 +402,55 @@ export default function EventActivity() {
     const el = document.getElementById('header-center-slot');
     if (el) setPlayerStripPortal(el);
   }, []);
+
+  // Award pending task points when all requirements are finally completed
+  useEffect(() => {
+    const allDone =
+      volunteerProgress?.preSurvey === 'submitted' &&
+      (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') &&
+      volunteerProgress?.attendance === 'present' &&
+      volunteerProgress?.postSurvey === 'submitted';
+
+    if (!allDone || hasAwardedPendingRef.current || !tasks.length) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    hasAwardedPendingRef.current = true;
+
+    (async () => {
+      let totalAdded = 0;
+      for (const task of tasks) {
+        if (!enrolledTasks[task.id]) continue;
+        try {
+          const participantRef = doc(db, "missions", id, "task", task.id, "participants", user.uid);
+          const participantSnap = await getDoc(participantRef);
+          if (!participantSnap.exists()) continue;
+          const data = participantSnap.data();
+          const pending = Number(data.pendingPoints) || 0;
+          if (!String(data.reflection || '').trim() || pending <= 0) continue;
+
+          await updateDoc(participantRef, {
+            pointsEarned: pending,
+            pendingPoints: deleteField(),
+          });
+          await setDoc(
+            doc(db, "missions", id, "volunteer", user.uid),
+            { pointsEarned: increment(pending) },
+            { merge: true },
+          );
+          await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(pending) });
+          totalAdded += pending;
+        } catch (e) {
+          console.warn("Failed to award pending task points for task", task.id, e);
+        }
+      }
+      if (totalAdded > 0) {
+        setTotalPointsEarned(prev => prev + totalAdded);
+        window.showToast?.(`+${totalAdded} pts unlocked! All requirements complete.`, 'success');
+      }
+    })();
+  }, [volunteerProgress?.preSurvey, volunteerProgress?.consent, volunteerProgress?.attendance, volunteerProgress?.postSurvey, tasks, enrolledTasks]);
 
   const canJoinActivities = true;
   const toggleTaskExpand = (taskId) => setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
@@ -555,6 +607,11 @@ export default function EventActivity() {
           });
         });
         const groupPoints = Number(activity.points) || 0;
+        const allRequirementsDoneForGroup =
+          volunteerProgress?.preSurvey === 'submitted' &&
+          (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') &&
+          volunteerProgress?.attendance === 'present' &&
+          volunteerProgress?.postSurvey === 'submitted';
 
         const groupParticipantsRef = collection(
           db,
@@ -576,19 +633,20 @@ export default function EventActivity() {
           const targetParticipantRef = groupParticipantDoc.ref;
           const targetParticipantData = groupParticipantDoc.data() || {};
           const currentPoints = Number(targetParticipantData.pointsEarned) || 0;
-          const pointsToAdd = Math.max(groupPoints - currentPoints, 0);
+          const pointsToAdd = allRequirementsDoneForGroup ? Math.max(groupPoints - currentPoints, 0) : 0;
 
           try {
             await updateDoc(targetParticipantRef, {
               status: "completed",
               reflection: reflectionText,
-              pointsEarned: groupPoints,
+              pointsEarned: allRequirementsDoneForGroup ? groupPoints : 0,
+              ...(allRequirementsDoneForGroup ? { pendingPoints: deleteField() } : { pendingPoints: groupPoints }),
               completedAt: targetParticipantData.completedAt || submittedAt,
               lastUpdated: submittedAt,
               groupId,
             });
 
-            if (pointsToAdd > 0) {
+            if (allRequirementsDoneForGroup && pointsToAdd > 0) {
               await setDoc(
                 doc(db, "missions", id, "volunteer", groupParticipantDoc.id),
                 {
@@ -600,7 +658,7 @@ export default function EventActivity() {
 
             if (groupParticipantDoc.id === user.uid) {
               didUpdateCurrentUser = true;
-              currentUserPointsAdded = pointsToAdd;
+              currentUserPointsAdded = allRequirementsDoneForGroup ? pointsToAdd : 0;
             }
           } catch (groupParticipantSyncError) {
             console.warn(
@@ -614,20 +672,23 @@ export default function EventActivity() {
           await updateDoc(participantRef, {
             status: "completed",
             reflection: reflectionText,
-            pointsEarned: groupPoints,
+            pointsEarned: allRequirementsDoneForGroup ? groupPoints : 0,
+            ...(allRequirementsDoneForGroup ? { pendingPoints: deleteField() } : { pendingPoints: groupPoints }),
             completedAt: submittedAt,
             lastUpdated: submittedAt,
             groupId,
           });
 
-          await setDoc(
-            doc(db, "missions", id, "volunteer", user.uid),
-            {
-              pointsEarned: increment(groupPoints),
-            },
-            { merge: true },
-          );
-          currentUserPointsAdded = groupPoints;
+          if (allRequirementsDoneForGroup) {
+            await setDoc(
+              doc(db, "missions", id, "volunteer", user.uid),
+              {
+                pointsEarned: increment(groupPoints),
+              },
+              { merge: true },
+            );
+            currentUserPointsAdded = groupPoints;
+          }
         }
 
         if (currentUserPointsAdded > 0) {
@@ -636,16 +697,20 @@ export default function EventActivity() {
 
         setSubmitStatus((prev) => ({
           ...prev,
-          [activityIdx]: `Group reflection submitted! +${groupPoints} points applied to your account.`,
+          [activityIdx]: allRequirementsDoneForGroup
+            ? `Group reflection submitted! +${groupPoints} pts applied to your account.`
+            : `Group reflection saved. Complete all requirements to unlock your ${groupPoints} pts.`,
         }));
         setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
 
-        await createNotification(user.uid, {
-          type: "points_earned",
-          title: "Points Earned!",
-          message: `You earned ${groupPoints} points for group task "${activity.title}"`,
-          link: `/event/${id}/activity`,
-        });
+        if (allRequirementsDoneForGroup && currentUserPointsAdded > 0) {
+          await createNotification(user.uid, {
+            type: "points_earned",
+            title: "Points Earned!",
+            message: `You earned ${groupPoints} points for group task "${activity.title}"`,
+            link: `/event/${id}/activity`,
+          });
+        }
 
         await createNotification(user.uid, {
           type: "reflection_submitted",
@@ -686,11 +751,18 @@ export default function EventActivity() {
       }
 
       const eligibleForPoints = isEnrollmentClosed(activity);
+      const allRequirementsDone =
+        volunteerProgress?.preSurvey === 'submitted' &&
+        (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') &&
+        volunteerProgress?.attendance === 'present' &&
+        volunteerProgress?.postSurvey === 'submitted';
+      const awardNow = eligibleForPoints && allRequirementsDone;
 
       await updateDoc(participantRef, {
         reflection: reflectionText,
         status: "completed",
-        pointsEarned: eligibleForPoints ? pointsToAward : 0,
+        pointsEarned: awardNow ? pointsToAward : 0,
+        ...(eligibleForPoints && !allRequirementsDone ? { pendingPoints: pointsToAward } : { pendingPoints: deleteField() }),
         completedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       });
@@ -698,7 +770,7 @@ export default function EventActivity() {
       // Update volunteer's total points in the event
       const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
       const volunteerSnap = await getDoc(volunteerRef);
-      if (eligibleForPoints && volunteerSnap.exists()) {
+      if (awardNow && volunteerSnap.exists()) {
         const currentTotal = volunteerSnap.data().pointsEarned || 0;
         const newTotal = currentTotal + pointsToAward;
         await updateDoc(volunteerRef, {
@@ -737,14 +809,16 @@ export default function EventActivity() {
 
       setSubmitStatus((prev) => ({
         ...prev,
-        [activityIdx]: eligibleForPoints
-          ? `Reflection submitted! +${pointsToAward} points earned!`
-          : "Reflection submitted! Points will be awarded after enrollment closes.",
+        [activityIdx]: awardNow
+          ? `Reflection submitted! +${pointsToAward} pts earned!`
+          : eligibleForPoints
+            ? `Reflection saved. Complete all requirements to unlock your ${pointsToAward} pts.`
+            : "Reflection submitted! Points will be awarded after enrollment closes.",
       }));
       setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
 
       // Send points earned notification
-      if (eligibleForPoints && pointsToAward > 0) {
+      if (awardNow && pointsToAward > 0) {
         await createNotification(user.uid, {
           type: "points_earned",
           title: "Points Earned!",
@@ -2124,7 +2198,6 @@ export default function EventActivity() {
     const halfwayMs = (new Date().setHours(23, 59, 0, 0) - startTime.getTime()) / 2;
     return now >= new Date(startTime.getTime() + halfwayMs);
   })();
-  const [tasks, setTasks] = useState([]);
   const [preSurveyData, setPreSurveyData] = useState(null);
   const [preSurveyFullData, setPreSurveyFullData] = useState(null);
   const [consentFileUrl, setConsentFileUrl] = useState(null);
@@ -2246,6 +2319,7 @@ export default function EventActivity() {
               const data = volunteerSnap.data();
               progress = data.progress || {};
               pointsEarned = data.pointsEarned || 0;
+              setRequirementBonusEarned(data.requirementBonus || {});
               const reviewStatus = data.consentSubmission?.reviewStatus || "";
               const hasConsentFile = Boolean(data.consentSubmission?.fileUrl);
               setConsentReviewStatus(reviewStatus);
@@ -2880,6 +2954,8 @@ export default function EventActivity() {
                           type: 'survey',
                           previewable: preSurveyDone && !!preSurveyFullData,
                           onPreview: () => setShowPreSurveyPreview(true),
+                          points: 5,
+                          bonusKey: 'preSurvey',
                         },
                         {
                           label: 'Parent Consent Form',
@@ -2894,6 +2970,8 @@ export default function EventActivity() {
                           type: 'upload',
                           previewable: !!consentFileUrl,
                           onPreview: () => window.open(consentFileUrl, '_blank'),
+                          points: 5,
+                          bonusKey: 'consent',
                         },
                         {
                           label: 'Attendance',
@@ -2903,6 +2981,8 @@ export default function EventActivity() {
                           onOpen: isEventDay && isEditable ? () => setShowQRModal(true) : null,
                           type: 'qr',
                           previewable: false,
+                          points: 5,
+                          bonusKey: 'attendance',
                         },
                         {
                           label: 'Post-Activity Survey',
@@ -2912,6 +2992,8 @@ export default function EventActivity() {
                           onOpen: postLocked ? null : () => setShowPostSurveyModal(true),
                           type: 'survey',
                           previewable: false,
+                          points: 5,
+                          bonusKey: 'postSurvey',
                         },
                       ];
                       const activeIndex = steps.findIndex(s => !s.done);
@@ -2927,7 +3009,14 @@ export default function EventActivity() {
                                   {i < steps.length - 1 && <div className={`req-timeline-line${lineTeal ? ' req-timeline-line--teal' : ''}`} />}
                                 </div>
                                 <div className="req-timeline-body">
-                                  <span className="req-timeline-label">{step.label}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <span className="req-timeline-label">{step.label}</span>
+                                    {step.points > 0 && (
+                                      requirementBonusEarned[step.bonusKey] > 0
+                                        ? <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{step.points} pts earned</span>
+                                        : <span style={{ fontSize: 11, fontWeight: 600, color: '#0d9488', background: '#ccfbf1', borderRadius: 4, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{step.points} pts</span>
+                                    )}
+                                  </div>
                                   <span className="req-timeline-desc">{step.desc}</span>
                                 </div>
                                 <div className="req-timeline-action">

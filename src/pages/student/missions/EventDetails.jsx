@@ -115,7 +115,7 @@ export default function EventDetails({ onClose = null, missionId = null }) {
             const userSnap = await getDoc(doc(db, 'users', user.uid));
             if (userSnap.exists()) {
               const uData = userSnap.data();
-              setUserName(uData.name || '');
+              setUserName(uData.name || uData.username || '');
               setUserDepartment(uData.department || '');
             }
           }
