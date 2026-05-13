@@ -716,7 +716,7 @@ const StudentHome = () => {
                     key={dept}
                     role="tab"
                     aria-selected={activeTab === ('dept:' + dept)}
-                    className={`mission-tab ${activeTab === ('dept:' + dept) ? "active" : ""}`}
+                    className={`mission-tab mission-tab-dept ${activeTab === ('dept:' + dept) ? "active" : ""}`}
                     onClick={() => setActiveTab('dept:' + dept)}
                   >
                     {dept}
@@ -911,27 +911,10 @@ const StudentHome = () => {
     {/* Proposal View/Edit Modal */}
     {selectedProposalForView && (
       <div
-        style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.45)',
-          zIndex: 3000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '16px',
-        }}
+        className="student-modal-overlay"
         onClick={(e) => { if (e.target === e.currentTarget) setSelectedProposalForView(null); }}
       >
-        <div style={{
-          background: '#fff',
-          borderRadius: 16,
-          boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
-          width: '90vw',
-          maxWidth: 700,
-          maxHeight: '90vh',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-        }}>
+        <div className="student-modal student-proposal-modal">
           {selectedProposalForView.status === 'for_approval' ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
@@ -966,24 +949,10 @@ const StudentHome = () => {
     {/* Event Details Modal */}
     {selectedMissionId && (
       <div
-        style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.45)',
-          zIndex: 3000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '16px',
-        }}
+        className="student-modal-overlay"
         onClick={(e) => { if (e.target === e.currentTarget) setSelectedMissionId(null); }}
       >
-        <div style={{
-          background: '#fff',
-          borderRadius: 16,
-          boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
-          width: '90vw',
-          maxWidth: 900,
-          overflow: 'hidden',
-          position: 'relative',
-        }}>
+        <div className="student-modal student-event-modal">
           <EventDetails
             key={selectedMissionId}
             missionId={selectedMissionId}

@@ -228,28 +228,21 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   }
 
   return (
-    <div className={onClose ? undefined : "full-page"} style={onClose ? { position: 'relative' } : undefined}>
+    <div className={onClose ? "event-details-modal-root" : "full-page"}>
       {!onClose && <Header />}
       {!onClose && <div className="header-spacer"></div>}
-      <div className="content-page" style={onClose ? { height: 'auto', overflow: 'visible', padding: 0 } : undefined}>
-        <div className="event-details-center" style={onClose ? { padding: 0 } : undefined}>
-          <div className="event-details-image" style={{ position: 'relative', ...(onClose ? { height: '180px', flexShrink: 0 } : {}) }}>
+      <div className={`content-page${onClose ? " event-details-modal-content" : ""}`}>
+        <div className={`event-details-center${onClose ? " event-details-center--modal" : ""}`}>
+          <div className={`event-details-image${onClose ? " event-details-image--modal" : ""}`}>
             <img
               src={mission.img && mission.img.trim() !== "" ? mission.img : defaultBanner}
               alt={mission.alt || "Event image"}
               onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = defaultBanner; }}
             />
-            <div style={{ position: 'absolute', top: 10, right: 12, display: 'flex', gap: 8, alignItems: 'center', zIndex: 20 }}>
+            <div className="event-details-toolbar">
               <button
                 onClick={handleShare}
-                style={{
-                  background: 'rgba(0,0,0,0.55)',
-                  border: 'none', color: '#fff',
-                  cursor: 'pointer',
-                  width: 32, height: 32, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backdropFilter: 'blur(4px)', flexShrink: 0,
-                }}
+                className="event-details-icon-btn"
                 aria-label={copySuccess ? 'Copied!' : 'Copy event link'}
                 title={copySuccess ? 'Copied!' : 'Copy event link'}
               >
@@ -260,37 +253,29 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               {onClose && (
                 <button
                   onClick={onClose}
-                  style={{
-                    background: 'rgba(0,0,0,0.55)',
-                    border: 'none', color: '#fff',
-                    fontSize: 16, cursor: 'pointer',
-                    width: 32, height: 32, borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    lineHeight: 1, fontWeight: 700,
-                    backdropFilter: 'blur(4px)', flexShrink: 0,
-                  }}
+                  className="event-details-icon-btn"
                   aria-label="Close"
                 >✕</button>
               )}
             </div>
           </div>
-          <div className="event-details-card" style={onClose ? { marginTop: -16, padding: '16px 28px 20px', transform: 'none', boxShadow: 'none' } : undefined}>
-            <div className="event-details-grid" style={onClose ? { padding: '0', gap: '12px' } : undefined}>
+          <div className={`event-details-card${onClose ? " event-details-card--modal" : ""}`}>
+            <div className={`event-details-grid${onClose ? " event-details-grid--modal" : ""}`}>
 
               {/* LEFT COLUMN */}
               <div className="event-details-left">
-                <h1 className="event-details-title" style={onClose ? { fontSize: '1.5rem', lineHeight: 1.25, marginBottom: 6 } : undefined}>{mission.title}</h1>
-                <p className="event-details-desc" style={onClose ? { fontSize: '0.85rem', lineHeight: 1.5, margin: 0 } : undefined}>{mission.description}</p>
-                <div className="event-details-meta" style={onClose ? { marginTop: 10, gap: 4 } : undefined}>
-                  <div className="event-meta-item" style={onClose ? { fontSize: '0.82rem' } : undefined}>
+                <h1 className="event-details-title">{mission.title}</h1>
+                <p className="event-details-desc">{mission.description}</p>
+                <div className="event-details-meta">
+                  <div className="event-meta-item">
                     📅 <span>{mission.targetDate || "Date TBA"}</span>
                   </div>
 
-                  <div className="event-meta-item" style={onClose ? { fontSize: '0.82rem' } : undefined}>
+                  <div className="event-meta-item">
                     📍 <span>{mission.location || "Location TBA"}</span>
                   </div>
 
-                  <div className="event-meta-item" style={onClose ? { fontSize: '0.82rem' } : undefined}>
+                  <div className="event-meta-item">
                     ⏱ <span>
                       {mission.volunteerHours
                         ? `${mission.volunteerHours} hours`
@@ -399,30 +384,8 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   {/* Modal for Pre-Activity Survey and Consent Upload */ }
   {
     showSurveyModal && (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        background: 'rgba(44,62,80,0.18)',
-        zIndex: 2000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <div style={{
-          background: '#fff',
-          borderRadius: 16,
-          boxShadow: '0 4px 32px rgba(44,62,80,0.18)',
-          padding: 0,
-          minWidth: 380,
-          maxWidth: 650,
-          width: '95vw',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          position: 'relative',
-        }}>
+      <div className="event-survey-modal-overlay">
+        <div className="event-survey-modal">
           <button
             onClick={() => setShowSurveyModal(false)}
             style={{
