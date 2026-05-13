@@ -170,6 +170,14 @@ const PreActivitySurvey = ({
   };
 
   const selectedCollege = colleges.find((c) => c.name === form.college);
+  const likertScale = [
+    { val: 1, label: 'Strongly Disagree', color: '#ef4444', light: '#fee2e2' },
+    { val: 2, label: 'Disagree', color: '#f97316', light: '#ffedd5' },
+    { val: 3, label: 'Neutral', color: '#eab308', light: '#fef9c3' },
+    { val: 4, label: 'Agree', color: '#22c55e', light: '#dcfce7' },
+    { val: 5, label: 'Strongly Agree', color: '#30bdb7', light: '#ccfbf1' },
+    { val: 0, label: 'No Basis', color: '#64748b', light: '#f1f5f9', display: 'No basis' },
+  ];
 
   const progressFields = [
     form.name,
@@ -337,6 +345,122 @@ const PreActivitySurvey = ({
           margin-top: 0;
           margin-bottom: 0;
         }
+        .pre-activity-survey-form .survey-likert-section {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-top: 8px;
+        }
+        .pre-activity-survey-form .survey-likert-heading {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          border-bottom: 1px solid #e5e7eb;
+          padding-bottom: 12px;
+        }
+        .pre-activity-survey-form .survey-likert-heading h3 {
+          font-weight: 700;
+          color: #23235b;
+          font-size: 1.05rem;
+          margin: 0;
+        }
+        .pre-activity-survey-form .survey-likert-heading p {
+          font-size: 13px;
+          color: #6b7280;
+          margin: 0;
+          line-height: 1.45;
+        }
+        .pre-activity-survey-form .pre-likert-card {
+          border-radius: 14px;
+          padding: 16px;
+          transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+        }
+        .pre-activity-survey-form .pre-likert-question {
+          margin: 0 0 12px 0;
+          font-size: 14px;
+          color: #1f2937;
+          font-weight: 500;
+          line-height: 1.5;
+        }
+        .pre-activity-survey-form .pre-likert-options {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(38px, 1fr)) minmax(92px, 1.25fr);
+          gap: 8px;
+          align-items: stretch;
+        }
+        .pre-activity-survey-form .likert-choice {
+          min-height: 42px;
+          border-radius: 11px;
+          border: 1.5px solid #e5e7eb;
+          background: #fff;
+          color: #475569;
+          font-weight: 700;
+          font-size: 14px;
+          cursor: pointer;
+          transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+        }
+        .pre-activity-survey-form .likert-choice:hover {
+          border-color: var(--choice-color);
+          color: var(--choice-color);
+        }
+        .pre-activity-survey-form .likert-choice.selected {
+          background: var(--choice-color);
+          border-color: var(--choice-color);
+          color: #fff;
+          box-shadow: 0 3px 10px var(--choice-shadow);
+        }
+        .pre-activity-survey-form .likert-choice-no-basis {
+          font-size: 12px;
+          line-height: 1.15;
+        }
+        .pre-activity-survey-form .pre-likert-selected-label {
+          margin-top: 10px;
+          min-height: 23px;
+        }
+        .pre-activity-survey-form .likert-selected-pill {
+          display: inline-flex;
+          align-items: center;
+          font-size: 12px;
+          font-weight: 700;
+          padding: 4px 10px;
+          border-radius: 20px;
+          border: 1px solid var(--choice-border);
+          color: var(--choice-color);
+          background: var(--choice-bg);
+        }
+        .pre-activity-survey-form .pre-likert-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .pre-activity-survey-form .pre-likert-selected-label {
+          min-width: 110px;
+          flex-shrink: 0;
+          margin-top: 0;
+          min-height: 23px;
+        }
+        @media (max-width: 520px) {
+          .pre-activity-survey-form {
+            padding: 20px 16px;
+          }
+          .pre-activity-survey-form .pre-likert-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 6px;
+          }
+          .pre-activity-survey-form .pre-likert-options {
+            grid-template-columns: repeat(5, 1fr);
+          }
+          .pre-activity-survey-form .likert-choice-no-basis {
+            grid-column: 1 / -1;
+            font-size: 13px;
+            min-height: 36px;
+          }
+          .pre-activity-survey-form .pre-likert-selected-label {
+            min-width: unset;
+            margin-top: 4px;
+          }
+        }
       `}</style>
       <label>
         Complete Name *
@@ -455,10 +579,13 @@ const PreActivitySurvey = ({
       </label>
       {/* Likert Scale Section */}
       <div style={{ marginTop: 8 }}>
+        <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+          Scale: 1 Strongly Disagree, 2 Disagree, 3 Neutral, 4 Agree, 5 Strongly Agree, then No basis.
+        </p>
         <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.05rem', marginBottom: 4 }}>
           How much do you agree with each statement? 🤔
         </h3>
-        <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+        <p style={{ display: 'none' }}>
           Tap a number to rate — <b>1</b> = Strongly Disagree, <b>5</b> = Strongly Agree, <b>0</b> = No basis
         </p>
         {[
@@ -472,17 +599,9 @@ const PreActivitySurvey = ({
           { text: 'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.', emoji: '⏰' },
         ].map((item, idx) => {
           const selected = form[`likert_${idx}`];
-          const SCALE = [
-            { val: 1, label: 'Strongly Disagree', color: '#ef4444', light: '#fee2e2' },
-            { val: 2, label: 'Disagree',          color: '#f97316', light: '#ffedd5' },
-            { val: 3, label: 'Neutral',            color: '#eab308', light: '#fef9c3' },
-            { val: 4, label: 'Agree',              color: '#22c55e', light: '#dcfce7' },
-            { val: 5, label: 'Strongly Agree',     color: '#30bdb7', light: '#ccfbf1' },
-            { val: 0, label: 'No Basis',           color: '#9ca3af', light: '#f3f4f6' },
-          ];
-          const selectedMeta = SCALE.find(s => String(s.val) === selected);
+          const selectedMeta = likertScale.find(s => String(s.val) === selected);
           return (
-            <div key={idx} style={{
+            <div key={idx} className="pre-likert-card" style={{
               background: selectedMeta ? selectedMeta.light : '#fafbfc',
               border: `1.5px solid ${selectedMeta ? selectedMeta.color : '#e5e7eb'}`,
               borderRadius: 14,
@@ -493,44 +612,31 @@ const PreActivitySurvey = ({
               <p style={{ margin: '0 0 12px 0', fontSize: 14, color: '#1f2937', fontWeight: 500, lineHeight: 1.5 }}>
                 <span style={{ marginRight: 8 }}>{item.emoji}</span>{item.text}
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {SCALE.map(({ val, label, color }) => {
+              <div className="pre-likert-row">
+                <div className="pre-likert-options" role="radiogroup" aria-label={`Statement ${idx + 1}`}>
+                  {likertScale.map(({ val, label, display, color }) => {
                     const isSelected = selected === String(val);
                     return (
                       <button
                         key={val}
                         type="button"
+                        className={`likert-choice${isSelected ? ' selected' : ''}${val === 0 ? ' likert-choice-no-basis' : ''}`}
                         title={label}
+                        aria-pressed={isSelected}
                         onClick={() => setForm(prev => ({ ...prev, [`likert_${idx}`]: String(val) }))}
                         style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: '50%',
-                          border: `2px solid ${isSelected ? color : '#e5e7eb'}`,
-                          background: isSelected ? color : '#fff',
-                          color: isSelected ? '#fff' : '#6b7280',
-                          fontWeight: 700,
-                          fontSize: 14,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          boxShadow: isSelected ? `0 2px 8px ${color}55` : 'none',
-                          flexShrink: 0,
-                          padding: 0,
-                          boxSizing: 'border-box',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          '--choice-color': color,
+                          '--choice-shadow': `${color}55`,
                         }}
                       >
-                        {val}
+                        {display || val}
                       </button>
                     );
                   })}
                 </div>
-                <div style={{ minWidth: 110 }}>
+                <div className="pre-likert-selected-label">
                   {selectedMeta && (
-                    <span style={{
+                    <span className="likert-selected-pill" style={{
                       fontSize: 12,
                       fontWeight: 600,
                       color: selectedMeta.color,

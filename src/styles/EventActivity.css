@@ -839,6 +839,15 @@
   letter-spacing: 0.5px;
 }
 
+.ea-leaderboard-divider {
+  text-align: center;
+  color: #cbd5e1;
+  font-size: 13px;
+  letter-spacing: 4px;
+  padding: 6px 0;
+  user-select: none;
+}
+
 .ea-leaderboard-empty {
   font-size: 13px;
   color: #6b7280;
@@ -1481,32 +1490,26 @@
 .task-enrolled-badge {
   font-size: 12px;
   font-weight: 700;
-  color: #374151;
-  background: #f1f5f9;
+  color: #0f766e;
+  background: #f0fdfc;
+  border: 1.5px solid #5eead4;
   border-radius: 999px;
   padding: 5px 12px;
   position: relative;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.task-enrolled-badge:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
 }
 
-/*Unjoin*/
-/* default state */
-.task-enrolled-badge .remove-text {
-  display: none;
-}
-
-/* hover effect */
-.task-enrolled-badge:hover .joined-text {
-  display: none;
-}
-
-.task-enrolled-badge:hover .remove-text {
-  display: inline;
-  /*color: #d32f2f;*/
-  color: black;
-  font-weight: bold;
-}
+/* default: hide remove, show joined */
+.task-enrolled-badge .remove-text { display: none; }
+.task-enrolled-badge:hover .joined-text { display: none; }
+.task-enrolled-badge:hover .remove-text { display: inline; font-weight: 700; }
 .task-collapse-btn {
   display: flex;
   align-items: center;
@@ -2309,6 +2312,14 @@
   background: #e0e7ef;
   transform: translateY(-1px);
 }
+.qr-location-details {
+  margin-top: 6px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  word-break: break-word;
+}
 
 /* ── VIEW BUTTON (on done steps) ───────────────── */
 .req-view-btn {
@@ -2576,4 +2587,209 @@
   .ea-tab-content { padding: 12px; }
   .ea-strip-progress-bar-wrap { flex: 0 0 60px; }
   .ea-strip-event-title { font-size: clamp(10px, 2.5vw, 13px); }
+}
+
+@media (max-width: 768px) {
+  .ea-modal-overlay {
+    align-items: center;
+    padding: 12px;
+    box-sizing: border-box;
+  }
+
+  .ea-modal-card {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 24px);
+    border-radius: 16px;
+  }
+
+  .modal-scrollable {
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ea-modal-header {
+    padding: 14px 16px 12px;
+  }
+
+  .ea-modal-title {
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .ea-qr-modal-body {
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .consent-modal-card {
+    min-width: 0;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .consent-modal-body {
+    padding: 14px;
+    gap: 12px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .consent-note-row {
+    padding: 12px;
+  }
+
+  .consent-pdf-row,
+  .consent-file-row {
+    align-items: flex-start;
+  }
+
+  .consent-pdf-row {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  .consent-pdf-text {
+    flex: 1 1 calc(100% - 44px);
+  }
+
+  .consent-download-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .consent-dropzone {
+    padding: 20px 14px;
+  }
+
+  .consent-file-remove {
+    width: 32px;
+    height: 32px;
+  }
+
+  .pre-activity-survey-form,
+  .post-activity-survey-form {
+    width: 100%;
+    max-width: none;
+    padding: 18px 14px 16px !important;
+    gap: 16px !important;
+    box-shadow: none !important;
+    border-radius: 12px !important;
+    box-sizing: border-box;
+  }
+
+  .pre-activity-survey-form input,
+  .pre-activity-survey-form select,
+  .pre-activity-survey-form textarea,
+  .post-activity-survey-form input,
+  .post-activity-survey-form select,
+  .post-activity-survey-form textarea {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 16px !important;
+  }
+
+  .pre-activity-survey-form .pill-group {
+    gap: 8px !important;
+  }
+
+  .pre-activity-survey-form .pill-btn {
+    flex: 1 1 calc(50% - 8px);
+    justify-content: center;
+    min-width: 0;
+    padding: 9px 10px !important;
+    white-space: normal;
+  }
+
+  .pre-activity-survey-form .pre-likert-card {
+    padding: 12px !important;
+  }
+
+  .pre-activity-survey-form .pre-likert-row {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 8px !important;
+    min-width: 0;
+  }
+
+  .pre-activity-survey-form .pre-likert-options {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .pre-activity-survey-form .pre-likert-options button {
+    width: 100% !important;
+    min-width: 0;
+    min-height: 38px;
+  }
+
+  .pre-activity-survey-form .pre-likert-options .likert-choice-no-basis {
+    grid-column: span 2;
+  }
+
+  .pre-activity-survey-form .pre-likert-selected-label {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .pre-activity-survey-form table,
+  .post-activity-survey-form table,
+  .post-activity-survey-form .post-likert-table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pre-activity-survey-form h2,
+  .post-activity-survey-form h2 {
+    font-size: 1.1rem !important;
+    padding-left: 0 !important;
+    margin-bottom: 10px !important;
+  }
+
+  .post-activity-survey-form h3,
+  .pre-activity-survey-form h3 {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .ea-nav-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) 38px;
+    align-items: end;
+    gap: 2px;
+    padding: 0px 6px 0;
+    overflow-x: hidden;
+  }
+
+  .ea-nav-tab {
+    min-width: 0;
+    width: 100%;
+    padding: 7px 2px 8px;
+    font-size: clamp(9px, 2.6vw, 11px);
+    line-height: 1.5;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .ea-nav-unenroll {
+    width: 36px;
+    height: 36px;
+    margin-left: 0;
+    padding: 0;
+    justify-self: end;
+    align-self: center;
+  }
+
+  .task-enrolled-badge {
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
 }

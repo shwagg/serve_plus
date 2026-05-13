@@ -68,6 +68,7 @@ export default function EventActivity() {
   const [surveyProgress, setSurveyProgress] = useState(0);
   // State for post-activity survey modal
   const [showPostSurveyModal, setShowPostSurveyModal] = useState(false);
+  const [joiningTaskId, setJoiningTaskId] = useState(null);
   const { id } = useParams();
   const navigate = useNavigate();
   const auth = getAuth();
@@ -173,10 +174,9 @@ export default function EventActivity() {
         await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
       }
 
-      // Show quick feedback while geocoding runs
-      setQRStatus(
-        `Attendance recorded — scanned at ${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`
-      );
+      setQRStatus("Attendance Recorded");
+      setScannedLocation(locData);
+      setScanSuccess(true);
 
       // Reverse-geocode volunteer location AND QR target location in parallel
       const geocode = async (lat, lng) => {
@@ -203,13 +203,9 @@ export default function EventActivity() {
         locData.name = scannedName;
       }
 
-      // Final status — show location name on a new line if available
-      const coordStr = `${locData.lat.toFixed(6)}, ${locData.lng.toFixed(6)} (±${Math.round(locData.accuracy)}m)`;
-      const nameStr = locData.name ? `\n📍 ${locData.name}` : "";
-      setQRStatus(`Attendance recorded — scanned at ${coordStr}${nameStr}`);
+      setQRStatus("Attendance Recorded");
 
       setVolunteerProgress((prev) => ({ ...prev, attendance: "present" }));
-      setScanSuccess(true);
       setScannedLocation(locData);
 
       // Audit-log every successful scan (overwrites are intentional and both entries remain)
@@ -1293,6 +1289,7 @@ export default function EventActivity() {
 
     // Proceed with direct enrollment
     try {
+      setJoiningTaskId(taskId);
       const participantRef = doc(
         db,
         "missions",
@@ -1344,10 +1341,12 @@ export default function EventActivity() {
         ...prev,
         [taskId]: participantsSnap.size + 1,
       }));
-      alert("Successfully enrolled in the activity!");
+      setJoiningTaskId(null);
+      window.showToast?.("Joined task successfully!", "success");
     } catch (err) {
       console.error("Error enrolling in activity:", err);
-      alert("Failed to enroll. Please try again.");
+      setJoiningTaskId(null);
+      window.showToast?.("Failed to join. Please try again.", "error");
     }
   };
 
@@ -2375,26 +2374,51 @@ export default function EventActivity() {
           usersMap.set(userDoc.id, userDoc.data());
         });
 
-        const leaderboardData = volunteersSnap.docs.map((volunteerDoc) => {
-          const userId = volunteerDoc.id;
-          const userData = usersMap.get(userId) || {};
-          const name =
-            userData.username ||
-            userData.name ||
-            userData.email?.split("@")[0] ||
-            "Volunteer";
+        const leaderboardData = volunteersSnap.docs
+          .filter((volunteerDoc) => {
+            const role = (usersMap.get(volunteerDoc.id) || {}).role;
+            return role === "student";
+          })
+          .map((volunteerDoc) => {
+            const userId = volunteerDoc.id;
+            const userData = usersMap.get(userId) || {};
+            const name =
+              userData.username ||
+              userData.name ||
+              userData.email?.split("@")[0] ||
+              "Volunteer";
 
-          return {
-            uid: userId,
-            name,
-            points: volunteerDoc.data().pointsEarned || 0,
-            avatar:
-              userData.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                name
-              )}&background=30bdb7&color=fff&size=120`,
-          };
-        });
+            return {
+              uid: userId,
+              name,
+              points: volunteerDoc.data().pointsEarned || 0,
+              avatar:
+                userData.avatar ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  name
+                )}&background=30bdb7&color=fff&size=120`,
+            };
+          });
+
+        // Always include the current user even if they have no volunteer doc,
+        // using their already-loaded totalPoints from the session
+        const currentAuthUser = auth.currentUser;
+        if (currentAuthUser) {
+          const existing = leaderboardData.find(e => e.uid === currentAuthUser.uid);
+          const cuData = usersMap.get(currentAuthUser.uid) || {};
+          const cuName = cuData.username || cuData.name || cuData.email?.split('@')[0] || 'You';
+          const sessionPoints = userData?.totalPoints || 0;
+          if (existing) {
+            existing.points = Math.max(existing.points, sessionPoints);
+          } else {
+            leaderboardData.push({
+              uid: currentAuthUser.uid,
+              name: cuName,
+              points: sessionPoints,
+              avatar: cuData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(cuName)}&background=30bdb7&color=fff&size=120`,
+            });
+          }
+        }
 
         leaderboardData.sort((a, b) => b.points - a.points);
 
@@ -2498,7 +2522,7 @@ export default function EventActivity() {
     if (id) {
       fetchEventLeaderboard();
     }
-  }, [id, totalPointsEarned]);
+  }, [id, totalPointsEarned, userData]);
 
   useEffect(() => {
     const container = leaderboardListRef.current;
@@ -2870,7 +2894,7 @@ export default function EventActivity() {
                       const consentDone = volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified';
                       const attendanceDone = volunteerProgress?.attendance === 'present';
                       const postSurveyDone = volunteerProgress?.postSurvey === 'submitted';
-                      const postLocked = !preSurveyDone || !consentDone || !attendanceDone;
+                      const postLocked = !attendanceDone;
                       const steps = [
                         {
                           label: 'Pre-Activity Survey',
@@ -2907,10 +2931,10 @@ export default function EventActivity() {
                         },
                         {
                           label: 'Post-Activity Survey',
-                          desc: !isEditable ? 'Event has ended' : 'Fill out after the event',
+                          desc: postLocked ? 'Complete the previous requirements first' : 'Fill out after the event',
                           done: postSurveyDone,
-                          locked: !isEditable || postLocked,
-                          onOpen: null,
+                          locked: postLocked,
+                          onOpen: postLocked ? null : () => setShowPostSurveyModal(true),
                           type: 'survey',
                           previewable: false,
                         },
@@ -3040,7 +3064,7 @@ export default function EventActivity() {
                                   {isEnrolled ? (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                       <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={!isEditable}>
-                                        <span className="joined-text">Joined</span><span className="remove-text">✕</span>
+                                        <span className="joined-text">✓ Joined</span><span className="remove-text">✕ Unjoin</span>
                                       </button>
                                       {!isEndedEnrolled && (
                                         <button className="task-collapse-btn" onClick={(e) => { e.stopPropagation(); toggleTaskExpand(activity.id); }} aria-label={isExpanded ? 'Collapse' : 'Expand'}>
@@ -3055,7 +3079,9 @@ export default function EventActivity() {
                                   ) : !isEditable ? (
                                     <span className="req-status locked">Ended</span>
                                   ) : canJoinActivities ? (
-                                    <button className="task-join-btn" onClick={() => handleJoinActivity(activity.id, activity)} disabled={!isEditable}>Join</button>
+                                    <button className="task-join-btn" onClick={() => handleJoinActivity(activity.id, activity)} disabled={!isEditable || joiningTaskId === activity.id}>
+                                      {joiningTaskId === activity.id ? 'Joining…' : 'Join'}
+                                    </button>
                                   ) : (
                                     <span className="req-status locked">Closed</span>
                                   )}
@@ -3179,6 +3205,32 @@ export default function EventActivity() {
                             </div>
                           );
                         })}
+                        {/* Pin current user below top 10 if they don't appear in it */}
+                        {currentUserId && currentUserIndex >= 10 && (() => {
+                          const cu = sortedLeaderboard[currentUserIndex];
+                          return (
+                            <>
+                              <div className="ea-leaderboard-divider">• • •</div>
+                              <div
+                                ref={currentUserRef}
+                                className="ea-leaderboard-row is-current-user"
+                                role="button"
+                                tabIndex={0}
+                                aria-label="Your position"
+                                onClick={() => openUserProfile(currentUserId)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { openUserProfile(currentUserId); e.preventDefault(); } }}
+                              >
+                                <span className="ea-rank-num">{currentUserRank}</span>
+                                {cu.avatar
+                                  ? <img src={cu.avatar} alt={cu.name} className="ea-rank-avatar" />
+                                  : <span className="ea-rank-avatar ea-rank-initials">{(cu.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
+                                }
+                                <span className="ea-rank-name">{cu.name} <span style={{ fontSize: 11, opacity: 0.65 }}>(You)</span></span>
+                                <span className="ea-rank-pts">{cu.points} PTS</span>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -3200,10 +3252,21 @@ export default function EventActivity() {
               <button className="ea-modal-close" onClick={() => setShowQRModal(false)} aria-label="Close">✕</button>
             </div>
             <div className="ea-qr-modal-body">
-              <QRScanner key={scannerKey} onScan={handleQRScan} />
+              <QRScanner key={scannerKey} onScan={handleQRScan} statusOverride={scanSuccess ? "Attendance Recorded" : undefined} />
               {qrStatus && (
                 <div>
                   <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`} style={{ whiteSpace: "pre-line" }}>{qrStatus}</div>
+                  {scanSuccess && scannedLocation && (
+                    <div className="qr-location-details">
+                      {scannedLocation.lat.toFixed(6)}, {scannedLocation.lng.toFixed(6)} (±{Math.round(scannedLocation.accuracy)}m)
+                      {scannedLocation.name && (
+                        <>
+                          <br />
+                          📍 {scannedLocation.name}
+                        </>
+                      )}
+                    </div>
+                  )}
                   <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                     {scanSuccess && (
                       <button
@@ -3369,14 +3432,13 @@ export default function EventActivity() {
       {/* Post-Activity Survey Modal */}
       {showPostSurveyModal && (
         <div className="ea-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowPostSurveyModal(false); }}>
-          <div className="ea-modal-card modal-scrollable" style={{ maxHeight: '90vh', overflowY: 'auto', minWidth: 340 }} onClick={e => e.stopPropagation()}>
+          <div className="ea-modal-card modal-scrollable" style={{ maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div className="ea-modal-header">
               <h3 className="ea-modal-title">📋 Post-Activity Survey</h3>
               <button className="ea-modal-close" onClick={() => setShowPostSurveyModal(false)} aria-label="Close">✕</button>
             </div>
 
             <PostActivitySurvey
-              //Auto fill with information already given from preSurvey
               initialName={userData?.name || ''}
               initialEngagementType={event?.projectType || ""}
               initialTitle={event?.title || ""}
@@ -3384,6 +3446,7 @@ export default function EventActivity() {
               initialCollege={preSurveyData?.college || ""}
               initialProgram={preSurveyData?.program || ""}
               initialNonAcademicOrg={preSurveyData?.nonAcademicOrg || ""}
+              initialLocation={event?.location || ""}
 
               onSubmit={async (form) => {
                 // Mark user as present in Firestore and save survey
