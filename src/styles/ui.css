@@ -604,54 +604,61 @@ input {
     min-height: 100dvh;
     height: auto;
     overflow-y: auto;
-    background: #f8fafc;
-    align-items: center;
-    justify-content: center;
-    padding: 18px;
+    background: #f6eedc;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 0;
+    flex-direction: column;
   }
 
   .auth-split {
-    position: relative;
+    flex-direction: column;
     width: 100%;
-    min-height: calc(100dvh - 36px);
+    min-height: 100dvh;
     height: auto;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: flex-start;
     overflow: visible;
+    position: relative;
   }
 
   .auth-poster-panel {
-    display: none;
-    position: absolute;
-    inset: 0;
+    display: flex;
+    position: relative;
+    inset: auto;
     margin: 0;
-    flex: none;
+    flex: 0 0 auto;
     width: 100%;
-    height: 100%;
+    height: 240px;
     padding: 0;
     border-right: none;
+    background: #f6eedc;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
 
   .auth-poster-panel img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
     max-height: none;
     max-width: none;
+    object-fit: cover;
+    transform: scale(1.15);
+    transform-origin: center center;
   }
 
   .auth-form-panel {
     position: relative;
     z-index: 1;
-    flex: none;
+    flex: 1;
     width: 100%;
-    max-width: 420px;
+    max-width: none;
     background: #ffffff;
-    border-radius: 18px;
-    padding: 22px 18px;
-    max-height: none;
+    border-radius: 24px 24px 0 0;
+    padding: 24px 20px 40px;
+    box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08);
     overflow: visible;
-    box-shadow: 0 16px 45px rgba(15, 23, 42, 0.12);
   }
 
   .auth-login-form {
@@ -693,13 +700,12 @@ input {
 }
 
 @media (max-width: 380px) {
-  .auth-page {
-    padding: 10px;
+  .auth-poster-panel {
+    height: 200px;
   }
 
   .auth-form-panel {
-    padding: 18px 14px;
-    border-radius: 14px;
+    padding: 0px 16px 36px;
   }
 
   .auth-sso-icon {

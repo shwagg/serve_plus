@@ -8,7 +8,6 @@ import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
-import googleIcon from "../assets/google_icon.svg";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
 import loginPosterGif from "../assets/login_poster_loop.gif";
 import loginPosterFallback from "../assets/login_poster_img.svg";
@@ -38,7 +37,6 @@ function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [emailStatus, setEmailStatus] = useState(null); // null | "checking" | "found" | "not-found"
-  const [emailMode, setEmailMode] = useState(false);
 
   // Agreement modal state
   const [showAgreement, setShowAgreement] = useState(false);
@@ -412,120 +410,84 @@ function Auth() {
 
             {/* Right: form */}
             <div className="auth-form-panel">
-              {!emailMode ? (
-                /* Screen 1: SSO options + Continue with email */
-                <div className="ui-form auth-login-form">
-                  <div className="auth-logo-row">
-                    <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
-                    <span className="auth-logo-text">
-                      SERVE<span className="auth-logo-plus">+</span>
-                    </span>
-                  </div>
+              <form className="ui-form auth-login-form" onSubmit={handleLogin}>
+                <div className="auth-logo-row">
+                  <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
+                  <span className="auth-logo-text">
+                    SERVE<span className="auth-logo-plus">+</span>
+                  </span> 
+                </div><br />
 
-                  <p className="ui-link" style={{ margin: "2px 0 10px" }}>
-                    New to SERVE+? <Link to="/register">Sign up here</Link>
-                  </p><br />
+                <button className="auth-bbl-btn" type="button" onClick={initiateBlackboardAuth}>
+                  <img src={bbl_icon} alt="" className="auth-sso-icon" />
+                  Login with Blackboard
+                </button>
 
-                  <button className="auth-bbl-btn" type="button" onClick={initiateBlackboardAuth}>
-                    <img src={bbl_icon} alt="" className="auth-sso-icon" />
-                    Login with Blackboard
-                  </button>
-
-                  <button className="auth-bbl-btn" type="button" onClick={handleGoogleLogin}>
-                    <img src={googleIcon} alt="" className="auth-sso-icon" />
-                    Sign in with Google
-                  </button>
-
-                  <div className="divider" style={{ width: "100%", maxWidth: 340 }}>
-                    <span>or sign in with</span>
-                  </div>
-
-                  <button className="auth-email-btn" type="button" onClick={() => { setError(""); setEmailMode(true); }}>
-                    Continue with email
-                  </button>
-
-                  {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
+                <div className="divider" style={{ width: "100%", maxWidth: 340 }}>
+                  <span>or sign in with</span>
                 </div>
-              ) : (
-                /* Screen 2: Email / password form */
-                <form className="ui-form auth-login-form" onSubmit={handleLogin}>
-                  <div className="auth-logo-row">
-                    <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
-                    <span className="auth-logo-text">
-                      SERVE<span className="auth-logo-plus">+</span>
-                    </span>
-                  </div>
 
-                  <p className="ui-link" style={{ margin: "2px 0 10px" }}>
-                    New to SERVE+? <Link to="/register">Sign up here</Link>
-                  </p>
+                {/* Email / Username */}
+                <div style={{ width: "100%", maxWidth: 340 }}>
+                  <input
+                    className={`ui-input${emailStatus === "not-found" ? " ui-input--error" : ""}`}
+                    style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                    type="text"
+                    placeholder="Email or Username"
+                    value={loginId}
+                    onChange={(e) => { setLoginId(e.target.value); setEmailStatus(null); }}
+                    onBlur={handleEmailBlur}
+                    required
+                  />
+                  {emailStatus === "not-found" && (
+                    <p className="field-hint error">No account found for this email or username</p>
+                  )}
+                </div>
 
-                  {/* Email / Username */}
-                  <div style={{ width: "100%", maxWidth: 340 }}>
+                {/* Password + Forgot Password */}
+                <div style={{ width: "100%", maxWidth: 340 }}>
+                  <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
                     <input
-                      className={`ui-input${emailStatus === "not-found" ? " ui-input--error" : ""}`}
+                      className="ui-input pass"
                       style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
-                      type="text"
-                      placeholder="Email or Username"
-                      value={loginId}
-                      onChange={(e) => { setLoginId(e.target.value); setEmailStatus(null); }}
-                      onBlur={handleEmailBlur}
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                     />
-                    {emailStatus === "not-found" && (
-                      <p className="field-hint error">No account found for this email or username</p>
+                    {password.length > 0 && (
+                      <button
+                        type="button"
+                        className="ui-btn eye"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((prev) => !prev)}
+                      >
+                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </button>
                     )}
                   </div>
-
-                  {/* Password + Forgot Password */}
-                  <div style={{ width: "100%", maxWidth: 340 }}>
-                    <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
-                      <input
-                        className="ui-input pass"
-                        style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                      {password.length > 0 && (
-                        <button
-                          type="button"
-                          className="ui-btn eye"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                          onClick={() => setShowPassword((prev) => !prev)}
-                        >
-                          {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                        </button>
-                      )}
-                    </div>
-                    <p className="ui-smallText" style={{ marginTop: 6 }}>
-                      <Link to="/reset-password">Forgot Password?</Link>
-                    </p>
-                  </div>
-
-                  <button className="auth-login-btn" type="submit">
-                    Login
-                  </button>
-
-                  <p
-                    className="ui-smallText"
-                    style={{ marginTop: 6, textAlign: "center", cursor: "pointer", color: "#6b7280" }}
-                    onClick={() => { setEmailMode(false); setError(""); setLoginId(""); setPassword(""); setEmailStatus(null); }}
-                  >
-                    ← Back
+                  <p className="ui-smallText" style={{ marginTop: 6 }}>
+                    <Link to="/reset-password">Forgot Password?</Link>
                   </p>
+                </div>
 
-                  {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
+                <button className="auth-login-btn" type="submit">
+                  Login
+                </button>
 
-                  {error && (
-                    <p className="ui-smallText" style={{ marginTop: 4, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}>
-                      Need help? Contact the SERVE+ administrator or try again in a few minutes.
-                    </p>
-                  )}
-                </form>
-              )}
+                <p className="ui-link" style={{ margin: "6px 0 0", textAlign: "center" }}>
+                  New to SERVE+? <Link to="/register">Sign up here</Link>
+                </p>
+
+                {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
+
+                {error && (
+                  <p className="ui-smallText" style={{ marginTop: 4, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}>
+                    Need help? Contact the SERVE+ administrator or try again in a few minutes.
+                  </p>
+                )}
+              </form>
             </div>
           </div>
         </div>
