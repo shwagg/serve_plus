@@ -45,6 +45,9 @@
   font-weight: 600;
   margin-left: 2px;
 }
+.qrs-status-text--success {
+  color: #30bdb7;
+}
 
 /* ── Error card ──────────────────────────────────────── */
 .qrs-error {

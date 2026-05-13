@@ -124,7 +124,7 @@ export default function QRScanner({ onScan, statusOverride }) {
       <div className="qrs-status-bar">
         <span className={`qrs-status-dot ${cameraStatus}`} />
         <span className="qrs-status-label">Status</span>
-        <span className="qrs-status-text">{displayStatusLabel}</span>
+        <span className={`qrs-status-text${statusOverride ? ' qrs-status-text--success' : ''}`}>{displayStatusLabel}</span>
       </div>
 
       {/* Error */}
@@ -149,15 +149,19 @@ export default function QRScanner({ onScan, statusOverride }) {
       {/* Hint */}
       <p className="qrs-hint">Point camera at the QR code</p>
 
-      {/* Divider */}
-      <div className="qrs-divider">or</div>
+      {!statusOverride && (
+        <>
+          {/* Divider */}
+          <div className="qrs-divider">or</div>
 
-      {/* Upload */}
-      <label className="qrs-upload-btn">
-        📁&nbsp; Upload QR Image
-        <input ref={fileInputRef} type="file" accept="image/*"
-          onChange={handleFileChange} className="qrs-upload-input" />
-      </label>
+          {/* Upload */}
+          <label className="qrs-upload-btn">
+            📁&nbsp; Upload QR Image
+            <input ref={fileInputRef} type="file" accept="image/*"
+              onChange={handleFileChange} className="qrs-upload-input" />
+          </label>
+        </>
+      )}
 
     </div>
   );

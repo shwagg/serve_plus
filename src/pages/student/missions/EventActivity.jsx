@@ -2374,51 +2374,26 @@ export default function EventActivity() {
           usersMap.set(userDoc.id, userDoc.data());
         });
 
-        const leaderboardData = volunteersSnap.docs
-          .filter((volunteerDoc) => {
-            const role = (usersMap.get(volunteerDoc.id) || {}).role;
-            return role === "student";
-          })
-          .map((volunteerDoc) => {
-            const userId = volunteerDoc.id;
-            const userData = usersMap.get(userId) || {};
-            const name =
-              userData.username ||
-              userData.name ||
-              userData.email?.split("@")[0] ||
-              "Volunteer";
+        const leaderboardData = volunteersSnap.docs.map((volunteerDoc) => {
+          const userId = volunteerDoc.id;
+          const userData = usersMap.get(userId) || {};
+          const name =
+            userData.username ||
+            userData.name ||
+            userData.email?.split("@")[0] ||
+            "Volunteer";
 
-            return {
-              uid: userId,
-              name,
-              points: volunteerDoc.data().pointsEarned || 0,
-              avatar:
-                userData.avatar ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  name
-                )}&background=30bdb7&color=fff&size=120`,
-            };
-          });
-
-        // Always include the current user even if they have no volunteer doc,
-        // using their already-loaded totalPoints from the session
-        const currentAuthUser = auth.currentUser;
-        if (currentAuthUser) {
-          const existing = leaderboardData.find(e => e.uid === currentAuthUser.uid);
-          const cuData = usersMap.get(currentAuthUser.uid) || {};
-          const cuName = cuData.username || cuData.name || cuData.email?.split('@')[0] || 'You';
-          const sessionPoints = userData?.totalPoints || 0;
-          if (existing) {
-            existing.points = Math.max(existing.points, sessionPoints);
-          } else {
-            leaderboardData.push({
-              uid: currentAuthUser.uid,
-              name: cuName,
-              points: sessionPoints,
-              avatar: cuData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(cuName)}&background=30bdb7&color=fff&size=120`,
-            });
-          }
-        }
+          return {
+            uid: userId,
+            name,
+            points: volunteerDoc.data().pointsEarned || 0,
+            avatar:
+              userData.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                name
+              )}&background=30bdb7&color=fff&size=120`,
+          };
+        });
 
         leaderboardData.sort((a, b) => b.points - a.points);
 
@@ -2522,7 +2497,7 @@ export default function EventActivity() {
     if (id) {
       fetchEventLeaderboard();
     }
-  }, [id, totalPointsEarned, userData]);
+  }, [id, totalPointsEarned]);
 
   useEffect(() => {
     const container = leaderboardListRef.current;
@@ -3205,32 +3180,6 @@ export default function EventActivity() {
                             </div>
                           );
                         })}
-                        {/* Pin current user below top 10 if they don't appear in it */}
-                        {currentUserId && currentUserIndex >= 10 && (() => {
-                          const cu = sortedLeaderboard[currentUserIndex];
-                          return (
-                            <>
-                              <div className="ea-leaderboard-divider">• • •</div>
-                              <div
-                                ref={currentUserRef}
-                                className="ea-leaderboard-row is-current-user"
-                                role="button"
-                                tabIndex={0}
-                                aria-label="Your position"
-                                onClick={() => openUserProfile(currentUserId)}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { openUserProfile(currentUserId); e.preventDefault(); } }}
-                              >
-                                <span className="ea-rank-num">{currentUserRank}</span>
-                                {cu.avatar
-                                  ? <img src={cu.avatar} alt={cu.name} className="ea-rank-avatar" />
-                                  : <span className="ea-rank-avatar ea-rank-initials">{(cu.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
-                                }
-                                <span className="ea-rank-name">{cu.name} <span style={{ fontSize: 11, opacity: 0.65 }}>(You)</span></span>
-                                <span className="ea-rank-pts">{cu.points} PTS</span>
-                              </div>
-                            </>
-                          );
-                        })()}
                       </div>
                     )}
                   </div>
@@ -3255,7 +3204,9 @@ export default function EventActivity() {
               <QRScanner key={scannerKey} onScan={handleQRScan} statusOverride={scanSuccess ? "Attendance Recorded" : undefined} />
               {qrStatus && (
                 <div>
-                  <div className={`qr-status ${scanSuccess ? "qr-status-success" : "qr-status-error"}`} style={{ whiteSpace: "pre-line" }}>{qrStatus}</div>
+                  {!scanSuccess && (
+                    <div className="qr-status qr-status-error" style={{ whiteSpace: "pre-line" }}>{qrStatus}</div>
+                  )}
                   {scanSuccess && scannedLocation && (
                     <div className="qr-location-details">
                       {scannedLocation.lat.toFixed(6)}, {scannedLocation.lng.toFixed(6)} (±{Math.round(scannedLocation.accuracy)}m)
@@ -3278,7 +3229,7 @@ export default function EventActivity() {
                           setScannerKey(k => k + 1);
                         }}
                       >
-                        📷 Scan Another
+                        Scan Another
                       </button>
                     )}
                     {!scanSuccess && (
