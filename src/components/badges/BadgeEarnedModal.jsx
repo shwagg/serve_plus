@@ -108,7 +108,7 @@ export default function BadgeEarnedModal({ badgeQueue = [], onDismiss }) {
           style={{ background: accentColor }}
           onClick={handleClose}
         >
-          {badgeQueue.length > 1 ? "Next →" : "Awesome!"}
+          {badgeQueue.length > 1 ? "Close" : "Awesome!"}
         </button>
       </div>
     </div>
