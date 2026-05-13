@@ -38,7 +38,7 @@ function PostSurveyWrapper({ missionId, volunteerId, ...otherProps }) {
 }
 */
 // --- End Example ---
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const colleges = [
   { name: 'College of Arts and Science (CAS)', programs: ['COMM', 'BMMA'] },
@@ -86,6 +86,7 @@ const PostActivitySurvey = ({
 }) => {
   const [form, setForm] = useState({
     name: initialName,
+
     engagementType: initialEngagementType,
     initiativeTitle: initialTitle,
     dateOfImplementation: initialDate,
@@ -102,6 +103,10 @@ const PostActivitySurvey = ({
     likert_6: '',
     likert_7: '',
   });
+
+  useEffect(() => {
+    if (initialName) setForm((prev) => ({ ...prev, name: initialName }));
+  }, [initialName]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -156,11 +161,12 @@ const PostActivitySurvey = ({
           accent-color: #30bdb7;
           padding: 10px 12px;
           font-size: 1rem;
-          background: #fafbfc;
+          background: #ffffff;
           color: #222;
           margin-top: 2px;
           outline: none;
           transition: border 0.2s;
+          cursor: text;
         }
         .post-activity-survey-form input:focus,
         .post-activity-survey-form select:focus,
@@ -169,9 +175,10 @@ const PostActivitySurvey = ({
         }
         .post-activity-survey-form input:disabled,
         .post-activity-survey-form select:disabled {
-          color: #808080;
-          background: #f1f1f1;
+          color: #9ca3af;
+          background: #f3f4f6;
           cursor: not-allowed;
+          border-color: #e5e7eb;
         }
         .post-activity-survey-form .post-likert-options {
           display: grid;
@@ -255,7 +262,7 @@ const PostActivitySurvey = ({
 
       <label>
         Name *
-        <input name="name" value={form.name} onChange={handleChange} required autoComplete="off" />
+        <input name="name" value={form.name} onChange={handleChange} required autoComplete="off" disabled={!!initialName} />
       </label>
 
       <label>

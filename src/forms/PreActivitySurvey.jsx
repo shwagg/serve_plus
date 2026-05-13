@@ -243,12 +243,13 @@ const PreActivitySurvey = ({
           accent-color: #30bdb7;
           padding: 10px 12px;
           font-size: 1rem;
-          background: #fafbfc;
+          background: #ffffff;
           color: #222;
           margin-top: 2px;
           margin-bottom: 0;
           outline: none;
           transition: border 0.2s;
+          cursor: text;
         }
         .pre-activity-survey-form input:focus,
         .pre-activity-survey-form select:focus,
@@ -258,9 +259,10 @@ const PreActivitySurvey = ({
         }
         .pre-activity-survey-form input:disabled,
         .pre-activity-survey-form select:disabled {
-          color: #808080;
-          background: #f1f1f1;
+          color: #9ca3af;
+          background: #f3f4f6;
           cursor: not-allowed;
+          border-color: #e5e7eb;
         }
         .pre-activity-survey-form fieldset {
           border: none;
