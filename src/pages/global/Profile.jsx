@@ -575,6 +575,25 @@ export default function Profile() {
 
         setProfile(prev => ({ ...prev, registeredEvents }));
 
+        const proposedEvents = missionsSnap.docs
+          .filter(d => d.data().createdBy === user.uid)
+          .map(d => ({
+            id: d.id,
+            title: d.data().title || d.id,
+            status: d.data().status || "unknown",
+            targetDate: (() => {
+              const td = d.data().targetDate;
+              if (td?.toDate) return td.toDate();
+              if (typeof td === "string" && td) return new Date(td);
+              return null;
+            })(),
+            proponents: d.data().proponents || [],
+            preparedBy: d.data().preparedBy || "",
+            projectType: d.data().projectType || "",
+            sdgs: d.data().sdgs || [],
+          }));
+        setProfile(prev => ({ ...prev, proposedEvents }));
+
       } catch (err) {
         setError("Failed to load profile.");
         setProfile(mockProfile);
@@ -850,6 +869,83 @@ export default function Profile() {
                                 <span className="peh-stat">⭐ {ev.pointsEarned || 0} pts</span>
                                 {tasksTotal > 0 && <span className="peh-stat">✅ {tasksDone}/{tasksTotal} tasks</span>}
                                 {ev.targetDate && <span className="peh-stat">📅 {ev.targetDate instanceof Date ? ev.targetDate.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : ev.targetDate}</span>}
+                              </div>
+                              {ev.sdgs && ev.sdgs.length > 0 && (
+                                <div className="peh-sdgs">
+                                  {ev.sdgs.slice(0, 5).map(sdg => (
+                                    <span key={sdg} className="peh-sdg-dot" style={{ background: SDG_COLORS[sdg] || "#234e7b" }} title={`SDG ${sdg}`}>#{sdg}</span>
+                                  ))}
+                                  {ev.sdgs.length > 5 && <span className="peh-sdg-dot" style={{ background: "#94a3b8" }}>+{ev.sdgs.length - 5}</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── Events I Proposed ───────────────────────────── */}
+              {(() => {
+                const proposed = profile.proposedEvents || [];
+                const statusMeta = {
+                  active:    { label: "Active",    bg: "#d1fae5", color: "#065f46" },
+                  published: { label: "Active",    bg: "#d1fae5", color: "#065f46" },
+                  completed: { label: "Completed", bg: "#dbeafe", color: "#1e40af" },
+                  cancelled: { label: "Cancelled", bg: "#fee2e2", color: "#991b1b" },
+                  pending:   { label: "Pending",   bg: "#fef9c3", color: "#854d0e" },
+                  unknown:   { label: "Unknown",   bg: "#f3f4f6", color: "#6b7280" },
+                };
+                const typeLabel = t =>
+                  t === "sl" ? "Service Learning"
+                  : t === "ce" ? "Community Engagement"
+                  : "Event";
+                return (
+                  <div className="peh-section" style={{ marginTop: 20 }}>
+                    <div className="peh-header">
+                      <div className="peh-title">
+                        📋 Events I Proposed{" "}
+                        <span className="peh-count">({proposed.length})</span>
+                      </div>
+                    </div>
+
+                    {proposed.length === 0 ? (
+                      <div className="peh-empty">
+                        You haven&apos;t proposed any events yet.
+                      </div>
+                    ) : (
+                      <div className="peh-grid">
+                        {proposed.map(ev => {
+                          const sm = statusMeta[ev.status] || statusMeta.unknown;
+                          return (
+                            <div className="peh-card" key={ev.id} style={{ borderLeft: "3px solid #30bdb7" }}>
+                              <div className="peh-card-top">
+                                <div className="peh-card-title">{ev.title}</div>
+                                <span className="peh-badge" style={{ background: sm.bg, color: sm.color }}>{sm.label}</span>
+                              </div>
+                              <div className="peh-card-row">
+                                <span className="peh-badge" style={{ background: "#f0fdf4", color: "#166534" }}>
+                                  🖊 Proponent
+                                </span>
+                                {ev.projectType && (
+                                  <span className="peh-badge" style={{ background: "#e8edf7", color: "#1f3b73" }}>
+                                    {typeLabel(ev.projectType)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="peh-card-stats">
+                                {ev.targetDate && (
+                                  <span className="peh-stat">
+                                    📅 {ev.targetDate instanceof Date
+                                      ? ev.targetDate.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })
+                                      : ev.targetDate}
+                                  </span>
+                                )}
+                                {ev.proponents && ev.proponents.length > 1 && (
+                                  <span className="peh-stat">👥 {ev.proponents.length} proponents</span>
+                                )}
                               </div>
                               {ev.sdgs && ev.sdgs.length > 0 && (
                                 <div className="peh-sdgs">

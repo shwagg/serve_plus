@@ -293,13 +293,39 @@ export default function CurrentEventMonitoring() {
           <div className="cem-summary-content">
 
             <h3 className="cem-project-name">{mission.title || "Untitled Event"}</h3>
-            <p className="cem-published">
-              Published By:{" "}
-              <strong>{typeof mission.waiver === 'string' ? mission.waiver : "wala pa sa firestore"}</strong>
-            </p>
+
+            {/* Proponent / Organizer spotlight */}
+            {(mission.preparedBy || (Array.isArray(mission.proponents) && mission.proponents.length > 0)) && (
+              <div style={{
+                background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)",
+                border: "1.5px solid #bfdbfe",
+                borderRadius: 10,
+                padding: "12px 16px",
+                marginBottom: 14,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+              }}>
+                <span style={{ fontSize: 20 }}>👤</span>
+                <div>
+                  <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
+                    Proponent / Organizer
+                  </div>
+                  {Array.isArray(mission.proponents) && mission.proponents.length > 0
+                    ? mission.proponents.map((p, i) => (
+                        <div key={i} style={{ fontSize: "0.9rem", fontWeight: i === 0 ? 700 : 500, color: "#1e293b" }}>
+                          {p}{i === 0 ? " (Lead)" : ""}
+                        </div>
+                      ))
+                    : <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#1e293b" }}>{mission.preparedBy}</div>
+                  }
+                </div>
+              </div>
+            )}
+
             <p className="cem-partner">
-              Partnering Organization:{""}
-              <strong>{mission.partnerOrg || "wala pa sa firestore"}</strong>
+              Partnering Organization:{" "}
+              <strong>{mission.partnerSchool || mission.partnerOrg || "N/A"}</strong>
             </p>
             <p></p>
             <strong>Details</strong>

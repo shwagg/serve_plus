@@ -796,9 +796,12 @@ const StudentHome = () => {
                         </div>
                         {Array.isArray(proposal.stakeholders) && proposal.stakeholders.length > 0 && (
                           <div className="mission-tags-row">
-                            {proposal.stakeholders.map((s, i) => (
+                            {proposal.stakeholders.slice(0, 2).map((s, i) => (
                               <span key={i} className="mission-tag">{s}</span>
                             ))}
+                            {proposal.stakeholders.length > 2 && (
+                              <span className="mission-tag mission-tag-more">+{proposal.stakeholders.length - 2} more</span>
+                            )}
                           </div>
                         )}
                         <div style={{ marginTop: 6, fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -892,9 +895,12 @@ const StudentHome = () => {
                     </div>
                     {Array.isArray(mission.stakeholders) && mission.stakeholders.length > 0 && (
                       <div className="mission-tags-row">
-                        {mission.stakeholders.map((s, i) => (
+                        {mission.stakeholders.slice(0, 2).map((s, i) => (
                           <span key={i} className="mission-tag">{s}</span>
                         ))}
+                        {mission.stakeholders.length > 2 && (
+                          <span className="mission-tag mission-tag-more">+{mission.stakeholders.length - 2} more</span>
+                        )}
                       </div>
                     )}
                   </div>

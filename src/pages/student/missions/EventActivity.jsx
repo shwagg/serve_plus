@@ -2284,6 +2284,38 @@ export default function EventActivity() {
           // Check enrollment status for each task and get volunteer points
           const user = auth.currentUser;
           if (user) {
+            // Auto-enroll the proponent/organizer (event creator) into the roster
+            // so they appear in the leaderboard and volunteer list without manually joining.
+            const eventData = eventSnap.data();
+            if (eventData.createdBy === user.uid) {
+              const proponentVolRef = doc(db, "missions", id, "volunteer", user.uid);
+              const proponentVolSnap = await getDoc(proponentVolRef);
+              if (!proponentVolSnap.exists()) {
+                await setDoc(proponentVolRef, {
+                  userId: user.uid,
+                  joinedAt: new Date().toISOString(),
+                  registrationStatus: "approved",
+                  completionStatus: "in_progress",
+                  role: "organizer",
+                  pointsEarned: 0,
+                  progress: {
+                    preSurvey: "not_required",
+                    consent: "not_required",
+                    attendance: "not_checked_in",
+                    postSurvey: "not_required",
+                  },
+                });
+                // Keep the reverse-index so chat / profile history loads correctly
+                setDoc(doc(db, "userMissions", user.uid, "missions", id), {
+                  missionId: id,
+                  title: eventData.title || "Untitled Mission",
+                  role: "organizer",
+                  date: eventData.targetDate || "",
+                  joinedAt: serverTimestamp(),
+                }).catch(() => {});
+              }
+            }
+
             // Fetch pre-activity survey
             const preSurveyRef = doc(
               db,
@@ -2856,6 +2888,19 @@ export default function EventActivity() {
                           <div>
                             <div className="ea-info-label">Volunteer Hours</div>
                             <div className="ea-info-value">{event.volunteerHours}</div>
+                          </div>
+                        </div>
+                      )}
+                      {(event.preparedBy || (Array.isArray(event.proponents) && event.proponents.length > 0)) && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">👤</span>
+                          <div>
+                            <div className="ea-info-label">Proponent(s)</div>
+                            <div className="ea-info-value">
+                              {Array.isArray(event.proponents) && event.proponents.length > 0
+                                ? event.proponents.join(', ')
+                                : event.preparedBy}
+                            </div>
                           </div>
                         </div>
                       )}

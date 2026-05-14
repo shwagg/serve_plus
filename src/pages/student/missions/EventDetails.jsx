@@ -137,6 +137,15 @@ export default function EventDetails({ onClose = null, missionId = null }) {
     }
   }, [volunteer, id, navigate]);
 
+  // Proponents/organizers go straight into the event — no join step needed
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || !mission) return;
+    if (mission.createdBy === user.uid) {
+      navigate(`/event/${id}/activity?mode=active`);
+    }
+  }, [mission, id, navigate]);
+
   const handleCancelRequest = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -282,6 +291,17 @@ export default function EventDetails({ onClose = null, missionId = null }) {
                         : "TBA"}
                     </span>
                   </div>
+
+                  {(mission.preparedBy || (Array.isArray(mission.proponents) && mission.proponents.length > 0)) && (
+                    <div className="event-meta-item">
+                      👤 <span>
+                        <strong>Proposed by: </strong>
+                        {Array.isArray(mission.proponents) && mission.proponents.length > 0
+                          ? mission.proponents.join(', ')
+                          : mission.preparedBy}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -343,8 +363,9 @@ export default function EventDetails({ onClose = null, missionId = null }) {
 
               {/* Right: join / flagged / already enrolled button */}
               <div className="event-details-action">
-                {/* Attendance flag check — active flag blocks joining */}
-                {attendanceFlag?.flagged && !attendanceFlag?.expired ? (
+                {/* Attendance flag check — active flag blocks joining.
+                    Exception: the event's own proponent/creator is never blocked. */}
+                {attendanceFlag?.flagged && !attendanceFlag?.expired && mission?.createdBy !== auth.currentUser?.uid ? (
                   <div style={{ textAlign: 'center' }}>
                     <button
                       className="event-details-join-btn"

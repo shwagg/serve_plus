@@ -52,6 +52,17 @@ function EventCard({ mission, onClick }) {
 
       <h3 className="rp-card-title">{mission.title || "Untitled Event"}</h3>
 
+      {(mission.preparedBy || (Array.isArray(mission.proponents) && mission.proponents.length > 0)) && (
+        <div style={{ fontSize: "0.78rem", color: "#64748b", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
+          👤 <span>
+            <strong>Proposed by: </strong>
+            {Array.isArray(mission.proponents) && mission.proponents.length > 0
+              ? mission.proponents[0]
+              : mission.preparedBy}
+          </span>
+        </div>
+      )}
+
       {mission.description && (
         <p className="rp-card-desc">
           {mission.description.length > 100
@@ -317,6 +328,7 @@ export default function CurrentEvent() {
         name: uData.name || "Unknown",
         level: uData.level || "--",
         email: uData.email || "",
+        role: vData.role || "volunteer",
         joinedAt: vData.joinedAt,
         registrationStatus: vData.registrationStatus || "pending",
         attendanceStatus: vData.progress?.attendance || null,
@@ -350,11 +362,17 @@ export default function CurrentEvent() {
       query(collection(db, "missions", mid, "volunteer"), where("registrationStatus", "==", "approved"))
     );
     let count = 0;
+    // The event creator and anyone with an organizer role are exempt from flagging
+    const isOrganizerRole = r => r === "organizer" || r === "lead_organizer" || r === "lead organizer";
+
     for (const vDoc of vSnap.docs) {
       const vData = vDoc.data();
       const userId = vDoc.id;
       if (vData.progress?.attendance === "present") continue;
       if (!allowReFlag && vData.attendanceFlagProcessed === true) continue;
+      // Skip the event organizer/proponent — they ran the event, should not be flagged
+      if (userId === mission.createdBy) continue;
+      if (isOrganizerRole(vData.role)) continue;
       const flagExpiry = new Date(now);
       flagExpiry.setDate(flagExpiry.getDate() + FLAG_DURATION_DAYS);
       await updateDoc(doc(db, "users", userId), {
@@ -468,6 +486,17 @@ export default function CurrentEvent() {
           ));
         }
       } else {
+        // Protect the event organizer/proponent from manual flagging
+        const targetVolunteer = rosterVolunteers.find(v => v.id === userId);
+        const isOrganizer =
+          targetVolunteer?.role === "organizer" ||
+          targetVolunteer?.role === "lead_organizer" ||
+          targetVolunteer?.role === "lead organizer" ||
+          userId === missionData?.createdBy;
+        if (isOrganizer) {
+          showToast("The event organizer/proponent cannot be flagged.");
+          return;
+        }
         const now = new Date();
         const flagExpiry = new Date(now);
         flagExpiry.setDate(flagExpiry.getDate() + FLAG_DURATION_DAYS);
@@ -745,6 +774,20 @@ export default function CurrentEvent() {
         )
       );
       showToast(`Event closed and marked as ${statusLabel}. ${rosterVolunteers.length} volunteer(s) notified.`);
+      // Notify the proponent (event creator) when the event is completed
+      if (!isCancelled && missionData?.createdBy) {
+        try {
+          await addDoc(collection(db, "users", missionData.createdBy, "notifications"), {
+            type: "event_proponent_recognition",
+            title: "🎉 Your Event Was Completed!",
+            message: `Great work! "${missionData?.title || "Your event"}" has been successfully completed with ${rosterVolunteers.length} volunteer(s). Thank you for organizing this initiative!`,
+            link: `/event/${missionId}`,
+            eventId: missionId,
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        } catch (_) { /* non-critical */ }
+      }
       navigate("/admin/current-event");
     } catch (_) {
       showToast("Failed to close event. Try again.");
@@ -1037,6 +1080,18 @@ export default function CurrentEvent() {
                             <div style={{ fontWeight: 600, color: "#1e293b" }}>{v.name}</div>
                             {v.email && <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>{v.email}</div>}
                           </div>
+                          {(v.role === "organizer" || v.role === "lead_organizer") && (
+                            <span style={{
+                              padding: "2px 8px",
+                              background: v.role === "lead_organizer" ? "#faf5ff" : "#eff6ff",
+                              color: v.role === "lead_organizer" ? "#6b21a8" : "#1d4ed8",
+                              borderRadius: 99, fontSize: 11, fontWeight: 700,
+                              border: `1px solid ${v.role === "lead_organizer" ? "#d8b4fe" : "#bfdbfe"}`,
+                              whiteSpace: "nowrap",
+                            }}>
+                              {v.role === "lead_organizer" ? "🎯 Lead Organizer" : "📋 Organizer"}
+                            </span>
+                          )}
                           {v.isFlagged && (
                             <>
                               <span title={`Flagged${v.flagExpiry ? " until " + v.flagExpiry.toLocaleDateString() : ""}`}>🚩</span>
