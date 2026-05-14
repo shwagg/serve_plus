@@ -158,6 +158,9 @@ export default function CurrentEvent() {
   const [flagging, setFlagging] = useState(false);
   const [flagResult, setFlagResult] = useState(null);
   const [togglingAttendance, setTogglingAttendance] = useState({});
+  const [assigningRole, setAssigningRole] = useState({});   // userId → true while saving
+  const [editingRoleFor, setEditingRoleFor] = useState(null); // userId whose role is being edited
+  const [pendingRole, setPendingRole] = useState("");         // selected value in the dropdown
 
   // ── edit details state ────────────────────────────────────────────
   const [editingDetails, setEditingDetails] = useState(false);
@@ -562,6 +565,41 @@ export default function CurrentEvent() {
       ));
     } finally {
       setTogglingAttendance(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  // ── assign volunteer role (admin only) ───────────────────────────
+  const handleAssignVolunteerRole = async (userId, newRole) => {
+    if (!newRole) return;
+    setAssigningRole(prev => ({ ...prev, [userId]: true }));
+    try {
+      await updateDoc(doc(db, "missions", missionId, "volunteer", userId), { role: newRole });
+      // Best-effort update of the reverse index so the volunteer's profile reflects the change
+      updateDoc(doc(db, "userMissions", userId, "missions", missionId), { role: newRole }).catch(() => {});
+      const volunteer = rosterVolunteers.find(v => v.id === userId);
+      logAudit({
+        action: "VOLUNTEER_ROLE_ASSIGNED",
+        category: "event",
+        details: {
+          missionId,
+          missionTitle: missionData?.title || "",
+          targetUserId: userId,
+          targetUserName: volunteer?.name || "",
+          previousRole: volunteer?.role || "",
+          newRole,
+        },
+      });
+      setRosterVolunteers(prev => prev.map(v =>
+        v.id === userId ? { ...v, role: newRole } : v
+      ));
+      setEditingRoleFor(null);
+      setPendingRole("");
+      const volunteer2 = rosterVolunteers.find(v => v.id === userId);
+      showToast(`Role updated to "${newRole}" for ${volunteer2?.name || "volunteer"}.`);
+    } catch {
+      showToast("Failed to update role. Please try again.");
+    } finally {
+      setAssigningRole(prev => ({ ...prev, [userId]: false }));
     }
   };
 
@@ -1141,6 +1179,59 @@ export default function CurrentEvent() {
                           >
                             {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
                           </button>
+
+                          {/* ── Assign organizer role ── */}
+                          {editingRoleFor === v.id ? (
+                            <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                              <select
+                                value={pendingRole}
+                                onChange={e => setPendingRole(e.target.value)}
+                                disabled={!!assigningRole[v.id]}
+                                style={{
+                                  padding: "3px 6px", border: "1.5px solid #cbd5e1",
+                                  borderRadius: 5, fontSize: 11, fontFamily: "inherit",
+                                  color: "#1e293b", background: "#fff", cursor: "pointer",
+                                }}
+                              >
+                                <option value="">Pick role…</option>
+                                <option value="volunteer">Volunteer</option>
+                                <option value="organizer">📋 Organizer</option>
+                                <option value="lead_organizer">🎯 Lead Organizer</option>
+                              </select>
+                              <button
+                                disabled={!pendingRole || !!assigningRole[v.id]}
+                                onClick={() => handleAssignVolunteerRole(v.id, pendingRole)}
+                                style={{
+                                  padding: "3px 8px", background: "#1f3b73", color: "#fff",
+                                  border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                                  cursor: (!pendingRole || assigningRole[v.id]) ? "not-allowed" : "pointer",
+                                  opacity: (!pendingRole || assigningRole[v.id]) ? 0.6 : 1,
+                                }}
+                              >
+                                {assigningRole[v.id] ? "…" : "Save"}
+                              </button>
+                              <button
+                                onClick={() => { setEditingRoleFor(null); setPendingRole(""); }}
+                                style={{
+                                  padding: "3px 7px", background: "#f1f5f9", color: "#475569",
+                                  border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingRoleFor(v.id); setPendingRole(v.role || "volunteer"); }}
+                              style={{
+                                padding: "3px 8px", background: "#eff6ff", color: "#1d4ed8",
+                                border: "1px solid #bfdbfe", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                                cursor: "pointer", whiteSpace: "nowrap",
+                              }}
+                            >
+                              Assign Role
+                            </button>
+                          )}
                         </td>
                       )}
                     </tr>
