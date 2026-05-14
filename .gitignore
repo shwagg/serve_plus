@@ -31,6 +31,8 @@ firestore-debug.log
 .env.development
 .env.production
 .env.blackboard
+.env.serveplus-a806e
+functions/.env*
 
 
 # SYSTEM / EDITORS

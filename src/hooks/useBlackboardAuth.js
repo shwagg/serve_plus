@@ -1,21 +1,18 @@
 import { useCallback } from "react";
-import { OAuthProvider, signInWithRedirect } from "firebase/auth";
-import { auth } from "../firebaseConfig";
 
-const BLACKBOARD_OIDC_PROVIDER_ID =
-  import.meta.env.VITE_BLACKBOARD_OIDC_PROVIDER_ID || "oidc.oidc.blackboard";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export function useBlackboardAuth() {
-  const initiateOidc = useCallback(() => {
-    const provider = new OAuthProvider(BLACKBOARD_OIDC_PROVIDER_ID);
-    provider.addScope("openid");
-    provider.addScope("email");
-    provider.addScope("profile");
+  const initiateBlackboardAuth = useCallback(() => {
+    if (!API_URL) {
+      throw new Error("VITE_API_URL is not configured.");
+    }
 
-    return signInWithRedirect(auth, provider);
+    const baseUrl = API_URL.replace(/\/+$/, "");
+    window.location.assign(`${baseUrl}/auth/blackboard/start`);
   }, []);
 
-  return initiateOidc;
+  return initiateBlackboardAuth;
 }
 
 export default useBlackboardAuth;

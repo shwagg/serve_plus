@@ -45,8 +45,12 @@ exports.verifyMfaCode = onCall(
   verifyMfaCode
 );
 
-// Blackboard OAuth callback (HTTP request handler, not callable)
-const { blackboardCallback } = require("./src/auth/blackboardCallback");
+// Blackboard OAuth bridge (HTTP request handler, not callable)
+const {
+  blackboardAuth,
+  blackboardCallback,
+} = require("./src/auth/blackboardCallback");
+exports.blackboardAuth = blackboardAuth;
 exports.blackboardCallback = blackboardCallback;
 
 // Backup & Restore functions

@@ -81,6 +81,7 @@ function App() {
         <Routes>
                     <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/blackboard/complete" element={<OAuthCallback />} />
           <Route path="/oauth-callback" element={<OAuthCallback />} />
           <Route path="/reset-password" element={<ForgotPass />} />
           <Route path="/register" element={<Register />} />

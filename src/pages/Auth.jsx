@@ -33,6 +33,7 @@ function Auth() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const initiateBlackboardAuth = useBlackboardAuth();
 
   const isDev = import.meta.env.DEV; //(Dev-only switch)
@@ -40,7 +41,8 @@ function Auth() {
 
   const [step, setStep] = useState("login"); //"login" or "mfa"
   const [mfaRole, setMfaRole] = useState("admin"); // tracks which privileged role is doing MFA
-  const intendedPath = useLocation().state?.from || null;
+  const intendedPath = location.state?.from || null;
+  const blackboardComplete = Boolean(location.state?.blackboardComplete);
   const [mfaCode, setMfaCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -51,69 +53,98 @@ function Auth() {
   const [pendingNavigation, setPendingNavigation] = useState(null); // stores role, uid, email, userCred
 
   useEffect(() => {
+    const callbackError = new URLSearchParams(location.search).get("error");
+    if (callbackError) setError(callbackError);
+  }, [location.search]);
+
+  useEffect(() => {
     let cancelled = false;
 
-    const handleBlackboardRedirectResult = async () => {
+    const completeBlackboardSignIn = async (firebaseUser) => {
+      const uid = firebaseUser.uid;
+      const email = firebaseUser.email || "";
+      console.log("Blackboard sign-in successful, uid:", uid);
+
+      const userRef = doc(db, "users", uid);
+      let userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid,
+          email,
+          name: firebaseUser.displayName || email || "Blackboard User",
+          role: "student",
+          status: "active",
+          authProvider: "blackboard",
+          createdAt: new Date(),
+        });
+
+        userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          setError("Failed to create user profile.");
+          return;
+        }
+      }
+
+      const { role, status } = userSnap.data();
+      if (status !== "active") {
+        setError("Your account is blocked.");
+        return;
+      }
+
+      const logLogin = httpsCallable(functions, "logLogin");
+      logLogin({ uid }).catch((err) => console.warn("Audit log failed:", err));
+
+      const userAgreementVersion = userSnap.data().agreementVersion || null;
+      const currentVersion = await fetchCurrentAgreementVersion();
+      if (userAgreementVersion !== currentVersion) {
+        setPendingNavigation({
+          role,
+          uid,
+          email,
+          userCred: { user: firebaseUser },
+          authProvider: "blackboard",
+        });
+        setShowAgreement(true);
+        return;
+      }
+
+      navigate(getBlackboardRedirectPath(role), { replace: true });
+    };
+
+    const handleBlackboardAuthResult = async () => {
       try {
         const userCred = await getRedirectResult(auth);
-        if (!userCred || cancelled) return;
 
-        const uid = userCred.user.uid;
-        const email = userCred.user.email || "";
-        console.log("Blackboard OIDC sign-in successful, uid:", uid);
+        if (cancelled) return;
 
-        const userRef = doc(db, "users", uid);
-        let userSnap = await getDoc(userRef);
+        if (userCred?.user) {
+          await completeBlackboardSignIn(userCred.user);
+          return;
+        }
 
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            uid,
-            email,
-            name: userCred.user.displayName || email || "Blackboard User",
-            role: "student",
-            status: "active",
-            authProvider: "blackboard",
-            createdAt: new Date(),
-          });
-
-          userSnap = await getDoc(userRef);
-          if (!userSnap.exists()) {
-            setError("Failed to create user profile.");
+        if (blackboardComplete) {
+          if (!auth.currentUser) {
+            setError("Blackboard sign-in could not be completed.");
             return;
           }
-        }
 
-        const { role, status } = userSnap.data();
-        if (status !== "active") {
-          setError("Your account is blocked.");
+          await completeBlackboardSignIn(auth.currentUser);
           return;
         }
-
-        const logLogin = httpsCallable(functions, "logLogin");
-        logLogin({ uid }).catch((err) => console.warn("Audit log failed:", err));
-
-        const userAgreementVersion = userSnap.data().agreementVersion || null;
-        const currentVersion = await fetchCurrentAgreementVersion();
-        if (userAgreementVersion !== currentVersion) {
-          setPendingNavigation({ role, uid, email, userCred, authProvider: "blackboard" });
-          setShowAgreement(true);
-          return;
-        }
-
-        navigate(getBlackboardRedirectPath(role), { replace: true });
       } catch (err) {
         if (cancelled) return;
-        if (isDev) console.error("Blackboard OIDC login error:", err);
+        if (isDev) console.error("Blackboard login error:", err);
         setError("Blackboard sign-in failed. Please try again.");
       }
     };
 
-    handleBlackboardRedirectResult();
+    handleBlackboardAuthResult();
 
     return () => {
       cancelled = true;
     };
-  }, [isDev, navigate]);
+  }, [blackboardComplete, isDev, navigate]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -150,7 +181,7 @@ function Auth() {
     try {
       await initiateBlackboardAuth();
     } catch (err) {
-      if (isDev) console.error("Blackboard OIDC redirect error:", err);
+      if (isDev) console.error("Blackboard redirect error:", err);
       setError("Blackboard sign-in could not start. Please try again.");
     }
   };
