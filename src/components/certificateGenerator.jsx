@@ -66,6 +66,9 @@ export default function CertificateGenerator() {
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
 
+  // Stable certificate ID — generated once, shared across export and release
+  const [certificateId] = useState(() => generateCertificateId());
+
   // Live preview state
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -80,8 +83,7 @@ export default function CertificateGenerator() {
   const generatePreview = useCallback(async () => {
     setPreviewLoading(true);
     try {
-      const tempId = generateCertificateId();
-      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: tempId });
+      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: certificateId });
       // Revoke previous blob URL
       if (previewBlobRef.current) URL.revokeObjectURL(previewBlobRef.current);
       const url = URL.createObjectURL(blob);
@@ -92,7 +94,7 @@ export default function CertificateGenerator() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [recipient, course, date, loc, day, month, year]);
+  }, [recipient, course, date, loc, day, month, year, certificateId]);
 
   useEffect(() => {
     // Only auto-preview if at least recipient or course has a value
@@ -115,8 +117,7 @@ export default function CertificateGenerator() {
 
   const handleOpenFullscreen = async () => {
     try {
-      const tempId = generateCertificateId();
-      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: tempId });
+      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: certificateId });
       if (modalUrl) URL.revokeObjectURL(modalUrl);
       const url = URL.createObjectURL(blob);
       setModalUrl(url);
@@ -140,15 +141,14 @@ export default function CertificateGenerator() {
       return;
     }
     try {
-      const certId = generateCertificateId();
       const safeRecipient = (recipient || "recipient").replace(/[^a-zA-Z0-9_\-]/g, "_");
       const safeCourse = (course || "event").replace(/[^a-zA-Z0-9_\-]/g, "_");
       const fileName = `${safeRecipient}_${safeCourse}.pdf`;
 
-      const certData = { fileName, recipient, course, date, loc, day, month, year, certificateId: certId, releasedAt: serverTimestamp() };
+      const certData = { fileName, recipient, course, date, loc, day, month, year, certificateId: certificateId, releasedAt: serverTimestamp() };
       const certDocRef = await addDoc(collection(doc(db, "users", userID), "certificates"), certData);
 
-      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId });
+      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: certificateId });
       const storage = getStorage(app);
       const storageRef = ref(storage, `event-certificates/${userID}/${fileName}`);
       await uploadBytes(storageRef, blob);
