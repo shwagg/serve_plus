@@ -9,8 +9,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import bbl_icon from "../assets/bbl_icon.svg";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
-import loginPosterGif from "../assets/login_poster_loop.gif";
-import loginPosterFallback from "../assets/login_poster_img.svg";
+// import loginPosterGif from "../assets/login_poster_loop.gif"; // temporarily removed
+// import loginPosterFallback from "../assets/login_poster_img.svg"; // temporarily removed
 import AgreementModal, {
   fetchCurrentAgreementVersion,
 } from "../components/AgreementModal";
@@ -434,10 +434,10 @@ function Auth() {
       {step === "login" && (
         <div className="auth-page">
           <div className="auth-split">
-            {/* Left: poster */}
-            <div className="auth-poster-panel">
-              <img src={loginPosterGif} alt="SERVE+ illustration" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = loginPosterFallback; }} />
-            </div>
+            {/* Left: poster — temporarily hidden */}
+            {/* <div className="auth-poster-panel">
+              <img src={loginPosterFallback} alt="SERVE+ illustration" />
+            </div> */}
 
             {/* Right: form */}
             <div className="auth-form-panel">
@@ -527,9 +527,9 @@ function Auth() {
       {step === "mfa" && (
         <div className="auth-page">
           <div className="auth-split">
-            <div className="auth-poster-panel">
-              <img src={loginPosterGif} alt="SERVE+ illustration" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = loginPosterFallback; }} />
-            </div>
+            {/* <div className="auth-poster-panel">
+              <img src={loginPosterFallback} alt="SERVE+ illustration" />
+            </div> */}
             <div className="auth-form-panel">
               <form className="ui-form auth-login-form" onSubmit={handleVerifyMfa}>
                 <div style={{ fontSize: 52, marginBottom: 6 }}>🔐</div>
