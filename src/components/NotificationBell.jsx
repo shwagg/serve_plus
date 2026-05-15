@@ -14,7 +14,9 @@ import "./styles/NotificationBell.css";
 
 export default function NotificationBell() {
   const { userData } = useSession();
-  const notifEnabled = userData?.globalNotificationsEnabled !== false;
+  const [notifEnabled, setNotifEnabled] = useState(
+    () => userData?.globalNotificationsEnabled !== false
+  );
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -46,13 +48,17 @@ export default function NotificationBell() {
     return () => unsubscribe();
   }, [userId]);
 
-  // Watch totalPoints for admin-released mission points
+  // Watch user doc for real-time updates (totalPoints + globalNotificationsEnabled)
   useEffect(() => {
     if (!userId) return;
     const userRef = doc(db, "users", userId);
     const unsubscribe = onSnapshot(userRef, (snap) => {
       if (!snap.exists()) return;
-      const pts = snap.data().totalPoints || 0;
+      const data = snap.data();
+
+      setNotifEnabled(data.globalNotificationsEnabled !== false);
+
+      const pts = data.totalPoints || 0;
       if (prevPointsRef.current !== null && pts > prevPointsRef.current) {
         const gained = pts - prevPointsRef.current;
         createNotification(userId, {

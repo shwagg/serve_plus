@@ -13,11 +13,11 @@ import { VisibilityIcon, VisibilityOffIcon, CloseIcon } from "./icons";
 import "./styles/SettingsModal.css";
 
 const SECTIONS = [
-  { id: "profile",      label: "Profile",             icon: "👤" },
-  { id: "terms",        label: "Terms & Privacy",      icon: "📜" },
-  { id: "notifications",label: "Notifications",        icon: "🔔" },
-  { id: "certificate",  label: "Verify Certificate",   icon: "✅" },
-  { id: "audit",        label: "Audit Log",            icon: "📋" },
+  { id: "profile",       icon: "👤", label: "Profile"           },
+  { id: "terms",         icon: "📄", label: "Terms & Privacy"   },
+  { id: "notifications", icon: "🔔", label: "Notifications"     },
+  { id: "certificate",   icon: "🏅", label: "Verify Certificate" },
+  { id: "audit",         icon: "🕒", label: "Audit Log"         },
 ];
 
 export default function SettingsModal({ isOpen, onClose }) {
@@ -45,6 +45,8 @@ export default function SettingsModal({ isOpen, onClose }) {
   // Notifications
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [savingNotif, setSavingNotif] = useState(false);
+  const [announcementsEnabled, setAnnouncementsEnabled] = useState(true);
+  const [savingAnnouncements, setSavingAnnouncements] = useState(false);
 
   // Audit log
   const [auditLogs, setAuditLogs] = useState([]);
@@ -55,6 +57,7 @@ export default function SettingsModal({ isOpen, onClose }) {
     if (isOpen && userData) {
       setUsername(userData.username || "");
       setNotifEnabled(userData.globalNotificationsEnabled !== false);
+      setAnnouncementsEnabled(userData.announcementsEnabled !== false);
       setUsernameError(""); setUsernameSuccess("");
       setPasswordError(""); setPasswordSuccess("");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
@@ -168,6 +171,21 @@ export default function SettingsModal({ isOpen, onClose }) {
       setNotifEnabled(!val);
     } finally {
       setSavingNotif(false);
+    }
+  };
+
+  const handleToggleAnnouncements = async (val) => {
+    setAnnouncementsEnabled(val);
+    setSavingAnnouncements(true);
+    try {
+      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+        announcementsEnabled: val,
+      });
+      await refreshUserData();
+    } catch {
+      setAnnouncementsEnabled(!val);
+    } finally {
+      setSavingAnnouncements(false);
     }
   };
 
@@ -397,18 +415,44 @@ export default function SettingsModal({ isOpen, onClose }) {
                   </p>
                   <div className="settings-toggle-row">
                     <div>
-                      <p className="settings-toggle-label">Global Notifications</p>
+                      <p className="settings-toggle-label">Notification Bell</p>
                       <p className="settings-toggle-sublabel">
-                        Show in-app alerts and activity updates
+                        When off, the unread count badge is hidden from the bell
                       </p>
                     </div>
-                    <button
+                    <div
                       className={`settings-toggle${notifEnabled ? " on" : ""}`}
+                      role="switch"
+                      aria-checked={notifEnabled}
+                      tabIndex={0}
                       onClick={() => !savingNotif && handleToggleNotifications(!notifEnabled)}
-                      aria-label={notifEnabled ? "Disable notifications" : "Enable notifications"}
+                      onKeyDown={e => e.key === "Enter" || e.key === " " ? handleToggleNotifications(!notifEnabled) : null}
+                      aria-label={notifEnabled ? "Disable notification bell" : "Enable notification bell"}
                     >
                       <span className="settings-toggle-thumb" />
-                    </button>
+                    </div>
+                  </div>
+
+                  <div className="settings-divider" />
+
+                  <div className="settings-toggle-row">
+                    <div>
+                      <p className="settings-toggle-label">Community Updates</p>
+                      <p className="settings-toggle-sublabel">
+                        When off, the 📢 announcements button is hidden from the page
+                      </p>
+                    </div>
+                    <div
+                      className={`settings-toggle${announcementsEnabled ? " on" : ""}`}
+                      role="switch"
+                      aria-checked={announcementsEnabled}
+                      tabIndex={0}
+                      onClick={() => !savingAnnouncements && handleToggleAnnouncements(!announcementsEnabled)}
+                      onKeyDown={e => e.key === "Enter" || e.key === " " ? handleToggleAnnouncements(!announcementsEnabled) : null}
+                      aria-label={announcementsEnabled ? "Hide community updates" : "Show community updates"}
+                    >
+                      <span className="settings-toggle-thumb" />
+                    </div>
                   </div>
                 </div>
               )}
