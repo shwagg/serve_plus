@@ -53,103 +53,11 @@ function Auth() {
   const [pendingNavigation, setPendingNavigation] = useState(null); // stores role, uid, email, userCred
 
   useEffect(() => {
-<<<<<<< Updated upstream
     const callbackError = new URLSearchParams(location.search).get("error");
     if (callbackError) setError(callbackError);
   }, [location.search]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const completeBlackboardSignIn = async (firebaseUser) => {
-      const uid = firebaseUser.uid;
-      const email = firebaseUser.email || "";
-      console.log("Blackboard sign-in successful, uid:", uid);
-
-      const userRef = doc(db, "users", uid);
-      let userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          uid,
-          email,
-          name: firebaseUser.displayName || email || "Blackboard User",
-          role: "student",
-          status: "active",
-          authProvider: "blackboard",
-          createdAt: new Date(),
-        });
-
-        userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          setError("Failed to create user profile.");
-          return;
-        }
-      }
-
-      const { role, status } = userSnap.data();
-      if (status !== "active") {
-        setError("Your account is blocked.");
-        return;
-      }
-
-      const logLogin = httpsCallable(functions, "logLogin");
-      logLogin({ uid }).catch((err) => console.warn("Audit log failed:", err));
-
-      const userAgreementVersion = userSnap.data().agreementVersion || null;
-      const currentVersion = await fetchCurrentAgreementVersion();
-      if (userAgreementVersion !== currentVersion) {
-        setPendingNavigation({
-          role,
-          uid,
-          email,
-          userCred: { user: firebaseUser },
-          authProvider: "blackboard",
-        });
-        setShowAgreement(true);
-        return;
-      }
-
-      navigate(getBlackboardRedirectPath(role), { replace: true });
-    };
-
-    const handleBlackboardAuthResult = async () => {
-      try {
-        const userCred = await getRedirectResult(auth);
-
-        if (cancelled) return;
-
-        if (userCred?.user) {
-          await completeBlackboardSignIn(userCred.user);
-          return;
-        }
-
-        if (blackboardComplete) {
-          if (!auth.currentUser) {
-            setError("Blackboard sign-in could not be completed.");
-            return;
-          }
-
-          await completeBlackboardSignIn(auth.currentUser);
-          return;
-        }
-      } catch (err) {
-        if (cancelled) return;
-        if (isDev) console.error("Blackboard login error:", err);
-        setError("Blackboard sign-in failed. Please try again.");
-      }
-    };
-
-    handleBlackboardAuthResult();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [blackboardComplete, isDev, navigate]);
-
-  useEffect(() => {
-=======
->>>>>>> Stashed changes
     if (cooldown <= 0) return;
     const t = setInterval(() => setCooldown((c) => c - 1), 1000);
     return () => clearInterval(t);
