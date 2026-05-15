@@ -672,6 +672,23 @@ export default function Profile() {
               </div>
             </div>
           </div>
+          {(profile.department || profile.program) && (
+            <div style={{ width: "100%", marginTop: 18 }}>
+              <div className="profile-skills-label">Department & Program</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                {profile.department && (
+                  <span style={{ fontSize: "0.85rem", color: "#475569", background: "#f1f5f9", borderRadius: 8, padding: "4px 10px", display: "inline-block" }}>
+                    {profile.department}
+                  </span>
+                )}
+                {profile.program && (
+                  <span style={{ fontSize: "0.85rem", color: "#234e7b", background: "#e0f2fe", borderRadius: 8, padding: "4px 10px", display: "inline-block", fontWeight: 600 }}>
+                    {profile.program}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div style={{ width: "100%", marginTop: 18 }}>
             <div className="profile-skills-label">Skills</div>
             <div className="profile-skills-list">
