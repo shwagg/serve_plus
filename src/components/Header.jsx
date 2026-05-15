@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db, functions } from '../firebaseConfig';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { useSession } from '../context/SessionContext';
@@ -86,8 +86,20 @@ export default function Header() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
+  const [announcementsEnabled, setAnnouncementsEnabled] = useState(true);
   const menuRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const unsubscribe = onSnapshot(doc(db, "users", uid), (snap) => {
+      if (!snap.exists()) return;
+      setAnnouncementsEnabled(snap.data().announcementsEnabled !== false);
+    });
+    return () => unsubscribe();
+  }, [userData]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -276,7 +288,7 @@ export default function Header() {
         </div>
       </header>
       <div className="header-fade-gradient" aria-hidden="true" />
-      {userRole !== 'admin' && (
+      {userRole !== 'admin' && announcementsEnabled && (
         <>
           <GlobalNotificationButton
             unreadCount={announcementUnreadCount}
