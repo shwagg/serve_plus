@@ -2,7 +2,7 @@
 //After logging in, MFA are placed for admin since it has sensitive role such
 //as approving, publishing, issuing certificates, and other high impact actions.
 
-import { getRedirectResult, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
@@ -53,6 +53,7 @@ function Auth() {
   const [pendingNavigation, setPendingNavigation] = useState(null); // stores role, uid, email, userCred
 
   useEffect(() => {
+<<<<<<< Updated upstream
     const callbackError = new URLSearchParams(location.search).get("error");
     if (callbackError) setError(callbackError);
   }, [location.search]);
@@ -147,6 +148,8 @@ function Auth() {
   }, [blackboardComplete, isDev, navigate]);
 
   useEffect(() => {
+=======
+>>>>>>> Stashed changes
     if (cooldown <= 0) return;
     const t = setInterval(() => setCooldown((c) => c - 1), 1000);
     return () => clearInterval(t);
