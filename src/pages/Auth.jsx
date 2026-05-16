@@ -2,7 +2,7 @@
 //After logging in, MFA are placed for admin since it has sensitive role such
 //as approving, publishing, issuing certificates, and other high impact actions.
 
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { getRedirectResult, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";

@@ -214,13 +214,23 @@ async function exchangeCodeForToken(code, config) {
     redirect_uri: config.redirectUri,
   }).toString();
 
-  const response = await axios.post(config.tokenEndpoint, body, {
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Authorization": `Basic ${credentials}`,
-    },
-    timeout: 15000,
-  });
+  let response;
+  try {
+    response = await axios.post(config.tokenEndpoint, body, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Basic ${credentials}`,
+      },
+      timeout: 15000,
+    });
+  } catch (error) {
+    console.error("Blackboard token exchange failed:", {
+      status: error.response?.status,
+      code: error.response?.data?.code || error.response?.data?.error,
+      message: error.response?.data?.message || error.response?.data?.error_description,
+    });
+    throw new Error("Blackboard token exchange failed");
+  }
 
   return response.data;
 }
@@ -228,12 +238,22 @@ async function exchangeCodeForToken(code, config) {
 async function fetchBlackboardUserProfile(accessToken, config) {
   requireConfig(config, ["userinfoEndpoint"]);
 
-  const response = await axios.get(config.userinfoEndpoint, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    timeout: 15000,
-  });
+  let response;
+  try {
+    response = await axios.get(config.userinfoEndpoint, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      timeout: 15000,
+    });
+  } catch (error) {
+    console.error("Blackboard user profile fetch failed:", {
+      status: error.response?.status,
+      code: error.response?.data?.code || error.response?.data?.error,
+      message: error.response?.data?.message || error.response?.data?.error_description,
+    });
+    throw new Error("Blackboard user profile fetch failed");
+  }
 
   return response.data;
 }
@@ -290,6 +310,7 @@ function extractBlackboardUser(profile) {
 }
 
 async function createOrUpdateFirebaseUser(user) {
+  const blackboardAuthUid = user.uid;
   const userData = {
     email: user.email,
     displayName: user.displayName,
@@ -297,14 +318,44 @@ async function createOrUpdateFirebaseUser(user) {
   };
 
   try {
-    await admin.auth().updateUser(user.uid, userData);
+    await admin.auth().updateUser(blackboardAuthUid, userData);
+    return {...user, uid: blackboardAuthUid, blackboardAuthUid};
   } catch (error) {
+    if (error.code === "auth/email-already-exists") {
+      return useExistingFirebaseUserByEmail(user, blackboardAuthUid);
+    }
+
     if (error.code !== "auth/user-not-found") throw error;
+  }
+
+  try {
     await admin.auth().createUser({
-      uid: user.uid,
+      uid: blackboardAuthUid,
       ...userData,
     });
+    return {...user, uid: blackboardAuthUid, blackboardAuthUid};
+  } catch (error) {
+    if (error.code === "auth/email-already-exists") {
+      return useExistingFirebaseUserByEmail(user, blackboardAuthUid);
+    }
+
+    throw error;
   }
+}
+
+async function useExistingFirebaseUserByEmail(user, blackboardAuthUid) {
+  const existingUser = await admin.auth().getUserByEmail(user.email);
+
+  await admin.auth().updateUser(existingUser.uid, {
+    displayName: existingUser.displayName || user.displayName,
+  });
+
+  console.warn("Blackboard email matched an existing Firebase Auth user.");
+  return {
+    ...user,
+    uid: existingUser.uid,
+    blackboardAuthUid,
+  };
 }
 
 async function createOrUpdateUserProfile(user) {
@@ -316,6 +367,7 @@ async function createOrUpdateUserProfile(user) {
     name: user.displayName,
     displayName: user.displayName,
     blackboardId: user.blackboardId,
+    blackboardAuthUid: user.blackboardAuthUid || user.uid,
     blackboardUsername: user.username,
     authProvider: "blackboard",
     lastLoginVia: "blackboard",
@@ -372,7 +424,10 @@ async function handleBlackboardCallback(req, res) {
     assertValidState(sessionState, state);
 
     if (error) {
-      console.warn("Blackboard authorization returned an error.");
+      console.warn(
+        `Blackboard authorization returned an error: error=${error || ""}; ` +
+        `description=${errorDescription || ""}`,
+      );
       return redirectToAuthError(
         res,
         config.frontendUrl,
@@ -404,9 +459,9 @@ async function handleBlackboardCallback(req, res) {
       profile = {...profile, ...userProfile};
     }
 
-    const blackboardUser = extractBlackboardUser(profile);
+    let blackboardUser = extractBlackboardUser(profile);
 
-    await createOrUpdateFirebaseUser(blackboardUser);
+    blackboardUser = await createOrUpdateFirebaseUser(blackboardUser);
     await createOrUpdateUserProfile(blackboardUser);
 
     const customToken = await admin.auth().createCustomToken(
