@@ -8,6 +8,7 @@ const ROOT_COLLECTIONS_TO_BACKUP = [
   "proposal",
   "settings",
   "support",
+  "userMissions"
 ];
 
 async function backupCollectionTree(collectionRef) {
