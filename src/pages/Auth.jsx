@@ -53,7 +53,6 @@ function Auth() {
   const [pendingNavigation, setPendingNavigation] = useState(null); // stores role, uid, email, userCred
 
   useEffect(() => {
-<<<<<<< Updated upstream
     const callbackError = new URLSearchParams(location.search).get("error");
     if (callbackError) setError(callbackError);
   }, [location.search]);
@@ -148,8 +147,6 @@ function Auth() {
   }, [blackboardComplete, isDev, navigate]);
 
   useEffect(() => {
-=======
->>>>>>> Stashed changes
     if (cooldown <= 0) return;
     const t = setInterval(() => setCooldown((c) => c - 1), 1000);
     return () => clearInterval(t);
