@@ -2,7 +2,7 @@
 //After logging in, MFA are placed for admin since it has sensitive role such
 //as approving, publishing, issuing certificates, and other high impact actions.
 
-import { getRedirectResult, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { getRedirectResult, signInWithEmailAndPassword } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
@@ -222,7 +222,7 @@ function Auth() {
             setError("Failed to create user profile.");
             return;
           }
-        } catch (createErr) {
+        } catch {
           setError("User profile not found and could not be created.");
           return;
         }
@@ -394,66 +394,6 @@ function Auth() {
     } catch (err) {
       console.error(err);
       setError("Unable to resend the code. Please try again.");
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setError("");
-    try {
-      const provider = new GoogleAuthProvider();
-      const userCred = await signInWithPopup(auth, provider);
-      const uid = userCred.user.uid;
-      const email = userCred.user.email;
-
-      const userRef = doc(db, "users", uid);
-      let userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        const { setDoc } = await import("firebase/firestore");
-        await setDoc(userRef, {
-          uid,
-          email,
-          name: userCred.user.displayName || email,
-          role: "student",
-          status: "active",
-          createdAt: new Date(),
-        });
-        userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) { setError("Failed to create user profile."); return; }
-      }
-
-      const { role, status } = userSnap.data();
-      if (status !== "active") { setError("Your account is blocked."); return; }
-
-      const logLogin = httpsCallable(functions, "logLogin");
-      logLogin({ uid }).catch((err) => console.warn("Audit log failed:", err));
-
-      const userAgreementVersion = userSnap.data().agreementVersion || null;
-      const currentVersion = await fetchCurrentAgreementVersion();
-      if (userAgreementVersion !== currentVersion) {
-        setPendingNavigation({ role, uid, email, userCred });
-        setShowAgreement(true);
-        return;
-      }
-
-      if (role === "admin" || role === "sysadmin") {
-        setMfaEmail(email);
-        setMfaRole(role);
-        const sendMfaCode = httpsCallable(functions, "sendMfaCode");
-        await sendMfaCode({ email });
-        setStep("mfa");
-        setCooldown(30);
-      } else if (role === "faculty") {
-        navigate(intendedPath || "/faculty/current-event", { replace: true });
-      } else if (role === "partner") {
-        navigate(intendedPath || "/partner/dashboard", { replace: true });
-      } else {
-        navigate(intendedPath || "/student/home", { replace: true });
-      }
-    } catch (err) {
-      if (isDev) console.error("Google login error:", err);
-      if (err?.code === "auth/popup-closed-by-user") return;
-      setError("Google sign-in failed. Please try again.");
     }
   };
 
