@@ -17,6 +17,9 @@ const { recordLoginFailure } = require("./src/auth/recordLoginFailure");
 const { resetLoginAttempts } = require("./src/auth/resetLoginAttempts");
 const { checkLoginAttempts } = require("./src/auth/checkLoginAttempts");
 const { sendMfaCode, verifyMfaCode } = require("./src/auth/mfa");
+const {
+  backfillBlackboardPasswordStatus,
+} = require("./src/auth/backfillBlackboardPasswordStatus");
 
 // Export as callable Cloud Functions with region
 // Export using v2
@@ -33,6 +36,10 @@ exports.resetLoginAttempts = onCall(
 exports.checkLoginAttempts = onCall(
   { region: "asia-southeast1" },
   checkLoginAttempts
+);
+exports.backfillBlackboardPasswordStatus = onCall(
+  { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
+  backfillBlackboardPasswordStatus
 );
 
 // mfa functions are defined in their module

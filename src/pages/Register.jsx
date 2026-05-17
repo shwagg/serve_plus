@@ -131,6 +131,8 @@ function Register() {
                 email,
                 role: "student", // Default role for new registrations
                 status: "active",
+                authProvider: "password",
+                hasServePassword: true,
                 createdAt: new Date(),
                 avatar: "",
                 totalPoints: 0,

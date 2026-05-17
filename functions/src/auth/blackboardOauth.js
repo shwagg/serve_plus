@@ -309,6 +309,12 @@ function extractBlackboardUser(profile) {
   };
 }
 
+function hasPasswordProvider(userRecord) {
+  return (userRecord.providerData || []).some(
+    (provider) => provider.providerId === "password",
+  );
+}
+
 async function createOrUpdateFirebaseUser(user) {
   const blackboardAuthUid = user.uid;
   const userData = {
@@ -318,32 +324,42 @@ async function createOrUpdateFirebaseUser(user) {
   };
 
   try {
-    await admin.auth().updateUser(blackboardAuthUid, userData);
-    return {...user, uid: blackboardAuthUid, blackboardAuthUid};
+    const updatedUser = await admin.auth().updateUser(blackboardAuthUid, userData);
+    return {
+      ...user,
+      uid: blackboardAuthUid,
+      blackboardAuthUid,
+      hasServePassword: hasPasswordProvider(updatedUser),
+    };
   } catch (error) {
     if (error.code === "auth/email-already-exists") {
-      return useExistingFirebaseUserByEmail(user, blackboardAuthUid);
+      return attachExistingFirebaseUserByEmail(user, blackboardAuthUid);
     }
 
     if (error.code !== "auth/user-not-found") throw error;
   }
 
   try {
-    await admin.auth().createUser({
+    const createdUser = await admin.auth().createUser({
       uid: blackboardAuthUid,
       ...userData,
     });
-    return {...user, uid: blackboardAuthUid, blackboardAuthUid};
+    return {
+      ...user,
+      uid: blackboardAuthUid,
+      blackboardAuthUid,
+      hasServePassword: hasPasswordProvider(createdUser),
+    };
   } catch (error) {
     if (error.code === "auth/email-already-exists") {
-      return useExistingFirebaseUserByEmail(user, blackboardAuthUid);
+      return attachExistingFirebaseUserByEmail(user, blackboardAuthUid);
     }
 
     throw error;
   }
 }
 
-async function useExistingFirebaseUserByEmail(user, blackboardAuthUid) {
+async function attachExistingFirebaseUserByEmail(user, blackboardAuthUid) {
   const existingUser = await admin.auth().getUserByEmail(user.email);
 
   await admin.auth().updateUser(existingUser.uid, {
@@ -355,6 +371,7 @@ async function useExistingFirebaseUserByEmail(user, blackboardAuthUid) {
     ...user,
     uid: existingUser.uid,
     blackboardAuthUid,
+    hasServePassword: hasPasswordProvider(existingUser),
   };
 }
 
@@ -370,6 +387,7 @@ async function createOrUpdateUserProfile(user) {
     blackboardAuthUid: user.blackboardAuthUid || user.uid,
     blackboardUsername: user.username,
     authProvider: "blackboard",
+    hasServePassword: user.hasServePassword === true,
     lastLoginVia: "blackboard",
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };

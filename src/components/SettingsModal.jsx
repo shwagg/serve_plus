@@ -131,7 +131,10 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   const handleChangePassword = async () => {
     setPasswordError(""); setPasswordSuccess("");
-    if (!currentPassword) { setPasswordError("Please enter your current password."); return; }
+    if (!isCreatingServePassword && !currentPassword) {
+      setPasswordError("Please enter your current password.");
+      return;
+    }
     const pwRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
     if (!pwRegex.test(newPassword)) {
       setPasswordError("Password needs 8+ characters, an uppercase letter, a number, and a symbol.");
@@ -141,16 +144,38 @@ export default function SettingsModal({ isOpen, onClose }) {
     setSavingPassword(true);
     try {
       const user = auth.currentUser;
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      await reauthenticateWithCredential(user, credential);
+      if (!user) {
+        setPasswordError("You need to be signed in to update your password.");
+        return;
+      }
+
+      if (!isCreatingServePassword) {
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
+        await reauthenticateWithCredential(user, credential);
+      }
+
       await updatePassword(user, newPassword);
-      setPasswordSuccess("Password changed successfully.");
+      await updateDoc(doc(db, "users", user.uid), {
+        hasServePassword: true,
+        updatedAt: new Date(),
+      });
+      await user.reload?.();
+      await refreshUserData();
+      setPasswordSuccess(
+        isCreatingServePassword
+          ? "SERVE+ password created successfully."
+          : "Password changed successfully.",
+      );
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
     } catch (e) {
       if (e.code === "auth/wrong-password" || e.code === "auth/invalid-credential") {
         setPasswordError("Current password is incorrect.");
       } else if (e.code === "auth/requires-recent-login") {
-        setPasswordError("Please log out and log back in before changing your password.");
+        setPasswordError(
+          isCreatingServePassword
+            ? "Please sign out, sign in with Blackboard again, then create your SERVE+ password."
+            : "Please log out and log back in before changing your password.",
+        );
       } else {
         setPasswordError("Failed to change password. Please try again.");
       }
@@ -200,6 +225,14 @@ export default function SettingsModal({ isOpen, onClose }) {
   const hasPasswordProvider = auth.currentUser?.providerData?.some(
     p => p.providerId === "password"
   );
+  const isBlackboardLinked = Boolean(
+    userData?.authProvider === "blackboard" ||
+      userData?.blackboardId ||
+      userData?.blackboardAuthUid
+  );
+  const hasServePassword = userData?.hasServePassword === true || hasPasswordProvider;
+  const isCreatingServePassword = isBlackboardLinked && !hasServePassword;
+  const canManagePassword = hasServePassword || isCreatingServePassword;
 
   if (!isOpen) return null;
 
@@ -277,36 +310,46 @@ export default function SettingsModal({ isOpen, onClose }) {
 
                   {/* Password */}
                   <div className="settings-group">
-                    <label className="settings-label">Change Password</label>
+                    <label className="settings-label">
+                      {isCreatingServePassword ? "Create SERVE+ Password" : "Change Password"}
+                    </label>
 
-                    {!hasPasswordProvider ? (
+                    {!canManagePassword ? (
                       <div className="settings-sso-notice">
-                        Your account uses Blackboard SSO. Password changes are managed
-                        through Blackboard.
+                        This account does not currently support SERVE+ password changes.
                       </div>
                     ) : (
                       <>
-                        <div className="ui-input-pass-wrap">
-                          <input
-                            className="ui-input pass"
-                            style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
-                            type={showCurrentPw ? "text" : "password"}
-                            placeholder="Current password"
-                            value={currentPassword}
-                            onChange={e => {
-                              setCurrentPassword(e.target.value);
-                              setPasswordError(""); setPasswordSuccess("");
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="ui-btn eye"
-                            onClick={() => setShowCurrentPw(v => !v)}
-                            tabIndex={-1}
-                          >
-                            {showCurrentPw ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                          </button>
-                        </div>
+                        {isCreatingServePassword && (
+                          <div className="settings-sso-notice">
+                            Your Blackboard account does not have a SERVE+ password yet.
+                            Create one here to enable email/password sign-in.
+                          </div>
+                        )}
+
+                        {!isCreatingServePassword && (
+                          <div className="ui-input-pass-wrap">
+                            <input
+                              className="ui-input pass"
+                              style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                              type={showCurrentPw ? "text" : "password"}
+                              placeholder="Current password"
+                              value={currentPassword}
+                              onChange={e => {
+                                setCurrentPassword(e.target.value);
+                                setPasswordError(""); setPasswordSuccess("");
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="ui-btn eye"
+                              onClick={() => setShowCurrentPw(v => !v)}
+                              tabIndex={-1}
+                            >
+                              {showCurrentPw ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </button>
+                          </div>
+                        )}
 
                         <div className="ui-input-pass-wrap" style={{ marginTop: 8 }}>
                           <input
@@ -365,7 +408,9 @@ export default function SettingsModal({ isOpen, onClose }) {
                           onClick={handleChangePassword}
                           disabled={savingPassword}
                         >
-                          {savingPassword ? "Changing…" : "Change Password"}
+                          {savingPassword
+                            ? isCreatingServePassword ? "Creating…" : "Changing…"
+                            : isCreatingServePassword ? "Create Password" : "Change Password"}
                         </button>
                       </>
                     )}

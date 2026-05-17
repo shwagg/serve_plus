@@ -27,6 +27,22 @@ function getBlackboardRedirectPath(role) {
   return "/student/home";
 }
 
+const BLACKBOARD_PASSWORD_REQUIRED_MESSAGE =
+  'This account is linked to Blackboard. Please select "Sign in with Blackboard" to continue.';
+
+function isBlackboardLinkedAccount(userData) {
+  return Boolean(
+    userData &&
+      (userData.authProvider === "blackboard" ||
+        userData.blackboardId ||
+        userData.blackboardAuthUid),
+  );
+}
+
+function requiresBlackboardSignIn(userData) {
+  return isBlackboardLinkedAccount(userData) && userData.hasServePassword !== true;
+}
+
 function Auth() {
   const [loginId, setLoginId] = useState(""); // email or username
   const [mfaEmail, setMfaEmail] = useState("");
@@ -76,6 +92,7 @@ function Auth() {
           role: "student",
           status: "active",
           authProvider: "blackboard",
+          hasServePassword: false,
           createdAt: new Date(),
         });
 
@@ -153,13 +170,25 @@ function Auth() {
   }, [cooldown]);
 
   // if it contains "@" treat as email, otherwise look up username
-  const resolveEmail = async (input) => {
-    if (input.includes("@")) return input;
+  const resolveLoginAccount = async (input) => {
+    if (input.includes("@")) {
+      const usersRef = collection(db, "users");
+      const snap = await getDocs(query(usersRef, where("email", "==", input)));
+      return {
+        email: snap.empty ? input : snap.docs[0].data().email || input,
+        userData: snap.empty ? null : snap.docs[0].data(),
+      };
+    }
+
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("username", "==", input));
     const snap = await getDocs(q);
     if (snap.empty) throw new Error("No account found for this username.");
-    return snap.docs[0].data().email;
+    const userData = snap.docs[0].data();
+    return {
+      email: userData.email,
+      userData,
+    };
   };
 
   const handleEmailBlur = async () => {
@@ -192,33 +221,37 @@ function Auth() {
 
     try {
       // ✅ 1. Resolve username to email if needed, then authenticate
-      const email = await resolveEmail(loginId.trim());
+      const { email, userData: resolvedUserData } = await resolveLoginAccount(loginId.trim());
+
+      if (requiresBlackboardSignIn(resolvedUserData)) {
+        setError(BLACKBOARD_PASSWORD_REQUIRED_MESSAGE);
+        return;
+      }
+
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
       console.log("Login successfully, uid:", uid);
 
       // ✅ 2. Fetch user profile from Firestore
       const userRef = doc(db, "users", uid);
-      const userSnap = await getDoc(userRef);
+      let userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
         // User document missing, create minimal profile
         try {
-          await import("firebase/firestore").then(({ setDoc }) =>
-            setDoc(userRef, {
-              uid,
-              email,
-              name: userCred.user.displayName || email,
-              role: "student",
-              status: "active",
-              createdAt: new Date(),
-            }),
-          );
-          // Optional, fetch again to update userSnap
-          const newSnap = await getDoc(userRef);
-          if (newSnap.exists()) {
-            // Continue as normal
-          } else {
+          await setDoc(userRef, {
+            uid,
+            email,
+            name: userCred.user.displayName || email,
+            role: "student",
+            status: "active",
+            authProvider: "password",
+            hasServePassword: true,
+            createdAt: new Date(),
+          });
+
+          userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) {
             setError("Failed to create user profile.");
             return;
           }
@@ -233,6 +266,15 @@ function Auth() {
       if (status !== "active") {
         setError("Your account is blocked.");
         return;
+      }
+
+      if (userSnap.data().hasServePassword !== true) {
+        setDoc(userRef, {
+          hasServePassword: true,
+          updatedAt: new Date(),
+        }, { merge: true }).catch((err) => {
+          console.warn("Failed to mark password sign-in availability:", err);
+        });
       }
       // REMOVED 'AWAIT' TO IMPROVE FASTER LOGIN TIME. THEY STILL RUN IN THE BACKGROUND
       // ✅ 3. CALL BACKEND TO CREATE AUDIT LOG
@@ -408,7 +450,7 @@ function Auth() {
       return;
     }
 
-    const { role, email: userCred } = pendingNavigation;
+    const { role, userCred } = pendingNavigation;
 
     if (role === "admin" || role === "sysadmin") {
       try {
@@ -480,7 +522,7 @@ function Auth() {
 
                 <button className="auth-bbl-btn" type="button" onClick={handleBlackboardLogin}>
                   <img src={bbl_icon} alt="" className="auth-sso-icon" />
-                  Login with Blackboard
+                  Sign in with Blackboard
                 </button>
 
                 <div className="divider" style={{ width: "100%", maxWidth: 340 }}>
