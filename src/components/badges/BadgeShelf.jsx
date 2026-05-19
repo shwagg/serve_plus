@@ -22,18 +22,17 @@ export default function BadgeShelf({ earnedBadges = [], onBadgeClick }) {
     earnedBadges.map((b) => [b.badgeId ?? b.id, b])
   );
 
-  const visibleBadges = BADGE_DEFINITIONS.filter((b) => b.category !== "default");
-  const totalEarned = visibleBadges.filter((b) => earnedMap[b.id]).length;
+  const totalEarned = BADGE_DEFINITIONS.filter((b) => earnedMap[b.id]).length;
 
   return (
     <div className="badge-shelf">
       <div className="badge-shelf-header">
         <span className="badge-shelf-progress">
-          {totalEarned} of {visibleBadges.length} collected
+          {totalEarned} of {BADGE_DEFINITIONS.length} collected
         </span>
       </div>
 
-      {BADGE_CATEGORIES.filter((cat) => cat.key !== "default").map((cat) => {
+      {BADGE_CATEGORIES.map((cat) => {
         const categoryBadges = BADGE_DEFINITIONS.filter((b) => b.category === cat.key);
         return (
           <div key={cat.key} className="badge-shelf-group">

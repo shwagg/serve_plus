@@ -93,7 +93,7 @@ export default function PartnerHub() {
                 onClick={() => toggleExpand(partner.id)}
               >
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#1f3b73" }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#000" }}>
                     {name}
                   </div>
                   <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
@@ -149,7 +149,7 @@ export default function PartnerHub() {
                         >
                           <div>
                             <div
-                              style={{ fontWeight: 600, fontSize: 13, color: "#1f3b73" }}
+                              style={{ fontWeight: 600, fontSize: 13, color: "#000" }}
                             >
                               {m.title || "Untitled"}
                             </div>

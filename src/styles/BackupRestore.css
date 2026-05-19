@@ -20,7 +20,7 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--navy, #1f3b73);
+  color: #000;
 }
 .backup-subtitle {
   margin: 4px 0 0;
@@ -95,7 +95,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: var(--navy, #1f3b73);
+  color: #000;
 }
 .backup-create-desc {
   margin: 2px 0 0;
@@ -167,7 +167,7 @@
 }
 .backup-btn-secondary {
   background: #f1f5f9;
-  color: var(--navy, #1f3b73);
+  color: #000;
   border: 1px solid var(--border, #e5e7eb);
 }
 .backup-btn-secondary:hover:not(:disabled) {
@@ -226,7 +226,7 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--navy, #1f3b73);
+  color: #000;
 }
 
 /* Table */
@@ -248,7 +248,7 @@
   text-align: left;
   padding: 12px 14px;
   font-weight: 600;
-  color: var(--navy, #1f3b73);
+  color: #000;
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -363,7 +363,7 @@
   margin: 0 0 12px;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--navy, #1f3b73);
+  color: #000;
 }
 .backup-collections-grid {
   display: grid;
@@ -381,7 +381,7 @@
   font-size: 0.85rem;
 }
 .backup-collection-chip strong {
-  color: var(--navy, #1f3b73);
+  color: #000;
 }
 .backup-collection-chip span {
   color: var(--muted, #64748b);
@@ -407,5 +407,24 @@
   }
   .backup-label-input {
     width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-outlet {
+    padding: 16px;
+  }
+
+  .backup-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .backup-actions {
+    flex-wrap: wrap;
+  }
+
+  .backup-confirm-group {
+    flex-wrap: wrap;
   }
 }
