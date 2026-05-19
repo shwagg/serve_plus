@@ -16,7 +16,6 @@ const { logLogout } = require("./src/auth/logLogout");
 const { recordLoginFailure } = require("./src/auth/recordLoginFailure");
 const { resetLoginAttempts } = require("./src/auth/resetLoginAttempts");
 const { checkLoginAttempts } = require("./src/auth/checkLoginAttempts");
-const { sendMfaCode, verifyMfaCode } = require("./src/auth/mfa");
 const {
   backfillBlackboardPasswordStatus,
 } = require("./src/auth/backfillBlackboardPasswordStatus");
@@ -40,16 +39,6 @@ exports.checkLoginAttempts = onCall(
 exports.backfillBlackboardPasswordStatus = onCall(
   { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
   backfillBlackboardPasswordStatus
-);
-
-// mfa functions are defined in their module
-exports.sendMfaCode = onCall(
-  { region: "asia-southeast1" },
-  sendMfaCode
-);
-exports.verifyMfaCode = onCall(
-  { region: "asia-southeast1" },
-  verifyMfaCode
 );
 
 // Blackboard OAuth bridge (HTTP request handler, not callable)

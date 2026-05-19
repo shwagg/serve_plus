@@ -1,6 +1,4 @@
-//Changed Login to Authorization page since it covers MFA as well.
-//After logging in, MFA are placed for admin since it has sensitive role such
-//as approving, publishing, issuing certificates, and other high impact actions.
+// Authorization page for password and Blackboard sign-in.
 
 import { getRedirectResult, signInWithEmailAndPassword } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
@@ -27,6 +25,10 @@ function getBlackboardRedirectPath(role) {
   return "/student/home";
 }
 
+function getPrivilegedRedirectPath(role) {
+  return role === "sysadmin" ? "/sysadmin/roster" : "/admin/dashboard";
+}
+
 const BLACKBOARD_PASSWORD_REQUIRED_MESSAGE =
   'This account is linked to Blackboard. Please select "Sign in with Blackboard" to continue.';
 
@@ -45,7 +47,6 @@ function requiresBlackboardSignIn(userData) {
 
 function Auth() {
   const [loginId, setLoginId] = useState(""); // email or username
-  const [mfaEmail, setMfaEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -55,18 +56,14 @@ function Auth() {
   const isDev = import.meta.env.DEV; //(Dev-only switch)
   //only developers can see detailed debug info while developing.
 
-  const [step, setStep] = useState("login"); //"login" or "mfa"
-  const [mfaRole, setMfaRole] = useState("admin"); // tracks which privileged role is doing MFA
   const intendedPath = location.state?.from || null;
   const blackboardComplete = Boolean(location.state?.blackboardComplete);
-  const [mfaCode, setMfaCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
   const [emailStatus, setEmailStatus] = useState(null); // null | "checking" | "found" | "not-found"
 
   // Agreement modal state
   const [showAgreement, setShowAgreement] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState(null); // stores role, uid, email, userCred
+  const [pendingNavigation, setPendingNavigation] = useState(null); // stores role and uid while agreement acceptance is pending
 
   useEffect(() => {
     const callbackError = new URLSearchParams(location.search).get("error");
@@ -118,8 +115,6 @@ function Auth() {
         setPendingNavigation({
           role,
           uid,
-          email,
-          userCred: { user: firebaseUser },
           authProvider: "blackboard",
         });
         setShowAgreement(true);
@@ -162,12 +157,6 @@ function Auth() {
       cancelled = true;
     };
   }, [blackboardComplete, isDev, navigate]);
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const t = setInterval(() => setCooldown((c) => c - 1), 1000);
-    return () => clearInterval(t);
-  }, [cooldown]);
 
   // if it contains "@" treat as email, otherwise look up username
   const resolveLoginAccount = async (input) => {
@@ -296,50 +285,14 @@ function Auth() {
 
       if (userAgreementVersion !== currentVersion) {
         // show modal when user hasn't accepted the latest agreements
-        setPendingNavigation({ role, uid, email, userCred });
+        setPendingNavigation({ role, uid });
         setShowAgreement(true);
         return;
       }
 
       // ✅ 5. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
       if (role === "admin" || role === "sysadmin") {
-        try {
-          const signedInEmail = userCred.user.email;
-          setMfaEmail(signedInEmail);
-          setMfaRole(role);
-          const sendMfaCode = httpsCallable(functions, "sendMfaCode");
-          await sendMfaCode({ email: signedInEmail });
-        } catch (mfaErr) {
-          //(Only developers can see these errors)
-          if (isDev) {
-            console.error("MFA send error full:", mfaErr);
-            console.error("MFA send error code:", mfaErr.code);
-            console.error("MFA send error message:", mfaErr.message);
-            console.error("MFA send error details:", mfaErr.details);
-          }
-
-          //(User-friendly error message)
-          const code = mfaErr?.code || "";
-          let userMsg =
-            "We couldn’t send the verification code right now. Please try again.";
-
-          if (code === "functions/unavailable") {
-            userMsg =
-              "The verification service is temporarily unavailable.\nPlease try again in a moment.";
-          } else if (code === "functions/deadline-exceeded") {
-            userMsg =
-              "The request took too long. Please check your connection and try again.";
-          } else if (code === "functions/permission-denied") {
-            userMsg =
-              "You don’t have permission to do this. Please contact your administrator.";
-          }
-
-          setError(userMsg);
-          return;
-        }
-        setStep("mfa");
-        setCooldown(30);
-        return;
+        navigate(getPrivilegedRedirectPath(role), { replace: true });
       } else if (role === "faculty") {
         navigate(intendedPath || "/faculty/current-event", { replace: true });
       } else if (role === "partner") {
@@ -397,48 +350,6 @@ function Auth() {
     }
   };
 
-  //for verifying and resending MFA
-  const handleVerifyMfa = async (e) => {
-    e.preventDefault();
-    setError("");
-
-    try {
-      const verifyMfaCode = httpsCallable(functions, "verifyMfaCode");
-      const res = await verifyMfaCode({ email: mfaEmail, code: mfaCode });
-
-      if (!res.data?.ok) {
-        setError("Invalid or expired code. Please try again.");
-        return;
-      }
-
-      //MFA success → redirect based on role
-      if (mfaRole === "sysadmin") {
-        navigate("/sysadmin/roster", { replace: true });
-      } else {
-        navigate("/admin/dashboard", { replace: true });
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Unable to verify the code. Please try again.");
-    }
-  };
-
-  //chance for user to resend MFA email code to them with Cooldown 30 seconds.
-  const handleResendMfa = async () => {
-    if (cooldown > 0) return;
-    setError("");
-
-    try {
-      const sendMfaCode = httpsCallable(functions, "sendMfaCode");
-      await sendMfaCode({ email: mfaEmail });
-
-      setCooldown(30);
-    } catch (err) {
-      console.error(err);
-      setError("Unable to resend the code. Please try again.");
-    }
-  };
-
   // After the user accepts the agreements, proceed auth flow
   const handleAgreementAccepted = async () => {
     setShowAgreement(false);
@@ -450,38 +361,10 @@ function Auth() {
       return;
     }
 
-    const { role, userCred } = pendingNavigation;
+    const { role } = pendingNavigation;
 
     if (role === "admin" || role === "sysadmin") {
-      try {
-        const signedInEmail = userCred.user.email;
-        setMfaEmail(signedInEmail);
-        setMfaRole(role);
-        const sendMfaCode = httpsCallable(functions, "sendMfaCode");
-        await sendMfaCode({ email: signedInEmail });
-      } catch (mfaErr) {
-        if (isDev) {
-          console.error("MFA send error full:", mfaErr);
-        }
-        const code = mfaErr?.code || "";
-        let userMsg =
-          "We couldn't send the verification code right now. Please try again.";
-        if (code === "functions/unavailable") {
-          userMsg =
-            "The verification service is temporarily unavailable.\nPlease try again in a moment.";
-        } else if (code === "functions/deadline-exceeded") {
-          userMsg =
-            "The request took too long. Please check your connection and try again.";
-        } else if (code === "functions/permission-denied") {
-          userMsg =
-            "You don't have permission to do this. Please contact your administrator.";
-        }
-        setError(userMsg);
-        setPendingNavigation(null);
-        return;
-      }
-      setStep("mfa");
-      setCooldown(30);
+      navigate(getPrivilegedRedirectPath(role), { replace: true });
     } else if (role === "faculty") {
       navigate("/faculty/current-event", { replace: true });
     } else if (role === "partner") {
@@ -502,167 +385,96 @@ function Auth() {
         />
       )}
 
-      {step === "login" && (
-        <div className="auth-page">
-          <div className="auth-split">
-            {/* Left: poster — temporarily hidden */}
-            {/* <div className="auth-poster-panel">
+      <div className="auth-page">
+        <div className="auth-split">
+          {/* Left: poster — temporarily hidden */}
+          {/* <div className="auth-poster-panel">
               <img src={loginPosterFallback} alt="SERVE+ illustration" />
             </div> */}
 
-            {/* Right: form */}
-            <div className="auth-form-panel">
-              <form className="ui-form auth-login-form" onSubmit={handleLogin}>
-                <div className="auth-logo-row">
-                  <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
-                  <span className="auth-logo-text">
-                    SERVE<span className="auth-logo-plus">+</span>
-                  </span> 
-                </div><br />
+          {/* Right: form */}
+          <div className="auth-form-panel">
+            <form className="ui-form auth-login-form" onSubmit={handleLogin}>
+              <div className="auth-logo-row">
+                <img src={servePlusIcon} alt="SERVE+" className="auth-logo-icon" />
+                <span className="auth-logo-text">
+                  SERVE<span className="auth-logo-plus">+</span>
+                </span>
+              </div><br />
 
-                <button className="auth-bbl-btn" type="button" onClick={handleBlackboardLogin}>
-                  <img src={bbl_icon} alt="" className="auth-sso-icon" />
-                  Sign in with Blackboard
-                </button>
+              <button className="auth-bbl-btn" type="button" onClick={handleBlackboardLogin}>
+                <img src={bbl_icon} alt="" className="auth-sso-icon" />
+                Sign in with Blackboard
+              </button>
 
-                <div className="divider" style={{ width: "100%", maxWidth: 340 }}>
-                  <span>or sign in with</span>
-                </div>
+              <div className="divider" style={{ width: "100%", maxWidth: 340 }}>
+                <span>or sign in with</span>
+              </div>
 
-                {/* Email / Username */}
-                <div className="auth-field-wrap">
-                  <input
-                    className={`ui-input${emailStatus === "not-found" ? " ui-input--error" : ""}`}
-                    style={{ width: "100%", boxSizing: "border-box" }}
-                    type="text"
-                    placeholder="Email or Username"
-                    value={loginId}
-                    onChange={(e) => { setLoginId(e.target.value); setEmailStatus(null); }}
-                    onBlur={handleEmailBlur}
-                    required
-                  />
-                  {emailStatus === "not-found" && (
-                    <p className="field-hint error">No account found for this email or username</p>
-                  )}
-                </div>
-
-                {/* Password + Forgot Password */}
-                <div className="auth-field-wrap">
-                  <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
-                    <input
-                      className="ui-input pass"
-                      style={{ width: "100%", boxSizing: "border-box" }}
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                    {password.length > 0 && (
-                      <button
-                        type="button"
-                        className="ui-btn eye"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                        onClick={() => setShowPassword((prev) => !prev)}
-                      >
-                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                      </button>
-                    )}
-                  </div>
-                  <p className="ui-smallText" style={{ marginTop: 6 }}>
-                    <Link to="/reset-password">Forgot Password?</Link>
-                  </p>
-                </div>
-
-                <button className="auth-login-btn" type="submit">
-                  Login
-                </button>
-
-                <p className="ui-link" style={{ margin: "6px 0 0", textAlign: "center" }}>
-                  New to SERVE+? <Link to="/register">Sign up here</Link>
-                </p>
-
-                {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
-
-                {error && (
-                  <p className="ui-smallText" style={{ marginTop: 4, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}>
-                    Need help? Contact the SERVE+ administrator or try again in a few minutes.
-                  </p>
-                )}
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {step === "mfa" && (
-        <div className="auth-page">
-          <div className="auth-split">
-            {/* <div className="auth-poster-panel">
-              <img src={loginPosterFallback} alt="SERVE+ illustration" />
-            </div> */}
-            <div className="auth-form-panel">
-              <form className="ui-form auth-login-form" onSubmit={handleVerifyMfa}>
-                <div style={{ fontSize: 52, marginBottom: 6 }}>🔐</div>
-                <h2 className="ui-title">Admin Verification</h2>
-
-                <p
-                  className="ui-smallText"
-                  style={{ textAlign: "center", color: "#475569", fontWeight: 400 }}
-                >
-                  We sent a 6-digit code to your email. Enter it to continue.
-                </p>
-
+              {/* Email / Username */}
+              <div className="auth-field-wrap">
                 <input
-                  className="ui-input"
+                  className={`ui-input${emailStatus === "not-found" ? " ui-input--error" : ""}`}
+                  style={{ width: "100%", boxSizing: "border-box" }}
                   type="text"
-                  inputMode="numeric"
-                  placeholder="6-digit code"
-                  value={mfaCode}
-                  onChange={(e) => setMfaCode(e.target.value)}
+                  placeholder="Email or Username"
+                  value={loginId}
+                  onChange={(e) => { setLoginId(e.target.value); setEmailStatus(null); }}
+                  onBlur={handleEmailBlur}
                   required
                 />
-
-                <button className="ui-btn" type="submit">
-                  CONTINUE
-                </button>
-
-                {error && <p className="ui-error">{error}</p>}
-
-                <p
-                  className="ui-smallText"
-                  style={{
-                    marginTop: 10,
-                    cursor: cooldown === 0 ? "pointer" : "not-allowed",
-                    color: cooldown === 0 ? "#0f766e" : "#94a3b8",
-                    fontWeight: 600,
-                    textAlign: "center",
-                  }}
-                  onClick={cooldown === 0 ? handleResendMfa : undefined}
-                  onMouseEnter={(e) => { if (cooldown === 0) e.currentTarget.style.textDecoration = "underline"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
-                >
-                  {cooldown > 0 ? `Resend available in ${cooldown}s` : "Resend code"}
-                </p>
-
-                <p
-                  className="ui-smallText"
-                  style={{ marginTop: 8, textAlign: "center", cursor: "pointer" }}
-                  onClick={() => { setStep("login"); setMfaCode(""); setError(""); }}
-                >
-                  Back to Login
-                </p>
-
-                {error && (
-                  <p className="ui-smallText" style={{ marginTop: 6, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}>
-                    Need help? Contact the SERVE+ administrator or try again in a few minutes.
-                  </p>
+                {emailStatus === "not-found" && (
+                  <p className="field-hint error">No account found for this email or username</p>
                 )}
-              </form>
-            </div>
+              </div>
+
+              {/* Password + Forgot Password */}
+              <div className="auth-field-wrap">
+                <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
+                  <input
+                    className="ui-input pass"
+                    style={{ width: "100%", boxSizing: "border-box" }}
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  {password.length > 0 && (
+                    <button
+                      type="button"
+                      className="ui-btn eye"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      onClick={() => setShowPassword((prev) => !prev)}
+                    >
+                      {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                    </button>
+                  )}
+                </div>
+                <p className="ui-smallText" style={{ marginTop: 6 }}>
+                  <Link to="/reset-password">Forgot Password?</Link>
+                </p>
+              </div>
+
+              <button className="auth-login-btn" type="submit">
+                Login
+              </button>
+
+              <p className="ui-link" style={{ margin: "6px 0 0", textAlign: "center" }}>
+                New to SERVE+? <Link to="/register">Sign up here</Link>
+              </p>
+
+              {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
+
+              {error && (
+                <p className="ui-smallText" style={{ marginTop: 4, textAlign: "center", color: "#64748b", fontWeight: 400, fontSize: 10 }}>
+                  Need help? Contact the SERVE+ administrator or try again in a few minutes.
+                </p>
+              )}
+            </form>
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 }
