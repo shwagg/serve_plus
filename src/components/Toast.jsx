@@ -7,7 +7,7 @@ const TOAST_BG = '#f0f0f0';
 
 const sharedStyle = {
   background: TOAST_BG,
-  borderRadius: 16,
+  borderRadius: '16px',
   fontFamily: "'Inter', sans-serif",
   fontWeight: 400,
   fontSize: 14,
@@ -156,8 +156,9 @@ export default function ToastContainer() {
               onMouseLeave={(e) => e.currentTarget.style.color = '#888'}
               style={{
                 position: isMobile ? 'absolute' : 'static',
-                top: isMobile ? 12 : 'auto',
+                top: isMobile ? '50%' : 'auto',
                 right: isMobile ? 14 : 'auto',
+                transform: isMobile ? 'translateY(-50%)' : 'none',
                 background: 'transparent',
                 border: 'none',
                 color: '#888',
