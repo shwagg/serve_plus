@@ -86,7 +86,3 @@ exports.manualFlagAbsentVolunteers = onCall(
   { region: "asia-southeast1" },
   manualFlagAbsentVolunteers
 );
-
-// OG preview for social sharing
-const { eventPreviewHandler } = require("./src/og/eventPreview");
-exports.eventPreview = eventPreviewHandler;
