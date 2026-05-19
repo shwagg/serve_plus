@@ -72,17 +72,16 @@ export default function Sidebar({ links, collapsed, setCollapsed }) {
 
     return (
         <>
-            {/* Floating toggle button — slides between sidebar and strip */}
-            <button
-                className={`sidebar-toggle-btn sidebar-toggle-floating ${collapsed ? "collapsed" : ""}`}
-                onClick={() => setCollapsed(prev => !prev)}
-                aria-label="Toggle sidebar"
-            >
-                <span className="material-symbols-outlined">dock_to_right</span>
-            </button>
-
-            {/* Context strip: breadcrumbs only */}
+            {/* Context strip: toggle + breadcrumbs always inline */}
             <div className="admin-context-strip">
+                <button
+                    className="sidebar-toggle-btn"
+                    onClick={() => setCollapsed(prev => !prev)}
+                    aria-label="Toggle sidebar"
+                >
+                    <span className="material-symbols-outlined">dock_to_right</span>
+                </button>
+
                 {breadcrumb && (
                     <div className="context-breadcrumb">
                         {/* Parent category — clickable, opens sub-item dropdown */}
