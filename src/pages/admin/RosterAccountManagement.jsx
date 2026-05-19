@@ -315,9 +315,8 @@ export default function RosterAccountManagement({ readOnly = false }) {
   );
 
   return (
-    <div className="roster-container">
-      <div className="roster-wrapper">
-        {/* Header */}
+    <div className="roster-page">
+      {/* Header */}
         <div className="roster-header">
           <h1 className="roster-title">Roster Account Management</h1>
         </div>
@@ -350,56 +349,22 @@ export default function RosterAccountManagement({ readOnly = false }) {
 
           {/* Role Filters */}
           <div className="role-filters">
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="role"
-                checked={roleFilter === "overall"}
-                onChange={() => handleRoleFilterChange("overall")}
-                className="filter-role"
-              />
-              <span>All Users</span>
-            </label>
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="role"
-                checked={roleFilter === "student"}
-                onChange={() => handleRoleFilterChange("student")}
-                className="filter-role"
-              />
-              <span>Volunteer</span>
-            </label>
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="role"
-                checked={roleFilter === "faculty"}
-                onChange={() => handleRoleFilterChange("faculty")}
-                className="filter-role"
-              />
-              <span>Faculty</span>
-            </label>
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="role"
-                checked={roleFilter === "partner"}
-                onChange={() => handleRoleFilterChange("partner")}
-                className="filter-role"
-              />
-              <span>Partner</span>
-            </label>
-            <label className="filter-label">
-              <input
-                type="radio"
-                name="role"
-                checked={roleFilter === "admin"}
-                onChange={() => handleRoleFilterChange("admin")}
-                className="filter-role"
-              />
-              <span>Admin</span>
-            </label>
+            {[
+              { value: "overall", label: "All" },
+              { value: "student", label: "Volunteer" },
+              { value: "faculty", label: "Faculty" },
+              { value: "partner", label: "Partner" },
+              { value: "admin", label: "Admin" },
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`role-filter-pill${roleFilter === value ? " active" : ""}`}
+                onClick={() => handleRoleFilterChange(value)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -560,7 +525,6 @@ export default function RosterAccountManagement({ readOnly = false }) {
             </button>
           </div>
         )}
-      </div>
     </div>
   );
 }
