@@ -1,5 +1,67 @@
 import React from "react";
 
+// Shared Bar Graph Component (used by ImpactMetrics and PostSurveyAnalytics)
+function BarGraphAndLegend({ counts, colorList }) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const entries = Object.entries(counts).sort((a, b) => Number(a[0]) - Number(b[0]));
+  const maxCount = Math.max(...Object.values(counts), 1);
+  const barColors = [
+    '#e53935',
+    '#fb8c00',
+    '#fbc02d',
+    '#7cb342',
+    '#00bfae',
+    '#1e88e5',
+    '#8e24aa',
+  ];
+  const barWidth = 56;
+  const barGap = 32;
+  const chartHeight = 180;
+  const chartWidth = entries.length * (barWidth + barGap);
+  const [tooltip, setTooltip] = React.useState({ show: false, x: 0, y: 0, label: '', count: 0, percent: 0 });
+  const handleMouseOver = (e, label, count, percent) => {
+    const rect = e.target.getBoundingClientRect();
+    setTooltip({ show: true, x: rect.left + rect.width / 2, y: rect.top - 8, label, count, percent });
+  };
+  const handleMouseOut = () => setTooltip(t => ({ ...t, show: false }));
+  return (
+    <div style={{ width: '100%', minWidth: 320, margin: '0 auto', position: 'relative', marginBottom: 18 }}>
+      <svg width={chartWidth} height={chartHeight + 40} style={{ display: 'block', margin: '0 auto' }}>
+        {[0.25, 0.5, 0.75, 1].map((v, i) => (
+          <line key={i} x1={0} x2={chartWidth} y1={chartHeight - v * chartHeight} y2={chartHeight - v * chartHeight} stroke="#eee" strokeDasharray="4 4" />
+        ))}
+        {entries.map(([answer, count], idx) => {
+          const percent = ((count / total) * 100).toFixed(1);
+          const barHeight = (count / maxCount) * (chartHeight - 10);
+          return (
+            <g key={answer}>
+              <rect
+                x={idx * (barWidth + barGap)}
+                y={chartHeight - barHeight}
+                width={barWidth}
+                height={barHeight}
+                fill={barColors[idx % barColors.length]}
+                rx={8}
+                style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
+                onMouseOver={e => handleMouseOver(e, answer, count, percent)}
+                onMouseOut={handleMouseOut}
+              />
+              <text x={idx * (barWidth + barGap) + barWidth / 2} y={chartHeight - barHeight - 8} textAnchor="middle" fontSize="14" fontWeight="bold" fill="#23335b">{count}</text>
+              <text x={idx * (barWidth + barGap) + barWidth / 2} y={chartHeight + 20} textAnchor="middle" fontSize="13" fill="#23335b">{answer}</text>
+            </g>
+          );
+        })}
+      </svg>
+      {tooltip.show && (
+        <div style={{ position: 'fixed', left: tooltip.x, top: tooltip.y, background: '#fff', border: '1px solid #ccc', borderRadius: 8, padding: '8px 14px', boxShadow: '0 2px 8px #0002', pointerEvents: 'none', zIndex: 9999, fontSize: 14, color: '#23335b', whiteSpace: 'nowrap', transform: 'translate(-50%, -100%)' }}>
+          <div style={{ fontWeight: 600 }}>{tooltip.label}</div>
+          <div>Count: {tooltip.count} ({tooltip.percent}%)</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Main ImpactMetrics Modal Component
 export default function ImpactMetrics({
   open,
@@ -468,7 +530,7 @@ export default function ImpactMetrics({
                   <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
                   <div style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>{Object.values(content).reduce((a, b) => a + b, 0)} responses</div>
                   {showType === 'post'
-                    ? renderBarGraphAndLegend(content, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])
+                    ? <BarGraphAndLegend counts={content} colorList={['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa']} />
                     : renderPieChartAndLegend(content, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
                 </div>
               );
@@ -509,7 +571,7 @@ export default function ImpactMetrics({
                   <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
                   <div style={{ color: '#888', fontSize: 14, marginBottom: 12 }}>{Object.values(counts).reduce((a, b) => a + b, 0)} responses</div>
                   {showType === 'post'
-                    ? renderBarGraphAndLegend(counts, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])
+                    ? <BarGraphAndLegend counts={counts} colorList={['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa']} />
                     : renderPieChartAndLegend(counts, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
                 </div>
               );
@@ -612,125 +674,6 @@ function PostSurveyAnalytics({ volunteers }) {
     });
   }
 
-  // Render bar graph and legend for each field (for post activity metrics)
-  // --- Bar Graph Renderer for Post Activity Survey ---
-  const renderBarGraphAndLegend = (counts, colorList) => {
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    const entries = Object.entries(counts).sort((a, b) => Number(a[0]) - Number(b[0]));
-    const maxCount = Math.max(...Object.values(counts), 1);
-    const barColors = [
-      '#e53935', // red
-      '#fb8c00', // orange
-      '#fbc02d', // yellow
-      '#7cb342', // green
-      '#00bfae', // teal
-      '#1e88e5', // blue
-      '#8e24aa', // purple
-    ];
-    const barWidth = 56;
-    const barGap = 32;
-    const chartHeight = 180;
-    const chartWidth = entries.length * (barWidth + barGap);
-    // Tooltip state (React hook)
-    const [tooltip, setTooltip] = React.useState({ show: false, x: 0, y: 0, label: '', count: 0, percent: 0 });
-    // Mouse event handlers
-    const handleMouseOver = (e, label, count, percent) => {
-      const rect = e.target.getBoundingClientRect();
-      setTooltip({
-        show: true,
-        x: rect.left + rect.width / 2,
-        y: rect.top - 8,
-        label,
-        count,
-        percent,
-      });
-    };
-    const handleMouseOut = () => setTooltip({ ...tooltip, show: false });
-    return (
-      <div style={{ width: '100%', minWidth: 320, margin: '0 auto', position: 'relative', marginBottom: 18 }}>
-        <svg width={chartWidth} height={chartHeight + 40} style={{ display: 'block', margin: '0 auto' }}>
-          {/* Y axis grid lines */}
-          {[0.25, 0.5, 0.75, 1].map((v, i) => (
-            <line
-              key={i}
-              x1={0}
-              x2={chartWidth}
-              y1={chartHeight - v * chartHeight}
-              y2={chartHeight - v * chartHeight}
-              stroke="#eee"
-              strokeDasharray="4 4"
-            />
-          ))}
-          {/* Bars */}
-          {entries.map(([answer, count], idx) => {
-            const percent = ((count / total) * 100).toFixed(1);
-            const barHeight = (count / maxCount) * (chartHeight - 10);
-            return (
-              <g key={answer}>
-                <rect
-                  x={idx * (barWidth + barGap)}
-                  y={chartHeight - barHeight}
-                  width={barWidth}
-                  height={barHeight}
-                  fill={barColors[idx % barColors.length]}
-                  rx={8}
-                  style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
-                  onMouseOver={e => handleMouseOver(e, answer, count, percent)}
-                  onMouseOut={handleMouseOut}
-                />
-                {/* Value label on top */}
-                <text
-                  x={idx * (barWidth + barGap) + barWidth / 2}
-                  y={chartHeight - barHeight - 8}
-                  textAnchor="middle"
-                  fontSize="14"
-                  fontWeight="bold"
-                  fill="#23335b"
-                >
-                  {count}
-                </text>
-                {/* Category label below */}
-                <text
-                  x={idx * (barWidth + barGap) + barWidth / 2}
-                  y={chartHeight + 20}
-                  textAnchor="middle"
-                  fontSize="13"
-                  fill="#23335b"
-                >
-                  {answer}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-        {/* Tooltip */}
-        {tooltip.show && (
-          <div
-            style={{
-              position: 'fixed',
-              left: tooltip.x,
-              top: tooltip.y,
-              background: '#fff',
-              border: '1px solid #ccc',
-              borderRadius: 8,
-              padding: '8px 14px',
-              boxShadow: '0 2px 8px #0002',
-              pointerEvents: 'none',
-              zIndex: 9999,
-              fontSize: 14,
-              color: '#23335b',
-              whiteSpace: 'nowrap',
-              transform: 'translate(-50%, -100%)',
-            }}
-          >
-            <div style={{ fontWeight: 600 }}>{tooltip.label}</div>
-            <div>Count: {tooltip.count} ({tooltip.percent}%)</div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // --- Render Post Activity Survey Analytics Grid ---
   return (
     <div
@@ -769,7 +712,7 @@ function PostSurveyAnalytics({ volunteers }) {
           >
             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
             <div style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>{Object.values(content).reduce((a, b) => a + b, 0)} responses</div>
-            {renderBarGraphAndLegend(content, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
+            <BarGraphAndLegend counts={content} colorList={['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa']} />
           </div>
         );
       })}
@@ -808,7 +751,7 @@ function PostSurveyAnalytics({ volunteers }) {
           >
             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{label}</div>
             <div style={{ color: '#888', fontSize: 14, marginBottom: 12 }}>{Object.values(counts).reduce((a, b) => a + b, 0)} responses</div>
-            {renderBarGraphAndLegend(counts, ['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa'])}
+            <BarGraphAndLegend counts={counts} colorList={['#1a237e', '#43a047', '#fbc02d', '#e53935', '#8e24aa']} />
           </div>
         );
       })}
