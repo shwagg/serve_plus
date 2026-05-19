@@ -10,6 +10,7 @@ import {
   markAllNotificationsAsRead,
   createNotification,
 } from "../utils/notificationUtils";
+import BadgeEarnedModal from "./badges/BadgeEarnedModal";
 import "./styles/NotificationBell.css";
 
 export default function NotificationBell() {
@@ -21,6 +22,7 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState(null);
+  const [replayBadgeId, setReplayBadgeId] = useState(null);
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const bellButtonRef = useRef(null);
@@ -86,10 +88,14 @@ export default function NotificationBell() {
     if (!notification.read) {
       await markNotificationAsRead(userId, notification.id);
     }
+    setIsOpen(false);
+    if (notification.type === "badge_earned" && notification.badgeId) {
+      setReplayBadgeId(notification.badgeId);
+      return;
+    }
     if (notification.link) {
       navigate(notification.link);
     }
-    setIsOpen(false);
   }, [userId, navigate]);
 
   const handleMarkAllAsRead = useCallback(async () => {
@@ -244,6 +250,13 @@ export default function NotificationBell() {
           className="notification-backdrop"
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
+        />
+      )}
+
+      {replayBadgeId && (
+        <BadgeEarnedModal
+          badgeQueue={[replayBadgeId]}
+          onDismiss={() => setReplayBadgeId(null)}
         />
       )}
     </div>

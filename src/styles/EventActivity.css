@@ -315,12 +315,12 @@
 }
 
 .qr-modal-content label {
-  color: #234e7b; 
+  color: #000; 
   font-weight: 600;
 }
 
 .qr-modal-content input[type="file"] {
-  color: #234e7b;
+  color: #000;
 }
 /* Hide native file input text */
 .hidden-file-input {
@@ -1154,7 +1154,7 @@
     background: #f7f7f7;
     border-radius: 8px;
     padding: 16px 18px;
-    color: #234e7b;
+    color: #000;
     font-size: 15px;
     max-width: 400px;
 }
@@ -2426,6 +2426,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
+  z-index: 9999;
 }
 .ea-strip-progress-bar-wrap {
   flex: 0 0 80px;
@@ -2586,7 +2587,7 @@
   .ea-event-banner-title { font-size: 15px; }
   .ea-tab-content { padding: 12px; }
   .ea-strip-progress-bar-wrap { flex: 0 0 60px; }
-  .ea-strip-event-title { font-size: clamp(10px, 2.5vw, 13px); }
+  .ea-strip-event-title { font-size: clamp(10px, 2.5vw, 13px); z-index: 9999; }
 }
 
 @media (max-width: 768px) {

@@ -33,7 +33,7 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const defaultBanner = mission1;
 
   const handleShare = () => {
-    const url = `${window.location.origin}/event/${id}`;
+    const url = `${window.location.origin}/preview/event/${id}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
@@ -249,16 +249,37 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = defaultBanner; }}
             />
             <div className="event-details-toolbar">
-              <button
-                onClick={handleShare}
-                className="event-details-icon-btn"
-                aria-label={copySuccess ? 'Copied!' : 'Copy event link'}
-                title={copySuccess ? 'Copied!' : 'Copy event link'}
-              >
-                {copySuccess
-                  ? <span style={{ fontSize: 15, fontWeight: 700 }}>✓</span>
-                  : <IosShareRoundedIcon sx={{ fontSize: 17 }} />}
-              </button>
+              <div style={{ position: 'relative', display: 'inline-flex' }}>
+                {copySuccess && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 6px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#1f2937',
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                  }}>
+                    Link copied!
+                  </div>
+                )}
+                <button
+                  onClick={handleShare}
+                  className="event-details-icon-btn"
+                  aria-label={copySuccess ? 'Copied!' : 'Copy event link'}
+                  title={copySuccess ? 'Copied!' : 'Copy event link'}
+                >
+                  {copySuccess
+                    ? <span style={{ fontSize: 15, fontWeight: 700}}>✓</span>
+                    : <IosShareRoundedIcon sx={{ fontSize: 17 }} />}
+                </button>
+              </div>
               {onClose && (
                 <button
                   onClick={onClose}

@@ -530,10 +530,10 @@ function Auth() {
                 </div>
 
                 {/* Email / Username */}
-                <div style={{ width: "100%", maxWidth: 340 }}>
+                <div className="auth-field-wrap">
                   <input
                     className={`ui-input${emailStatus === "not-found" ? " ui-input--error" : ""}`}
-                    style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                    style={{ width: "100%", boxSizing: "border-box" }}
                     type="text"
                     placeholder="Email or Username"
                     value={loginId}
@@ -547,11 +547,11 @@ function Auth() {
                 </div>
 
                 {/* Password + Forgot Password */}
-                <div style={{ width: "100%", maxWidth: 340 }}>
+                <div className="auth-field-wrap">
                   <div className="ui-input-pass-wrap" style={{ maxWidth: "100%" }}>
                     <input
                       className="ui-input pass"
-                      style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                      style={{ width: "100%", boxSizing: "border-box" }}
                       type={showPassword ? "text" : "password"}
                       placeholder="Password"
                       value={password}

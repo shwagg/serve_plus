@@ -196,11 +196,12 @@
   }
 }
 @media (max-width: 540px) {
-  /* Hide greeting and logo text on small screens to maximise header space */
+  /* Hide greeting on small screens to maximise header space */
   .header-greeting {
     display: none;
   }
-  .header-logo-text {
+  /* Hide logo text only when the player strip is occupying the center slot */
+  .header-container:has(#header-center-slot > *) .header-logo-text {
     display: none;
   }
   .header-logo {
@@ -257,7 +258,7 @@
   background: linear-gradient(to bottom, #d0edfc 10%, rgba(208, 237, 252, 0) 100%);
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
   pointer-events: none;
-  z-index: 999;
+  z-index: 98;
 }
 
 /* Modal Styles */
