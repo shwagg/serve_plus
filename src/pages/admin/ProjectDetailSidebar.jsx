@@ -1162,7 +1162,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
             onClick={e => e.stopPropagation()}>
             <button style={{ position: "absolute", top: 14, right: 14, background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer" }}
               onClick={() => setShowRosterModal(false)}>✕</button>
-            <h2 style={{ textAlign: "center", marginBottom: 6, color: "#1f3b73", fontSize: 20 }}>Volunteer Roster</h2>
+            <h2 style={{ textAlign: "center", marginBottom: 6, color: "#000", fontSize: 20 }}>Volunteer Roster</h2>
             <p style={{ textAlign: "center", color: "#888", fontSize: 13, marginBottom: 20 }}>
               {project.title} — {volunteers.length} registered
             </p>
@@ -1172,7 +1172,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                 <div style={{ fontSize: 12, color: "#666" }}>Registered</div>
               </div>
               <div style={{ background: "#e8f0fe", borderRadius: 10, padding: "8px 20px", textAlign: "center" }}>
-                <div style={{ fontWeight: 700, fontSize: 22, color: "#1f3b73" }}>{attended}</div>
+                <div style={{ fontWeight: 700, fontSize: 22, color: "#000" }}>{attended}</div>
                 <div style={{ fontSize: 12, color: "#666" }}>Present</div>
               </div>
               <div style={{ background: "#fef3e8", borderRadius: 10, padding: "8px 20px", textAlign: "center" }}>
@@ -1185,22 +1185,33 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                 <tr style={{ background: "#f3f4f8", color: "#23335b" }}>
                   <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700 }}>Name</th>
                   <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700 }}>Role</th>
+                  <th style={{ padding: "10px 12px", textAlign: "center", fontWeight: 700 }}>Points</th>
                   <th style={{ padding: "10px 12px", textAlign: "center", fontWeight: 700 }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {volunteers.map((v, idx) => {
                   const isPresent = v.progress?.attendance === "present";
+                  const pts = v.pointsEarned ?? v.points ?? null;
                   return (
                     <tr key={v.uid || idx} style={{ borderBottom: "1px solid #f0f0f0" }}>
                       <td style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e8f0fe", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#1f3b73", fontSize: 13, flexShrink: 0, overflow: "hidden" }}>
+                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e8f0fe", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#000", fontSize: 13, flexShrink: 0, overflow: "hidden" }}>
                           {v.avatar ? <img src={v.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : getInitials(v.displayName)}
                         </div>
                         <span style={{ color: "#111", fontWeight: 500 }}>{v.displayName}</span>
                       </td>
                       <td style={{ padding: "10px 12px", color: "#555", fontSize: 13 }}>
                         {v.role === "faculty" ? "Adviser" : "Volunteer"}
+                      </td>
+                      <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                        {pts !== null ? (
+                          <span style={{ background: "#eef9f8", color: "#1a7a6e", borderRadius: 20, padding: "3px 12px", fontSize: 13, fontWeight: 700 }}>
+                            {pts} pts
+                          </span>
+                        ) : (
+                          <span style={{ color: "#bbb", fontSize: 13 }}>—</span>
+                        )}
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         <span style={{ background: isPresent ? "#d4f5ef" : "#f5f5f5", color: isPresent ? "#1a7a6e" : "#888", borderRadius: 20, padding: "3px 14px", fontSize: 13, fontWeight: 600 }}>

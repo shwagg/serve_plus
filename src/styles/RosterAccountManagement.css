@@ -356,3 +356,44 @@
   font-size: 0.85rem;
   color: #64748b;
 }
+
+/* ── Mobile ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .roster-container {
+    padding: 1rem;
+  }
+
+  .roster-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .roster-title {
+    font-size: 1.3rem;
+  }
+
+  .search-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .search-wrapper {
+    width: 100%;
+  }
+
+  .status-filters {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .role-filters {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .pagination-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
