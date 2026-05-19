@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useSession } from "../context/SessionContext";
@@ -23,7 +22,6 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState(null);
   const [replayBadgeId, setReplayBadgeId] = useState(null);
-  const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const bellButtonRef = useRef(null);
   const prevPointsRef = useRef(null);
@@ -88,15 +86,11 @@ export default function NotificationBell() {
     if (!notification.read) {
       await markNotificationAsRead(userId, notification.id);
     }
-    setIsOpen(false);
     if (notification.type === "badge_earned" && notification.badgeId) {
+      setIsOpen(false);
       setReplayBadgeId(notification.badgeId);
-      return;
     }
-    if (notification.link) {
-      navigate(notification.link);
-    }
-  }, [userId, navigate]);
+  }, [userId]);
 
   const handleMarkAllAsRead = useCallback(async () => {
     if (!userId) return;
