@@ -1,7 +1,7 @@
 // Authorization page for password and Blackboard sign-in.
 
-import { getRedirectResult, signInWithEmailAndPassword } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { getRedirectResult, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { collection, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -45,6 +45,17 @@ function requiresBlackboardSignIn(userData) {
   return isBlackboardLinkedAccount(userData) && userData.hasServePassword !== true;
 }
 
+function checkDeactivation(data) {
+  if (!data.deactivated) return null;
+  const raw = data.scheduledDeletionAt;
+  const deletionDate = raw?.toDate ? raw.toDate() : raw instanceof Date ? raw : null;
+  if (deletionDate && deletionDate <= new Date()) return "permanent";
+  const daysLeft = deletionDate
+    ? Math.max(1, Math.ceil((deletionDate - new Date()) / 86400000))
+    : 30;
+  return { daysLeft };
+}
+
 function Auth() {
   const [loginId, setLoginId] = useState(""); // email or username
   const [password, setPassword] = useState("");
@@ -64,6 +75,10 @@ function Auth() {
   // Agreement modal state
   const [showAgreement, setShowAgreement] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(null); // stores role and uid while agreement acceptance is pending
+
+  // Deactivated account reactivation prompt
+  const [showReactivatePrompt, setShowReactivatePrompt] = useState(false);
+  const [pendingReactivation, setPendingReactivation] = useState(null); // { uid, role, email, authProvider, daysLeft }
 
   useEffect(() => {
     const callbackError = new URLSearchParams(location.search).get("error");
@@ -98,6 +113,18 @@ function Auth() {
           setError("Failed to create user profile.");
           return;
         }
+      }
+
+      const deactivationStateBb = checkDeactivation(userSnap.data());
+      if (deactivationStateBb === "permanent") {
+        await signOut(auth);
+        setError("This account has been permanently deleted and cannot be recovered.");
+        return;
+      }
+      if (deactivationStateBb) {
+        setPendingReactivation({ uid, role: userSnap.data().role, email, authProvider: "blackboard", daysLeft: deactivationStateBb.daysLeft });
+        setShowReactivatePrompt(true);
+        return;
       }
 
       const { role, status } = userSnap.data();
@@ -250,6 +277,18 @@ function Auth() {
         }
       }
 
+      const deactivationState = checkDeactivation(userSnap.data());
+      if (deactivationState === "permanent") {
+        await signOut(auth);
+        setError("This account has been permanently deleted and cannot be recovered.");
+        return;
+      }
+      if (deactivationState) {
+        setPendingReactivation({ uid, role: userSnap.data().role, email, authProvider: "password", daysLeft: deactivationState.daysLeft });
+        setShowReactivatePrompt(true);
+        return;
+      }
+
       const { role, status } = userSnap.data();
 
       if (status !== "active") {
@@ -350,6 +389,51 @@ function Auth() {
     }
   };
 
+  const handleReactivate = async () => {
+    if (!pendingReactivation) return;
+    const { uid, role, authProvider } = pendingReactivation;
+    try {
+      await updateDoc(doc(db, "users", uid), {
+        deactivated: deleteField(),
+        deactivatedAt: deleteField(),
+        scheduledDeletionAt: deleteField(),
+      });
+      const logLogin = httpsCallable(functions, "logLogin");
+      logLogin({ uid }).catch(() => {});
+      const freshSnap = await getDoc(doc(db, "users", uid));
+      const userAgreementVersion = freshSnap.data()?.agreementVersion || null;
+      const currentVersion = await fetchCurrentAgreementVersion();
+      setShowReactivatePrompt(false);
+      setPendingReactivation(null);
+      if (userAgreementVersion !== currentVersion) {
+        setPendingNavigation({ role, uid, authProvider });
+        setShowAgreement(true);
+        return;
+      }
+      if (authProvider === "blackboard") {
+        navigate(getBlackboardRedirectPath(role), { replace: true });
+      } else if (role === "admin" || role === "sysadmin") {
+        navigate(getPrivilegedRedirectPath(role), { replace: true });
+      } else if (role === "faculty") {
+        navigate(intendedPath || "/faculty/current-event", { replace: true });
+      } else if (role === "partner") {
+        navigate(intendedPath || "/partner/dashboard", { replace: true });
+      } else {
+        navigate(intendedPath || "/student/home", { replace: true });
+      }
+    } catch {
+      setShowReactivatePrompt(false);
+      setPendingReactivation(null);
+      setError("Failed to reactivate account. Please try again.");
+    }
+  };
+
+  const handleDeclineReactivate = async () => {
+    await signOut(auth);
+    setShowReactivatePrompt(false);
+    setPendingReactivation(null);
+  };
+
   // After the user accepts the agreements, proceed auth flow
   const handleAgreementAccepted = async () => {
     setShowAgreement(false);
@@ -377,6 +461,61 @@ function Auth() {
 
   return (
     <>
+      {/* Reactivation Prompt */}
+      {showReactivatePrompt && pendingReactivation && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 10000,
+          background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: "1rem",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 16, width: "100%", maxWidth: 420,
+            padding: "32px 28px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+            display: "flex", flexDirection: "column", gap: 0,
+          }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.4px", margin: "0 0 10px 0" }}>
+              Account Deactivated
+            </p>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#111827", margin: "0 0 12px 0" }}>
+              Do you want to reactivate your account?
+            </h2>
+            <p style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, margin: "0 0 8px 0" }}>
+              Your account is currently deactivated. You have{" "}
+              <strong>{pendingReactivation.daysLeft} day{pendingReactivation.daysLeft !== 1 ? "s" : ""} left</strong>{" "}
+              before it is permanently deleted.
+            </p>
+            <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.55, margin: "0 0 24px 0" }}>
+              If you choose not to reactivate now, you can sign in again before the deadline to recover your account. After that, all your data — including levels, badges, and achievements — will be gone forever.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                onClick={handleReactivate}
+                style={{
+                  height: 44, borderRadius: 16, background: "#30bdb7", border: "none",
+                  color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "inherit", transition: "filter 0.15s",
+                }}
+                onMouseOver={e => e.currentTarget.style.filter = "brightness(0.93)"}
+                onMouseOut={e => e.currentTarget.style.filter = ""}
+              >
+                Yes, Reactivate My Account
+              </button>
+              <button
+                onClick={handleDeclineReactivate}
+                style={{
+                  height: 44, borderRadius: 16, background: "#f1f5f9",
+                  border: "1px solid #e2e8f0", color: "#374151", fontSize: 14,
+                  fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s",
+                }}
+                onMouseOver={e => e.currentTarget.style.background = "#e2e8f0"}
+                onMouseOut={e => e.currentTarget.style.background = "#f1f5f9"}
+              >
+                No, Sign Me Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Agreement Modal */}
       {showAgreement && pendingNavigation && (
         <AgreementModal

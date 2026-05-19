@@ -5,7 +5,7 @@ import ProjectProposal from "../global/proposal/ProjectProposal";
 import ReviewModal from "../global/proposal/ReviewModal";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Fragment } from "react";
 import { collection, getDocs, doc, getDoc, query, orderBy, limit, where, getCountFromServer, onSnapshot } from "firebase/firestore";
 import { getLevelInfo } from "../../hooks/rewardSystem";
 import Header from "../../components/Header";
@@ -17,6 +17,7 @@ import mission1 from '../../assets/mission1.jpg';
 import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
 import emptyFile from '../../assets/empty_file.svg';
+import servePlusIcon from '../../assets/serve_plus_icon.svg';
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
   const radius = (size - stroke) / 2;
@@ -474,12 +475,13 @@ const StudentHome = () => {
     [missionCards, enrolledMissions]
   );
 
-  const tickerText = useMemo(() =>
-    tickerAnnouncements
-      .map(a => a.title + (a.body ? ` — ${a.body}` : ''))
-      .join('  ◆  '),
-    [tickerAnnouncements]
-  );
+  const renderTickerItems = (items, keyPrefix = '') =>
+    items.map((a, i) => (
+      <Fragment key={keyPrefix + (a.id || i)}>
+        {i > 0 && <img src={servePlusIcon} className="ticker-sep" alt="" aria-hidden="true" />}
+        {a.title}{a.body ? ` — ${a.body}` : ''}
+      </Fragment>
+    ));
 
   const getMissionProgress = useCallback((missionId) => {
     const detail = enrollmentDetails[missionId];
@@ -500,8 +502,8 @@ const StudentHome = () => {
         <span className="ticker-label">📢 News</span>
         <div className="ticker-track">
           <div className="ticker-content">
-            <span className="ticker-text">{tickerText}</span>
-            <span className="ticker-text" aria-hidden="true">{tickerText}</span>
+            <span className="ticker-text">{renderTickerItems(tickerAnnouncements)}</span>
+            <span className="ticker-text" aria-hidden="true">{renderTickerItems(tickerAnnouncements, 'd-')}</span>
           </div>
         </div>
       </div>

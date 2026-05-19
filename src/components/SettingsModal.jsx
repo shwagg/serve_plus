@@ -6,7 +6,7 @@ import {
   doc, getDoc, updateDoc, collection, query, where, getDocs,
 } from "firebase/firestore";
 import {
-  updatePassword, reauthenticateWithCredential, EmailAuthProvider,
+  updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut,
 } from "firebase/auth";
 import { useSession } from "../context/SessionContext";
 import CertificateQRScannerModal from "./CertificateQRScannerModal";
@@ -14,7 +14,7 @@ import {
   VisibilityIcon, VisibilityOffIcon, CloseIcon,
   Face6RoundedIcon, GavelRoundedIcon, NotificationsNoneRoundedIcon,
   LocalPoliceOutlinedIcon, HistoryOutlinedIcon,
-  ArticleOutlinedIcon, FileDownloadOutlinedIcon,
+  ArticleOutlinedIcon, FileDownloadOutlinedIcon, PersonOffOutlinedIcon,
 } from "./icons";
 import "./styles/SettingsModal.css";
 
@@ -25,6 +25,7 @@ const ALL_SECTIONS = [
   { id: "certificate",   Icon: LocalPoliceOutlinedIcon,     label: "Verify Certificate", roles: null },
   { id: "documents",     Icon: ArticleOutlinedIcon,         label: "Documents",          roles: ["student"] },
   { id: "audit",         Icon: HistoryOutlinedIcon,         label: "Audit Log",         roles: null },
+  { id: "deactivate",   Icon: PersonOffOutlinedIcon,       label: "Deactivate Account", roles: null, danger: true },
 ];
 
 export default function SettingsModal({ isOpen, onClose }) {
@@ -66,6 +67,11 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
+  // Deactivate account
+  const [deactivateConfirmText, setDeactivateConfirmText] = useState("");
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivateError, setDeactivateError] = useState("");
+
   // Reset all form state whenever modal opens
   useEffect(() => {
     if (isOpen && userData) {
@@ -75,6 +81,7 @@ export default function SettingsModal({ isOpen, onClose }) {
       setUsernameError(""); setUsernameSuccess("");
       setPasswordError(""); setPasswordSuccess("");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      setDeactivateConfirmText(""); setDeactivateError("");
     }
     if (!isOpen) { setActiveSection("profile"); setEditingUsername(false); }
   }, [isOpen, userData]);
@@ -134,6 +141,27 @@ export default function SettingsModal({ isOpen, onClose }) {
       setAuditLogs([]);
     }
     setAuditLoading(false);
+  };
+
+  const handleDeactivateAccount = async () => {
+    setDeactivateError("");
+    setDeactivating(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not signed in.");
+      await updateDoc(doc(db, "users", user.uid), {
+        deactivated: true,
+        deactivatedAt: new Date(),
+        scheduledDeletionAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+      await signOut(auth);
+      onClose();
+      navigate("/");
+    } catch {
+      setDeactivateError("Failed to deactivate account. Please try again.");
+    } finally {
+      setDeactivating(false);
+    }
   };
 
   const handleSaveUsername = async () => {
@@ -295,10 +323,21 @@ export default function SettingsModal({ isOpen, onClose }) {
 
             {/* Left sidebar nav */}
             <nav className="settings-nav">
-              {sections.map(s => (
+              {sections.filter(s => !s.danger).map(s => (
                 <button
                   key={s.id}
                   className={`settings-nav-item${activeSection === s.id ? " active" : ""}`}
+                  onClick={() => setActiveSection(s.id)}
+                >
+                  <s.Icon className="settings-nav-icon" fontSize="small" />
+                  <span>{s.label}</span>
+                </button>
+              ))}
+              <div style={{ flex: 1 }} />
+              {sections.filter(s => s.danger).map(s => (
+                <button
+                  key={s.id}
+                  className={`settings-nav-item danger${activeSection === s.id ? " active" : ""}`}
                   onClick={() => setActiveSection(s.id)}
                 >
                   <s.Icon className="settings-nav-icon" fontSize="small" />
@@ -674,6 +713,54 @@ export default function SettingsModal({ isOpen, onClose }) {
                         <p className="settings-doc-desc">Export your portfolio as PDF from your Profile page</p>
                       </div>
                       <FileDownloadOutlinedIcon className="settings-doc-action" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Deactivate Account ── */}
+              {activeSection === "deactivate" && (
+                <div className="settings-section">
+                  <h2 className="settings-section-title">Deactivate Account</h2>
+                  <p className="settings-desc">
+                    This will deactivate your account and schedule it for permanent deletion.
+                  </p>
+
+                  <div className="settings-deactivate-warning">
+                    <p className="settings-deactivate-warning-title">Before you continue</p>
+                    <ul className="settings-deactivate-warning-list">
+                      <li>Your account will be <strong>immediately deactivated</strong> and you will be signed out.</li>
+                      <li>You have <strong>30 days</strong> to contact support and recover your account.</li>
+                      <li>After 30 days, your account and all associated data will be <strong>permanently deleted</strong> and cannot be recovered.</li>
+                    </ul>
+                  </div>
+
+                  <div className="settings-divider" />
+
+                  <div className="settings-group">
+                    <label className="settings-label">Confirm deactivation</label>
+                    <p className="settings-deactivate-confirm-hint">
+                      Type <strong>DEACTIVATE</strong> below to continue.
+                    </p>
+                    <input
+                      className="ui-input"
+                      style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+                      type="text"
+                      placeholder="DEACTIVATE"
+                      value={deactivateConfirmText}
+                      onChange={e => { setDeactivateConfirmText(e.target.value); setDeactivateError(""); }}
+                      autoComplete="off"
+                    />
+                    {deactivateError && (
+                      <p className="ui-error" style={{ marginTop: 4 }}>{deactivateError}</p>
+                    )}
+                    <button
+                      className="settings-danger-btn"
+                      style={{ marginTop: 14 }}
+                      onClick={handleDeactivateAccount}
+                      disabled={deactivateConfirmText !== "DEACTIVATE" || deactivating}
+                    >
+                      {deactivating ? "Deactivating…" : "Deactivate My Account"}
                     </button>
                   </div>
                 </div>
