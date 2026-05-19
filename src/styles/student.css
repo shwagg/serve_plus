@@ -62,7 +62,7 @@
   font-weight: 700;
   font-size: 22px;
   margin-bottom: 12px;
-  color: #234e7b;
+  color: #000;
 }
 .logout-popup-desc {
   font-size: 16px;
@@ -220,7 +220,6 @@
   background: #ffffff;
   border-radius: 999px;
   padding: 7px 22px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
 }
 .strip-compact-row {
   display: flex;
@@ -1238,12 +1237,12 @@
 .leaderboard-modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
+  padding: 16px 12px 16px 20px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
 }
 .leaderboard-modal-header h3 {
+  flex: 1;
   margin: 0;
   font-size: 18px;
   font-weight: 700;
@@ -1258,9 +1257,10 @@
   cursor: pointer;
   color: #6b7280;
   line-height: 1;
-  padding: 4px 8px;
+  padding: 12px 24px;
   border-radius: 4px;
   transition: background 0.15s;
+  flex-shrink: 0;
 }
 .leaderboard-modal-header button:hover {
   background: #f3f4f6;
@@ -2529,7 +2529,13 @@
   .leaderboard-modal {
     height: 88dvh;
   }
-  .leaderboard-modal-header,
+  .leaderboard-modal-header {
+    padding-left: 14px;
+    padding-right: 0;
+  }
+  .leaderboard-modal-header button{
+     padding: 6px 4px 6px 50px;
+  }
   .leaderboard-modal-search-wrap {
     padding-left: 14px;
     padding-right: 14px;
