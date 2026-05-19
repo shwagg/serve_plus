@@ -1,32 +1,41 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebaseConfig";
 import {
-  doc, updateDoc, collection, query, where, getDocs,
+  doc, getDoc, updateDoc, collection, query, where, getDocs,
 } from "firebase/firestore";
 import {
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
 } from "firebase/auth";
 import { useSession } from "../context/SessionContext";
 import CertificateQRScannerModal from "./CertificateQRScannerModal";
-import { VisibilityIcon, VisibilityOffIcon, CloseIcon } from "./icons";
+import {
+  VisibilityIcon, VisibilityOffIcon, CloseIcon,
+  Face6RoundedIcon, GavelRoundedIcon, NotificationsNoneRoundedIcon,
+  LocalPoliceOutlinedIcon, HistoryOutlinedIcon,
+  ArticleOutlinedIcon, FileDownloadOutlinedIcon,
+} from "./icons";
 import "./styles/SettingsModal.css";
 
-const SECTIONS = [
-  { id: "profile",       icon: "👤", label: "Profile"           },
-  { id: "terms",         icon: "📄", label: "Terms & Privacy"   },
-  { id: "notifications", icon: "🔔", label: "Notifications"     },
-  { id: "certificate",   icon: "🏅", label: "Verify Certificate" },
-  { id: "audit",         icon: "🕒", label: "Audit Log"         },
+const ALL_SECTIONS = [
+  { id: "profile",       Icon: Face6RoundedIcon,            label: "Profile",           roles: null },
+  { id: "terms",         Icon: GavelRoundedIcon,            label: "Terms & Privacy",   roles: null },
+  { id: "notifications", Icon: NotificationsNoneRoundedIcon, label: "Notifications",    roles: null },
+  { id: "certificate",   Icon: LocalPoliceOutlinedIcon,     label: "Verify Certificate", roles: null },
+  { id: "documents",     Icon: ArticleOutlinedIcon,         label: "Documents",          roles: ["student"] },
+  { id: "audit",         Icon: HistoryOutlinedIcon,         label: "Audit Log",         roles: null },
 ];
 
 export default function SettingsModal({ isOpen, onClose }) {
   const { userData, refreshUserData } = useSession();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("profile");
   const [showCertModal, setShowCertModal] = useState(false);
 
   // Username
   const [username, setUsername] = useState("");
+  const [editingUsername, setEditingUsername] = useState(false);
   const [usernameError, setUsernameError] = useState("");
   const [usernameSuccess, setUsernameSuccess] = useState("");
   const [savingUsername, setSavingUsername] = useState(false);
@@ -48,6 +57,11 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [announcementsEnabled, setAnnouncementsEnabled] = useState(true);
   const [savingAnnouncements, setSavingAnnouncements] = useState(false);
 
+  // Terms & Privacy inline viewer
+  const [termsTab, setTermsTab] = useState("terms");
+  const [agreementData, setAgreementData] = useState(null);
+  const [agreementLoading, setAgreementLoading] = useState(false);
+
   // Audit log
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -62,12 +76,33 @@ export default function SettingsModal({ isOpen, onClose }) {
       setPasswordError(""); setPasswordSuccess("");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
     }
-    if (!isOpen) setActiveSection("profile");
+    if (!isOpen) { setActiveSection("profile"); setEditingUsername(false); }
   }, [isOpen, userData]);
+
+  useEffect(() => {
+    if (isOpen && activeSection === "terms" && !agreementData) fetchAgreementData();
+  }, [isOpen, activeSection]);
 
   useEffect(() => {
     if (isOpen && activeSection === "audit") fetchAuditLogs();
   }, [isOpen, activeSection]);
+
+  const fetchAgreementData = async () => {
+    setAgreementLoading(true);
+    try {
+      const snap = await getDoc(doc(db, "settings", "agreements"));
+      if (snap.exists()) setAgreementData(snap.data());
+      else setAgreementData({});
+    } catch {
+      setAgreementData({});
+    }
+    setAgreementLoading(false);
+  };
+
+  const renderAgreementBody = (body) => {
+    if (!body) return null;
+    return <div dangerouslySetInnerHTML={{ __html: body }} />;
+  };
 
   const fetchAuditLogs = async () => {
     const user = auth.currentUser;
@@ -104,26 +139,28 @@ export default function SettingsModal({ isOpen, onClose }) {
   const handleSaveUsername = async () => {
     setUsernameError(""); setUsernameSuccess("");
     const trimmed = username.trim().toLowerCase();
-    if (!trimmed) { setUsernameError("Username cannot be empty."); return; }
+    if (!trimmed) { setUsernameError("Username cannot be empty."); return false; }
     if (!/^[a-z0-9._]{3,20}$/.test(trimmed)) {
       setUsernameError("3–20 characters: letters, numbers, . or _");
-      return;
+      return false;
     }
     if (trimmed === userData?.username) {
       setUsernameError("That's already your current username.");
-      return;
+      return false;
     }
     setSavingUsername(true);
     try {
       const snap = await getDocs(
         query(collection(db, "users"), where("username", "==", trimmed))
       );
-      if (!snap.empty) { setUsernameError("Username is already taken."); return; }
+      if (!snap.empty) { setUsernameError("Username is already taken."); return false; }
       await updateDoc(doc(db, "users", auth.currentUser.uid), { username: trimmed });
       await refreshUserData();
       setUsernameSuccess("Username updated successfully.");
+      return true;
     } catch {
       setUsernameError("Failed to update username. Please try again.");
+      return false;
     } finally {
       setSavingUsername(false);
     }
@@ -234,6 +271,10 @@ export default function SettingsModal({ isOpen, onClose }) {
   const isCreatingServePassword = isBlackboardLinked && !hasServePassword;
   const canManagePassword = hasServePassword || isCreatingServePassword;
 
+  const communityUpdatesDisabled = userData?.role === "admin" || userData?.role === "partner" || userData?.role === "sysadmin";
+
+  const sections = ALL_SECTIONS.filter(s => !s.roles || s.roles.includes(userData?.role));
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -243,7 +284,7 @@ export default function SettingsModal({ isOpen, onClose }) {
 
           {/* ── Header ── */}
           <div className="settings-header">
-            <span className="settings-title">⚙️ Settings</span>
+            <span className="settings-title">Settings</span>
             <button className="settings-close" onClick={onClose} aria-label="Close settings">
               <CloseIcon style={{ fontSize: 16 }} />
             </button>
@@ -254,13 +295,13 @@ export default function SettingsModal({ isOpen, onClose }) {
 
             {/* Left sidebar nav */}
             <nav className="settings-nav">
-              {SECTIONS.map(s => (
+              {sections.map(s => (
                 <button
                   key={s.id}
                   className={`settings-nav-item${activeSection === s.id ? " active" : ""}`}
                   onClick={() => setActiveSection(s.id)}
                 >
-                  <span className="settings-nav-icon">{s.icon}</span>
+                  <s.Icon className="settings-nav-icon" fontSize="small" />
                   <span>{s.label}</span>
                 </button>
               ))}
@@ -277,34 +318,87 @@ export default function SettingsModal({ isOpen, onClose }) {
                     Update your display username and account password.
                   </p>
 
-                  {/* Username */}
-                  <div className="settings-group">
-                    <label className="settings-label">Username</label>
-                    <div className="settings-input-row">
-                      <div className="ui-input-prefix-wrap">
-                        <span className="ui-input-prefix">@</span>
-                        <input
-                          className="ui-input-bare"
-                          value={username}
-                          onChange={e => {
-                            setUsername(e.target.value);
-                            setUsernameError(""); setUsernameSuccess("");
-                          }}
-                          placeholder="username"
-                          maxLength={20}
-                        />
-                      </div>
-                      <button
-                        className="settings-save-btn"
-                        onClick={handleSaveUsername}
-                        disabled={savingUsername}
-                      >
-                        {savingUsername ? "Saving…" : "Save"}
-                      </button>
+                  {/* Blackboard SSO notice */}
+                  {!hasPasswordProvider && (
+                    <div className="settings-sso-banner">
+                      🏫 This account was created by signing in through <strong>Blackboard</strong>.
+                      Password changes are managed there.
                     </div>
-                    {usernameError && <p className="ui-error">{usernameError}</p>}
-                    {usernameSuccess && <p className="ui-success">{usernameSuccess}</p>}
+                  )}
+
+                  {/* Info table */}
+                  <div className="settings-info-table">
+                    <div className="settings-info-row">
+                      <span className="settings-info-key">Name</span>
+                      <span className="settings-info-val">{userData?.name || "—"}</span>
+                    </div>
+                    <div className="settings-info-row">
+                      <span className="settings-info-key">Email</span>
+                      <span className="settings-info-val">
+                        {userData?.email || auth.currentUser?.email || "—"}
+                      </span>
+                    </div>
+                    <div className="settings-info-row">
+                      <span className="settings-info-key">Username</span>
+                      {editingUsername ? (
+                        <div className="settings-username-inline">
+                          <div className="ui-input-prefix-wrap settings-username-wrap">
+                            <span className="ui-input-prefix">@</span>
+                            <input
+                              className="ui-input-bare"
+                              value={username}
+                              onChange={e => {
+                                setUsername(e.target.value);
+                                setUsernameError(""); setUsernameSuccess("");
+                              }}
+                              placeholder="new username"
+                              maxLength={20}
+                              autoFocus
+                            />
+                          </div>
+                          <button
+                            className="settings-save-btn"
+                            onClick={async () => {
+                              const ok = await handleSaveUsername();
+                              if (ok) setEditingUsername(false);
+                            }}
+                            disabled={savingUsername}
+                          >
+                            {savingUsername ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            className="settings-cancel-btn"
+                            onClick={() => {
+                              setEditingUsername(false);
+                              setUsername(userData?.username || "");
+                              setUsernameError(""); setUsernameSuccess("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="settings-username-view">
+                          <span className="settings-info-val" style={{ flex: "none" }}>
+                            {userData?.username ? `@${userData.username}` : "—"}
+                          </span>
+                          <button
+                            className="settings-edit-icon-btn"
+                            onClick={() => {
+                              setUsername(userData?.username || "");
+                              setUsernameError(""); setUsernameSuccess("");
+                              setEditingUsername(true);
+                            }}
+                            aria-label="Edit username"
+                          >
+                            ✏️
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {usernameError && <p className="ui-error" style={{ marginTop: 6 }}>{usernameError}</p>}
+                  {usernameSuccess && <p className="ui-success" style={{ marginTop: 6 }}>{usernameSuccess}</p>}
 
                   <div className="settings-divider" />
 
@@ -422,32 +516,60 @@ export default function SettingsModal({ isOpen, onClose }) {
               {activeSection === "terms" && (
                 <div className="settings-section">
                   <h2 className="settings-section-title">Terms & Privacy</h2>
-                  <p className="settings-desc">
-                    Review the agreements you accepted when joining SERVE+.
-                  </p>
-                  <div className="settings-terms-links">
-                    <a
-                      href="/global/terms-condition"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="settings-terms-btn"
-                    >
-                      📄 Terms of Service
-                    </a>
-                    <a
-                      href="/global/privacy-policy"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="settings-terms-btn"
-                    >
-                      🔒 Privacy Policy
-                    </a>
-                  </div>
                   {(userData?.termsAccepted || userData?.privacyAccepted) && (
-                    <p className="settings-accepted-note">
+                    <p className="settings-accepted-note" style={{ marginBottom: 14 }}>
                       ✅ You have accepted the Terms of Service and Privacy Policy.
                     </p>
                   )}
+                  <div className="settings-agreement-tabs">
+                    <button
+                      className={`settings-agreement-tab${termsTab === "terms" ? " active" : ""}`}
+                      onClick={() => setTermsTab("terms")}
+                    >
+                      Terms of Service
+                    </button>
+                    <button
+                      className={`settings-agreement-tab${termsTab === "privacy" ? " active" : ""}`}
+                      onClick={() => setTermsTab("privacy")}
+                    >
+                      Privacy Policy
+                    </button>
+                  </div>
+                  <div className="settings-agreement-body">
+                    {agreementLoading ? (
+                      <p className="settings-loading">Loading…</p>
+                    ) : !agreementData ? (
+                      <p className="settings-empty">Could not load content.</p>
+                    ) : termsTab === "terms" ? (
+                      <>
+                        {agreementData.termsIntro && <div dangerouslySetInnerHTML={{ __html: agreementData.termsIntro }} />}
+                        {agreementData.version && (
+                          <p className="settings-agreement-version">v{agreementData.version}</p>
+                        )}
+                        <hr className="settings-agreement-divider" />
+                        {(agreementData.termsSections || []).map((s, i) => (
+                          <div key={i}>
+                            <h3 className="settings-agreement-heading">{s.heading}</h3>
+                            {renderAgreementBody(s.body)}
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        {agreementData.privacyIntro && <div dangerouslySetInnerHTML={{ __html: agreementData.privacyIntro }} />}
+                        {agreementData.version && (
+                          <p className="settings-agreement-version">v{agreementData.version}</p>
+                        )}
+                        <hr className="settings-agreement-divider" />
+                        {(agreementData.privacySections || []).map((s, i) => (
+                          <div key={i}>
+                            <h3 className="settings-agreement-heading">{s.heading}</h3>
+                            {renderAgreementBody(s.body)}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -480,20 +602,23 @@ export default function SettingsModal({ isOpen, onClose }) {
 
                   <div className="settings-divider" />
 
-                  <div className="settings-toggle-row">
+                  <div className={`settings-toggle-row${communityUpdatesDisabled ? " disabled" : ""}`}>
                     <div>
                       <p className="settings-toggle-label">Community Updates</p>
                       <p className="settings-toggle-sublabel">
-                        When off, the 📢 announcements button is hidden from the page
+                        {communityUpdatesDisabled
+                          ? "Not available for this account type"
+                          : "When off, the 📢 announcements button is hidden from the page"
+                        }
                       </p>
                     </div>
                     <div
                       className={`settings-toggle${announcementsEnabled ? " on" : ""}`}
                       role="switch"
                       aria-checked={announcementsEnabled}
-                      tabIndex={0}
-                      onClick={() => !savingAnnouncements && handleToggleAnnouncements(!announcementsEnabled)}
-                      onKeyDown={e => e.key === "Enter" || e.key === " " ? handleToggleAnnouncements(!announcementsEnabled) : null}
+                      tabIndex={communityUpdatesDisabled ? -1 : 0}
+                      onClick={() => !communityUpdatesDisabled && !savingAnnouncements && handleToggleAnnouncements(!announcementsEnabled)}
+                      onKeyDown={e => !communityUpdatesDisabled && (e.key === "Enter" || e.key === " ") ? handleToggleAnnouncements(!announcementsEnabled) : null}
                       aria-label={announcementsEnabled ? "Hide community updates" : "Show community updates"}
                     >
                       <span className="settings-toggle-thumb" />
@@ -516,6 +641,41 @@ export default function SettingsModal({ isOpen, onClose }) {
                   >
                     Open Certificate Scanner
                   </button>
+                </div>
+              )}
+
+              {/* ── Documents ── */}
+              {activeSection === "documents" && (
+                <div className="settings-section">
+                  <h2 className="settings-section-title">Documents</h2>
+                  <p className="settings-desc">
+                    Download official SERVE+ forms and export your volunteer portfolio.
+                  </p>
+                  <div className="settings-doc-list">
+                    <a
+                      href="/assets/Activity Information and Consent Form.pdf"
+                      download="Activity Information and Consent Form.pdf"
+                      className="settings-doc-item"
+                    >
+                      <ArticleOutlinedIcon className="settings-doc-icon" />
+                      <div className="settings-doc-info">
+                        <p className="settings-doc-name">Activity Consent Form</p>
+                        <p className="settings-doc-desc">Blank consent form for SERVE+ activities</p>
+                      </div>
+                      <FileDownloadOutlinedIcon className="settings-doc-action" />
+                    </a>
+                    <button
+                      className="settings-doc-item"
+                      onClick={() => { onClose(); navigate("/profile"); }}
+                    >
+                      <ArticleOutlinedIcon className="settings-doc-icon" />
+                      <div className="settings-doc-info">
+                        <p className="settings-doc-name">Volunteer Portfolio</p>
+                        <p className="settings-doc-desc">Export your portfolio as PDF from your Profile page</p>
+                      </div>
+                      <FileDownloadOutlinedIcon className="settings-doc-action" />
+                    </button>
+                  </div>
                 </div>
               )}
 

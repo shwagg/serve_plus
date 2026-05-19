@@ -39,14 +39,14 @@ export default function Sidebar({ links, collapsed, setCollapsed }) {
             };
         }
 
-        // Handle project detail and tasks sub-routes
-        if (pathParts[1] === "projects" && pathParts[2]) {
+        if (pathParts[1] === "projects" || pathParts[1] === "review-proposals") {
+            const isDetail = pathParts[1] === "projects" && !!pathParts[2];
             return {
                 parent: "Project",
                 parentKey: "project",
                 current: "Project Proposals",
-                currentTo: "/admin/projects",
-                child: pathParts[3] === "tasks" ? "Manage Tasks" : null,
+                currentTo: isDetail ? "/admin/review-proposals" : null,
+                child: isDetail && pathParts[3] === "tasks" ? "Manage Tasks" : null,
             };
         }
 
