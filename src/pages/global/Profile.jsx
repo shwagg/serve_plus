@@ -289,10 +289,12 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
 import { useSession } from "../../context/SessionContext.jsx";
 import Header from "../../components/Header.jsx";
 import BadgeShelf from "../../components/badges/BadgeShelf";
+import BadgeIcon from "../../components/badges/BadgeIcon";
 import "../../styles/Profile.css";
 import "../../styles/Badge.css";
 import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
+import { BADGE_BY_ID } from "../../constants/badgeDefinitions";
 const PROFILE_TABS = ["Overview", "Badges", "Portfolio"];
 
 const SDG_LABELS = {
@@ -362,8 +364,41 @@ export default function Profile() {
   const [historyFilter, setHistoryFilter] = useState("all");
   const [historySort, setHistorySort] = useState("date_desc");
   const portfolioPdfRef = useRef(null);
+  const serveReadyAwardedRef = useRef(false);
+  const certBlobRef = useRef(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedCert, setSelectedCert] = useState(null);
+  const [certShareCopied, setCertShareCopied] = useState(false);
+  const [certBlobUrl, setCertBlobUrl] = useState(null);
+  const [certBlobLoading, setCertBlobLoading] = useState(false);
+
+  // Fetch cert PDF as blob URL so the iframe can display cross-origin Firebase Storage files
+  useEffect(() => {
+    if (certBlobRef.current) {
+      URL.revokeObjectURL(certBlobRef.current);
+      certBlobRef.current = null;
+    }
+    if (!selectedCert?.downloadURL) {
+      setCertBlobUrl(null);
+      setCertBlobLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setCertBlobUrl(null);
+    setCertBlobLoading(true);
+    fetch(selectedCert.downloadURL)
+      .then(r => r.blob())
+      .then(blob => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        certBlobRef.current = url;
+        setCertBlobUrl(url);
+        setCertBlobLoading(false);
+      })
+      .catch(() => { if (!cancelled) setCertBlobLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedCert]);
 
   const exportToPDF = async () => {
     if (!portfolioPdfRef.current) return;
@@ -480,26 +515,32 @@ export default function Profile() {
         setProfile(profileData);
         setLoading(false); // Show the page now — events load in background
 
-        // Phase 2: Fetch missions, rewards, badges all in parallel
-        const [missionsSnap, rewardsSnap, badgesSnap] = await Promise.all([
+        // Phase 2: Fetch missions and rewards in parallel
+        const [missionsSnap, rewardsSnap] = await Promise.all([
           getDocs(collection(db, "missions")),
           getDocs(collection(db, "users", user.uid, "rewards")),
-          getDocs(collection(db, "users", user.uid, "badges")),
         ]);
 
         setRewards(rewardsSnap.docs.map(r => ({ id: r.id, ...r.data() })));
 
-        // Badges — auto-award SERVE Ready if missing
-        const badgeList = badgesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const hasServeReady = badgeList.some(b => (b.badgeId ?? b.id) === "serve-ready");
-        if (!hasServeReady) {
-          const { awardServeReadyBadge } = await import("../../hooks/badgeSystem");
-          await awardServeReadyBadge(user.uid);
-          const refreshed = await getDocs(collection(db, "users", user.uid, "badges"));
-          setEarnedBadges(refreshed.docs.map(d => ({ id: d.id, ...d.data() })));
-        } else {
-          setEarnedBadges(badgeList);
-        }
+        // Real-time badge listener — updates whenever a badge is awarded
+        const badgesRef = collection(db, "users", user.uid, "badges");
+        onSnapshot(badgesRef, async (snapshot) => {
+          const badgeList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const hasServeReady = badgeList.some(b => (b.badgeId ?? b.id) === "serve-ready");
+          if (profileData.role === "student" && !hasServeReady && !serveReadyAwardedRef.current) {
+            serveReadyAwardedRef.current = true;
+            try {
+              const { awardServeReadyBadge } = await import("../../hooks/badgeSystem");
+              await awardServeReadyBadge(user.uid);
+              // onSnapshot fires again with serve-ready included
+            } catch {
+              setEarnedBadges(badgeList);
+            }
+          } else {
+            setEarnedBadges(badgeList);
+          }
+        });
 
         // Certificates — real-time listener
         const certsRef = collection(db, "users", user.uid, "certificates");
@@ -645,6 +686,109 @@ export default function Profile() {
         </div>
       )}
       <Header />
+
+      {/* ── Certificate fullscreen modal ── */}
+      {selectedCert && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15,23,42,0.72)",
+            zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => { setSelectedCert(null); setCertShareCopied(false); }}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: 14,
+              width: "min(920px, 96vw)", maxHeight: "92vh",
+              display: "flex", flexDirection: "column", overflow: "hidden",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.38)",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderBottom: "1px solid #e2e8f0", flexShrink: 0 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.72rem", color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>SerVe+ · Mission</div>
+                <div style={{ fontWeight: 700, fontSize: "1.05rem", color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {selectedCert.course}
+                </div>
+                {(selectedCert.month || selectedCert.date) && (
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 2 }}>
+                    Completed {selectedCert.month} {selectedCert.year || selectedCert.date}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => { setSelectedCert(null); setCertShareCopied(false); }}
+                style={{ background: "none", border: "none", fontSize: "1.4rem", cursor: "pointer", color: "#94a3b8", padding: "4px 8px", borderRadius: 6, lineHeight: 1 }}
+              >✕</button>
+            </div>
+
+            {/* PDF body */}
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 420, display: "flex", flexDirection: "column" }}>
+              {certBlobLoading ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 420, gap: 12, color: "#64748b", fontSize: "0.9rem" }}>
+                  <div style={{ width: 26, height: 26, border: "3px solid #e2e8f0", borderTopColor: "#1a73e8", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+                  Loading certificate…
+                </div>
+              ) : certBlobUrl ? (
+                <iframe
+                  src={certBlobUrl}
+                  title="Certificate"
+                  style={{ width: "100%", height: "100%", minHeight: 420, border: "none", display: "block", flex: 1 }}
+                />
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, flexDirection: "column", gap: 10, color: "#94a3b8", minHeight: 300 }}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span style={{ fontSize: "0.85rem" }}>PDF not available</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer actions */}
+            <div style={{ display: "flex", gap: 10, padding: "14px 20px", borderTop: "1px solid #e2e8f0", justifyContent: "flex-end", flexShrink: 0 }}>
+              <button
+                onClick={async () => {
+                  if (!selectedCert.downloadURL) return;
+                  if (navigator.share) {
+                    try { await navigator.share({ title: `SerVe+ Certificate — ${selectedCert.course}`, url: selectedCert.downloadURL }); } catch {}
+                  } else {
+                    try { await navigator.clipboard.writeText(selectedCert.downloadURL); } catch {}
+                    setCertShareCopied(true);
+                    setTimeout(() => setCertShareCopied(false), 2200);
+                  }
+                }}
+                style={{
+                  background: certShareCopied ? "#10b981" : "#f1f5f9",
+                  color: certShareCopied ? "#fff" : "#334155",
+                  border: "none", borderRadius: 8, padding: "9px 20px",
+                  fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
+                  transition: "background 0.2s",
+                }}
+              >
+                {certShareCopied ? "✓ Link copied!" : "↗ Share"}
+              </button>
+              {selectedCert.downloadURL && (
+                <a
+                  href={selectedCert.downloadURL}
+                  download={`SerVe+_Certificate_${(selectedCert.course || "certificate").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    background: "#1a73e8", color: "#fff", borderRadius: 8,
+                    padding: "9px 20px", fontWeight: 600, fontSize: "0.85rem",
+                    textDecoration: "none", display: "inline-block",
+                  }}
+                >
+                  ↓ Download PDF
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="profile-main-flex">
         <div className="profile-card">
           <div className="profile-avatar">
@@ -682,7 +826,7 @@ export default function Profile() {
                   </span>
                 )}
                 {profile.program && (
-                  <span style={{ fontSize: "0.85rem", color: "#234e7b", background: "#e0f2fe", borderRadius: 8, padding: "4px 10px", display: "inline-block", fontWeight: 600 }}>
+                  <span style={{ fontSize: "0.85rem", color: "#000", background: "#e0f2fe", borderRadius: 8, padding: "4px 10px", display: "inline-block", fontWeight: 600 }}>
                     {profile.program}
                   </span>
                 )}
@@ -702,17 +846,6 @@ export default function Profile() {
             <div className="profile-interests-list">
               {profile.interests && profile.interests.map(interest => (
                 <span className="profile-interest-badge" key={interest}>{interest}</span>
-              ))}
-            </div>
-          </div>
-          <div style={{ width: "100%", marginTop: 18 }}>
-            <div className="profile-achievements-label">Rewards</div>
-            <div className="profile-achievements-list">
-              {rewards.map(reward => (
-                <div key={reward.id} className="profile-reward-container">
-                  <span className="profile-reward-icon">{reward.icon || "🏅"}</span>
-                  <span className="profile-reward-name">{reward.name || reward.id}</span>
-                </div>
               ))}
             </div>
           </div>
@@ -947,7 +1080,7 @@ export default function Profile() {
                                   🖊 Proponent
                                 </span>
                                 {ev.projectType && (
-                                  <span className="peh-badge" style={{ background: "#e8edf7", color: "#1f3b73" }}>
+                                  <span className="peh-badge" style={{ background: "#e8edf7", color: "#000" }}>
                                     {typeLabel(ev.projectType)}
                                   </span>
                                 )}
@@ -1009,18 +1142,24 @@ export default function Profile() {
 
                 {/* Achievements */}
                 <div className="portfolio-section">
-                  <div className="card-title">🏅 Achievements <span className="muted-count">({rewards.length})</span></div>
-                  {rewards.length === 0
+                  <div className="card-title">🏅 Achievements <span className="muted-count">({earnedBadges.length})</span></div>
+                  {earnedBadges.length === 0
                     ? <p className="muted-text">No achievements yet.</p>
                     : (
                       <div className="achievements-grid">
-                        {rewards.map(r => (
-                          <div key={r.id} title={r.description || r.name || r.id} className="achievement-card">
-                            <div className="achievement-icon">{r.icon || "🏅"}</div>
-                            <div className="achievement-name">{r.name || r.id}</div>
-                            {r.description && <div className="achievement-desc">{r.description}</div>}
-                          </div>
-                        ))}
+                        {earnedBadges.map(b => {
+                          const bid = b.badgeId ?? b.id;
+                          const def = BADGE_BY_ID[bid];
+                          return (
+                            <div key={bid} title={def?.criteria || def?.description || bid} className="achievement-card">
+                              <div className="achievement-icon">
+                                <BadgeIcon badgeId={bid} earned={true} size="md" />
+                              </div>
+                              <div className="achievement-name">{def?.name || b.name || bid}</div>
+                              {def?.criteria && <div className="achievement-desc">{def.criteria}</div>}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                 </div>
@@ -1085,23 +1224,65 @@ export default function Profile() {
 
                 {/* Certificates */}
                 <div className="portfolio-section">
-                  <div className="card-title">🎓 Certificates</div>
+                  <div className="card-title">🎓 Certificates <span className="muted-count">({certificates.length})</span></div>
                   {certificates.length === 0
                     ? <p className="muted-text">No certificates yet.</p>
                     : (
-                      <div className="certificates-list">
-                        {certificates.map(cert => (
-                          <div key={cert.id} className="certificate-card">
-                            <div className="cert-icon">🎓</div>
-                            <div className="cert-body">
-                              <div className="cert-course">{cert.course}</div>
-                              <div className="cert-meta">{cert.recipient} &middot; {cert.date}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                        {certificates.map((cert, idx) => (
+                          <div
+                            key={cert.id}
+                            onClick={() => setSelectedCert(cert)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 16,
+                              padding: "16px 0",
+                              borderBottom: idx < certificates.length - 1 ? "1px solid #e2e8f0" : "none",
+                              cursor: "pointer",
+                              borderRadius: 8,
+                              transition: "background 0.15s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                            onMouseLeave={e => e.currentTarget.style.background = ""}
+                          >
+                            {/* Certificate thumbnail */}
+                            <div style={{
+                              width: 80, height: 57, flexShrink: 0,
+                              borderRadius: 6, border: "1px solid #c5d9fd",
+                              background: "linear-gradient(135deg, #f0f7ff 0%, #e8f4ff 100%)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                              <svg width="30" height="36" viewBox="0 0 30 36" fill="none">
+                                <rect x="1" y="1" width="22" height="32" rx="3" fill="#fff" stroke="#c5d9fd" strokeWidth="1.5"/>
+                                <path d="M17 1v8h8" stroke="#c5d9fd" strokeWidth="1.5" fill="none"/>
+                                <rect x="5" y="13" width="13" height="2" rx="1" fill="#93c5fd"/>
+                                <rect x="5" y="18" width="10" height="2" rx="1" fill="#bfdbfe"/>
+                                <rect x="5" y="23" width="8" height="2" rx="1" fill="#bfdbfe"/>
+                                <circle cx="22" cy="28" r="7" fill="#1a73e8"/>
+                                <path d="M19 28l2 2 4-4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
                             </div>
-                            <a href={cert.downloadURL} target="_blank" rel="noopener noreferrer" className="cert-link">View ↗</a>
+
+                            {/* Details */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 2 }}>
+                                SerVe+ &middot; Mission
+                              </div>
+                              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1e293b", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {cert.course}
+                              </div>
+                              <div style={{ color: "#1a73e8", fontSize: "0.8rem", fontWeight: 600 }}>
+                                View certificate ↗
+                              </div>
+                              {(cert.month || cert.date) && (
+                                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 3 }}>
+                                  Completed {cert.month} {cert.year || cert.date}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
                 </div>
               </div>
             );
@@ -1156,7 +1337,7 @@ export default function Profile() {
                   {/* Skills & Interests row */}
                   <div style={{ display: 'flex', gap: 20 }}>
                     <div style={{ flex: 1, background: '#f7fafd', borderRadius: 10, padding: '16px 18px', border: '1px solid #e0e7ef' }}>
-                      <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Skills</div>
+                      <div style={{ fontWeight: 700, color: '#000', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Skills</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {(profile.skills || []).map(s => (
                           <span key={s} style={{ background: '#234e7b', color: '#fff', borderRadius: 20, padding: '3px 12px', fontSize: 11, fontWeight: 600 }}>{s}</span>
@@ -1180,18 +1361,24 @@ export default function Profile() {
 
                   {/* Achievements */}
                   <div>
-                    <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>Achievements <span style={{ color: '#30bdb7', fontWeight: 500, fontSize: 13 }}>({rewards.length})</span></div>
-                    {rewards.length === 0 ? (
+                    <div style={{ fontWeight: 700, color: '#000', fontSize: 15, marginBottom: 12 }}>Achievements <span style={{ color: '#30bdb7', fontWeight: 500, fontSize: 13 }}>({earnedBadges.length})</span></div>
+                    {earnedBadges.length === 0 ? (
                       <p style={{ color: '#bbb', fontSize: 12 }}>No achievements yet.</p>
                     ) : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                        {rewards.map(r => (
-                          <div key={r.id} style={{ background: 'linear-gradient(135deg, #e8f5e9, #f0fdf4)', border: '1.5px solid #4caf50', borderRadius: 8, padding: '10px 14px', minWidth: 110, textAlign: 'center' }}>
-                            <div style={{ fontSize: 22 }}>{r.icon || '🏅'}</div>
-                            <div style={{ fontWeight: 700, fontSize: 11, color: '#234e7b', marginTop: 4 }}>{r.name || r.id}</div>
-                            {r.description && <div style={{ fontSize: 10, color: '#777', marginTop: 2 }}>{r.description}</div>}
-                          </div>
-                        ))}
+                        {earnedBadges.map(b => {
+                          const bid = b.badgeId ?? b.id;
+                          const def = BADGE_BY_ID[bid];
+                          return (
+                            <div key={bid} style={{ background: 'linear-gradient(135deg, #e8f5e9, #f0fdf4)', border: '1.5px solid #4caf50', borderRadius: 8, padding: '10px 14px', minWidth: 110, textAlign: 'center' }}>
+                              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <BadgeIcon badgeId={bid} earned={true} size="sm" />
+                              </div>
+                              <div style={{ fontWeight: 700, fontSize: 11, color: '#000', marginTop: 4 }}>{def?.name || b.name || bid}</div>
+                              {def?.criteria && <div style={{ fontSize: 10, color: '#777', marginTop: 2 }}>{def.criteria}</div>}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1201,7 +1388,7 @@ export default function Profile() {
 
                   {/* SDG Contributions */}
                   <div>
-                    <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>SDG Contributions</div>
+                    <div style={{ fontWeight: 700, color: '#000', fontSize: 15, marginBottom: 12 }}>SDG Contributions</div>
                     {allSdgs.length === 0 ? (
                       <p style={{ color: '#bbb', fontSize: 12 }}>No SDG contributions yet.</p>
                     ) : (
@@ -1222,16 +1409,16 @@ export default function Profile() {
 
                   {/* Events by Role */}
                   <div>
-                    <div style={{ fontWeight: 700, color: '#234e7b', fontSize: 15, marginBottom: 12 }}>Events by Role</div>
+                    <div style={{ fontWeight: 700, color: '#000', fontSize: 15, marginBottom: 12 }}>Events by Role</div>
                     {events.length === 0 ? (
                       <p style={{ color: '#bbb', fontSize: 12 }}>No events joined yet.</p>
                     ) : (
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                         <thead>
                           <tr style={{ background: '#f0f4f8' }}>
-                            <th style={{ textAlign: 'left', padding: '8px 12px', color: '#234e7b', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Event</th>
-                            <th style={{ textAlign: 'center', padding: '8px 12px', color: '#234e7b', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Role</th>
-                            <th style={{ textAlign: 'right', padding: '8px 12px', color: '#234e7b', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Points</th>
+                            <th style={{ textAlign: 'left', padding: '8px 12px', color: '#000', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Event</th>
+                            <th style={{ textAlign: 'center', padding: '8px 12px', color: '#000', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Role</th>
+                            <th style={{ textAlign: 'right', padding: '8px 12px', color: '#000', fontWeight: 700, borderBottom: '2px solid #e0e7ef' }}>Points</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1242,7 +1429,7 @@ export default function Profile() {
                                 <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #f0f4f8' }}>
                                   <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 4, padding: '2px 9px', fontWeight: 600 }}>{event.role}</span>
                                 </td>
-                                <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#234e7b', borderBottom: '1px solid #f0f4f8' }}>+{event.pointsEarned}</td>
+                                <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#000', borderBottom: '1px solid #f0f4f8' }}>+{event.pointsEarned}</td>
                               </tr>
 
                               {event.tasksDone && event.tasksDone.length > 0 && (
@@ -1251,8 +1438,8 @@ export default function Profile() {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                       {event.tasksDone.map(t => (
                                         <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 11, paddingLeft: 20 }}>
-                                          <div style={{ color: '#234e7b', fontWeight: 600, fontSize: 11 }}>{t.title} <span style={{ color: '#666', fontWeight: 500, fontSize: 11 }}>· {t.status}</span></div>
-                                          <div style={{ color: '#234e7b', fontWeight: 600, fontSize: 11 }}>+{t.pointsEarned} pts</div>
+                                          <div style={{ color: '#000', fontWeight: 600, fontSize: 11 }}>{t.title} <span style={{ color: '#666', fontWeight: 500, fontSize: 11 }}>· {t.status}</span></div>
+                                          <div style={{ color: '#000', fontWeight: 600, fontSize: 11 }}>+{t.pointsEarned} pts</div>
                                         </div>
                                       ))}
                                     </div>

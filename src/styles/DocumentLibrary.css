@@ -2,6 +2,23 @@
   padding: 24px 50px;
   color: #000;
 }
+
+@media (max-width: 768px) {
+  .document-library {
+    padding: 16px;
+  }
+
+  .submission-modal-x {
+    min-width: unset !important;
+    width: 95vw !important;
+    padding: 20px !important;
+  }
+
+  .submission-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
 .document-library p{
     color: #000;
 }

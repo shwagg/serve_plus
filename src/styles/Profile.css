@@ -47,7 +47,7 @@
   margin-bottom: 12px;
 }
 .profile-skills-label, .profile-interests-label, .profile-achievements-label {
-  color: #234e7b;
+  color: #000;
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -115,7 +115,7 @@
 .profile-level-label {
   font-weight: 600;
   font-size: 22px;
-  color: #234e7b;
+  color: #000;
 }
 .profile-level-bar-container {
   display: flex;
@@ -148,7 +148,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #234e7b;
+  color: #000;
   font-weight: 600;
 }
 .profile-earn-btn {
@@ -170,7 +170,7 @@
 .profile-event-history-title {
   font-weight: 700;
   font-size: 24px;
-  color: #234e7b;
+  color: #000;
   margin-bottom: 16px;
   text-align: center;
 }
@@ -189,7 +189,7 @@
   gap: 8px;
 }
 .profile-event-item-label {
-  color: #234e7b;
+  color: #000;
   font-weight: 500;
   font-size: 15px;
 }
@@ -223,7 +223,7 @@
 }
 .profile-modal-title {
   margin-bottom: 18px;
-  color: #234e7b;
+  color: #000;
 }
 .profile-modal-fields {
   display: flex;
@@ -283,7 +283,7 @@
   border-radius: 8px;
   border: 1px solid #ccc;
   background: #fff;
-  color: #234e7b;
+  color: #000;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -298,7 +298,7 @@
 }
 .profile-modal-skill-section-title {
   font-weight: 700;
-  color: #234e7b;
+  color: #000;
   font-size: 16px;
   margin-bottom: 10px;
   padding-bottom: 6px;
@@ -312,7 +312,7 @@
 }
 .profile-modal-cancel-btn {
   background: #ccc;
-  color: #234e7b;
+  color: #000;
   border: none;
   border-radius: 6px;
   padding: 8px 18px;
@@ -343,7 +343,7 @@
   font-size: 20px;
 }
 .profile-reward-name {
-  color: #234e7b;
+  color: #000;
   font-weight: 600;
   font-size: 11px;
   margin-top: 4px;
@@ -458,7 +458,7 @@
 .profile-avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 
 /* Header info */
-.profile-username { color: #234e7b; font-weight: 700; font-size: 28px; margin-bottom: 4px; }
+.profile-username { color: #000; font-weight: 700; font-size: 28px; margin-bottom: 4px; }
 .profile-name { color: #30bdb7; font-weight: 600; font-size: 18px; margin-bottom: 8px; }
 .profile-email { color: #555; font-size: 16px; margin-bottom: 18px; }
 
@@ -466,17 +466,17 @@
 .profile-level-section { width: 100%; margin: 16px 0; }
 .profile-level-bar-bg { background: #e6eef3; border-radius: 8px; height: 14px; position: relative; overflow: hidden; }
 .profile-level-bar-fill { background: linear-gradient(90deg,#234e7b,#30bdb7); height: 100%; transition: width .3s ease; }
-.profile-level-bar-label { position: absolute; left: 0; right: 0; text-align: center; top: 0; font-size: 12px; color: #234e7b; font-weight: 700; }
+.profile-level-bar-label { position: absolute; left: 0; right: 0; text-align: center; top: 0; font-size: 12px; color: #000; font-weight: 700; }
 
 /* Lists */
 .profile-skills-list, .profile-interests-list, .profile-achievements-list { display: flex; gap: 8px; flex-wrap: wrap; }
-.profile-skill-badge { background: #f0f4f8; padding: 6px 10px; border-radius: 16px; font-weight: 600; color: #234e7b; }
+.profile-skill-badge { background: #f0f4f8; padding: 6px 10px; border-radius: 16px; font-weight: 600; color: #000; }
 .profile-interest-badge { background: #30bdb7; color: #fff; padding: 6px 10px; border-radius: 16px; font-weight: 600; }
 
 /* Export and tabs */
 .profile-tab-row { display: flex; gap: 0; border-bottom: 2px solid #e0e7ef; margin-bottom: 4px; }
 .profile-tab-btn { padding: 10px 28px; background: none; border: none; border-bottom: 3px solid transparent; color: #888; font-weight: 500; font-size: 15px; cursor: pointer; transition: all .2s; }
-.profile-tab-btn.active { border-bottom-color: #234e7b; color: #234e7b; font-weight: 700; }
+.profile-tab-btn.active { border-bottom-color: #234e7b; color: #000; font-weight: 700; }
 .export-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
 .profile-export-btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#234e7b,#30bdb7); color: #fff; border: none; border-radius: 10px; padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(35,78,123,0.18); transition: all .2s; }
 .profile-export-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
@@ -488,7 +488,7 @@
 .portfolio-section { background: #fff; border-radius: 14px; padding: 20px 22px; box-shadow: 0 1px 6px rgba(35,78,123,0.08); border: 1px solid #eef2f7; }
 
 /* Card titles */
-.card-title { font-weight: 700; color: #234e7b; font-size: 16px; margin: 0 0 14px; }
+.card-title { font-weight: 700; color: #000; font-size: 16px; margin: 0 0 14px; }
 .muted-count { color: #30bdb7; font-size: 13px; font-weight: 500; }
 .muted-text { color: #9ca3af; font-size: 13px; margin: 0; }
 
@@ -514,7 +514,7 @@
 .event-title { font-weight: 600; color: #1e3a5f; font-size: 13px; flex: 1; }
 .event-meta { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 .event-role { background: #e0f7f6; color: #0d6e6a; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; text-transform: capitalize; }
-.event-points { color: #234e7b; font-size: 12px; font-weight: 700; }
+.event-points { color: #000; font-size: 12px; font-weight: 700; }
 .event-tasks { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #dde4f0; display: flex; flex-direction: column; gap: 5px; }
 .event-task-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0 3px 8px; }
 .task-left { display: flex; gap: 8px; align-items: center; min-width: 0; }
@@ -525,7 +525,7 @@
 .task-status-badge.task-status-done,
 .task-status-badge.task-status-completed { background: #d1fae5; color: #065f46; }
 .task-status-badge.task-status-in_progress { background: #dbeafe; color: #1e40af; }
-.task-points { font-size: 11px; color: #234e7b; font-weight: 700; }
+.task-points { font-size: 11px; color: #000; font-weight: 700; }
 
 /* Certificates */
 .certificates-list { display: flex; flex-direction: column; gap: 10px; }
@@ -547,7 +547,7 @@
 .pdf-body { padding: 28px 40px; display: flex; flex-direction: column; gap: 22px; }
 .pdf-skills-interests-row { display: flex; gap: 20px; }
 .pdf-box { flex: 1; background: #f7fafd; border-radius: 10px; padding: 16px 18px; border: 1px solid #e0e7ef; }
-.pdf-box-title { font-weight: 700; color: #234e7b; font-size: 13px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.pdf-box-title { font-weight: 700; color: #000; font-size: 13px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
 .pdf-box-content { display: flex; flex-wrap: wrap; gap: 6px; }
 .pdf-pill { border-radius: 20px; padding: 3px 12px; font-size: 11px; font-weight: 600; }
 .pdf-pill-dark { background: #234e7b; color: #fff; }
@@ -580,7 +580,7 @@
   justify-content: center;
   gap: 16px;
   min-height: 40vh;
-  color: #234e7b;
+  color: #000;
   font-size: 16px;
   font-weight: 500;
   animation: profileFadeUp 0.4s ease;
@@ -702,7 +702,7 @@
 .peh-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #234e7b;
+  color: #000;
 }
 .peh-count {
   font-weight: 400;
