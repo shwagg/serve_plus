@@ -70,7 +70,7 @@
   justify-content: flex-start;
   gap: 12px;
   padding: 0 20px;
-  z-index: 1060;
+  z-index: 100;
   transition: left 0.25s ease;
 }
 
@@ -547,7 +547,7 @@
 
   /* Sidebar slides over content (overlay), not push */
   .admin-sidebar {
-    z-index: 1050;
+    z-index: 10;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.18);
   }
 
@@ -557,7 +557,7 @@
     inset: 0;
     top: calc(var(--header-height) + var(--context-height));
     background: rgba(0, 0, 0, 0.35);
-    z-index: 1040;
+    z-index: 9;
   }
 
   /* Main content: offset below header + context strip */
@@ -623,4 +623,46 @@
 }
 .event-details-join-btn:disabled {
   pointer-events: none;
+}
+/* Shared admin modal close button: matches NotificationBell close control. */
+.admin-modal-close {
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.admin-modal-close:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.admin-modal-close:focus-visible {
+  outline: 2px solid #374151;
+  outline-offset: 2px;
+}
+
+.admin-modal-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.admin-modal-close--absolute {
+  position: absolute;
+  top: 14px;
+  right: 14px;
 }

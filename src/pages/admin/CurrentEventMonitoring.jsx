@@ -442,15 +442,10 @@ export default function CurrentEventMonitoring() {
                         onClick={e => e.stopPropagation()}
                       >
                         <button
-                          style={{
-                            position: 'absolute', top: 14, right: 14,
-                            background: '#1f2937', border: 'none', borderRadius: '50%',
-                            width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 16, fontWeight: 700, color: '#fff', cursor: 'pointer',
-                          }}
+                          className="admin-modal-close admin-modal-close--absolute"
                           onClick={() => setShowRosterModal(false)}
                         >
-                          ✕
+                          ×
                         </button>
                         <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Registered Volunteers</h2>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
@@ -510,9 +505,15 @@ export default function CurrentEventMonitoring() {
                                 const user = usersById[v.id] || {};
                                 const name = user.name || user.username || user.email || v.id;
                                 const attendance = v.progress?.attendance === 'present' ? 'Present' : '';
+                                const isFlagged = user.attendanceFlagged === true;
                                 return (
                                   <tr key={v.id}>
-                                    <td style={{ padding: '10px 8px', color: '#111' }}>{name}</td>
+                                    <td style={{ padding: '10px 8px', color: '#111' }}>
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                        {name}
+                                        {isFlagged && <span title="Attendance flagged" style={{ fontSize: 13, lineHeight: 1 }}>🚩</span>}
+                                      </span>
+                                    </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>{attendance}</td>
                                   </tr>
                                 );
@@ -578,15 +579,10 @@ export default function CurrentEventMonitoring() {
                           onClick={e => e.stopPropagation()}
                         >
                           <button
-                            style={{
-                              position: 'absolute', top: 14, right: 14,
-                              background: '#1f2937', border: 'none', borderRadius: '50%',
-                              width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: 16, fontWeight: 700, color: '#fff', cursor: 'pointer',
-                            }}
+                            className="admin-modal-close admin-modal-close--absolute"
                             onClick={() => setShowPreSurveyAnalytics(false)}
                           >
-                            ✕
+                            ×
                           </button>
                           <ImpactMetrics
                             open={showPreSurveyAnalytics}

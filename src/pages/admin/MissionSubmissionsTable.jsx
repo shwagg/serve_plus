@@ -14,6 +14,12 @@ function toTitleCase(str) {
   return str.toLowerCase().split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
+function getInitials(name) {
+  const parts = (name || "?").trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (name || "?").slice(0, 2).toUpperCase();
+}
+
 const PRE_LIKERT = [
   "There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.",
   "Volunteer work along with teamwork would somehow help solve social problems.",
@@ -55,6 +61,14 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
   const [answerModalData, setAnswerModalData] = useState(null);
   const [issuingCertFor, setIssuingCertFor] = useState(null);
   const [isReleasingFor, setIsReleasingFor] = useState(null);
+  const [volunteerCard, setVolunteerCard] = useState(null);
+
+  useEffect(() => {
+    if (!volunteerCard) return;
+    const close = () => setVolunteerCard(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [volunteerCard]);
 
   useEffect(() => {
     if (!missionId) return;
@@ -104,6 +118,11 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
           ...vData,
           id: userId,
           name: toTitleCase(rawName),
+          email: userData?.email || "",
+          department: userData?.department || "",
+          level: userData?.level || "",
+          photoURL: (() => { const p = userData?.avatar || userData?.photoURL || userData?.profilePhoto || ""; return p.includes("ui-avatars.com") ? "" : p; })(),
+          totalPoints: userData?.totalPoints || 0,
           preSurveyAnswers,
           postSurveyAnswers,
         };
@@ -270,15 +289,27 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                 <tr key={v.id} style={{ borderBottom: idx < volunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
                   <td style={{ padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-                        background: "#f1f3f4", color: "#5f6368",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontWeight: 700, fontSize: "0.82rem",
-                      }}>
-                        {(v.name || "?").charAt(0).toUpperCase()}
-                      </div>
-                      <span style={{ fontWeight: 600, color: "#202124" }}>{v.name}</span>
+                      {v.photoURL ? (
+                        <img src={v.photoURL} alt={v.name}
+                          style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, objectFit: "cover", border: "1.5px solid #e8eaed" }} />
+                      ) : (
+                        <div style={{
+                          width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                          background: "#30bdb7", color: "#fff",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontWeight: 700, fontSize: "0.82rem",
+                        }}>
+                          {getInitials(v.name)}
+                        </div>
+                      )}
+                      <span
+                        style={{ fontWeight: 600, color: "#202124", cursor: "pointer" }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          const r = e.currentTarget.getBoundingClientRect();
+                          setVolunteerCard(prev => prev?.volunteer.id === v.id ? null : { volunteer: v, x: r.right + 8, y: r.top });
+                        }}
+                      >{v.name}</span>
                     </div>
                   </td>
                   <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>
@@ -447,7 +478,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
             style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 400, maxWidth: "90vw", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", position: "relative", color: "#202124", maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}
           >
-            <button style={{ position: "absolute", top: 14, right: 14, background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer" }} onClick={() => setShowAnswerModal(false)}>✕</button>
+            <button className="admin-modal-close admin-modal-close--absolute" onClick={() => setShowAnswerModal(false)}>×</button>
             <h2 style={{ textAlign: "center", marginBottom: 24, color: "#202124", fontSize: "1.05rem", fontWeight: 700 }}>{answerModalTitle}</h2>
             {answerModalData ? (
               <div style={{ maxWidth: 600, margin: "0 auto" }}>
@@ -504,6 +535,68 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
             ) : (
               <div style={{ textAlign: "center", color: "#9aa0a6" }}>No answers found.</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* volunteer contact card popover */}
+      {volunteerCard && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: Math.min(volunteerCard.y, window.innerHeight - 220),
+            left: Math.min(volunteerCard.x, window.innerWidth - 272),
+            zIndex: 12000,
+            background: "#fff",
+            borderRadius: 10,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+            border: "1px solid #e8eaed",
+            width: 260,
+            padding: "16px 18px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {volunteerCard.volunteer.photoURL ? (
+              <img
+                src={volunteerCard.volunteer.photoURL}
+                alt={volunteerCard.volunteer.name}
+                style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1.5px solid #e8eaed" }}
+              />
+            ) : (
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%", background: "#30bdb7",
+                color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18, fontWeight: 700, flexShrink: 0,
+              }}>
+                {getInitials(volunteerCard.volunteer.name)}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: "0.93rem", color: "#202124", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {volunteerCard.volunteer.name}
+              </div>
+              {volunteerCard.volunteer.email && (
+                <div style={{ fontSize: "0.72rem", color: "#5f6368", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {volunteerCard.volunteer.email}
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ borderTop: "1px solid #f1f3f4", paddingTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+            {[
+              { label: "Department", value: /\(([^)]+)\)$/.exec(volunteerCard.volunteer.department)?.[1] || volunteerCard.volunteer.department },
+              { label: "Level", value: volunteerCard.volunteer.level },
+              { label: "Points", value: volunteerCard.volunteer.totalPoints ?? "—" },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+                <span style={{ color: "#80868b" }}>{label}</span>
+                <span style={{ color: "#202124", fontWeight: 600 }}>{value || "—"}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

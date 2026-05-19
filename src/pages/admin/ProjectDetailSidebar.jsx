@@ -1160,8 +1160,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
           onClick={() => setShowRosterModal(false)}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 400, maxWidth: "92vw", boxShadow: "0 4px 24px #0003", position: "relative", color: "#111", maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
-            <button style={{ position: "absolute", top: 14, right: 14, background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer" }}
-              onClick={() => setShowRosterModal(false)}>✕</button>
+            <button className="admin-modal-close admin-modal-close--absolute"
+              onClick={() => setShowRosterModal(false)}>×</button>
             <h2 style={{ textAlign: "center", marginBottom: 6, color: "#000", fontSize: 20 }}>Volunteer Roster</h2>
             <p style={{ textAlign: "center", color: "#888", fontSize: 13, marginBottom: 20 }}>
               {project.title} — {volunteers.length} registered
