@@ -1,694 +1,817 @@
 //first page for admin after login
-import { collection, getDocs } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import ProjectDetailSidebar from "./ProjectDetailSidebar";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import "../../styles/AdminDashboard.css";
 
-export default function AdminDashboard() {
-  // New: State for summary cards
-  const [totalStudents, setTotalStudents] = useState(null);
-  const [totalTasks, setTotalTasks] = useState(null);
-    // Fetch total registered students
-    useEffect(() => {
-      const fetchTotalStudents = async () => {
-        try {
-          const snap = await getDocs(collection(db, "users"));
-          setTotalStudents(snap.size);
-        } catch (err) {
-          setTotalStudents("-");
-        }
-      };
-      fetchTotalStudents();
-    }, []);
+// ── Design tokens ────────────────────────────────────────────
+const G = {
+  // Google Material palette
+  blue:     "#1a73e8",
+  blueL:    "#e8f0fe",
+  green:    "#34a853",
+  greenL:   "#e6f4ea",
+  red:      "#ea4335",
+  redL:     "#fce8e6",
+  amber:    "#f9ab00",
+  amberL:   "#fef7e0",
+  text:     "#202124",
+  sub:      "#5f6368",
+  border:   "#e0e0e0",
+  bg:       "#f8f9fa",
+  white:    "#ffffff",
+  // brand accents
+  teal:     "#B1E1E6",
+  pink:     "#E4AABB",
+  orange:   "#ED4F13",
+  yellow:   "#FBC805",
+};
 
-    // Fetch total completed tasks (assumes a 'tasks' collection with a 'status' field)
-    useEffect(() => {
-      const fetchTotalTasks = async () => {
-        try {
-          const snap = await getDocs(collection(db, "tasks"));
-          // If tasks have a 'status' field, count only completed
-          const completed = snap.docs.filter(doc => (doc.data().status || "") === "completed").length;
-          setTotalTasks(completed);
-        } catch (err) {
-          setTotalTasks("-");
-        }
-      };
-      fetchTotalTasks();
-    }, []);
-  const navigate = useNavigate();
-  //Filled from firestore under 'Missons'
-  const [eventsToday, setEventsToday] = useState([]);
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
-  //(Under dashboard) SDG Analytics
-  const [sdgAnalytics, setSdgAnalytics] = useState([]);
-  const [totalProjects, setTotalProjects] = useState(0);
-  const topSDG = sdgAnalytics
-    .slice()
-    .sort((a, b) => b.count - a.count)[0];
-  //For the pie chart
-  const CHART_SIZE = 220;
-  const RADIUS = 90;
-  const CENTER = CHART_SIZE / 2;
-  const getPieSlices = (data) => {
-    let cumulative = 0;
+const elev1 = "0 1px 2px rgba(60,64,67,.3), 0 2px 6px rgba(60,64,67,.15)";
+const elev2 = "0 1px 3px rgba(60,64,67,.3), 0 4px 8px rgba(60,64,67,.15)";
 
-    return data.map((item) => {
-      const startAngle = cumulative * 2 * Math.PI;
-      const sliceAngle = (item.percentage / 100) * 2 * Math.PI;
-      cumulative += item.percentage / 100;
-
-      return {
-        ...item,
-        startAngle,
-        endAngle: startAngle + sliceAngle,
-        midAngle: startAngle + sliceAngle / 2,
-      };
-    });
-  };
-  // ---------- SDG CHART DATA (Industry Standard: Top 5 + Others) ----------
-
-  // sort SDGs by percentage (descending)
-  const sortedSDGs = [...sdgAnalytics].sort(
-    (a, b) => b.percentage - a.percentage
-  );
-
-  // take top 5 SDGs
-  const topFive = sortedSDGs.slice(0, 5);
-
-  // group the rest as "Others"
-  const others = sortedSDGs.slice(5);
-
-  const othersPercentage = others.reduce(
-    (sum, x) => sum + x.percentage,
-    0
-  );
-
-  // final dataset used by the chart
-  const chartData =
-    others.length > 0
-      ? [
-        ...topFive,
-        {
-          sdgId: "Others",
-          count: others.reduce((s, x) => s + x.count, 0),
-          percentage: Number(othersPercentage.toFixed(1)),
-        },
-      ]
-      : topFive;
-
-  // build pie slices from FINAL chart data
-  const pieSlices = getPieSlices(chartData);
-
-  const visibleSlices = pieSlices.filter((x) => x.percentage >= 5);
-  const maxCount = Math.max(
-    ...visibleSlices.map((x) => x.count),
-    0
-  );
-
-  const topSDGs = visibleSlices.filter(
-    (x) => x.count === maxCount && maxCount > 0
-  );
-
-
-
-  const describeArc = (cx, cy, r, startAngle, endAngle) => {
-    const polarToCartesian = (angle) => ({
-      x: cx + r * Math.cos(angle - Math.PI / 2),
-      y: cy + r * Math.sin(angle - Math.PI / 2),
-    });
-
-    const start = polarToCartesian(endAngle);
-    const end = polarToCartesian(startAngle);
-    const largeArcFlag = endAngle - startAngle > Math.PI ? 1 : 0;
-
-    return `
-    M ${start.x} ${start.y}
-    A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}
-    L ${cx} ${cy}
-    Z
-  `;
-  };
-
-  useEffect(() => {
-    const parseMissionDate = (dateStr) => {
-      // Accepts (yyyy-mm-dd) or other string formats
-      if (!dateStr) return null;
-      const d = new Date(dateStr);
-      return isNaN(d.getTime()) ? null : d;
-    };
-
-    const isSameDay = (a, b) =>
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate();
-
-    const startOfToday = () => {
-      const now = new Date();
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    };
-
-    const fetchPublishedMissions = async () => {
-      try {
-        const snap = await getDocs(collection(db, "missions"));
-        const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-
-        // only published missions should be visible as "events" (after complete approval)
-        const published = rows.filter(
-          (m) => (m.status || "draft") === "published",
-        );
-
-        // SDG analytics (only published projects are being counted)
-        const sdgCounts = {};
-        published.forEach((mission) => {
-          (mission.sdgs || []).forEach((sdgId) => {
-            sdgCounts[sdgId] = (sdgCounts[sdgId] || 0) + 1;
-          });
-        });
-        const totalSDGAssignments = Object.values(sdgCounts).reduce(
-          (sum, c) => sum + c,
-          0
-        );
-
-        const analytics = Object.entries(sdgCounts).map(([sdgId, count]) => ({
-          sdgId: Number(sdgId),
-          count,
-          percentage: totalSDGAssignments
-            ? Number(((count / totalSDGAssignments) * 100).toFixed(1))
-            : 0,
-        }));
-
-        setSdgAnalytics(analytics);
-        setTotalProjects(published.length);
-
-        const today = startOfToday();
-        const todayEvents = [];
-        const upcoming = [];
-
-        for (const m of published) {
-          // Use targetDate as the event date
-          const md = parseMissionDate(m.targetDate);
-          if (!md) continue;
-          const missionDay = new Date(
-            md.getFullYear(),
-            md.getMonth(),
-            md.getDate(),
-          );
-          if (isSameDay(missionDay, today)) todayEvents.push(m);
-          else if (missionDay > today) upcoming.push(m);
-        }
-        // Sort upcoming by soonest targetDate
-        upcoming.sort((a, b) => {
-          const da = parseMissionDate(a.targetDate);
-          const db = parseMissionDate(b.targetDate);
-          return (da || 0) - (db || 0);
-        });
-        setEventsToday(todayEvents);
-        setUpcomingEvents(upcoming);
-      } catch (err) {
-        console.error("Failed to load missions for dashboard:", err);
-        setEventsToday([]);
-        setUpcomingEvents([]);
-      }
-    };
-
-    fetchPublishedMissions();
-  }, []);
-
-
-  // Real-time Student Engagement metrics for each mission
-  const [engagement, setEngagement] = useState([]);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
-  useEffect(() => {
-    const fetchEngagement = async () => {
-      try {
-        const snap = await getDocs(collection(db, "missions"));
-        const missions = snap.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((doc) => doc.status === "published");
-
-        const engagementArr = [];
-        for (const mission of missions) {
-          const volSnap = await getDocs(collection(db, "missions", mission.id, "volunteer"));
-          const volunteers = volSnap.docs.map(d => d.data());
-          const total = volunteers.length;
-          const count = (key, value) => volunteers.filter(v => v.progress?.[key] === value).length;
-          const completed =
-            count("preSurvey", "submitted") +
-            count("consent", "submitted") +
-            count("attendance", "present") +
-            count("postSurvey", "submitted");
-          const maxPossible = total * 4;
-          const percent = maxPossible === 0 ? 0 : Math.round((completed / maxPossible) * 100);
-          engagementArr.push({
-            id: mission.id,
-            label: mission.title || mission.alt || mission.name || "Untitled Mission",
-            value: percent,
-            data: mission,
-          });
-        }
-        setEngagement(engagementArr);
-      } catch (err) {
-        setEngagement([]);
-      }
-    };
-    fetchEngagement();
-  }, []);
-
+// ── Small shared components ──────────────────────────────────
+function Card({ children, style }) {
   return (
-    <div className="admin-outlet">
-      <h1 className="page-title">Dashboard</h1>
+    <div style={{ background: G.white, borderRadius: 12, boxShadow: elev1, marginBottom: 20, overflow: "hidden", ...style }}>
+      {children}
+    </div>
+  );
+}
 
-      {/* Summary cards row */}
-      <div style={{ display: 'flex', gap: 18, marginBottom: 18, flexWrap: 'wrap' }}>
-                <div style={{
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
-                  minWidth: 220,
-                  flex: '1 1 220px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '18px 22px',
-                  gap: 16
-                }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%', background: 'rgba(76, 72, 255, 0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10
-                  }}>
-                    <svg width="26" height="26" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M7 7h10v2H7V7Zm0 4h10v2H7v-2Zm0 4h7v2H7v-2Zm-2-9.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-13ZM6.5 5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-13a.5.5 0 0 0-.5-.5h-11Z" fill="#4C48FF"/></g></svg>
-                  </div>
-                  <div>
-                    <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total Published Events</div>
-                    <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{typeof totalProjects === 'number' ? totalProjects : '...'}</div>
-                  </div>
-                </div>
-        <div style={{
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: 12,
-          boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
-          minWidth: 220,
-          flex: '1 1 220px',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '18px 22px',
-          gap: 16
+function CardHead({ title, sub, onMore }) {
+  return (
+    <div style={{ padding: "18px 20px 10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 15, color: G.text, letterSpacing: "-.01em" }}>{title}</div>
+        {sub && <div style={{ fontSize: 12, color: G.sub, marginTop: 3, lineHeight: 1.45 }}>{sub}</div>}
+      </div>
+      {onMore && (
+        <button onClick={onMore} style={{
+          border: "none", background: "none", cursor: "pointer",
+          color: G.blue, fontSize: 12, fontWeight: 600, padding: "2px 0",
+          flexShrink: 0, marginLeft: 12, whiteSpace: "nowrap",
         }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%', background: 'rgba(76, 72, 255, 0.08)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10
-          }}>
-            <svg width="26" height="26" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" fill="#4C48FF"/></g></svg>
-          </div>
+          View details →
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Pill({ label, color, bg }) {
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, color, background: bg, borderRadius: 999, padding: "2px 8px" }}>
+      {label}
+    </span>
+  );
+}
+
+function ProgressBar({ value, color, height = 6 }) {
+  return (
+    <div style={{ background: "#e8eaed", borderRadius: 999, height, overflow: "hidden" }}>
+      <div style={{ height: "100%", width: `${Math.min(value, 100)}%`, background: color, borderRadius: 999, transition: "width .4s ease" }} />
+    </div>
+  );
+}
+
+function Empty({ text }) {
+  return <p style={{ color: G.sub, fontSize: 13, margin: 0, padding: "6px 0 10px" }}>{text}</p>;
+}
+
+function Divider() {
+  return <div style={{ height: 1, background: G.border, margin: "0 0 4px" }} />;
+}
+
+// Full-screen modal overlay
+function Modal({ title, subtitle, onClose, children }) {
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(32,33,36,.52)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 20 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: G.white, borderRadius: 16, width: "100%", maxWidth: 660, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 24px 48px rgba(0,0,0,.22)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Modal header */}
+        <div style={{ padding: "24px 28px 16px", borderBottom: `1px solid ${G.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "sticky", top: 0, background: G.white, zIndex: 1, borderRadius: "16px 16px 0 0" }}>
           <div>
-            <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total registered volunteers</div>
-            <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{totalStudents === null ? '...' : totalStudents}</div>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: G.text }}>{title}</h3>
+            {subtitle && <p style={{ margin: "4px 0 0", fontSize: 13, color: G.sub }}>{subtitle}</p>}
           </div>
+          <button onClick={onClose} style={{ border: `1px solid ${G.border}`, background: G.white, borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontSize: 17, color: G.sub, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 16 }}>
+            ×
+          </button>
         </div>
-        <div style={{
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: 12,
-          boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
-          minWidth: 220,
-          flex: '1 1 220px',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '18px 22px',
-          gap: 16
-        }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%', background: 'rgba(48, 189, 183, 0.10)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10
-          }}>
-            <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M17.5 10.5l-5 5-2.5-2.5" stroke="#30bdb7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="10" stroke="#30bdb7" strokeWidth="2"/></g></svg>
-          </div>
-          <div>
-            <div style={{ color: '#8A94A6', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Total tasks completed</div>
-            <div style={{ color: '#1f3b73', fontSize: 26, fontWeight: 700 }}>{totalTasks === null ? '...' : totalTasks}</div>
-          </div>
+        <div style={{ padding: "20px 28px 28px" }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────
+export default function AdminDashboard() {
+  const navigate = useNavigate();
+
+  // data state
+  const [totalStudents,          setTotalStudents]          = useState(null);
+  const [flaggedCount,           setFlaggedCount]           = useState(0);
+  const [totalProjects,          setTotalProjects]          = useState(0);
+  const [slCount,                setSlCount]                = useState(0);
+  const [ceCount,                setCeCount]                = useState(0);
+  const [eventsToday,            setEventsToday]            = useState([]);
+  const [upcomingEvents,         setUpcomingEvents]         = useState([]);
+  const [sdgAnalytics,           setSdgAnalytics]           = useState([]);
+  const [engagement,             setEngagement]             = useState([]);
+  const [participationBreakdown, setParticipationBreakdown] = useState({ verified: 0, partial: 0, minimal: 0, no_show: 0 });
+  const [stepFunnel,             setStepFunnel]             = useState({ preSurvey: 0, consent: 0, attendance: 0, postSurvey: 0, total: 0 });
+  const [pendingConsent,         setPendingConsent]         = useState(null);
+
+  // UI state
+  const [activeModal,     setActiveModal]     = useState(null); // 'sdg'|'engagement'|'funnel'|'participation'|'flaggedStudents'
+  const [showSidebar,     setShowSidebar]     = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  // Flagged students modal state
+  const [flaggedStudents,  setFlaggedStudents]  = useState([]);
+  const [flaggedLoading,   setFlaggedLoading]   = useState(false);
+  const [unflaggingIds,    setUnflaggingIds]    = useState({});
+
+  // ── Fetch users ──────────────────────────────────────────
+  useEffect(() => {
+    getDocs(collection(db, "users")).then(snap => {
+      const docs = snap.docs.map(d => d.data());
+      setTotalStudents(docs.filter(u => u.role === "student").length);
+      setFlaggedCount(docs.filter(u => u.attendanceFlagged === true).length);
+    }).catch(() => setTotalStudents("-"));
+  }, []);
+
+  // ── Fetch missions ───────────────────────────────────────
+  useEffect(() => {
+    const parseDate = str => { if (!str) return null; const d = new Date(str); return isNaN(d) ? null : d; };
+    const sameDay   = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+    getDocs(collection(db, "missions")).then(snap => {
+      const rows      = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const published = rows.filter(m => m.status === "published");
+
+      setTotalProjects(published.length);
+      setSlCount(published.filter(m => m.projectType === "sl").length);
+      setCeCount(published.filter(m => m.projectType === "ce").length);
+
+      // SDG distribution
+      const sdgCounts = {};
+      published.forEach(m => (m.sdgs || []).forEach(id => { sdgCounts[id] = (sdgCounts[id] || 0) + 1; }));
+      const totalSdg = Object.values(sdgCounts).reduce((s, c) => s + c, 0);
+      setSdgAnalytics(Object.entries(sdgCounts).map(([id, count]) => ({
+        sdgId: Number(id), count,
+        percentage: totalSdg ? Number(((count / totalSdg) * 100).toFixed(1)) : 0,
+      })));
+
+      // Events today / upcoming
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const todayEvts = [], upcoming = [];
+      for (const m of published) {
+        const d = parseDate(m.targetDate);
+        if (!d) continue;
+        const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        if (sameDay(day, today)) todayEvts.push(m);
+        else if (day > today) upcoming.push(m);
+      }
+      upcoming.sort((a, b) => (parseDate(a.targetDate) || 0) - (parseDate(b.targetDate) || 0));
+      setEventsToday(todayEvts);
+      setUpcomingEvents(upcoming);
+    }).catch(console.error);
+  }, []);
+
+  // ── Fetch volunteer data ─────────────────────────────────
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const snap    = await getDocs(collection(db, "missions"));
+        const missions = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.status === "published");
+
+        const eng = [];
+        const bd  = { verified: 0, partial: 0, minimal: 0, no_show: 0 };
+        const fn  = { preSurvey: 0, consent: 0, attendance: 0, postSurvey: 0, total: 0 };
+        let pending = 0;
+
+        for (const m of missions) {
+          const vs    = (await getDocs(collection(db, "missions", m.id, "volunteer"))).docs.map(d => d.data());
+          const total = vs.length;
+          const cnt   = (k, v) => vs.filter(x => x.progress?.[k] === v).length;
+
+          const ps = cnt("preSurvey", "submitted");
+          const cs = cnt("consent",   "submitted");
+          const at = cnt("attendance","present");
+          const po = cnt("postSurvey","submitted");
+
+          eng.push({
+            id: m.id, label: m.title || m.alt || "Untitled Mission",
+            value:      total ? Math.round(((ps + cs + at + po) / (total * 4)) * 100) : 0,
+            total, preSurvey: ps, consent: cs, attendance: at, postSurvey: po,
+            data: m,
+          });
+
+          vs.forEach(v => { if (bd[v.participationStatus] !== undefined) bd[v.participationStatus]++; });
+
+          fn.total      += total;
+          fn.preSurvey  += ps;
+          fn.consent    += cs;
+          fn.attendance += at;
+          fn.postSurvey += po;
+          pending       += vs.filter(v => v.consentSubmission?.reviewStatus === "pending").length;
+        }
+
+        setEngagement(eng);
+        setParticipationBreakdown(bd);
+        setStepFunnel(fn);
+        setPendingConsent(pending);
+      } catch { setEngagement([]); }
+    };
+    run();
+  }, []);
+
+  // ── Flagged students fetch ────────────────────────────────
+  const openFlaggedModal = async () => {
+    setActiveModal("flaggedStudents");
+    setFlaggedLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, "users"), where("attendanceFlagged", "==", true)));
+      setFlaggedStudents(snap.docs.map(d => ({
+        id: d.id,
+        name: d.data().name || d.data().email || d.id,
+        email: d.data().email || "",
+        level: d.data().level || "—",
+        flaggedMissionTitle: d.data().attendanceFlaggedMissionTitle || "—",
+        flagExpiry: d.data().attendanceFlagExpiry?.toDate?.() || null,
+      })));
+    } finally {
+      setFlaggedLoading(false);
+    }
+  };
+
+  const handleUnflag = async (student) => {
+    setUnflaggingIds(prev => ({ ...prev, [student.id]: true }));
+    try {
+      await updateDoc(doc(db, "users", student.id), {
+        attendanceFlagged: false,
+        attendanceFlagExpiry: null,
+        attendanceFlaggedAt: null,
+        attendanceFlaggedMissionId: null,
+        attendanceFlaggedMissionTitle: null,
+      });
+      await addDoc(collection(db, "users", student.id, "notifications"), {
+        type: "attendance_unflag",
+        title: "Attendance Flag Removed",
+        message: "An admin has removed your attendance flag. You can join missions again.",
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      setFlaggedStudents(prev => prev.filter(s => s.id !== student.id));
+      setFlaggedCount(prev => Math.max(0, prev - 1));
+    } finally {
+      setUnflaggingIds(prev => { const n = { ...prev }; delete n[student.id]; return n; });
+    }
+  };
+
+  // ── Donut chart helpers ──────────────────────────────────
+  const SDG_COLORS = [G.teal, G.pink, G.yellow, G.orange, G.blue, "#9c27b0", "#4caf50"];
+
+  const sorted    = [...sdgAnalytics].sort((a, b) => b.percentage - a.percentage);
+  const top5      = sorted.slice(0, 5);
+  const rest      = sorted.slice(5);
+  const chartData = rest.length > 0
+    ? [...top5, { sdgId: "Others", count: rest.reduce((s, x) => s + x.count, 0), percentage: Number(rest.reduce((s, x) => s + x.percentage, 0).toFixed(1)) }]
+    : top5;
+
+  const makeSlices = (data) => {
+    let cum = 0;
+    return data.map(item => {
+      const sa = cum * 2 * Math.PI, angle = (item.percentage / 100) * 2 * Math.PI;
+      cum += item.percentage / 100;
+      return { ...item, startAngle: sa, endAngle: sa + angle, midAngle: sa + angle / 2 };
+    });
+  };
+
+  const arcPath = (cx, cy, r, sa, ea) => {
+    const pt = a => ({ x: cx + r * Math.cos(a - Math.PI / 2), y: cy + r * Math.sin(a - Math.PI / 2) });
+    const s = pt(ea), e = pt(sa);
+    return `M ${s.x} ${s.y} A ${r} ${r} 0 ${ea - sa > Math.PI ? 1 : 0} 0 ${e.x} ${e.y} L ${cx} ${cy} Z`;
+  };
+
+  const slices  = makeSlices(chartData);
+  const pct     = v => stepFunnel.total > 0 ? Math.round((v / stepFunnel.total) * 100) : 0;
+  const bdTotal = Object.values(participationBreakdown).reduce((a, b) => a + b, 0);
+
+  const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+
+  // step defs reused by both dashboard and modal
+  const STEPS = [
+    { key: "preSurvey",  label: "Pre-Survey",   color: G.teal,   desc: "Volunteer completed the pre-activity survey before the event."      },
+    { key: "consent",    label: "Consent Form",  color: G.yellow, desc: "Volunteer uploaded and submitted their signed consent form."        },
+    { key: "attendance", label: "Attendance",    color: G.orange, desc: "Volunteer was marked present via QR scan or manual entry."          },
+    { key: "postSurvey", label: "Post-Survey",   color: G.pink,   desc: "Volunteer completed the post-activity reflection survey."           },
+  ];
+
+  const PART_STATUSES = [
+    { key: "verified", label: "Verified", color: G.teal,   desc: "Fully completed and actively participated in the event."         },
+    { key: "partial",  label: "Partial",  color: G.yellow, desc: "Attended but only partially completed required activities."       },
+    { key: "minimal",  label: "Minimal",  color: G.orange, desc: "Was present for a very small portion of the event."              },
+    { key: "no_show",  label: "No Show",  color: G.pink,   desc: "Registered but did not attend. No points are awarded."           },
+  ];
+
+  // ── Render ───────────────────────────────────────────────
+  return (
+    <div style={{ fontFamily: "'Inter', 'Google Sans', 'Roboto', 'Segoe UI', sans-serif" }}>
+
+      {/* Page header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: G.text, letterSpacing: "-.02em" }}>Dashboard</h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: G.sub }}>{dateLabel}</p>
         </div>
       </div>
 
-      <div className="dashboard-grid">
-        {/* LEFT column cards */}
-        <section className="left-col">
-          {/* Students Engagement - Real-Time Metrics Styled */}
-          <div style={{
-            background: '#fff',
-            borderRadius: 16,
-            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
-            marginBottom: 24,
-            padding: 0,
-            border: 'none',
-            overflow: 'visible',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              padding: '24px 32px 0 32px',
-              background: 'transparent',
-              borderRadius: '16px 16px 0 0',
-            }}>
-              <span style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 38, height: 38, borderRadius: '50%', background: '#e6eaff',
-              }}>
-                <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" fill="#4C48FF"/></g></svg>
-              </span>
-              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Volunteers Engagement</span>
+      {/* ── KPI summary row ── */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 24, flexWrap: "wrap" }}>
+        {[
+          { label: "Published Events",        value: totalProjects,         icon: "📋", accent: G.blue,   accentBg: G.blueL  },
+          { label: "Registered Students",     value: totalStudents ?? "…",  icon: "👤", accent: G.green,  accentBg: G.greenL },
+          { label: "Events Today",            value: eventsToday.length,    icon: "📅", accent: G.orange, accentBg: "#fff3e0"},
+          { label: "Pending Consent Reviews", value: pendingConsent ?? "…", icon: "📝", accent: pendingConsent > 0 ? G.red : G.sub, accentBg: pendingConsent > 0 ? G.redL : G.bg, flag: pendingConsent > 0 },
+        ].map(c => (
+          <div key={c.label} style={{ flex: "1 1 170px", background: G.white, borderRadius: 12, boxShadow: elev1, padding: "18px 20px", minWidth: 155 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: c.accentBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, marginBottom: 12 }}>
+              {c.icon}
             </div>
-            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 60 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 8 }}>
-                {engagement.map((x) => (
-                  <div
-                    key={x.label}
-                    style={{ marginBottom: 2, cursor: 'pointer' }}
-                    onClick={() => { if (x.data) { setSelectedProject(x.data); setShowSidebar(true); } }}
-                    title="View Project Details"
-                  >
-                    <div style={{ fontWeight: 600, color: '#1f3b73', fontSize: 15, marginBottom: 6 }}>{x.label}</div>
-                    <div style={{ background: '#e6eaf3', borderRadius: 8, height: 18, position: 'relative', overflow: 'hidden', width: '100%' }}>
-                      <div style={{
-                        height: '100%',
-                        background: 'linear-gradient(90deg, #4C48FF 60%, #30bdb7 100%)',
-                        width: `${x.value}%`,
-                        borderRadius: 8,
-                        transition: 'width 0.3s',
-                      }} />
-                      <div style={{
-                        position: 'absolute',
-                        right: 6,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        fontSize: 13,
-                        color: '#fff',
-                        fontWeight: 700,
-                        background: 'linear-gradient(90deg, #4C48FF 60%, #30bdb7 100%)',
-                        padding: '1px 14px',
-                        borderRadius: 12,
-                        minWidth: 36,
-                        textAlign: 'center',
-                        boxShadow: '0 1px 4px rgba(31,59,115,0.08)',
-                      }}>{x.value}%</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p style={{ margin: '14px 0 0 0', fontSize: 12, color: '#8A94A6' }}>
-                *Sample only for demo. Replace with real metrics later.
-              </p>
-            </div>
+            <div style={{ fontSize: 30, fontWeight: 700, color: G.text, lineHeight: 1 }}>{c.value}</div>
+            <div style={{ fontSize: 12, color: G.sub, marginTop: 6, fontWeight: 500 }}>{c.label}</div>
+            {c.flag && <div style={{ fontSize: 11, color: G.red, fontWeight: 600, marginTop: 4 }}>● Needs review</div>}
           </div>
+        ))}
+      </div>
 
-          {/* Satisfaction Ratings - Modern Styled */}
-          <div style={{
-            background: '#fff',
-            borderRadius: 16,
-            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
-            marginBottom: 24,
-            padding: 0,
-            border: 'none',
-            overflow: 'visible',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              padding: '24px 32px 0 32px',
-              background: 'transparent',
-              borderRadius: '16px 16px 0 0',
-            }}>
-              <span style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 38, height: 38, borderRadius: '50%', background: '#e6eaff',
-              }}>
-                <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 2a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 19.93 11H21a1 1 0 1 1 0 2h-1.07A7.002 7.002 0 0 1 13 19.93V21a1 1 0 1 1-2 0v-1.07A7.002 7.002 0 0 1 4.07 13H3a1 1 0 1 1 0-2h1.07A7.002 7.002 0 0 1 11 4.07V3a1 1 0 0 1 1-1Z" fill="#4C48FF"/></g></svg>
-              </span>
-              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Satisfaction Ratings</span>
+      {/* ── Main grid ── */}
+      <div className="dashboard-grid">
+
+        {/* LEFT column */}
+        <section className="left-col">
+
+          {/* Volunteer Engagement */}
+          <Card>
+            <CardHead
+              title="Volunteer Engagement per Mission"
+              sub="Overall step-completion rate — pre-survey, consent, attendance, post-survey"
+              onMore={() => setActiveModal("engagement")}
+            />
+            <Divider />
+            <div style={{ padding: "12px 20px 20px" }}>
+              {engagement.length === 0
+                ? <Empty text="No published missions with volunteers yet." />
+                : engagement.map(x => (
+                  <div key={x.id} style={{ marginBottom: 14, cursor: "pointer" }}
+                    onClick={() => { if (x.data) { setSelectedProject(x.data); setShowSidebar(true); } }}
+                    title="Click to view mission details"
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, alignItems: "center" }}>
+                      <span style={{ fontSize: 13, color: G.text, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "78%" }}>
+                        {x.label}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: G.blue, flexShrink: 0 }}>{x.value}%</span>
+                    </div>
+                    <ProgressBar value={x.value} color={G.blue} height={6} />
+                  </div>
+                ))
+              }
             </div>
-            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 60 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#1f3b73', fontWeight: 500 }}>
-                  <span>Volunteer Satisfaction</span>
-                  <span style={{ color: '#8A94A6', fontWeight: 700 }}>—</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#1f3b73', fontWeight: 500 }}>
-                  <span>Faculty/SI Satisfaction</span>
-                  <span style={{ color: '#8A94A6', fontWeight: 700 }}>—</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#1f3b73', fontWeight: 500 }}>
-                  <span>Community Partner Feedback</span>
-                  <span style={{ color: '#8A94A6', fontWeight: 700 }}>—</span>
-                </div>
-              </div>
-              <p style={{ margin: '14px 0 0 0', fontSize: 12, color: '#8A94A6' }}>
-                *Leave blank for now. You can compute later from surveys.
-              </p>
-            </div>
-          </div>
-          {/* SDG Distribution - Modern Styled */}
-          <div style={{
-            background: '#fff',
-            borderRadius: 24,
-            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
-            marginBottom: 24,
-            padding: 0,
-            border: 'none',
-            overflow: 'visible',
-            textAlign: 'center',
-          }}>
-            <div style={{ padding: '32px 0 0 0', textAlign: 'center' }}>
-              <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 28, letterSpacing: 0.5 }}>SDG Distribution</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, padding: '0 0 0 0' }}>
-              {pieSlices.length === 0 ? (
-                <p style={{ color: '#8A94A6', fontSize: 16, marginTop: 40 }}>No SDG data available yet.</p>
-              ) : (
-                <svg width={CHART_SIZE} height={CHART_SIZE} style={{ margin: '32px 0 0 0' }}>
-                  {pieSlices.map((slice, index) => {
-                    // Use a simple color palette for clarity
-                    const palette = ['#e6f0fa', '#ff5c5c', '#7cff7c', '#ffe066', '#6ec6ff', '#b388ff', '#ffb3b3'];
-                    const path = describeArc(
-                      CENTER,
-                      CENTER,
-                      RADIUS,
-                      slice.startAngle,
-                      slice.endAngle
-                    );
-                    const labelX =
-                      CENTER + (RADIUS * 0.6) * Math.cos(slice.midAngle - Math.PI / 2);
-                    const labelY =
-                      CENTER + (RADIUS * 0.6) * Math.sin(slice.midAngle - Math.PI / 2);
-                    return (
-                      <g key={slice.sdgId}>
-                        <path
-                          d={path}
-                          fill={palette[index % palette.length]}
-                        />
-                        {slice.percentage >= 5 && (
-                          <text
-                            x={labelX}
-                            y={labelY}
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            fill={index === 1 ? '#fff' : '#1f3b73'}
-                            fontSize="13"
-                            fontWeight="700"
-                          >
-                            <tspan x={labelX} dy="-2">SDG {slice.sdgId}</tspan>
-                            <tspan x={labelX} dy="15">{slice.percentage}%</tspan>
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                </svg>
+          </Card>
+
+          {/* Step Completion Funnel */}
+          <Card>
+            <CardHead
+              title="Step Completion Funnel"
+              sub="Of all registered volunteers, percentage who completed each step"
+              onMore={() => setActiveModal("funnel")}
+            />
+            <Divider />
+            <div style={{ padding: "12px 20px 20px" }}>
+              {stepFunnel.total === 0
+                ? <Empty text="No volunteer data yet." />
+                : STEPS.map(s => (
+                  <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <div style={{ width: 9, height: 9, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: G.text, width: 96, flexShrink: 0 }}>{s.label}</span>
+                    <div style={{ flex: 1 }}>
+                      <ProgressBar value={pct(stepFunnel[s.key])} color={s.color} height={7} />
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: G.text, width: 36, textAlign: "right", flexShrink: 0 }}>
+                      {pct(stepFunnel[s.key])}%
+                    </span>
+                  </div>
+                ))
+              }
+              {stepFunnel.total > 0 && (
+                <p style={{ fontSize: 11, color: G.sub, margin: "10px 0 0", borderTop: `1px solid ${G.border}`, paddingTop: 10 }}>
+                  Based on {stepFunnel.total} total volunteer registration{stepFunnel.total !== 1 ? "s" : ""}
+                </p>
               )}
             </div>
-            {/* Description text */}
-            {chartData.length > 0 && (
-              <p style={{ margin: '32px 0 0 0', fontSize: 16, color: '#8A94A6', fontWeight: 500, padding: '0 32px 32px 32px', lineHeight: 1.5 }}>
-                <span style={{ color: '#1f3b73', fontWeight: 700 }}>
-                  {chartData
-                    .filter((x) => x.sdgId !== "Others")
-                    .slice(0, 2)
-                    .map((x) => `SDG ${x.sdgId}`)
-                    .join(" & ")}
-                </span>
-                {` account for the largest share of SDG engagements, with the remaining contributions grouped under `}
-                <span style={{ color: '#1f3b73', fontWeight: 700 }}>Others</span>.
-              </p>
-            )}
-          </div>
+          </Card>
 
+          {/* SDG Distribution — donut */}
+          <Card>
+            <CardHead
+              title="SDG Distribution"
+              sub="UN Sustainable Development Goals addressed by published missions"
+              onMore={() => setActiveModal("sdg")}
+            />
+            <Divider />
+            <div style={{ padding: "12px 20px 24px" }}>
+              {slices.length === 0
+                ? <Empty text="No SDG data available yet." />
+                : <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                  {/* Donut chart */}
+                  <svg width={160} height={160} style={{ flexShrink: 0 }}>
+                    {slices.map((s, i) => (
+                      <path key={s.sdgId} d={arcPath(80, 80, 70, s.startAngle, s.endAngle)} fill={SDG_COLORS[i % SDG_COLORS.length]} />
+                    ))}
+                    {/* Center hole */}
+                    <circle cx={80} cy={80} r={44} fill={G.white} />
+                    <text x={80} y={74} textAnchor="middle" fontSize="22" fontWeight="700" fill={G.text}>{totalProjects}</text>
+                    <text x={80} y={92} textAnchor="middle" fontSize="10" fill={G.sub}>missions</text>
+                  </svg>
+                  {/* Legend */}
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {chartData.map((item, i) => (
+                      <div key={item.sdgId} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 2, background: SDG_COLORS[i % SDG_COLORS.length], flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: G.text, flex: 1 }}>SDG {item.sdgId}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: G.sub }}>{item.percentage}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              }
+            </div>
+          </Card>
 
         </section>
 
-        {/* RIGHT column panels */}
+        {/* RIGHT column */}
         <section className="right-col">
-          {/* Events Today - Custom Styled */}
-          <div style={{
-            background: '#fff',
-            borderRadius: 16,
-            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
-            marginBottom: 24,
-            padding: 0,
-            border: 'none',
-            overflow: 'visible',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '24px 32px 0 32px',
-              background: 'transparent',
-              borderRadius: '16px 16px 0 0',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <span style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 38, height: 38, borderRadius: '50%', background: '#ffe6e6',
-                }}>
-                  <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M12 2a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 19.93 11H21a1 1 0 1 1 0 2h-1.07A7.002 7.002 0 0 1 13 19.93V21a1 1 0 1 1-2 0v-1.07A7.002 7.002 0 0 1 4.07 13H3a1 1 0 1 1 0-2h1.07A7.002 7.002 0 0 1 11 4.07V3a1 1 0 0 1 1-1Zm0 4a5 5 0 1 0 0 10A5 5 0 0 0 12 6Z" fill="#ff5c5c"/></g></svg>
-                </span>
-                <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Events Today</span>
+
+          {/* Mission Types */}
+          <Card>
+            <CardHead title="Mission Types" sub="Published missions by project type" />
+            <Divider />
+            <div style={{ padding: "12px 20px 20px", display: "flex", gap: 12 }}>
+              {[
+                { label: "Service-Learning", sub: "SL", count: slCount, color: G.teal,   bg: "#f0f9fa" },
+                { label: "Community Engagement", sub: "CE", count: ceCount, color: G.amber, bg: G.amberL },
+              ].map(t => {
+                const p = totalProjects > 0 ? Math.round((t.count / totalProjects) * 100) : 0;
+                return (
+                  <div key={t.sub} style={{ flex: 1, background: t.bg, borderRadius: 10, padding: "14px 16px", border: `1px solid ${G.border}` }}>
+                    <div style={{ fontSize: 11, color: G.sub, fontWeight: 600, marginBottom: 4 }}>{t.label} ({t.sub})</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: G.text, lineHeight: 1 }}>{t.count}</div>
+                    <div style={{ fontSize: 11, color: t.color, fontWeight: 600, marginTop: 4 }}>{p}% of total</div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Compliance Alerts — only shown when actionable */}
+          {(pendingConsent > 0 || flaggedCount > 0) && (
+            <Card style={{ border: `1px solid #fad2cf` }}>
+              <CardHead title="Compliance Alerts" sub="Items that require your attention" />
+              <Divider />
+              <div style={{ padding: "12px 20px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                {pendingConsent > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: G.redL, borderRadius: 8, padding: "10px 14px" }}>
+                    <span style={{ fontSize: 13, color: G.text }}>Consent forms awaiting review</span>
+                    <span style={{ fontWeight: 700, color: G.red, fontSize: 16 }}>{pendingConsent}</span>
+                  </div>
+                )}
+                {flaggedCount > 0 && (
+                  <div
+                    onClick={openFlaggedModal}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff8f0", borderRadius: 8, padding: "10px 14px", border: "1px solid #ffe0b2", cursor: "pointer" }}
+                    title="Click to view flagged students"
+                  >
+                    <span style={{ fontSize: 13, color: G.text }}>Students with flagged attendance</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontWeight: 700, color: G.orange, fontSize: 16 }}>{flaggedCount}</span>
+                      <span style={{ fontSize: 11, color: G.orange, fontWeight: 600 }}>View →</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Participation Status */}
+          <Card>
+            <CardHead
+              title="Participation Status"
+              sub="How volunteers were rated after each completed event"
+              onMore={() => setActiveModal("participation")}
+            />
+            <Divider />
+            <div style={{ padding: "12px 20px 20px" }}>
+              {bdTotal === 0
+                ? <Empty text="No participation data yet. Status is set after events are completed." />
+                : PART_STATUSES.map(({ key, label, color }) => {
+                  const count = participationBreakdown[key];
+                  const p     = bdTotal > 0 ? Math.round((count / bdTotal) * 100) : 0;
+                  return (
+                    <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: G.text, width: 68, flexShrink: 0 }}>{label}</span>
+                      <div style={{ flex: 1 }}>
+                        <ProgressBar value={p} color={color} height={6} />
+                      </div>
+                      <span style={{ fontSize: 12, color: G.sub, width: 56, textAlign: "right", flexShrink: 0 }}>
+                        {count} ({p}%)
+                      </span>
+                    </div>
+                  );
+                })
+              }
+            </div>
+          </Card>
+
+          {/* Events Today */}
+          <Card>
+            <div style={{ padding: "18px 20px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 15, color: G.text }}>Events Today</div>
+                <div style={{ fontSize: 12, color: eventsToday.length > 0 ? G.orange : G.sub, marginTop: 2 }}>
+                  {eventsToday.length > 0 ? `${eventsToday.length} happening today` : "None scheduled today"}
+                </div>
               </div>
               <button
-                style={{
-                  background: '#4C48FF', color: '#fff', border: 'none', borderRadius: 18,
-                  fontWeight: 700, fontSize: 15, padding: '8px 24px', cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(76,72,255,0.08)',
-                  transition: 'background 0.2s',
-                }}
-                type="button"
                 onClick={() => navigate("/admin/projects")}
+                style={{ background: G.blue, color: G.white, border: "none", borderRadius: 20, fontWeight: 600, fontSize: 12, padding: "7px 18px", cursor: "pointer", boxShadow: "0 1px 3px rgba(26,115,232,.4)" }}
               >
-                View All Events
+                View All
               </button>
             </div>
-            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 90 }}>
-              {eventsToday.length === 0 ? (
-                <div style={{ border: '1px dashed #e5e7eb', borderRadius: 12, background: '#fff', padding: 24, marginTop: 8 }}>
-                  <p style={{ fontWeight: 700, color: '#1f3b73', fontSize: 18, margin: 0 }}>No Events today yet!</p>
-                  <p style={{ color: '#8A94A6', fontSize: 15, margin: '8px 0 0 0' }}>
-                    Once you create project/events (with today’s date + active status), they will appear here automatically.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 8 }}>
-                  {eventsToday.map((e) => (
-                    <div
-                      key={e.id}
-                      onClick={() => e.id && navigate(`/admin/events/${e.id}`)}
-                      style={{
-                        background: '#fff',
-                        borderRadius: 14,
-                        boxShadow: '0 2px 8px rgba(31,59,115,0.04)',
-                        padding: '18px 22px',
-                        display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer',
-                        border: '1px solid #f0f1f7',
-                        transition: 'box-shadow 0.2s',
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, color: '#1f3b73', fontSize: 17 }}>{e.title || e.alt || 'Untitled Event'}</div>
-                      <div style={{ color: '#8A94A6', fontSize: 14, marginBottom: 6 }}>
-                        {e.proponent ? `proposed by: (${e.proponent})` : ''}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
-                        {/* Placeholder avatars */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: -8 }}>
-                          {[1,2,3,4].map((_, idx) => (
-                            <img key={idx} src={`https://randomuser.me/api/portraits/men/${idx+10}.jpg`} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid #fff', marginLeft: idx === 0 ? 0 : -12, boxShadow: '0 1px 4px rgba(31,59,115,0.08)' }} />
-                          ))}
-                          <span style={{ marginLeft: 6, background: '#4C48FF', color: '#fff', borderRadius: 12, fontSize: 13, fontWeight: 700, padding: '2px 10px' }}>18+</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <Divider />
+            <div style={{ padding: "6px 20px 16px" }}>
+              {eventsToday.length === 0
+                ? <Empty text="No events scheduled for today." />
+                : eventsToday.map(e => <EventRow key={e.id} event={e} onClick={() => e.id && navigate(`/admin/events/${e.id}`)} />)
+              }
             </div>
-          </div>
+          </Card>
 
-          {/* Upcoming Events - Custom Styled */}
-          <div style={{
-            background: '#fff',
-            borderRadius: 16,
-            boxShadow: '0 4px 24px rgba(31,59,115,0.07)',
-            marginBottom: 24,
-            padding: 0,
-            border: 'none',
-            overflow: 'visible',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '24px 32px 0 32px',
-              background: 'transparent',
-              borderRadius: '16px 16px 0 0',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <span style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 38, height: 38, borderRadius: '50%', background: '#e6f7ff',
-                }}>
-                  <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><g><rect width="24" height="24" fill="none"/><path d="M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0Zm-5-9a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 19.93 11H21a1 1 0 1 1 0 2h-1.07A7.002 7.002 0 0 1 13 19.93V21a1 1 0 1 1-2 0v-1.07A7.002 7.002 0 0 1 4.07 13H3a1 1 0 1 1 0-2h1.07A7.002 7.002 0 0 1 11 4.07V3a1 1 0 0 1 1-1Z" fill="#30bdb7"/></g></svg>
-                </span>
-                <span style={{ color: '#1f3b73', fontWeight: 700, fontSize: 20 }}>Upcoming Events</span>
-              </div>
+          {/* Upcoming Events */}
+          <Card>
+            <CardHead title="Upcoming Events" sub="Future-dated published missions, sorted by soonest date" />
+            <Divider />
+            <div style={{ padding: "6px 20px 16px" }}>
+              {upcomingEvents.length === 0
+                ? <Empty text="No upcoming events yet." />
+                : upcomingEvents.map(e => <EventRow key={e.id} event={e} onClick={() => e.id && navigate(`/admin/events/${e.id}`)} />)
+              }
             </div>
-            <div style={{ background: '#f8faff', borderRadius: '0 0 16px 16px', marginTop: 18, padding: '0 32px 24px 32px', minHeight: 90 }}>
-              {upcomingEvents.length === 0 ? (
-                <div style={{ border: '1px dashed #e5e7eb', borderRadius: 12, background: '#fff', padding: 24, marginTop: 8 }}>
-                  <p style={{ fontWeight: 700, color: '#1f3b73', fontSize: 18, margin: 0 }}>No upcoming events yet</p>
-                  <p style={{ color: '#8A94A6', fontSize: 15, margin: '8px 0 0 0' }}>
-                    Future-dated projects will be listed here once added.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 8 }}>
-                  {upcomingEvents.map((e) => (
-                    <div
-                      key={e.id}
-                      onClick={() => e.id && navigate(`/admin/events/${e.id}`)}
-                      style={{
-                        background: '#fff',
-                        borderRadius: 14,
-                        boxShadow: '0 2px 8px rgba(31,59,115,0.04)',
-                        padding: '18px 22px',
-                        display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer',
-                        border: '1px solid #f0f1f7',
-                        transition: 'box-shadow 0.2s',
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, color: '#1f3b73', fontSize: 17 }}>{e.title || e.alt || e.name || 'Untitled Event'}</div>
-                      <div style={{ color: '#8A94A6', fontSize: 14, marginBottom: 6 }}>
-                        {e.proponent ? `proposed by: (${e.proponent})` : ''}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
-                        {/* Placeholder avatars */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: -8 }}>
-                          {[1,2,3,4].map((_, idx) => (
-                            <img key={idx} src={`https://randomuser.me/api/portraits/men/${idx+20}.jpg`} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid #fff', marginLeft: idx === 0 ? 0 : -12, boxShadow: '0 1px 4px rgba(31,59,115,0.08)' }} />
-                          ))}
-                          <span style={{ marginLeft: 6, background: '#30bdb7', color: '#fff', borderRadius: 12, fontSize: 13, fontWeight: 700, padding: '2px 10px' }}>18+</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          </Card>
+
         </section>
       </div>
+
+      {/* ════════════ MODALS ════════════ */}
+
+      {/* SDG Distribution Modal */}
+      {activeModal === "sdg" && (
+        <Modal
+          title="SDG Distribution"
+          subtitle={`Full breakdown across all ${totalProjects} published missions`}
+          onClose={() => setActiveModal(null)}
+        >
+          {/* Larger donut */}
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
+            <svg width={220} height={220}>
+              {makeSlices(chartData).map((s, i) => (
+                <path key={s.sdgId} d={arcPath(110, 110, 90, s.startAngle, s.endAngle)} fill={SDG_COLORS[i % SDG_COLORS.length]} />
+              ))}
+              <circle cx={110} cy={110} r={56} fill={G.white} />
+              <text x={110} y={103} textAnchor="middle" fontSize="28" fontWeight="700" fill={G.text}>{totalProjects}</text>
+              <text x={110} y={122} textAnchor="middle" fontSize="11" fill={G.sub}>total missions</text>
+            </svg>
+          </div>
+          {/* Full breakdown table */}
+          <div style={{ border: `1px solid ${G.border}`, borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto 120px", padding: "10px 16px", background: G.bg, borderBottom: `1px solid ${G.border}` }}>
+              <span style={{ fontSize: 12, color: G.sub, fontWeight: 600 }}>SDG</span>
+              <span style={{ fontSize: 12, color: G.sub, fontWeight: 600, textAlign: "center" }}>Missions</span>
+              <span style={{ fontSize: 12, color: G.sub, fontWeight: 600, textAlign: "right" }}>Share</span>
+            </div>
+            {[...sdgAnalytics].sort((a, b) => b.count - a.count).map((item, i) => (
+              <div key={item.sdgId} style={{ display: "grid", gridTemplateColumns: "1fr auto 120px", alignItems: "center", padding: "12px 16px", borderBottom: i < sdgAnalytics.length - 1 ? `1px solid ${G.border}` : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: SDG_COLORS[i % SDG_COLORS.length], display: "inline-block", flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: G.text, fontWeight: 500 }}>SDG {item.sdgId}</span>
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: G.text, textAlign: "center" }}>{item.count}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                  <div style={{ width: 60, background: "#e8eaed", borderRadius: 999, height: 6, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${item.percentage}%`, background: SDG_COLORS[i % SDG_COLORS.length], borderRadius: 999 }} />
+                  </div>
+                  <span style={{ fontSize: 12, color: G.sub, width: 36, textAlign: "right" }}>{item.percentage}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* Volunteer Engagement Modal */}
+      {activeModal === "engagement" && (
+        <Modal
+          title="Volunteer Engagement"
+          subtitle="Per-mission breakdown of step completion. Sorted by highest engagement."
+          onClose={() => setActiveModal(null)}
+        >
+          {engagement.length === 0
+            ? <Empty text="No data available." />
+            : [...engagement].sort((a, b) => b.value - a.value).map((x, idx) => (
+              <div key={x.id} style={{ marginBottom: 22, paddingBottom: 22, borderBottom: idx < engagement.length - 1 ? `1px solid ${G.border}` : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: G.text }}>{x.label}</span>
+                  <Pill label={`${x.value}% overall`} color={G.blue} bg={G.blueL} />
+                </div>
+                <p style={{ fontSize: 12, color: G.sub, margin: "0 0 12px" }}>
+                  {x.total} volunteer{x.total !== 1 ? "s" : ""} registered
+                </p>
+                {STEPS.map(s => {
+                  const count = x[s.key];
+                  const p     = x.total > 0 ? Math.round((count / x.total) * 100) : 0;
+                  return (
+                    <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: G.sub, width: 90, flexShrink: 0 }}>{s.label}</span>
+                      <div style={{ flex: 1 }}>
+                        <ProgressBar value={p} color={s.color} height={6} />
+                      </div>
+                      <span style={{ fontSize: 12, color: G.sub, width: 52, textAlign: "right", flexShrink: 0 }}>
+                        {count}/{x.total}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          }
+        </Modal>
+      )}
+
+      {/* Step Funnel Modal */}
+      {activeModal === "funnel" && (
+        <Modal
+          title="Step Completion Funnel"
+          subtitle={`Aggregate across all missions — ${stepFunnel.total} total volunteer registrations`}
+          onClose={() => setActiveModal(null)}
+        >
+          {STEPS.map((s, i, arr) => {
+            const count   = stepFunnel[s.key];
+            const p       = pct(count);
+            const prev    = i > 0 ? stepFunnel[arr[i - 1].key] : stepFunnel.total;
+            const dropoff = prev > 0 ? Math.round(((prev - count) / prev) * 100) : 0;
+            return (
+              <div key={s.key} style={{ marginBottom: 24 }}>
+                {/* Step header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: s.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: G.white, flexShrink: 0 }}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: G.text }}>{s.label}</div>
+                    <div style={{ fontSize: 12, color: G.sub }}>{s.desc}</div>
+                  </div>
+                </div>
+                {/* Bar + count */}
+                <div style={{ paddingLeft: 38 }}>
+                  <ProgressBar value={p} color={s.color} height={10} />
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: G.sub }}>
+                      {count} of {stepFunnel.total} volunteers ({p}%)
+                    </span>
+                    {i > 0 && dropoff > 0 && (
+                      <span style={{ fontSize: 11, color: G.orange, fontWeight: 600 }}>
+                        ↓ {dropoff}% drop-off from previous step
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Connector line between steps */}
+                {i < arr.length - 1 && (
+                  <div style={{ width: 2, height: 16, background: G.border, margin: "8px 0 0 13px" }} />
+                )}
+              </div>
+            );
+          })}
+        </Modal>
+      )}
+
+      {/* Participation Status Modal */}
+      {activeModal === "participation" && (
+        <Modal
+          title="Participation Status"
+          subtitle={`Admins rate volunteers after each completed event. ${bdTotal} total ratings recorded.`}
+          onClose={() => setActiveModal(null)}
+        >
+          {PART_STATUSES.map(({ key, label, color, desc }) => {
+            const count = participationBreakdown[key];
+            const p     = bdTotal > 0 ? Math.round((count / bdTotal) * 100) : 0;
+            return (
+              <div key={key} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: `1px solid ${G.border}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: G.text }}>{label}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: G.text }}>{count}</span>
+                    <Pill label={`${p}%`} color={color} bg={`${color}22`} />
+                  </div>
+                </div>
+                <ProgressBar value={p} color={color} height={8} />
+                <p style={{ fontSize: 12, color: G.sub, margin: "8px 0 0" }}>{desc}</p>
+              </div>
+            );
+          })}
+        </Modal>
+      )}
+
+      {/* Flagged Students Modal */}
+      {activeModal === "flaggedStudents" && (
+        <Modal
+          title="Flagged Students"
+          subtitle={`Students currently restricted from joining missions due to missed attendance`}
+          onClose={() => setActiveModal(null)}
+        >
+          {flaggedLoading ? (
+            <p style={{ color: G.sub, fontSize: 13, margin: 0 }}>Loading…</p>
+          ) : flaggedStudents.length === 0 ? (
+            <Empty text="No students are currently flagged." />
+          ) : (
+            <div style={{ border: `1px solid ${G.border}`, borderRadius: 10, overflow: "hidden" }}>
+              {/* Table header */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 1fr 90px 80px", padding: "10px 16px", background: G.bg, borderBottom: `1px solid ${G.border}` }}>
+                {["Student", "Level", "Flagged For", "Expires", ""].map(h => (
+                  <span key={h} style={{ fontSize: 12, color: G.sub, fontWeight: 600 }}>{h}</span>
+                ))}
+              </div>
+              {flaggedStudents.map((s, i) => (
+                <div
+                  key={s.id}
+                  style={{
+                    display: "grid", gridTemplateColumns: "1fr 80px 1fr 90px 80px",
+                    alignItems: "center", padding: "12px 16px",
+                    borderBottom: i < flaggedStudents.length - 1 ? `1px solid ${G.border}` : "none",
+                    background: G.white,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>{s.name}</div>
+                    {s.email && s.email !== s.name && (
+                      <div style={{ fontSize: 11, color: G.sub, marginTop: 2 }}>{s.email}</div>
+                    )}
+                  </div>
+                  <div>
+                    <Pill label={s.level} color={G.orange} bg="#fff3e0" />
+                  </div>
+                  <div style={{ fontSize: 12, color: G.sub, paddingRight: 8 }}>{s.flaggedMissionTitle}</div>
+                  <div style={{ fontSize: 12, color: s.flagExpiry ? G.red : G.sub, fontWeight: s.flagExpiry ? 600 : 400 }}>
+                    {s.flagExpiry ? s.flagExpiry.toLocaleDateString("en-PH") : "—"}
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => handleUnflag(s)}
+                      disabled={!!unflaggingIds[s.id]}
+                      style={{
+                        fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
+                        border: `1px solid ${G.border}`, background: unflaggingIds[s.id] ? G.bg : G.white,
+                        color: unflaggingIds[s.id] ? G.sub : G.green, cursor: unflaggingIds[s.id] ? "default" : "pointer",
+                      }}
+                    >
+                      {unflaggingIds[s.id] ? "…" : "Unflag"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
 
       {showSidebar && selectedProject && (
         <ProjectDetailSidebar
@@ -697,6 +820,32 @@ export default function AdminDashboard() {
           onApprovalChange={() => {}}
         />
       )}
+    </div>
+  );
+}
+
+// ── EventRow (separated to keep render clean) ────────────────
+function EventRow({ event, onClick }) {
+  const dateStr = event.targetDate
+    ? new Date(event.targetDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "No date";
+  const imgSrc = event.coverUrl || event.img || null;
+  return (
+    <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #f1f3f4", cursor: "pointer" }}>
+      <div style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, overflow: "hidden", background: G.bg, border: `1px solid ${G.border}` }}>
+        {imgSrc
+          ? <img src={imgSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={e => { e.currentTarget.style.display = "none"; }} />
+          : null
+        }
+      </div>
+      <div>
+        <div style={{ fontWeight: 500, color: "#202124", fontSize: 14 }}>
+          {event.title || event.alt || "Untitled Event"}
+        </div>
+        <div style={{ fontSize: 12, color: "#5f6368", marginTop: 2 }}>
+          {dateStr}{event.location ? ` · ${event.location}` : ""}
+        </div>
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@
 
 .page-title{
   margin: 0 0 16px 0;
-  color: var(--navy);
+  color: #000;
   font-size: 22px;
   font-weight: 700;
 }
@@ -23,6 +23,38 @@
   gap: 18px;
   align-items: start;
   min-height: 100vh;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    min-height: unset;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    gap: 12px;
+  }
+
+  /* Reduce heavy inline padding on dashboard card sections */
+  .left-col > div > div:first-child,
+  .right-col > div > div:first-child {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .left-col > div > div:last-child,
+  .right-col > div > div:last-child {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* Events Today / Upcoming Events header row */
+  .right-col > div > div:first-child {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 /* Cards */
@@ -40,7 +72,7 @@
   padding: 10px 14px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--navy);
+  color: #000;
   border-bottom: 1px solid var(--border);
   border-radius: 12px 12px 0 0;
 }
@@ -52,10 +84,10 @@
 
 .card-title{
   font-weight: 700;
-  color: var(--navy);
+  color: #000;
   font-size: 14px;
   margin-bottom: 10px;
-  
+
 }
 
 .card-note{
@@ -142,7 +174,7 @@
 
 .panel-header-row{
    background: #c6d9f6;
-   color: #1f3b73;
+   color: #000;
 }
 
 /* Panel header with right-side actions */
@@ -396,7 +428,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #1f3b73;
+  color: #000;
 }
 
 /* card container */
@@ -427,7 +459,7 @@
   display:block;
   font-size: 11px;
   font-weight: 600;
-  color: #1f3b73;
+  color: #000;
   margin: 0 0 6px 4px;
 }
 
@@ -504,7 +536,7 @@
   align-items:flex-start;
   gap: 8px;
   font-size: 10.5px;
-  color: #1f3b73;
+  color: #000;
   line-height: 1.15;
 }
 
@@ -556,7 +588,7 @@
   border-radius: 999px;
   border: 1px solid #cbd5e1;
   background: #fff;
-  color: #1f3b73;
+  color: #000;
   font-weight: 800;
   font-size: 10px;      /* smaller “i” */
   cursor: default;
@@ -804,7 +836,7 @@
   color: #111827;
 }
 .cp-propertyCard.active .cp-propertyIcon svg {
-  color: var(--navy);
+  color: #000;
 }
 
 
@@ -931,7 +963,7 @@
 /* Number */
 .cp-indicatorIndex {
   font-weight: 700;
-  color: var(--navy);
+  color: #000;
   display: flex;
   align-items: center;
 }

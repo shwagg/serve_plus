@@ -32,12 +32,12 @@
 }
 .admin-main{ /* contains outlet pages */
   width: calc(100% - var(--sidebar-width));
-  padding: 24px 32px;
+  padding: 12px 32px;
   overflow-x: hidden;
   margin-top: calc(var(--header-height) + var(--context-height));
   margin-left: var(--sidebar-width);
   transition: margin-left 0.25s ease, width 0.25s ease;
-  background: #ffffff;
+  background: #f8f9fa;
   min-height: calc(100vh - var(--header-height) - var(--context-height));
 }
 
@@ -84,7 +84,7 @@
   padding: 6px;
   border-radius: 6px;
   cursor: pointer;
-  color: #234e7b;
+  color: #000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -166,7 +166,7 @@
   display: block;
   padding: 9px 16px 9px 20px;
   font-size: 14px;
-  color: #234e7b;
+  color: #000;
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
 }
@@ -209,7 +209,7 @@
 }
 
 .context-breadcrumb strong {
-  color: var(--navy);
+  color: #000;
 }
 
 .context-breadcrumb .sep {
@@ -229,19 +229,19 @@
 }
 
 .breadcrumb-link:hover {
-  color: var(--navy);
+  color: #000;
   text-decoration: underline;
 }
 
 .breadcrumb-link.breadcrumb-current {
   font-weight: 600;
-  color: var(--navy);
+  color: #000;
 }
 
 .breadcrumb-current-plain {
   font-size: 13px;
   font-weight: 600;
-  color: var(--navy);
+  color: #000;
 }
 
 /* ── Breadcrumb category dropdown ────────────────── */
@@ -330,7 +330,7 @@
 /* CSS Design for every pages in Outlet under Admin*/
 .page-title{
   max-width: 1200px;
-  color: var(--navy);
+  color: #000;
   font-size: 26px;
   font-weight: 600;
 }
@@ -351,7 +351,7 @@
   padding: 10px 14px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--navy);
+  color: #000;
   border-bottom: 1px solid var(--border);
   border-radius: 12px 12px 0 0;
 }
@@ -363,10 +363,10 @@
 
 .card-title{
   font-weight: 700;
-  color: var(--navy);
+  color: #000;
   font-size: 14px;
   margin-bottom: 10px;
-  
+
 }
 
 .card-note{
@@ -439,7 +439,7 @@
 
 .panel-header-row{
    background: #c6d9f6;
-   color: #1f3b73;
+   color: #000;
 }
 
 /* Panel header with right-side actions */
@@ -550,15 +550,9 @@
 }
 /* ── Mobile / Phone Responsive ──────────────────── */
 @media (max-width: 768px) {
-  /* Hide breadcrumbs to maximise vertical space */
+  /* Keep context strip visible — shows toggle + breadcrumbs above page heading */
   .admin-context-strip {
-    display: none;
-  }
-
-  /* Reposition toggle below header (context strip is gone) */
-  .sidebar-toggle-floating {
-    top: calc(var(--header-height) + 10px);
-    transform: none;
+    display: flex;
   }
 
   /* Sidebar slides over content (overlay), not push */
@@ -567,22 +561,22 @@
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.18);
   }
 
-  /* Backdrop that closes the sidebar when tapped */
+  /* Backdrop starts below both header and context strip */
   .mobile-sidebar-overlay {
     position: fixed;
     inset: 0;
-    top: var(--header-height);
+    top: calc(var(--header-height) + var(--context-height));
     background: rgba(0, 0, 0, 0.35);
     z-index: 1040;
   }
 
-  /* Main content fills full width; only header offset */
+  /* Main content: offset below header + context strip */
   .admin-main {
     width: 100% !important;
     margin-left: 0 !important;
-    margin-top: var(--header-height) !important;
+    margin-top: calc(var(--header-height) + var(--context-height)) !important;
     padding: 16px;
-    min-height: calc(100vh - var(--header-height));
+    min-height: calc(100vh - var(--header-height) - var(--context-height));
   }
 
   /* Content wrapper: full width on mobile */
