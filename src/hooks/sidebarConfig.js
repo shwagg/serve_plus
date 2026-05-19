@@ -28,7 +28,7 @@ export const adminLinks = [
     key: "project",
     label: "Project",
     children: [
-      { label: "Project Proposals", to: "/admin/projects" },
+      { label: "Project Proposals", to: "/admin/review-proposals" },
       { label: "Badges", to: "/admin/system/badges" },
     ],
   },
@@ -36,7 +36,7 @@ export const adminLinks = [
     key: "system",
     label: "System",
     children: [
-      { label: "Announcements & Banner", to: "/admin/system/announcements" },
+      { label: "Announcements", to: "/admin/system/announcements" },
       { label: "Audit Logs", to: "/admin/audit-logs" },
     ],
   },

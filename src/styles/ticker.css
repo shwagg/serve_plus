@@ -1,0 +1,86 @@
+/* ── ANNOUNCEMENT TICKER ─────────────────────────────────── */
+
+/* Full-page fixed strip (student page) */
+.announcement-ticker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
+  background: #ED4F13;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* Inline preview strip (admin page) */
+.ticker-preview-wrap {
+  height: 34px;
+  background: #ED4F13;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  width: 100%;
+}
+
+.ticker-label {
+  background: #30bdb7;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ticker-track {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ticker-content {
+  display: flex;
+  white-space: nowrap;
+  will-change: transform;
+  animation: ticker-scroll 25s linear infinite;
+}
+
+/* Preview runs faster so the motion is obvious in the small box */
+.ticker-preview-wrap .ticker-content {
+  animation-duration: 12s;
+}
+
+.ticker-text {
+  font-size: 12px;
+  padding: 0 48px;
+  letter-spacing: 0.02em;
+  color: #f1f5f9;
+}
+
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ── Push header + content down when ticker is active ──── */
+body.ticker-active .serve-header {
+  top: 34px;
+}
+body.ticker-active .header-fade-gradient {
+  top: 90px; /* 56 original + 34 ticker */
+}
+body.ticker-active .header-spacer {
+  height: 94px; /* 60 header + 34 ticker */
+}
+body.ticker-active .content-page {
+  height: calc(100dvh - 94px);
+}

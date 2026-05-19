@@ -11,6 +11,7 @@ import { getLevelInfo } from "../../hooks/rewardSystem";
 import Header from "../../components/Header";
 import "../../styles/student.css";
 import "../../styles/ui.css";
+import "../../styles/ticker.css";
 import { WestIcon, EastIcon, SearchRoundedIcon, CalendarTodayOutlinedIcon, PlaceOutlinedIcon, PeopleOutlinedIcon } from "../../components/icons";
 import mission1 from '../../assets/mission1.jpg';
 import ProposalTimeline from '../../components/ProposalTimeline';
@@ -99,6 +100,7 @@ const StudentHome = () => {
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
   const [missionSearch, setMissionSearch] = useState('');
+  const [tickerAnnouncements, setTickerAnnouncements] = useState([]);
 
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = landingPromos.length;
@@ -249,6 +251,30 @@ const StudentHome = () => {
     fetchProposals();
   }, [currentUser, proposalRefreshKey]);
 
+  // Fetch admin announcements for the ticker strip
+  useEffect(() => {
+    const fetchTicker = async () => {
+      try {
+        const q = query(collection(db, "adminAnnouncements"), orderBy("createdAt", "desc"));
+        const snap = await getDocs(q);
+        setTickerAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch {
+        // collection may not exist yet
+      }
+    };
+    fetchTicker();
+  }, []);
+
+  // Add/remove body class so header shifts down below the ticker
+  useEffect(() => {
+    if (tickerAnnouncements.length > 0) {
+      document.body.classList.add('ticker-active');
+    } else {
+      document.body.classList.remove('ticker-active');
+    }
+    return () => document.body.classList.remove('ticker-active');
+  }, [tickerAnnouncements]);
+
   const navigate = useNavigate();
   const location = useLocation();
   const missionsSectionRef = useRef(null);
@@ -314,15 +340,9 @@ const StudentHome = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Fetch all users, then filter for students (Firestore does not support compound queries with orderBy and where on different fields unless indexed)
-        const usersQuery = query(
-          collection(db, "users"),
-          orderBy("totalPoints", "desc"),
-          limit(50)
-        );
-        const usersSnap = await getDocs(usersQuery);
+        // Fetch all users without orderBy so documents missing `totalPoints` are not excluded
+        const usersSnap = await getDocs(collection(db, "users"));
 
-        // Only include users with role === 'student'
         const leaderboardData = usersSnap.docs
           .map(userDoc => {
             const userData = userDoc.data();
@@ -454,6 +474,13 @@ const StudentHome = () => {
     [missionCards, enrolledMissions]
   );
 
+  const tickerText = useMemo(() =>
+    tickerAnnouncements
+      .map(a => a.title + (a.body ? ` — ${a.body}` : ''))
+      .join('  ◆  '),
+    [tickerAnnouncements]
+  );
+
   const getMissionProgress = useCallback((missionId) => {
     const detail = enrollmentDetails[missionId];
     if (!detail?.progress) return 0;
@@ -468,6 +495,17 @@ const StudentHome = () => {
 
   return (
     <>
+    {tickerAnnouncements.length > 0 && (
+      <div className="announcement-ticker" role="marquee" aria-label="Announcements">
+        <span className="ticker-label">📢 News</span>
+        <div className="ticker-track">
+          <div className="ticker-content">
+            <span className="ticker-text">{tickerText}</span>
+            <span className="ticker-text" aria-hidden="true">{tickerText}</span>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="full-page">
       {/* Logout Popup */}
       {showLogoutPopup && (
@@ -924,7 +962,7 @@ const StudentHome = () => {
           {selectedProposalForView.status === 'for_approval' ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1f3b73' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#000' }}>
                   {selectedProposalForView.projectType === 'sl' ? 'ðŸ" Service Learning Proposal' : 'ðŸ" Community Engagement Proposal'}
                 </h3>
                 <button
