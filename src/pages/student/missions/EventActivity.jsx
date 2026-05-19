@@ -427,20 +427,46 @@ export default function EventActivity() {
           const participantSnap = await getDoc(participantRef);
           if (!participantSnap.exists()) continue;
           const data = participantSnap.data();
+          const reflection = String(data.reflection || '').trim();
+          if (!reflection) continue;
+
           const pending = Number(data.pendingPoints) || 0;
-          if (!String(data.reflection || '').trim() || pending <= 0) continue;
+          const earned = Number(data.pointsEarned) || 0;
+
+          let pointsToAward = 0;
+
+          if (pending > 0) {
+            // Standard case: pendingPoints were stored at reflection time
+            pointsToAward = pending;
+          } else if (earned === 0 && isEnrollmentClosed(task)) {
+            // Reflection was submitted before enrollment closed — no pendingPoints were stored.
+            // Now that enrollment is closed and all requirements are done, calculate and award.
+            if (task.type === 'grouped') {
+              pointsToAward = Number(task.points) || 0;
+            } else {
+              const participantsSnap = await getDocs(
+                collection(db, "missions", id, "task", task.id, "participants")
+              );
+              const sortedParticipants = [...participantsSnap.docs].sort(compareParticipantsByEnrollment);
+              const positionIndex = sortedParticipants.findIndex(p => p.id === user.uid);
+              const position = positionIndex >= 0 ? positionIndex + 1 : participantsSnap.docs.length;
+              pointsToAward = calculateWeightedTaskPoints(task.points || 0, position, participantsSnap.docs.length);
+            }
+          }
+
+          if (pointsToAward <= 0) continue;
 
           await updateDoc(participantRef, {
-            pointsEarned: pending,
+            pointsEarned: pointsToAward,
             pendingPoints: deleteField(),
           });
           await setDoc(
             doc(db, "missions", id, "volunteer", user.uid),
-            { pointsEarned: increment(pending) },
+            { pointsEarned: increment(pointsToAward) },
             { merge: true },
           );
-          await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(pending) });
-          totalAdded += pending;
+          await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(pointsToAward) });
+          totalAdded += pointsToAward;
         } catch (e) {
           console.warn("Failed to award pending task points for task", task.id, e);
         }
@@ -776,6 +802,7 @@ export default function EventActivity() {
         await updateDoc(volunteerRef, {
           pointsEarned: newTotal,
         });
+        await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(pointsToAward) });
         // Update the displayed total
         setTotalPointsEarned(newTotal);
 
@@ -1707,7 +1734,7 @@ export default function EventActivity() {
                     border: "1.5px solid #1ea7fd",
                     marginBottom: 12,
                     marginTop: 4,
-                    color: "#234e7b",
+                    color: "#000",
                     background: "#fff",
                   }}
                   placeholder=""
@@ -1726,7 +1753,7 @@ export default function EventActivity() {
                     minHeight: 100,
                     marginBottom: 12,
                     marginTop: 4,
-                    color: "#234e7b",
+                    color: "#000",
                     background: "#fff",
                   }}
                   placeholder=""
@@ -1751,7 +1778,7 @@ export default function EventActivity() {
                         padding: 8,
                         borderRadius: 6,
                         border: "1.5px solid #1ea7fd",
-                        color: "#234e7b",
+                        color: "#000",
                         background: "#fff",
                         textAlign: "left",
                         fontWeight: 500,
@@ -1855,7 +1882,7 @@ export default function EventActivity() {
                         padding: 8,
                         borderRadius: 6,
                         border: "1.5px solid #1ea7fd",
-                        color: "#234e7b",
+                        color: "#000",
                         background: "#fff",
                         textAlign: "left",
                         fontWeight: 500,
@@ -1959,7 +1986,7 @@ export default function EventActivity() {
                         padding: 8,
                         borderRadius: 6,
                         border: "1.5px solid #1ea7fd",
-                        color: "#234e7b",
+                        color: "#000",
                         background: "#fff",
                         textAlign: "left",
                         fontWeight: 500,
@@ -2081,7 +2108,7 @@ export default function EventActivity() {
                         border: "1.5px solid #1ea7fd",
                         minHeight: 40,
                         marginBottom: 4,
-                        color: "#234e7b",
+                        color: "#000",
                         background: "#fff",
                       }}
                       placeholder=""
@@ -2101,7 +2128,7 @@ export default function EventActivity() {
                         border: "1.5px solid #1ea7fd",
                         minHeight: 40,
                         marginBottom: 4,
-                        color: "#234e7b",
+                        color: "#000",
                         background: "#fff",
                       }}
                       placeholder=""
@@ -2121,7 +2148,7 @@ export default function EventActivity() {
                         border: "1.5px solid #1ea7fd",
                         minHeight: 40,
                         marginBottom: 4,
-                        color: "#234e7b",
+                        color: "#000",
                         background: "#fff",
                       }}
                       placeholder=""
@@ -2351,7 +2378,40 @@ export default function EventActivity() {
               const data = volunteerSnap.data();
               progress = data.progress || {};
               pointsEarned = data.pointsEarned || 0;
-              setRequirementBonusEarned(data.requirementBonus || {});
+              const requirementBonus = data.requirementBonus || {};
+              setRequirementBonusEarned(requirementBonus);
+
+              // Backfill any missing requirement bonuses for already-completed requirements.
+              // Guards against old records written before the bonus fields were added.
+              const bonusBackfill = {};
+              let bonusBackfillPoints = 0;
+              if (preSurveySubmitted && !requirementBonus.preSurvey) {
+                bonusBackfill['requirementBonus.preSurvey'] = 5;
+                bonusBackfillPoints += 5;
+              }
+              if ((progress.attendance === 'present') && !requirementBonus.attendance) {
+                bonusBackfill['requirementBonus.attendance'] = 5;
+                bonusBackfillPoints += 5;
+              }
+              if ((progress.postSurvey === 'submitted') && !requirementBonus.postSurvey) {
+                bonusBackfill['requirementBonus.postSurvey'] = 5;
+                bonusBackfillPoints += 5;
+              }
+              if (Object.keys(bonusBackfill).length > 0) {
+                try {
+                  await updateDoc(volunteerRef, bonusBackfill);
+                  await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(bonusBackfillPoints) });
+                  setRequirementBonusEarned(prev => ({
+                    ...prev,
+                    ...Object.fromEntries(
+                      Object.entries(bonusBackfill).map(([k, v]) => [k.replace('requirementBonus.', ''), v])
+                    ),
+                  }));
+                } catch (e) {
+                  console.warn('Failed to backfill requirement bonuses:', e);
+                }
+              }
+
               const reviewStatus = data.consentSubmission?.reviewStatus || "";
               const hasConsentFile = Boolean(data.consentSubmission?.fileUrl);
               setConsentReviewStatus(reviewStatus);
@@ -2364,6 +2424,16 @@ export default function EventActivity() {
               if (reviewStatus === "approved") {
                 consentSubmitted = true;
                 consentStatus = "verified";
+
+                // Award 5 pts if admin approved but bonus was never recorded at submission time
+                if (!data.requirementBonus?.consent) {
+                  try {
+                    await updateDoc(volunteerRef, { "requirementBonus.consent": 5 });
+                    await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                  } catch (e) {
+                    console.warn("Failed to award consent approval bonus:", e);
+                  }
+                }
               } else if (reviewStatus === "rejected") {
                 consentSubmitted = false;
                 consentStatus = "rejected";
@@ -2447,6 +2517,68 @@ export default function EventActivity() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
+  }, [id, authChecked]);
+
+  // Real-time listener: update consent status when admin approves or rejects
+  useEffect(() => {
+    if (!authChecked) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    let isFirstFire = true;
+    const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+
+    const unsubscribeConsent = onSnapshot(volunteerRef, async (snap) => {
+      if (!snap.exists()) return;
+
+      if (isFirstFire) {
+        isFirstFire = false;
+        return;
+      }
+
+      const data = snap.data();
+      const reviewStatus = data.consentSubmission?.reviewStatus || "";
+      const hasConsentFile = Boolean(data.consentSubmission?.fileUrl);
+
+      setConsentReviewStatus(reviewStatus);
+      if (hasConsentFile) setConsentFileUrl(data.consentSubmission.fileUrl);
+
+      let consentStatus = "";
+      let consentIsSubmitted = false;
+
+      if (reviewStatus === "approved") {
+        consentIsSubmitted = true;
+        consentStatus = "verified";
+
+        if (!data.requirementBonus?.consent) {
+          try {
+            await updateDoc(volunteerRef, { "requirementBonus.consent": 5 });
+            await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+            setRequirementBonusEarned(prev => ({ ...prev, consent: 5 }));
+            window.showToast?.("Consent approved! +5 pts earned.", "success");
+          } catch (e) {
+            console.warn("Failed to award consent approval bonus:", e);
+            window.showToast?.("Your consent form has been approved!", "success");
+          }
+        } else {
+          window.showToast?.("Your consent form has been approved!", "success");
+        }
+      } else if (reviewStatus === "rejected") {
+        consentIsSubmitted = false;
+        consentStatus = "rejected";
+        window.showToast?.("Your consent form was rejected. Please re-upload.", "error");
+      } else if (hasConsentFile) {
+        consentIsSubmitted = true;
+        consentStatus = "submitted";
+      } else {
+        consentStatus = data.progress?.consent || "";
+      }
+
+      setConsentSubmitted(consentIsSubmitted);
+      setVolunteerProgress(prev => prev ? { ...prev, consent: consentStatus } : prev);
+    });
+
+    return () => unsubscribeConsent();
   }, [id, authChecked]);
 
   useEffect(() => {
@@ -3216,6 +3348,14 @@ export default function EventActivity() {
                                   {hasSubmittedJournal ? (
                                     <div className="journal-submit-row">
                                       <span className="journal-submitted-badge">Submitted</span>
+                                      {(() => {
+                                        const j = journalsForActivity[0];
+                                        const earned = Number(j?.pointsEarned) || 0;
+                                        const pending = Number(j?.pendingPoints) || 0;
+                                        if (earned > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>+{earned} pts earned</span>;
+                                        if (pending > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>{pending} pts pending</span>;
+                                        return null;
+                                      })()}
                                       <>
                                         <button onClick={() => handleEditJournal(journalsForActivity[0])} className="journal-edit-icon-btn" title={isGrouped ? 'Edit group reflection' : 'Edit reflection'}>
                                           <ModeRoundedIcon sx={{ fontSize: 15 }} />

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, updateDoc, deleteField, increment } from "firebase/firestore";
 import { computeFinalPoints } from "../../hooks/rewardSystem";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
 import { createNotification } from "../../utils/notificationUtils";
+import { issueCertificate } from "../../utils/certificateUtils";
 
 function toTitleCase(str) {
   if (!str) return str;
@@ -47,9 +48,13 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
   const [loading, setLoading] = useState(true);
   const [isFeedbackActive, setIsFeedbackActive] = useState(true);
   const [missionAvgRating, setMissionAvgRating] = useState(0);
+  const [missionLocation, setMissionLocation] = useState("");
+  const [missionDate, setMissionDate] = useState(null);
   const [showAnswerModal, setShowAnswerModal] = useState(false);
   const [answerModalTitle, setAnswerModalTitle] = useState("");
   const [answerModalData, setAnswerModalData] = useState(null);
+  const [issuingCertFor, setIssuingCertFor] = useState(null);
+  const [isReleasingFor, setIsReleasingFor] = useState(null);
 
   useEffect(() => {
     if (!missionId) return;
@@ -64,6 +69,9 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
       const missionData = missionSnap.data() || {};
       setIsFeedbackActive(missionData?.feedback?.isActive !== false);
       setMissionAvgRating(missionData?.feedback?.avgRating || 0);
+      setMissionLocation(missionData.location || "");
+      const td = missionData.targetDate;
+      setMissionDate(td?.toDate ? td.toDate() : td ? new Date(td) : null);
 
       const snap = await getDocs(collection(db, "missions", missionId, "volunteer"));
       const usersSnap = await getDocs(collection(db, "users"));
@@ -129,9 +137,23 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
   const handleConsentReviewChange = async (volunteerId, value) => {
     try {
       const selectedVolunteer = volunteers.find(v => v.id === volunteerId);
-      await updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId), {
-        "consentSubmission.reviewStatus": value,
-      });
+      const volunteerDocRef = doc(db, "missions", missionId, "volunteer", volunteerId);
+
+      // Check if consent bonus needs to be revoked before updating status
+      let shouldRevokeBonus = false;
+      if (value === "rejected") {
+        const volunteerDocSnap = await getDoc(volunteerDocRef);
+        shouldRevokeBonus = volunteerDocSnap.exists() && !!volunteerDocSnap.data().requirementBonus?.consent;
+      }
+
+      const updateData = { "consentSubmission.reviewStatus": value };
+      if (shouldRevokeBonus) updateData["requirementBonus.consent"] = deleteField();
+
+      await updateDoc(volunteerDocRef, updateData);
+
+      if (shouldRevokeBonus) {
+        await updateDoc(doc(db, "users", volunteerId), { totalPoints: increment(-5) });
+      }
       logAudit({
         action: "VOLUNTEER_CONSENT_REVIEW_UPDATED",
         category: "event",
@@ -185,32 +207,37 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
   return (
     <>
       {isFeedbackActive && (
-        <div style={{ background: "#fff3cd", color: "#856404", padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontWeight: 600, textAlign: "center" }}>
-          Community feedback form is still active. Points cannot be released yet.
+        <div style={{ background: "#e8f0fe", color: "#1a73e8", padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontWeight: 600, border: "1px solid #c5d9fd", fontSize: "0.85rem" }}>
+          ⚠ Community feedback form is still active. Points cannot be released yet.
         </div>
       )}
 
-      <div className="table-scroll-wrapper">
-        <table className="submission-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 8px #0001" }}>
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8eaed" }}>
+        <div style={{ width: "100%", overflowX: "auto" }}>
+        <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: "0.84rem" }}>
           <thead>
-            <tr style={{ background: "#f3f4f8", color: "#23335b", borderBottom: "2px solid #e0e4ea" }}>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "left", fontSize: "1.05rem" }}>Volunteer Name / Participant</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Role</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Attendance</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Pre-Activity Survey</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Activity Consent Form</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Post-Activity Form</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Participation Factor</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Completion %</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}>Points</th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, borderRight: "1px solid #e0e4ea", textAlign: "center", fontSize: "1.05rem" }}> </th>
-              <th style={{ padding: "14px 10px", fontWeight: 700, textAlign: "center", fontSize: "1.05rem" }}>Certificate</th>
+            <tr style={{ borderBottom: "1.5px solid #e8eaed" }}>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>
+                Volunteer
+                <span style={{ marginLeft: 8, background: "#f1f3f4", color: "#5f6368", borderRadius: 99, fontSize: "0.68rem", padding: "2px 7px", fontWeight: 600 }}>
+                  {volunteers.length}
+                </span>
+              </th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Role</th>
+              <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Attendance</th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Pre-Survey</th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Consent Form</th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Post-Survey</th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Participation</th>
+              <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Done %</th>
+              <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Points</th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Release</th>
             </tr>
           </thead>
           <tbody>
             {volunteers.length === 0 ? (
               <tr>
-                <td colSpan={11} style={{ textAlign: "center", padding: 24, color: "#888", background: "#fff" }}>No submissions found.</td>
+                <td colSpan={10} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>No submissions found.</td>
               </tr>
             ) : volunteers.map((v, idx) => {
               const rawRoles = v.preSurveyAnswers?.engagement?.participation || [];
@@ -240,54 +267,64 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                 !v.releasedAt;
 
               return (
-                <tr key={v.id} style={{ background: idx % 2 === 0 ? "#f8f9fb" : "#fff", color: "#23335b" }}>
-                  <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "left", fontWeight: 500 }}>{v.name}</td>
-                  <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center", fontWeight: 500 }}>
-                    {rawRoles.map(r => r.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())).join(", ") || "-"}
+                <tr key={v.id} style={{ borderBottom: idx < volunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
+                  <td style={{ padding: "12px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                        background: "#f1f3f4", color: "#5f6368",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontWeight: 700, fontSize: "0.82rem",
+                      }}>
+                        {(v.name || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontWeight: 600, color: "#202124" }}>{v.name}</span>
+                    </div>
                   </td>
-                  <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center" }}>
-                    {v.progress?.attendance === "present" ? "Present" : ""}
+                  <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>
+                    {rawRoles.map(r => r.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())).join(", ") || "—"}
                   </td>
-                  <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center" }}>
+                  <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
+                    {v.progress?.attendance === "present"
+                      ? <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>✓ Present</span>
+                      : <span style={{ color: "#80868b", fontSize: "0.82rem" }}>—</span>}
+                  </td>
+                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     {v.preSurveyAnswers
-                      ? <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #30bdb7", background: "#f3f4f8", color: "#23335b", cursor: "pointer", fontWeight: 600 }} onClick={() => handleViewAnswers(v, "pre")}>View Answers</button>
-                      : ""}
+                      ? <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1a73e8", background: "#fff", color: "#1a73e8", cursor: "pointer", fontWeight: 600, fontSize: "0.78rem", whiteSpace: "nowrap" }} onClick={() => handleViewAnswers(v, "pre")}>View</button>
+                      : <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>—</span>}
                   </td>
-                  <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center" }}>
+                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     {hasConsentSubmission ? (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                         <select
-                          className="participation-select"
                           value={consentReviewStatus}
                           disabled={!!v.releasedAt}
                           onChange={e => handleConsentReviewChange(v.id, e.target.value)}
+                          style={{ padding: "4px 8px", border: "1px solid #dadce0", borderRadius: 6, fontSize: "0.78rem", fontFamily: "inherit", color: "#202124", background: "#fff", cursor: !!v.releasedAt ? "not-allowed" : "pointer", maxWidth: 110 }}
                         >
                           <option value="">Select</option>
                           <option value="approved">Approved</option>
                           <option value="rejected">Rejected</option>
                         </select>
-                        <a
-                          href={v.consentSubmission.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "#30bdb7", fontSize: "0.6rem", fontWeight: 600, textDecoration: "none", lineHeight: 1.1 }}
-                        >
+                        <a href={v.consentSubmission.fileUrl} target="_blank" rel="noreferrer"
+                          style={{ color: "#1a73e8", fontSize: "0.72rem", fontWeight: 600, textDecoration: "none" }}>
                           View PDF
                         </a>
                       </div>
-                    ) : ""}
+                    ) : <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>—</span>}
                   </td>
-                  <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center" }}>
+                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     {v.postSurveyAnswers
-                      ? <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #30bdb7", background: "#f3f4f8", color: "#23335b", cursor: "pointer", fontWeight: 600 }} onClick={() => handleViewAnswers(v, "post")}>View Answers</button>
-                      : ""}
+                      ? <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1a73e8", background: "#fff", color: "#1a73e8", cursor: "pointer", fontWeight: 600, fontSize: "0.78rem", whiteSpace: "nowrap" }} onClick={() => handleViewAnswers(v, "post")}>View</button>
+                      : <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>—</span>}
                   </td>
-                  <td className="submission-table-cell">
+                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     <select
-                      className="participation-select"
                       value={v.participationStatus || ""}
                       disabled={!!v.releasedAt}
                       onChange={e => handleParticipationChange(v.id, e.target.value)}
+                      style={{ padding: "4px 8px", border: "1px solid #dadce0", borderRadius: 6, fontSize: "0.78rem", fontFamily: "inherit", color: "#202124", background: "#fff", cursor: !!v.releasedAt ? "not-allowed" : "pointer", maxWidth: 110 }}
                     >
                       <option value="">Select</option>
                       <option value="verified">Verified</option>
@@ -296,66 +333,127 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                       <option value="no_show">No-show</option>
                     </select>
                   </td>
-                  <td style={{ padding: "12px 10px", borderBottom: "1px solid #e0e4ea", borderRight: "1px solid #e0e4ea", textAlign: "center", fontWeight: 600 }}>
+                  <td style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, background: "#f8f9fa", color: individualCompletion === 100 ? "#137333" : "#202124" }}>
                     {individualCompletion}%
                   </td>
-                  <td className="submission-table-cell">
+                  <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
                     {v.releasedAt
-                      ? v.pointsEarned
+                      ? <span style={{ fontWeight: 700, color: "#202124" }}>{v.pointsEarned}</span>
                       : individualCompletion === 100 && previewPoints !== null
-                        ? <span title={breakdown ? `Base: ${breakdown.base} | ×${breakdown.multiplier} | Factor: ${breakdown.factor}` : ""} style={{ cursor: "help" }}>{previewPoints}</span>
-                        : "-"}
+                        ? <span title={breakdown ? `Base: ${breakdown.base} | ×${breakdown.multiplier} | Factor: ${breakdown.factor}` : ""} style={{ cursor: "help", fontWeight: 600, color: "#5f6368" }}>{previewPoints}</span>
+                        : <span style={{ color: "#9aa0a6" }}>—</span>}
                   </td>
-                  <td className="submission-table-cell" style={{ textAlign: "center" }}>
+                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     {v.releasedAt ? (
-                      <span style={{ fontWeight: 700, color: "#555" }}>Released</span>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                        <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.8rem" }}>✓ Released</span>
+                        {!v.certIssuedAt && (
+                          <button
+                            disabled={issuingCertFor === v.id}
+                            style={{ padding: "3px 8px", background: issuingCertFor === v.id ? "#f1f3f4" : "#fff", color: "#1a73e8", border: "1px solid #1a73e8", borderRadius: 6, fontWeight: 600, fontSize: "0.72rem", cursor: issuingCertFor === v.id ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}
+                            onClick={async () => {
+                              setIssuingCertFor(v.id);
+                              try {
+                                const certDate = missionDate || new Date();
+                                const certDay = String(certDate.getDate());
+                                const certMonth = certDate.toLocaleString("en-US", { month: "long" });
+                                const certYear = String(certDate.getFullYear());
+                                await issueCertificate({
+                                  userId: v.id,
+                                  recipient: v.name,
+                                  course: missionTitle || "",
+                                  date: `${certMonth} ${certDay}, ${certYear}`,
+                                  loc: missionLocation,
+                                  day: certDay,
+                                  month: certMonth,
+                                  year: certYear,
+                                });
+                                await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { certIssuedAt: new Date().toISOString() });
+                                setVolunteers(prev => prev.map(vol => vol.id === v.id ? { ...vol, certIssuedAt: new Date().toISOString() } : vol));
+                                showToast("Certificate issued successfully!");
+                              } catch (err) {
+                                showToast("Failed to issue certificate: " + err.message);
+                              } finally {
+                                setIssuingCertFor(null);
+                              }
+                            }}
+                          >
+                            {issuingCertFor === v.id ? "Issuing…" : "Issue Cert"}
+                          </button>
+                        )}
+                        {v.certIssuedAt && (
+                          <span style={{ color: "#1a73e8", fontSize: "0.72rem", fontWeight: 600 }}>🎓 Cert issued</span>
+                        )}
+                      </div>
                     ) : isReadyToRelease ? (
                       <button
-                        style={{ background: "#30bdb7", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontWeight: 600, cursor: "pointer" }}
+                        disabled={isReleasingFor === v.id}
+                        style={{ padding: "4px 12px", background: isReleasingFor === v.id ? "#e8f0fe" : "#1a73e8", color: isReleasingFor === v.id ? "#1a73e8" : "#fff", border: isReleasingFor === v.id ? "1px solid #1a73e8" : "none", borderRadius: 6, fontWeight: 600, fontSize: "0.78rem", cursor: isReleasingFor === v.id ? "not-allowed" : "pointer" }}
                         onClick={async () => {
+                          setIsReleasingFor(v.id);
                           try {
                             const finalPoints = await releaseVolunteerPoints(missionId, v.id);
                             await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { completionStatus: "complete" });
                             setVolunteers(prev => prev.map(vol => vol.id === v.id ? { ...vol, pointsEarned: finalPoints, releasedAt: new Date().toISOString() } : vol));
+
+                            const certDate = missionDate || new Date();
+                            const certDay = String(certDate.getDate());
+                            const certMonth = certDate.toLocaleString("en-US", { month: "long" });
+                            const certYear = String(certDate.getFullYear());
+                            const certDateStr = `${certMonth} ${certDay}, ${certYear}`;
+
+                            try {
+                              await issueCertificate({
+                                userId: v.id,
+                                recipient: v.name,
+                                course: missionTitle || "",
+                                date: certDateStr,
+                                loc: missionLocation,
+                                day: certDay,
+                                month: certMonth,
+                                year: certYear,
+                              });
+                              await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { certIssuedAt: new Date().toISOString() });
+                              setVolunteers(prev => prev.map(vol => vol.id === v.id ? { ...vol, certIssuedAt: new Date().toISOString() } : vol));
+                            } catch {
+                              showToast("Points released, but certificate could not be generated automatically.");
+                            }
                           } catch (err) {
                             showToast(err.message);
+                          } finally {
+                            setIsReleasingFor(null);
                           }
                         }}
-                      >Release</button>
+                      >{isReleasingFor === v.id ? "Releasing…" : "Release"}</button>
                     ) : (
-                      <span style={{ color: "#c0c0c0", fontWeight: 600 }}>Release</span>
+                      <span style={{ color: "#dadce0", fontWeight: 600, fontSize: "0.8rem" }}>—</span>
                     )}
-                  </td>
-                  <td className="submission-table-cell" style={{ textAlign: "center" }}>
-                    <button
-                      style={{ background: "#1a3764", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontWeight: 600, cursor: "pointer" }}
-                      onClick={() => navigate("/certificate-generator", { state: { userID: v.id, recipient: v.name, course: missionTitle || "" } })}
-                    >Certificate</button>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Answer Modal */}
       {showAnswerModal && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(44,62,80,0.18)", zIndex: 11000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 11000, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={() => setShowAnswerModal(false)}
         >
           <div
-            style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 400, maxWidth: "90vw", boxShadow: "0 2px 16px #0002", position: "relative", color: "#000", maxHeight: "80vh", overflowY: "auto" }}
+            style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 400, maxWidth: "90vw", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", position: "relative", color: "#202124", maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}
           >
-            <button style={{ position: "absolute", top: 14, right: 14, background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer" }} onClick={() => setShowAnswerModal(false)}>✕</button>
-            <h2 style={{ textAlign: "center", marginBottom: 24, color: "#000" }}>{answerModalTitle}</h2>
+            <button style={{ position: "absolute", top: 14, right: 14, background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer" }} onClick={() => setShowAnswerModal(false)}>✕</button>
+            <h2 style={{ textAlign: "center", marginBottom: 24, color: "#202124", fontSize: "1.05rem", fontWeight: 700 }}>{answerModalTitle}</h2>
             {answerModalData ? (
               <div style={{ maxWidth: 600, margin: "0 auto" }}>
                 {answerModalTitle.startsWith("Pre-Activity") && (
                   <div>
-                    <h3 style={{ fontWeight: 700, color: "#23235b", fontSize: "1.08rem", marginBottom: 18 }}>Pre-Activity Survey</h3>
+                    <h3 style={{ fontWeight: 700, color: "#202124", fontSize: "1rem", marginBottom: 18 }}>Pre-Activity Survey</h3>
                     <div style={{ marginBottom: 12 }}><b>Name:</b> {answerModalData.respondent?.name || ""}</div>
                     <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ""}</div>
                     <div style={{ marginBottom: 12 }}><b>Program:</b> {answerModalData.respondent?.program || ""}</div>
@@ -372,7 +470,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                       {PRE_LIKERT.map((q, i) => (
                         <li key={i} style={{ marginBottom: 6 }}>
                           <span>{q}</span><br />
-                          <span style={{ color: "#30bdb7", fontWeight: 600 }}>Answer: {answerModalData.likert?.[`q${i + 1}`]}</span>
+                          <span style={{ color: "#1a73e8", fontWeight: 600 }}>Answer: {answerModalData.likert?.[`q${i + 1}`]}</span>
                         </li>
                       ))}
                     </ol>
@@ -380,7 +478,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                 )}
                 {answerModalTitle.startsWith("Post-Activity") && (
                   <div>
-                    <h3 style={{ fontWeight: 700, color: "#23235b", fontSize: "1.08rem", marginBottom: 18 }}>Post-Activity Survey</h3>
+                    <h3 style={{ fontWeight: 700, color: "#202124", fontSize: "1rem", marginBottom: 18 }}>Post-Activity Survey</h3>
                     <div style={{ marginBottom: 12 }}><b>Name:</b> {answerModalData.respondent?.name || ""}</div>
                     <div style={{ marginBottom: 12 }}><b>College/Department/Organization:</b> {answerModalData.respondent?.college || ""}</div>
                     <div style={{ marginBottom: 12 }}><b>Program:</b> {answerModalData.respondent?.program || ""}</div>
@@ -396,7 +494,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                       {POST_LIKERT.map((q, i) => (
                         <li key={i} style={{ marginBottom: 6 }}>
                           <span>{q}</span><br />
-                          <span style={{ color: "#30bdb7", fontWeight: 600 }}>Answer: {answerModalData.likert?.[`q${i + 1}`]}</span>
+                          <span style={{ color: "#1a73e8", fontWeight: 600 }}>Answer: {answerModalData.likert?.[`q${i + 1}`]}</span>
                         </li>
                       ))}
                     </ol>
@@ -404,7 +502,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                 )}
               </div>
             ) : (
-              <div style={{ textAlign: "center", color: "#888" }}>No answers found.</div>
+              <div style={{ textAlign: "center", color: "#9aa0a6" }}>No answers found.</div>
             )}
           </div>
         </div>

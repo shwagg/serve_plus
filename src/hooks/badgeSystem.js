@@ -66,6 +66,9 @@ async function computeBadgeStats(userId) {
  */
 export const checkAndAssignBadges = async (userId) => {
   try {
+    const userSnap = await getDoc(doc(db, "users", userId));
+    if (!userSnap.exists() || userSnap.data().role !== "student") return [];
+
     const stats = await computeBadgeStats(userId);
     const userBadgesRef = collection(db, "users", userId, "badges");
     const existingSnap = await getDocs(userBadgesRef);
