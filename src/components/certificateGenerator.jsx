@@ -1,55 +1,11 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from "react";
-import { PDFDocument } from "pdf-lib";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { app, db } from "../firebaseConfig";
+import { db } from "../firebaseConfig";
 import { doc, collection, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import QRCode from "qrcode";
 import { showToast } from "../utils/toast";
+import { generateCertificateId, buildCertificateBlob, issueCertificate } from "../utils/certificateUtils";
 import "./certificateGenerator.css";
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function generateCertificateId() {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-async function buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId }) {
-  const response = await fetch("/assets/SERVE+ Certificate.pdf");
-  if (!response.ok) throw new Error("Failed to fetch certificate template PDF.");
-  const existingPdfBytes = await response.arrayBuffer();
-  const pdfDoc = await PDFDocument.load(existingPdfBytes);
-  const form = pdfDoc.getForm();
-
-  form.getTextField("text_1jfkq").setText(recipient || "");
-  form.getTextField("text_2rpme").setText(course || "");
-  form.getTextField("text_3ptnr").setText(date || "");
-  form.getTextField("text_4kyth").setText(loc || "");
-  form.getTextField("text_5nqbl").setText(day || "");
-  form.getTextField("text_6iyng").setText(month || "");
-  form.getTextField("text_7dgil").setText(year || "");
-  form.getTextField("text_10gqgh").setText(certId || "");
-  form.flatten();
-
-  const qrValue = JSON.stringify({ recipient, course, date, loc, day, month, year, certificateId: certId });
-  const qrDataUrl = await QRCode.toDataURL(qrValue, {
-    margin: 1,
-    width: 120,
-    color: { dark: "#000", light: "#0000" },
-  });
-  const pngImageBytes = await fetch(qrDataUrl).then((r) => r.arrayBuffer());
-  const pngImage = await pdfDoc.embedPng(pngImageBytes);
-  const page = pdfDoc.getPages()[0];
-  page.drawImage(pngImage, { x: 382, y: 55, width: 90, height: 90 });
-
-  const pdfBytes = await pdfDoc.save();
-  return new Blob([pdfBytes], { type: "application/pdf" });
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -141,28 +97,7 @@ export default function CertificateGenerator() {
       return;
     }
     try {
-      const safeRecipient = (recipient || "recipient").replace(/[^a-zA-Z0-9_\-]/g, "_");
-      const safeCourse = (course || "event").replace(/[^a-zA-Z0-9_\-]/g, "_");
-      const fileName = `${safeRecipient}_${safeCourse}.pdf`;
-
-      const certData = { fileName, recipient, course, date, loc, day, month, year, certificateId: certificateId, releasedAt: serverTimestamp() };
-      const certDocRef = await addDoc(collection(doc(db, "users", userID), "certificates"), certData);
-
-      const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId: certificateId });
-      const storage = getStorage(app);
-      const storageRef = ref(storage, `event-certificates/${userID}/${fileName}`);
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-      await updateDoc(certDocRef, { downloadURL });
-
-      await addDoc(collection(doc(db, "users", userID), "notifications"), {
-        type: "certificate_obtained",
-        message: `Congratulations! A certificate has been obtained for event "${course}".`,
-        event: course,
-        createdAt: serverTimestamp(),
-        read: false,
-      });
-
+      await issueCertificate({ userId: userID, recipient, course, date, loc, day, month, year });
       showToast("Certificate released to volunteer and recorded successfully!");
     } catch (err) {
       showToast("Failed to release certificate: " + err.message);

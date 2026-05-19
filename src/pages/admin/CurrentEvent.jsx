@@ -15,6 +15,7 @@ import { showToast, showConfirm } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
 
 import MissionSubmissionsTable from "./MissionSubmissionsTable";
+import { computeAverageRating, getProgramMultiplier } from "../../hooks/rewardSystem";
 
 // ── helpers ───────────────────────────────────────────────────────────
 function getDateUrgency(targetDate) {
@@ -33,45 +34,72 @@ function getDateUrgency(targetDate) {
 }
 
 // ── list card ─────────────────────────────────────────────────────────
-function EventCard({ mission, onClick }) {
+function EventCard({ mission, onClick, onToggleStatus }) {
   const urgency = getDateUrgency(mission.targetDate);
+  const typeLabel = mission.projectType === "sl" ? "Service Learning"
+    : mission.projectType === "ce" ? "Community Engagement" : "Event";
+
+  const handleStatusClick = onToggleStatus
+    ? (e) => { e.stopPropagation(); onToggleStatus(mission); }
+    : undefined;
+
   return (
     <div className="rp-card ce-event-card" onClick={onClick} role="button" tabIndex={0}
       onKeyDown={e => (e.key === "Enter" || e.key === " ") && onClick()}>
 
-      <div className="rp-card-top">
-        <div className="rp-card-tags">
-          <span className="rp-type-tag">
-            {mission.projectType === "sl" ? "Service Learning"
-              : mission.projectType === "ce" ? "Community Engagement"
-              : "Event"}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ background: "#e8f0fe", color: "#1a73e8", padding: "3px 10px", borderRadius: 99, fontSize: "0.71rem", fontWeight: 600 }}>
+          {typeLabel}
+        </span>
+        {mission.status === "completed" ? (
+          <span
+            onClick={handleStatusClick}
+            title={onToggleStatus ? "Click to reopen event" : undefined}
+            style={{ background: "#e8f0fe", color: "#1a73e8", padding: "3px 8px", borderRadius: 99, fontSize: "0.71rem", fontWeight: 700, cursor: onToggleStatus ? "pointer" : "default" }}
+          >
+            ✓ Closed
           </span>
-        </div>
-        <span className="status-badge published">Active</span>
+        ) : mission.status === "cancelled" ? (
+          <span
+            onClick={handleStatusClick}
+            title={onToggleStatus ? "Click to reopen event" : undefined}
+            style={{ background: "#fce8e6", color: "#d93025", padding: "3px 8px", borderRadius: 99, fontSize: "0.71rem", fontWeight: 700, cursor: onToggleStatus ? "pointer" : "default" }}
+          >
+            ✕ Cancelled
+          </span>
+        ) : (
+          <span
+            onClick={handleStatusClick}
+            title={onToggleStatus ? "Click to close event" : undefined}
+            style={{ background: "#e6f4ea", color: "#137333", padding: "3px 8px", borderRadius: 99, fontSize: "0.71rem", fontWeight: 700, cursor: onToggleStatus ? "pointer" : "default" }}
+          >
+            ● Active
+          </span>
+        )}
       </div>
 
-      <h3 className="rp-card-title">{mission.title || "Untitled Event"}</h3>
+      <h3 style={{ margin: "0 0 5px", color: "#202124", fontSize: "0.97rem", fontWeight: 700, lineHeight: 1.3 }}>
+        {mission.title || "Untitled Event"}
+      </h3>
 
       {(mission.preparedBy || (Array.isArray(mission.proponents) && mission.proponents.length > 0)) && (
-        <div style={{ fontSize: "0.78rem", color: "#64748b", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
-          👤 <span>
-            <strong>Proposed by: </strong>
+        <div style={{ fontSize: "0.77rem", color: "#5f6368", marginBottom: 6 }}>
+          by <span style={{ fontWeight: 600, color: "#3c4043" }}>
             {Array.isArray(mission.proponents) && mission.proponents.length > 0
-              ? mission.proponents[0]
-              : mission.preparedBy}
+              ? mission.proponents[0] : mission.preparedBy}
           </span>
         </div>
       )}
 
       {mission.description && (
-        <p className="rp-card-desc">
+        <p style={{ margin: "0 0 8px", fontSize: "0.81rem", color: "#5f6368", lineHeight: 1.5 }}>
           {mission.description.length > 100
             ? mission.description.slice(0, 100) + "…"
             : mission.description}
         </p>
       )}
 
-      <div className="rp-card-meta">
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 10, marginTop: "auto", borderTop: "1px solid #f1f3f4", fontSize: "0.77rem", color: "#5f6368", alignItems: "center" }}>
         {mission.targetDate && <span>📅 {mission.targetDate}</span>}
         <span className="ce-live-count">
           <span className="ce-live-dot" />
@@ -80,16 +108,17 @@ function EventCard({ mission, onClick }) {
       </div>
 
       {urgency && (
-        <div className="ce-urgency-bar" style={{ background: urgency.bg, color: urgency.color }}>
+        <div className="ce-urgency-bar" style={{ background: urgency.bg, color: urgency.color, marginTop: 8 }}>
           {urgency.label}
         </div>
       )}
 
-      <div className="rp-card-footer">
-        <button className="rp-review-btn" onClick={e => { e.stopPropagation(); onClick(); }}>
-          View Roster →
-        </button>
-      </div>
+      <button
+        onClick={e => { e.stopPropagation(); onClick(); }}
+        style={{ marginTop: 12, width: "100%", padding: "8px 0", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.83rem", cursor: "pointer" }}
+      >
+        View Roster →
+      </button>
     </div>
   );
 }
@@ -167,12 +196,17 @@ export default function CurrentEvent() {
   const [editDetailsData, setEditDetailsData] = useState({});
   const [savingDetails, setSavingDetails] = useState(false);
 
+  // ── community feedback tab state ─────────────────────────────────
+  const [feedbackResponses, setFeedbackResponses] = useState([]);
+  const [feedbackLoading, setFeedbackLoading]     = useState(false);
+
   // ── doc library answer modal state ────────────────────────────────
   // (handled by MissionSubmissionsTable)
 
   const FLAG_DURATION_DAYS = 30;
 
   // ── QR + close event state ────────────────────────────────────────
+  const [togglingStatus, setTogglingStatus] = useState({});
   const [showAttQR, setShowAttQR]           = useState(false);
   const [showFeedbackQR, setShowFeedbackQR] = useState(false);
   const [qrGenerating, setQrGenerating]     = useState(false);
@@ -194,7 +228,7 @@ export default function CurrentEvent() {
     setLoading(true);
 
     const loadMissions = async () => {
-      const q = query(collection(db, "missions"), where("status", "==", "published"));
+      const q = query(collection(db, "missions"), where("status", "in", ["published", "completed", "cancelled"]));
       const snap = await getDocs(q);
       const data = snap.docs.map(d => ({
         id: d.id, ...d.data(),
@@ -348,6 +382,14 @@ export default function CurrentEvent() {
     if (!missionId) return;
     fetchMissionVolunteers();
   }, [missionId]);
+
+  useEffect(() => {
+    if (!missionId || activeTab !== "feedback") return;
+    setFeedbackLoading(true);
+    getDocs(collection(db, "missions", missionId, "feedbackResponses")).then(snap => {
+      setFeedbackResponses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }).finally(() => setFeedbackLoading(false));
+  }, [missionId, activeTab]);
 
   // ── flagging helpers ──────────────────────────────────────────────
   const flagMission = async (missionDoc, now, todayStr, { allowReFlag = true } = {}) => {
@@ -826,11 +868,99 @@ export default function CurrentEvent() {
           });
         } catch (_) { /* non-critical */ }
       }
-      navigate("/admin/current-event");
+      // Stay on the detail page so grades/requirements can still be managed
+      setMissionData(prev => prev ? { ...prev, status: newStatus, completedAt: new Date() } : prev);
     } catch (_) {
       showToast("Failed to close event. Try again.");
     } finally {
       setClosingEvent(false);
+    }
+  };
+
+  // ── reopen event (detail view) ────────────────────────────────────
+  const handleReopenEvent = async () => {
+    if (!await showConfirm("Reopen this event? Status will be set back to Active.")) return;
+    setClosingEvent(true);
+    try {
+      await updateDoc(doc(db, "missions", missionId), {
+        status: "published",
+        completedAt: null,
+        updatedAt: serverTimestamp(),
+      });
+      logAudit({
+        action: "EVENT_REOPENED",
+        category: "event",
+        details: { missionId, missionTitle: missionData?.title || "" },
+      });
+      setMissionData(prev => prev ? { ...prev, status: "published", completedAt: null } : prev);
+      showToast("Event reopened and set to Active.");
+    } catch {
+      showToast("Failed to reopen event. Try again.");
+    } finally {
+      setClosingEvent(false);
+    }
+  };
+
+  // ── toggle status from list card ──────────────────────────────────
+  const handleToggleEventStatus = async (mission) => {
+    if (togglingStatus[mission.id]) return;
+    const isOpen = mission.status === "published";
+
+    if (isOpen) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let targetDate = null;
+      if (mission.targetDate?.toDate) {
+        targetDate = mission.targetDate.toDate();
+      } else if (typeof mission.targetDate === "string") {
+        targetDate = new Date(mission.targetDate);
+      }
+      if (targetDate) targetDate.setHours(0, 0, 0, 0);
+      const isCancelled = targetDate && today < targetDate;
+      const newStatus = isCancelled ? "cancelled" : "completed";
+      const statusLabel = isCancelled ? "Cancelled" : "Completed";
+
+      if (!await showConfirm(`Close this event? Status will be set to ${statusLabel}.`)) return;
+      setTogglingStatus(prev => ({ ...prev, [mission.id]: true }));
+      try {
+        await updateDoc(doc(db, "missions", mission.id), {
+          status: newStatus,
+          completedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        setMissions(prev => prev.map(m => m.id === mission.id ? { ...m, status: newStatus } : m));
+        logAudit({
+          action: "EVENT_STATUS_CHANGED",
+          category: "event",
+          details: { missionId: mission.id, missionTitle: mission.title, newStatus },
+        });
+        showToast(`Event marked as ${statusLabel}.`);
+      } catch {
+        showToast("Failed to update event status. Try again.");
+      } finally {
+        setTogglingStatus(prev => ({ ...prev, [mission.id]: false }));
+      }
+    } else {
+      if (!await showConfirm("Reopen this event? Status will be set back to Active.")) return;
+      setTogglingStatus(prev => ({ ...prev, [mission.id]: true }));
+      try {
+        await updateDoc(doc(db, "missions", mission.id), {
+          status: "published",
+          completedAt: null,
+          updatedAt: serverTimestamp(),
+        });
+        setMissions(prev => prev.map(m => m.id === mission.id ? { ...m, status: "published" } : m));
+        logAudit({
+          action: "EVENT_REOPENED",
+          category: "event",
+          details: { missionId: mission.id, missionTitle: mission.title },
+        });
+        showToast("Event reopened and set to Active.");
+      } catch {
+        showToast("Failed to reopen event. Try again.");
+      } finally {
+        setTogglingStatus(prev => ({ ...prev, [mission.id]: false }));
+      }
     }
   };
 
@@ -922,6 +1052,7 @@ export default function CurrentEvent() {
       { key: "roster",  label: "Roster" },
       { key: "details", label: "Project Details" },
       ...(!isFaculty ? [{ key: "docs", label: "Document Library" }] : []),
+      { key: "feedback", label: "Community Feedback" },
     ];
 
     const typeLabel =
@@ -936,7 +1067,7 @@ export default function CurrentEvent() {
         <button
           onClick={() => navigate(isFaculty ? "/faculty/current-event" : "/admin/current-event")}
           style={{
-            background: "none", border: "none", color: "#64748b",
+            background: "none", border: "none", color: "#1a73e8",
             fontSize: "0.82rem", cursor: "pointer", marginBottom: 16,
             display: "flex", alignItems: "center", gap: 4, padding: 0, fontWeight: 600,
           }}
@@ -946,31 +1077,39 @@ export default function CurrentEvent() {
 
         {/* ── mission hero card ── */}
         <div style={{
-          background: "#fff", borderRadius: 16, padding: "20px 24px",
-          marginBottom: 16, border: "1px solid #e5e7eb",
-          boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
+          background: "#fff", borderRadius: 12, padding: "20px 24px",
+          marginBottom: 16, border: "1px solid #e8eaed",
+          boxShadow: "0 1px 3px rgba(60,64,67,0.05)",
         }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
-            <div>
-              <h2 style={{ margin: 0, color: "#1e293b", fontSize: "1.3rem", fontWeight: 800, lineHeight: 1.2 }}>
-                {missionTitle || "Loading…"}
-              </h2>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                <span style={{ background: "#e8edf7", color: "#1f3b73", padding: "3px 10px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 700 }}>
-                  {typeLabel}
+          <div style={{ marginBottom: 14 }}>
+            <h2 style={{ margin: "0 0 10px", color: "#202124", fontSize: "1.25rem", fontWeight: 700, lineHeight: 1.3 }}>
+              {missionTitle || "Loading…"}
+            </h2>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ background: "#e8f0fe", color: "#1a73e8", padding: "3px 10px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 600 }}>
+                {typeLabel}
+              </span>
+              {missionData?.status === "completed" ? (
+                <span style={{ background: "#e8f0fe", color: "#1a73e8", padding: "3px 10px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 700 }}>
+                  ✓ Closed
                 </span>
-                <span style={{ background: "#dcfce7", color: "#15803d", padding: "3px 10px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 700 }}>
+              ) : missionData?.status === "cancelled" ? (
+                <span style={{ background: "#fce8e6", color: "#d93025", padding: "3px 10px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 700 }}>
+                  ✕ Cancelled
+                </span>
+              ) : (
+                <span style={{ background: "#e6f4ea", color: "#137333", padding: "3px 10px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 700 }}>
                   ● Active
                 </span>
-                <span style={{ background: "#f1f5f9", color: "#475569", padding: "3px 10px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 600 }}>
-                  {rosterVolunteers.length}{missionData?.maxStudents ? ` / ${missionData.maxStudents}` : ""} volunteers
-                </span>
-              </div>
+              )}
+              <span style={{ background: "#f8f9fa", color: "#5f6368", padding: "3px 10px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 600, border: "1px solid #e8eaed" }}>
+                {rosterVolunteers.length}{missionData?.maxStudents ? ` / ${missionData.maxStudents}` : ""} volunteers
+              </span>
             </div>
           </div>
 
           {missionData && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px 20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "10px 20px", paddingTop: 14, borderTop: "1px solid #f1f3f4" }}>
               <MetaItem icon="📅" label="Date"       value={missionData.targetDate} />
               <MetaItem icon="⏰" label="Time"       value={missionData.startTime} />
               <MetaItem icon="📍" label="Location"   value={missionData.location} />
@@ -983,110 +1122,101 @@ export default function CurrentEvent() {
           )}
 
           {missionData?.qrLocationName && (
-            <div style={{ marginTop: 12, fontSize: "0.78rem", color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ marginTop: 10, fontSize: "0.77rem", color: "#5f6368", display: "flex", alignItems: "center", gap: 5, paddingTop: 10, borderTop: "1px solid #f1f3f4" }}>
               <span>📱</span>
-              <span>QR pinned at: <b>{missionData.qrLocationName}</b></span>
+              <span>QR pinned at: <b style={{ color: "#3c4043" }}>{missionData.qrLocationName}</b></span>
             </div>
           )}
         </div>
 
         {/* ── action strip ── */}
-        {!isFaculty && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-          <button
-            onClick={() => setShowAttQR(true)}
-            style={{
-              padding: "9px 16px", background: "#234e7b", color: "#fff",
-              border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem",
-              cursor: "pointer", whiteSpace: "nowrap",
-            }}
-          >
-            📱 Attendance QR
-          </button>
-          <button
-            onClick={() => setShowFeedbackQR(true)}
-            style={{
-              padding: "9px 16px", background: "#0f766e", color: "#fff",
-              border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem",
-              cursor: "pointer", whiteSpace: "nowrap",
-            }}
-          >
-            📋 Partner Feedback QR
-          </button>
-          <button
-            onClick={handleToggleFeedback}
-            disabled={togglingFeedback}
-            style={{
-              padding: "9px 16px",
-              background: missionData?.feedback?.isActive ? "#7c3aed" : "#9ca3af",
-              color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
-              fontSize: "0.85rem", cursor: togglingFeedback ? "not-allowed" : "pointer",
-              whiteSpace: "nowrap", opacity: togglingFeedback ? 0.7 : 1,
-            }}
-          >
-            {togglingFeedback
-              ? "Updating…"
-              : missionData?.feedback?.isActive
-              ? "🔓 Close Feedback Form"
-              : "🔒 Open Feedback Form"}
-          </button>
-          <div className="ce-tooltip-wrap">
-            <button
-              onClick={handleFlagThisEvent}
-              disabled={flagging}
-              style={{
-                padding: "9px 16px",
-                background: flagging ? "#9ca3af" : "#b45309",
-                color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
-                fontSize: "0.85rem", cursor: flagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-              }}
-            >
-              {flagging ? "Flagging…" : "🚩 Flag Absent Volunteers"}
+        {!isFaculty && (
+          <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            {/* QR + Feedback group */}
+            <button className="ce-action-btn" onClick={() => setShowAttQR(true)}>
+              Attendance QR
             </button>
-            <span className="ce-tooltip">Marks volunteers who missed attendance in this event. Flagged volunteers cannot join new missions for {FLAG_DURATION_DAYS} days.</span>
+            <button className="ce-action-btn" onClick={() => setShowFeedbackQR(true)}>
+              Feedback QR
+            </button>
+
+            {/* Divider */}
+            <div style={{ width: 1, height: 28, background: "#e8eaed", margin: "0 4px" }} />
+
+            {/* Admin actions */}
+            <div className="ce-tooltip-wrap">
+              <button
+                className="ce-action-btn"
+                onClick={handleFlagThisEvent}
+                disabled={flagging}
+              >
+                {flagging ? "Flagging…" : "Flag Absent"}
+              </button>
+              <span className="ce-tooltip">Marks volunteers who missed attendance in this event. Flagged volunteers cannot join new missions for {FLAG_DURATION_DAYS} days.</span>
+            </div>
+            {missionData?.status === "published" && (
+              <button
+                onClick={handleCloseEvent}
+                disabled={closingEvent}
+                style={{
+                  padding: "8px 14px",
+                  background: closingEvent ? "#f8f9fa" : "#ea4335",
+                  color: closingEvent ? "#9aa0a6" : "#fff",
+                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.82rem",
+                  cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                {closingEvent ? "Closing…" : "✓ Close Event"}
+              </button>
+            )}
+            {(missionData?.status === "completed" || missionData?.status === "cancelled") && (
+              <button
+                onClick={handleReopenEvent}
+                disabled={closingEvent}
+                style={{
+                  padding: "8px 14px",
+                  background: closingEvent ? "#f8f9fa" : "#137333",
+                  color: closingEvent ? "#9aa0a6" : "#fff",
+                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.82rem",
+                  cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                {closingEvent ? "Reopening…" : "↺ Reopen Event"}
+              </button>
+            )}
+            {flagResult && (
+              <span style={{ fontSize: 12, color: flagResult.ok ? "#137333" : "#d93025", fontWeight: 600 }}>
+                {flagResult.ok ? `${flagResult.count} flagged` : `Error: ${flagResult.error}`}
+              </span>
+            )}
           </div>
-          <button
-            onClick={handleCloseEvent}
-            disabled={closingEvent}
-            style={{
-              padding: "9px 16px",
-              background: closingEvent ? "#9ca3af" : "#dc2626",
-              color: "#fff", border: "none", borderRadius: 10, fontWeight: 700,
-              fontSize: "0.85rem", cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-            }}
-          >
-            {closingEvent ? "Closing…" : "✓ Close Event"}
-          </button>
-          {flagResult && (
-            <span style={{ fontSize: 13, color: flagResult.ok ? "#15803d" : "#b91c1c", fontWeight: 600 }}>
-              {flagResult.ok ? `${flagResult.count} flagged` : `Error: ${flagResult.error}`}
-            </span>
-          )}
-        </div>}
+        )}
 
         {/* ── tab navigation ── */}
-        <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb", marginBottom: 20 }}>
+        <div className="ce-tab-nav" style={{ display: "flex", borderBottom: "2px solid #e8eaed", marginBottom: 20 }}>
           {tabs.map(t => (
             <button
               key={t.key}
+              className={`ce-tab-btn${activeTab === t.key ? " active" : ""}`}
               onClick={() => setActiveTab(t.key)}
-              style={{
-                padding: "10px 20px", background: "none", border: "none",
-                borderBottom: activeTab === t.key ? "2px solid #234e7b" : "2px solid transparent",
-                marginBottom: -2,
-                fontWeight: activeTab === t.key ? 700 : 500,
-                color: activeTab === t.key ? "#234e7b" : "#6b7280",
-                cursor: "pointer", fontSize: "0.9rem", transition: "color 0.15s",
-                display: "flex", alignItems: "center", gap: 6,
-              }}
             >
               {t.label}
               {t.key === "roster" && rosterVolunteers.length > 0 && (
                 <span style={{
-                  background: activeTab === "roster" ? "#234e7b" : "#e8edf7",
-                  color: activeTab === "roster" ? "#fff" : "#234e7b",
-                  borderRadius: 99, fontSize: "0.7rem", fontWeight: 700, padding: "1px 7px",
+                  background: activeTab === "roster" ? "#1a73e8" : "#e8eaed",
+                  color: activeTab === "roster" ? "#fff" : "#5f6368",
+                  borderRadius: 99, fontSize: "0.68rem", fontWeight: 700, padding: "1px 7px",
                 }}>
                   {rosterVolunteers.length}
+                </span>
+              )}
+              {t.key === "feedback" && (missionData?.feedback?.avgRating != null || feedbackResponses.length > 0) && (
+                <span style={{
+                  background: activeTab === "feedback" ? "#1a73e8" : "#e8eaed",
+                  color: activeTab === "feedback" ? "#fff" : "#5f6368",
+                  borderRadius: 99, fontSize: "0.68rem", fontWeight: 700, padding: "1px 7px",
+                }}>
+                  {feedbackResponses.length > 0 ? feedbackResponses.length : "✓"}
                 </span>
               )}
             </button>
@@ -1098,87 +1228,102 @@ export default function CurrentEvent() {
           rosterVolunteers.length === 0 ? (
             <div className="empty-label">No volunteers have joined yet.</div>
           ) : (
-            <div style={{ width: "100%" }}>
-              <table className="admin-table">
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8eaed" }}>
+              <div style={{ width: "100%", overflowX: "auto" }}>
+              <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: "0.85rem" }}>
                 <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Level</th>
-                    <th>Joined</th>
-                    {!isFaculty && <th>Attendance</th>}
-                    {!isFaculty && <th>Actions</th>}
+                  <tr style={{ borderBottom: "1.5px solid #e8eaed" }}>
+                    <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", letterSpacing: "0.02em", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>
+                      Community Members
+                      <span style={{ marginLeft: 8, background: "#f1f3f4", color: "#5f6368", borderRadius: 99, fontSize: "0.68rem", padding: "2px 7px", fontWeight: 600 }}>
+                        {rosterVolunteers.length}
+                      </span>
+                    </th>
+                    <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Level</th>
+                    <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Joined</th>
+                    {!isFaculty && <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Attendance</th>}
+                    {!isFaculty && <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {rosterVolunteers.map(v => (
-                    <tr key={v.id}>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          <div>
-                            <div style={{ fontWeight: 600, color: "#1e293b" }}>{v.name}</div>
-                            {v.email && <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>{v.email}</div>}
+                  {rosterVolunteers.map((v, idx) => (
+                    <tr key={v.id} style={{ borderBottom: idx < rosterVolunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{
+                            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                            background: v.role === "lead_organizer" ? "#f3e8ff" : v.role === "organizer" ? "#e8f0fe" : "#f1f3f4",
+                            color: v.role === "lead_organizer" ? "#7c3aed" : v.role === "organizer" ? "#1a73e8" : "#5f6368",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 700, fontSize: "0.88rem",
+                          }}>
+                            {(v.name || "?").charAt(0).toUpperCase()}
                           </div>
-                          {(v.role === "organizer" || v.role === "lead_organizer") && (
-                            <span style={{
-                              padding: "2px 8px",
-                              background: v.role === "lead_organizer" ? "#faf5ff" : "#eff6ff",
-                              color: v.role === "lead_organizer" ? "#6b21a8" : "#1d4ed8",
-                              borderRadius: 99, fontSize: 11, fontWeight: 700,
-                              border: `1px solid ${v.role === "lead_organizer" ? "#d8b4fe" : "#bfdbfe"}`,
-                              whiteSpace: "nowrap",
-                            }}>
-                              {v.role === "lead_organizer" ? "🎯 Lead Organizer" : "📋 Organizer"}
-                            </span>
-                          )}
-                          {v.isFlagged && (
-                            <>
-                              <span title={`Flagged${v.flagExpiry ? " until " + v.flagExpiry.toLocaleDateString() : ""}`}>🚩</span>
-                              {!isFaculty && (
-                                <button
-                                  disabled={!!togglingFlag[v.id]}
-                                  onClick={() => handleToggleFlag(v.id, true)}
-                                  style={{
-                                    padding: "2px 8px",
-                                    background: togglingFlag[v.id] ? "#9ca3af" : "#16a34a",
-                                    color: "#fff", border: "none", borderRadius: 4,
-                                    fontSize: 11, fontWeight: 600,
-                                    cursor: togglingFlag[v.id] ? "not-allowed" : "pointer",
-                                  }}
-                                >
-                                  {togglingFlag[v.id] ? "…" : "Unflag"}
-                                </button>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                              <span style={{ fontWeight: 600, color: "#202124" }}>{v.name}</span>
+                              {(v.role === "organizer" || v.role === "lead_organizer") && (
+                                <span style={{
+                                  padding: "1px 7px",
+                                  background: v.role === "lead_organizer" ? "#f3e8ff" : "#e8f0fe",
+                                  color: v.role === "lead_organizer" ? "#7c3aed" : "#1a73e8",
+                                  borderRadius: 99, fontSize: 10.5, fontWeight: 700,
+                                  border: `1px solid ${v.role === "lead_organizer" ? "#d8b4fe" : "#c5d9fd"}`,
+                                }}>
+                                  {v.role === "lead_organizer" ? "🎯 Lead" : "📋 Organizer"}
+                                </span>
                               )}
-                            </>
-                          )}
+                              {v.isFlagged && (
+                                <span title={`Flagged${v.flagExpiry ? " until " + v.flagExpiry.toLocaleDateString() : ""}`} style={{ fontSize: 13 }}>🚩</span>
+                              )}
+                            </div>
+                            {v.email && <div style={{ fontSize: "0.72rem", color: "#80868b", marginTop: 1 }}>{v.email}</div>}
+                            {v.isFlagged && !isFaculty && (
+                              <button
+                                disabled={!!togglingFlag[v.id]}
+                                onClick={() => handleToggleFlag(v.id, true)}
+                                style={{
+                                  marginTop: 3, padding: "1px 7px",
+                                  background: togglingFlag[v.id] ? "#f1f3f4" : "#e6f4ea",
+                                  color: togglingFlag[v.id] ? "#9aa0a6" : "#137333",
+                                  border: "none", borderRadius: 4, fontSize: 10.5, fontWeight: 600,
+                                  cursor: togglingFlag[v.id] ? "not-allowed" : "pointer",
+                                }}
+                              >
+                                {togglingFlag[v.id] ? "…" : "✔ Unflag"}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </td>
-                      <td style={{ color: "#64748b" }}>{v.level}</td>
-                      <td style={{ fontSize: "0.82rem", color: "#64748b" }}>
+                      <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>{v.level}</td>
+                      <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>
                         {v.joinedAt ? new Date(v.joinedAt).toLocaleDateString() : "—"}
                       </td>
                       {!isFaculty && (
-                        <td>
+                        <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
                           {v.attendanceStatus === "present"
-                            ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Present</span>
-                            : <span style={{ color: "#9ca3af" }}>—</span>}
+                            ? <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>✓ Present</span>
+                            : <span style={{ color: "#80868b", fontSize: "0.82rem" }}>—</span>}
                         </td>
                       )}
                       {!isFaculty && (
-                        <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button
-                            disabled={!!togglingAttendance[v.id]}
-                            onClick={() => handleToggleAttendance(v.id, v.attendanceStatus)}
-                            style={{
-                              padding: "3px 8px",
-                              background: v.attendanceStatus === "present" ? "#fff3cd" : "#d4edda",
-                              color: v.attendanceStatus === "present" ? "#856404" : "#155724",
-                              border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600,
-                              cursor: togglingAttendance[v.id] ? "not-allowed" : "pointer",
-                              opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
-                            }}
-                          >
-                            {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
-                          </button>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                            <button
+                              disabled={!!togglingAttendance[v.id]}
+                              onClick={() => handleToggleAttendance(v.id, v.attendanceStatus)}
+                              style={{
+                                padding: "4px 10px",
+                                background: v.attendanceStatus === "present" ? "#fce8e6" : "#e6f4ea",
+                                color: v.attendanceStatus === "present" ? "#d93025" : "#137333",
+                                border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                cursor: togglingAttendance[v.id] ? "not-allowed" : "pointer",
+                                opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
+                              }}
+                            >
+                              {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
+                            </button>
 
                           {/* ── Assign organizer role ── */}
                           {editingRoleFor === v.id ? (
@@ -1188,9 +1333,9 @@ export default function CurrentEvent() {
                                 onChange={e => setPendingRole(e.target.value)}
                                 disabled={!!assigningRole[v.id]}
                                 style={{
-                                  padding: "3px 6px", border: "1.5px solid #cbd5e1",
-                                  borderRadius: 5, fontSize: 11, fontFamily: "inherit",
-                                  color: "#1e293b", background: "#fff", cursor: "pointer",
+                                  padding: "3px 6px", border: "1px solid #dadce0",
+                                  borderRadius: 6, fontSize: 11, fontFamily: "inherit",
+                                  color: "#202124", background: "#fff", cursor: "pointer",
                                 }}
                               >
                                 <option value="">Pick role…</option>
@@ -1202,8 +1347,8 @@ export default function CurrentEvent() {
                                 disabled={!pendingRole || !!assigningRole[v.id]}
                                 onClick={() => handleAssignVolunteerRole(v.id, pendingRole)}
                                 style={{
-                                  padding: "3px 8px", background: "#1f3b73", color: "#fff",
-                                  border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                                  padding: "3px 8px", background: "#1a73e8", color: "#fff",
+                                  border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
                                   cursor: (!pendingRole || assigningRole[v.id]) ? "not-allowed" : "pointer",
                                   opacity: (!pendingRole || assigningRole[v.id]) ? 0.6 : 1,
                                 }}
@@ -1213,8 +1358,8 @@ export default function CurrentEvent() {
                               <button
                                 onClick={() => { setEditingRoleFor(null); setPendingRole(""); }}
                                 style={{
-                                  padding: "3px 7px", background: "#f1f5f9", color: "#475569",
-                                  border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                  padding: "3px 7px", background: "#f1f3f4", color: "#5f6368",
+                                  border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
                                 }}
                               >
                                 ✕
@@ -1224,20 +1369,22 @@ export default function CurrentEvent() {
                             <button
                               onClick={() => { setEditingRoleFor(v.id); setPendingRole(v.role || "volunteer"); }}
                               style={{
-                                padding: "3px 8px", background: "#eff6ff", color: "#1d4ed8",
-                                border: "1px solid #bfdbfe", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                                padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8",
+                                border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
                                 cursor: "pointer", whiteSpace: "nowrap",
                               }}
                             >
                               Assign Role
                             </button>
                           )}
+                          </div>
                         </td>
                       )}
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )
         )}
@@ -1251,7 +1398,7 @@ export default function CurrentEvent() {
                 <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
                   {!editingDetails ? (
                     <button onClick={() => setEditingDetails(true)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "#1f3b73", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -1261,11 +1408,11 @@ export default function CurrentEvent() {
                   ) : (
                     <>
                       <button onClick={handleSaveDetails} disabled={savingDetails}
-                        style={{ padding: "8px 20px", background: savingDetails ? "#9ca3af" : "#0D9488", color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: "0.85rem", cursor: savingDetails ? "not-allowed" : "pointer" }}>
+                        style={{ padding: "8px 20px", background: savingDetails ? "#f8f9fa" : "#1a73e8", color: savingDetails ? "#9aa0a6" : "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: savingDetails ? "not-allowed" : "pointer" }}>
                         {savingDetails ? "Saving…" : "✓ Save Changes"}
                       </button>
                       <button onClick={() => setEditingDetails(false)} disabled={savingDetails}
-                        style={{ padding: "8px 16px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 9, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
+                        style={{ padding: "8px 16px", background: "#fff", color: "#5f6368", border: "1px solid #dadce0", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
                         Cancel
                       </button>
                     </>
@@ -1289,7 +1436,7 @@ export default function CurrentEvent() {
                       <input type={type} value={editDetailsData[key] || ""}
                         onChange={e => setEditDetailsData(p => ({ ...p, [key]: e.target.value }))}
                         style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: "0.9rem", fontFamily: "inherit", color: "#1e293b", outline: "none", boxSizing: "border-box" }}
-                        onFocus={e => e.target.style.borderColor = "#1f3b73"}
+                        onFocus={e => e.target.style.borderColor = "#1a73e8"}
                         onBlur={e => e.target.style.borderColor = "#e2e8f0"}
                       />
                     </div>
@@ -1306,7 +1453,7 @@ export default function CurrentEvent() {
                       <textarea rows={rows} value={editDetailsData[key] || ""}
                         onChange={e => setEditDetailsData(p => ({ ...p, [key]: e.target.value }))}
                         style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: "0.9rem", fontFamily: "inherit", color: "#1e293b", outline: "none", resize: "vertical", boxSizing: "border-box" }}
-                        onFocus={e => e.target.style.borderColor = "#1f3b73"}
+                        onFocus={e => e.target.style.borderColor = "#1a73e8"}
                         onBlur={e => e.target.style.borderColor = "#e2e8f0"}
                       />
                     </div>
@@ -1368,7 +1515,7 @@ export default function CurrentEvent() {
                   <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>SDGs</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
                     {missionData.sdgs.map((sdg, i) => (
-                      <span key={i} style={{ background: "#e8edf7", color: "#1f3b73", padding: "3px 10px", borderRadius: 99, fontSize: "0.8rem", fontWeight: 600 }}>{sdg}</span>
+                      <span key={i} style={{ background: "#e8edf7", color: "#000", padding: "3px 10px", borderRadius: 99, fontSize: "0.8rem", fontWeight: 600 }}>{sdg}</span>
                     ))}
                   </div>
                 </div>
@@ -1407,6 +1554,208 @@ export default function CurrentEvent() {
           <MissionSubmissionsTable missionId={missionId} missionTitle={missionData?.title || missionTitle || ""} />
         )}
 
+        {/* ── Community Feedback tab ── */}
+        {activeTab === "feedback" && (() => {
+          const RATING_LABELS = {
+            overallOrganization: "Overall Organization",
+            qualityOfService: "Quality of Service",
+            participation: "Participation",
+            continuity: "Continuity",
+            socialImpact: "Social Impact",
+            relevance: "Relevance",
+            inclusivity: "Inclusivity",
+            knowledge: "Knowledge",
+            alignment: "Alignment",
+          };
+
+          const avgRating = missionData?.feedback?.avgRating ?? null;
+          const multiplier = missionData?.feedback?.multiplier ?? null;
+          const responseCount = feedbackResponses.length;
+
+          // Compute per-category averages from responses
+          const categoryAverages = {};
+          if (responseCount > 0) {
+            Object.keys(RATING_LABELS).forEach(key => {
+              const vals = feedbackResponses.map(r => r.ratings?.[key]).filter(v => typeof v === "number");
+              categoryAverages[key] = vals.length > 0
+                ? Number((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2))
+                : 0;
+            });
+          }
+
+          return (
+            <div>
+              {feedbackLoading ? (
+                <div style={{ padding: 24, color: "#64748b", textAlign: "center" }}>Loading feedback…</div>
+              ) : (
+                <>
+                  {/* ── Stat cards ── */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
+                    {[
+                      { label: "Responses", value: responseCount, color: "#0f766e", bg: "#f0fdf4", icon: "📋" },
+                      { label: "Avg. Rating", value: avgRating != null ? `${avgRating} / 5` : "—", color: "#d97706", bg: "#fffbeb", icon: "⭐" },
+                      { label: "Multiplier", value: multiplier != null ? `×${multiplier}` : "—", color: "#1a73e8", bg: "#e8f0fe", icon: "🔢" },
+                    ].map(({ label, value, color, bg, icon }) => (
+                      <div key={label} style={{ background: bg, borderRadius: 12, padding: "16px 18px", border: `1px solid ${color}22` }}>
+                        <div style={{ fontSize: "1.3rem", marginBottom: 4 }}>{icon}</div>
+                        <div style={{ fontSize: "1.3rem", fontWeight: 700, color }}>{value}</div>
+                        <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 2 }}>{label}</div>
+                      </div>
+                    ))}
+                    {avgRating != null && (
+                      <div style={{ background: "#f8f9fa", borderRadius: 12, padding: "16px 18px", border: "1px solid #e8eaed" }}>
+                        <div style={{ fontSize: "1.3rem", marginBottom: 4 }}>📊</div>
+                        <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>Rating Tier</div>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 700, color: avgRating >= 4.5 ? "#15803d" : avgRating >= 3.5 ? "#1a73e8" : avgRating >= 2.5 ? "#d97706" : "#dc2626" }}>
+                          {avgRating >= 4.5 ? "Excellent" : avgRating >= 3.5 ? "Good" : avgRating >= 2.5 ? "Fair" : "Needs Work"}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Per-category vertical bar graph ── */}
+                  {responseCount > 0 && (() => {
+                    const CHART_H = 180;
+                    const Y_TICKS = [0, 1, 2, 3, 4, 5];
+                    const ABBR = {
+                      overallOrganization: "OO", qualityOfService: "QS",
+                      participation: "PA", continuity: "CO", socialImpact: "SI",
+                      relevance: "RE", inclusivity: "IN", knowledge: "KN", alignment: "AL",
+                    };
+                    const getColor = v => v >= 4 ? "#16a34a" : v >= 3 ? "#1a73e8" : v >= 2 ? "#d97706" : "#dc2626";
+                    const keys = Object.keys(RATING_LABELS);
+                    return (
+                      <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
+                        <h3 style={{ margin: "0 0 16px", fontSize: "0.9rem", fontWeight: 700, color: "#1e293b" }}>Per-Category Averages</h3>
+
+                        {/* value labels row — sits above the chart, aligned with bars */}
+                        <div style={{ display: "flex", gap: 8, paddingLeft: 28, paddingRight: 4, marginBottom: 2 }}>
+                          {keys.map(key => {
+                            const val = categoryAverages[key] ?? 0;
+                            return (
+                              <div key={key} style={{ flex: 1, textAlign: "center", fontSize: "0.62rem", fontWeight: 700, color: getColor(val) }}>
+                                {val}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* chart row: y-axis + plot area */}
+                        <div style={{ display: "flex" }}>
+                          {/* Y-axis labels */}
+                          <div style={{ width: 24, flexShrink: 0, position: "relative", height: CHART_H }}>
+                            {Y_TICKS.map(v => (
+                              <span key={v} style={{
+                                position: "absolute", right: 4,
+                                bottom: `${(v / 5) * 100}%`,
+                                transform: "translateY(50%)",
+                                fontSize: "0.58rem", color: "#94a3b8", lineHeight: 1,
+                              }}>{v}</span>
+                            ))}
+                          </div>
+
+                          {/* plot area */}
+                          <div style={{ flex: 1, height: CHART_H, position: "relative" }}>
+                            {/* gridlines */}
+                            {Y_TICKS.map(v => (
+                              <div key={v} style={{
+                                position: "absolute", left: 0, right: 0,
+                                bottom: `${(v / 5) * 100}%`,
+                                height: v === 0 ? 2 : 1,
+                                background: v === 0 ? "#c4c9d4" : "#f1f3f4",
+                              }} />
+                            ))}
+                            {/* bars */}
+                            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-end", gap: 8, padding: "0 4px" }}>
+                              {keys.map(key => {
+                                const val = categoryAverages[key] ?? 0;
+                                const color = getColor(val);
+                                return (
+                                  <div key={key} style={{
+                                    flex: 1,
+                                    height: `${(val / 5) * 100}%`,
+                                    minHeight: val > 0 ? 3 : 0,
+                                    background: `linear-gradient(to top, ${color}, ${color}99)`,
+                                    borderRadius: "4px 4px 0 0",
+                                    transition: "height 0.45s ease",
+                                  }} />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* X-axis category name labels */}
+                        <div style={{ display: "flex", gap: 8, paddingLeft: 28, paddingRight: 4, marginTop: 5 }}>
+                          {keys.map(key => (
+                            <div key={key} style={{ flex: 1, textAlign: "center", fontSize: "0.55rem", color: "#64748b", fontWeight: 600, wordBreak: "break-word", lineHeight: 1.2 }}>
+                              {RATING_LABELS[key]}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Responses list ── */}
+                  <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f3f4", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e293b" }}>Responses</span>
+                      {responseCount > 0 && (
+                        <span style={{ background: "#f1f3f4", color: "#5f6368", borderRadius: 99, fontSize: "0.68rem", padding: "1px 7px", fontWeight: 700 }}>{responseCount}</span>
+                      )}
+                    </div>
+                    {responseCount === 0 ? (
+                      <div style={{ padding: "32px 20px", textAlign: "center", color: "#94a3b8", fontSize: "0.88rem" }}>
+                        <div style={{ fontSize: "2rem", marginBottom: 8 }}>📋</div>
+                        No responses yet. Share the feedback QR with the community partner.
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.83rem" }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1.5px solid #e8eaed", background: "#f8f9fa" }}>
+                              <th style={{ padding: "10px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.78rem", textAlign: "left" }}>Respondent</th>
+                              <th style={{ padding: "10px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.78rem", textAlign: "center" }}>Avg Score</th>
+                              <th style={{ padding: "10px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.78rem", textAlign: "left" }}>Comments</th>
+                              <th style={{ padding: "10px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.78rem", textAlign: "left" }}>Submitted</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {feedbackResponses.map((r, idx) => {
+                              const indivAvg = r.ratings ? computeAverageRating(r.ratings) : 0;
+                              const submittedAt = r.submittedAt?.toDate ? r.submittedAt.toDate() : null;
+                              return (
+                                <tr key={r.id} style={{ borderBottom: idx < feedbackResponses.length - 1 ? "1px dashed #e8eaed" : "none" }}>
+                                  <td style={{ padding: "10px 16px", fontWeight: 600, color: "#202124" }}>{r.name || <span style={{ color: "#94a3b8" }}>Anonymous</span>}</td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                                    <span style={{
+                                      fontWeight: 700, fontSize: "0.85rem",
+                                      color: indivAvg >= 4 ? "#16a34a" : indivAvg >= 3 ? "#1a73e8" : indivAvg >= 2 ? "#d97706" : "#dc2626",
+                                    }}>{indivAvg} / 5</span>
+                                  </td>
+                                  <td style={{ padding: "10px 16px", color: "#5f6368", maxWidth: 280 }}>
+                                    {r.comments ? (
+                                      <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.comments}</span>
+                                    ) : <span style={{ color: "#c4c9d4" }}>—</span>}
+                                  </td>
+                                  <td style={{ padding: "10px 16px", color: "#80868b", whiteSpace: "nowrap" }}>
+                                    {submittedAt ? submittedAt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── Location Picker Modal ── */}
         {showLocationPicker && (
           <div
@@ -1420,7 +1769,7 @@ export default function CurrentEvent() {
               {/* header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #e5e7eb" }}>
                 <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#1e293b" }}>📍 Pick Attendance Location</h3>
-                <button onClick={() => setShowLocationPicker(false)} style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                <button onClick={() => setShowLocationPicker(false)} style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}>✕</button>
               </div>
               {/* hint */}
               <div style={{ padding: "8px 18px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: "0.78rem", color: "#475569" }}>
@@ -1446,7 +1795,7 @@ export default function CurrentEvent() {
               <div style={{ display: "flex", gap: 8, padding: "12px 18px", borderTop: "1px solid #e5e7eb" }}>
                 <button
                   onClick={() => setShowLocationPicker(false)}
-                  style={{ flex: 1, padding: "10px 0", background: "#f1f5f9", color: "#334155", border: "none", borderRadius: 9, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+                  style={{ flex: 1, padding: "10px 0", background: "#f8f9fa", color: "#5f6368", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
                 >
                   Cancel
                 </button>
@@ -1455,9 +1804,10 @@ export default function CurrentEvent() {
                   onClick={() => pickerCoords && generateAttendanceQRAtLocation(pickerCoords.lat, pickerCoords.lng, pickerAddress)}
                   style={{
                     flex: 2, padding: "10px 0",
-                    background: (!pickerCoords || pickerSaving) ? "#9ca3af" : "#234e7b",
-                    color: "#fff", border: "none", borderRadius: 9,
-                    fontWeight: 700, fontSize: "0.85rem",
+                    background: (!pickerCoords || pickerSaving) ? "#f8f9fa" : "#1a73e8",
+                    color: (!pickerCoords || pickerSaving) ? "#9aa0a6" : "#fff",
+                    border: "none", borderRadius: 8,
+                    fontWeight: 600, fontSize: "0.85rem",
                     cursor: (!pickerCoords || pickerSaving) ? "not-allowed" : "pointer",
                   }}
                 >
@@ -1480,7 +1830,7 @@ export default function CurrentEvent() {
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
                 <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📱 Attendance QR</h3>
-                <button onClick={() => setShowAttQR(false)} style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                <button onClick={() => setShowAttQR(false)} style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}>✕</button>
               </div>
               <div style={{ padding: "24px 20px", textAlign: "center" }}>
                 {missionData?.validQRTimestamp ? (
@@ -1508,22 +1858,22 @@ export default function CurrentEvent() {
                   onClick={generateAttendanceQR}
                   style={{
                     width: "100%", padding: "11px 0",
-                    background: qrGenerating ? "#9ca3af" : "#234e7b",
-                    color: "#fff", border: "none", borderRadius: 10,
-                    fontWeight: 700, fontSize: "0.9rem",
+                    background: qrGenerating ? "#f8f9fa" : "#1a73e8",
+                    color: qrGenerating ? "#9aa0a6" : "#fff", border: "none", borderRadius: 8,
+                    fontWeight: 600, fontSize: "0.88rem",
                     cursor: qrGenerating ? "not-allowed" : "pointer",
                   }}
                 >
-                  {qrGenerating ? "Getting location…" : missionData?.validQRTimestamp ? "📍 Use My Current Location" : "📍 Use My Current Location"}
+                  {qrGenerating ? "Getting location…" : "📍 Use My Current Location"}
                 </button>
                 <button
                   disabled={qrGenerating}
                   onClick={() => { setShowAttQR(false); setShowLocationPicker(true); }}
                   style={{
                     width: "100%", marginTop: 8, padding: "11px 0",
-                    background: "#e0f2fe", color: "#0369a1",
-                    border: "none", borderRadius: 10,
-                    fontWeight: 700, fontSize: "0.9rem",
+                    background: "#fff", color: "#1a73e8",
+                    border: "1px solid #1a73e8", borderRadius: 8,
+                    fontWeight: 600, fontSize: "0.88rem",
                     cursor: qrGenerating ? "not-allowed" : "pointer",
                   }}
                 >
@@ -1534,9 +1884,9 @@ export default function CurrentEvent() {
                     onClick={downloadAttendanceQR}
                     style={{
                       width: "100%", marginTop: 8, padding: "10px 0",
-                      background: "#f1f5f9", color: "#334155",
-                      border: "none", borderRadius: 10,
-                      fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+                      background: "#f8f9fa", color: "#5f6368",
+                      border: "none", borderRadius: 8,
+                      fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
                     }}
                   >
                     ⬇ Download QR Image
@@ -1559,7 +1909,7 @@ export default function CurrentEvent() {
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
                 <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📋 Partner Feedback QR</h3>
-                <button onClick={() => setShowFeedbackQR(false)} style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                <button onClick={() => setShowFeedbackQR(false)} style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}>✕</button>
               </div>
               <div style={{ padding: "20px", textAlign: "center" }}>
                 {/* status pill */}
@@ -1596,7 +1946,7 @@ export default function CurrentEvent() {
                   disabled={togglingFeedback}
                   style={{
                     width: "100%", padding: "10px 0", marginBottom: 8,
-                    background: missionData?.feedback?.isActive ? "#dc2626" : "#15803d",
+                    background: missionData?.feedback?.isActive ? "#ea4335" : "#34a853",
                     color: "#fff", border: "none", borderRadius: 10,
                     fontWeight: 700, fontSize: "0.85rem",
                     cursor: togglingFeedback ? "not-allowed" : "pointer",
@@ -1612,13 +1962,13 @@ export default function CurrentEvent() {
                 <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                   <button
                     onClick={() => window.open(`/global/feedback/${missionId}`, "_blank")}
-                    style={{ flex: 1, padding: "10px 0", background: "#0f766e", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+                    style={{ flex: 1, padding: "10px 0", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
                   >
                     Open Form ↗
                   </button>
                   <button
                     onClick={() => setShowFeedbackQR(false)}
-                    style={{ flex: 1, padding: "10px 0", background: "#f1f5f9", color: "#334155", border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+                    style={{ flex: 1, padding: "10px 0", background: "#f8f9fa", color: "#5f6368", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
                   >
                     Close
                   </button>
@@ -1627,9 +1977,9 @@ export default function CurrentEvent() {
                   onClick={downloadFeedbackQR}
                   style={{
                     width: "100%", padding: "10px 0",
-                    background: "#f1f5f9", color: "#334155",
-                    border: "none", borderRadius: 10,
-                    fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+                    background: "#f8f9fa", color: "#5f6368",
+                    border: "none", borderRadius: 8,
+                    fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
                   }}
                 >
                   ⬇ Download QR Image
@@ -1668,12 +2018,12 @@ export default function CurrentEvent() {
             <button
               onClick={() => { setShowFlaggedModal(true); fetchFlaggedStudents(); }}
               style={{
-                padding: "7px 14px", background: "#1d4ed8", color: "#fff",
-                border: "none", borderRadius: 8, fontWeight: 700,
+                padding: "7px 14px", background: "#fff", color: "#1a73e8",
+                border: "1px solid #1a73e8", borderRadius: 8, fontWeight: 600,
                 fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap",
               }}
             >
-              📄 View Flagged Absent Volunteers
+              📄 Flagged Volunteers
             </button>
             <span className="ce-tooltip">Shows a list of all volunteers currently flagged for absence. You can manually remove flags from here.</span>
           </div>
@@ -1685,12 +2035,13 @@ export default function CurrentEvent() {
               disabled={globalFlagging}
               style={{
                 padding: "7px 14px",
-                background: globalFlagging ? "#9ca3af" : "#b91c1c",
-                color: "#fff", border: "none", borderRadius: 8, fontWeight: 700,
+                background: globalFlagging ? "#f8f9fa" : "#ea4335",
+                color: globalFlagging ? "#9aa0a6" : "#fff",
+                border: "none", borderRadius: 8, fontWeight: 600,
                 fontSize: "0.82rem", cursor: globalFlagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
               }}
             >
-              {globalFlagging ? "Flagging..." : "🚩 Flag Absent — All Events"}
+              {globalFlagging ? "Flagging..." : "🚩 Flag All Events"}
             </button>
             <span className="ce-tooltip">Scans every past event and flags volunteers who missed attendance. This may take a while.</span>
           </div>
@@ -1699,15 +2050,15 @@ export default function CurrentEvent() {
       </div>
 
       {autoFlagStatus === "running" && (
-        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>⏳ Checking attendance flags…</div>
+        <div style={{ fontSize: 12, color: "#5f6368", marginBottom: 4 }}>⏳ Checking attendance flags…</div>
       )}
       {autoFlagStatus && autoFlagStatus !== "running" && autoFlagStatus.count > 0 && (
-        <div style={{ fontSize: 12, color: "#15803d", marginBottom: 4 }}>
+        <div style={{ fontSize: 12, color: "#137333", marginBottom: 4 }}>
           ✅ Auto-flagged {autoFlagStatus.count} volunteer(s)
         </div>
       )}
       {globalFlagResult && (
-        <div style={{ fontSize: 13, color: globalFlagResult.ok ? "#15803d" : "#b91c1c", fontWeight: 600, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, color: globalFlagResult.ok ? "#137333" : "#d93025", fontWeight: 600, marginBottom: 8 }}>
           {globalFlagResult.ok
             ? `${globalFlagResult.count} volunteer(s) flagged across all events`
             : `Error: ${globalFlagResult.error}`}
@@ -1730,6 +2081,7 @@ export default function CurrentEvent() {
               key={m.id}
               mission={m}
               onClick={() => navigate(`${isFaculty ? "/faculty" : "/admin"}/current-event/${m.id}`, { state: { missionTitle: m.title } })}
+              onToggleStatus={isFaculty ? null : handleToggleEventStatus}
             />
           ))}
         </div>
@@ -1750,14 +2102,14 @@ export default function CurrentEvent() {
               background: "#fff", borderRadius: 12, padding: 28,
               width: "min(680px, 95vw)", maxHeight: "80vh",
               display: "flex", flexDirection: "column", gap: 16,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+              boxShadow: "0 4px 24px rgba(60,64,67,0.18)",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0, fontSize: "1.1rem" }}>🚩 Flagged Absent Volunteers</h3>
+              <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 600, color: "#202124" }}>🚩 Flagged Absent Volunteers</h3>
               <button
                 onClick={() => setShowFlaggedModal(false)}
-                style={{ background: "#1f2937", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0 }}
+                style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}
               >✕</button>
             </div>
             {flaggedLoading ? (
@@ -1766,40 +2118,41 @@ export default function CurrentEvent() {
               <div style={{ color: "#6b7280", padding: 16 }}>No flagged volunteers.</div>
             ) : (
               <div style={{ overflowY: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                   <thead>
-                    <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
-                      <th style={{ padding: "8px 10px" }}>Name</th>
-                      <th style={{ padding: "8px 10px" }}>Level</th>
-                      <th style={{ padding: "8px 10px" }}>Flagged For</th>
-                      <th style={{ padding: "8px 10px" }}>Flag Expires</th>
-                      <th style={{ padding: "8px 10px" }}>Action</th>
+                    <tr style={{ borderBottom: "1.5px solid #e8eaed", textAlign: "left" }}>
+                      <th style={{ padding: "10px 12px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", letterSpacing: "0.02em" }}>Name</th>
+                      <th style={{ padding: "10px 12px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem" }}>Level</th>
+                      <th style={{ padding: "10px 12px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem" }}>Flagged For</th>
+                      <th style={{ padding: "10px 12px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem" }}>Expires</th>
+                      <th style={{ padding: "10px 12px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem" }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {flaggedStudents.map(s => (
-                      <tr key={s.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "8px 10px" }}>
-                          <div style={{ fontWeight: 600 }}>{s.name}</div>
+                    {flaggedStudents.map((s, idx) => (
+                      <tr key={s.id} style={{ borderBottom: idx < flaggedStudents.length - 1 ? "1px dashed #e8eaed" : "none" }}>
+                        <td style={{ padding: "10px 12px" }}>
+                          <div style={{ fontWeight: 600, color: "#202124" }}>{s.name}</div>
                           {s.email && s.email !== s.name && (
-                            <div style={{ fontSize: "0.78rem", color: "#6b7280" }}>{s.email}</div>
+                            <div style={{ fontSize: "0.75rem", color: "#80868b" }}>{s.email}</div>
                           )}
                         </td>
-                        <td style={{ padding: "8px 10px" }}>{s.level}</td>
-                        <td style={{ padding: "8px 10px", color: "#6b7280", fontSize: "0.82rem" }}>
+                        <td style={{ padding: "10px 12px", color: "#5f6368" }}>{s.level}</td>
+                        <td style={{ padding: "10px 12px", color: "#5f6368", fontSize: "0.8rem" }}>
                           {s.flaggedMissionTitle || "—"}
                         </td>
-                        <td style={{ padding: "8px 10px", fontSize: "0.82rem" }}>
+                        <td style={{ padding: "10px 12px", fontSize: "0.8rem", color: "#5f6368" }}>
                           {s.flagExpiry ? s.flagExpiry.toLocaleDateString() : "—"}
                         </td>
-                        <td style={{ padding: "8px 10px" }}>
+                        <td style={{ padding: "10px 12px" }}>
                           <button
                             disabled={!!togglingFlag[s.id]}
                             onClick={() => handleToggleFlag(s.id, true)}
                             style={{
                               padding: "4px 12px",
-                              background: togglingFlag[s.id] ? "#9ca3af" : "#16a34a",
-                              color: "#fff", border: "none", borderRadius: 6,
+                              background: togglingFlag[s.id] ? "#f1f3f4" : "#e6f4ea",
+                              color: togglingFlag[s.id] ? "#9aa0a6" : "#137333",
+                              border: "none", borderRadius: 6,
                               fontWeight: 600, fontSize: "0.78rem",
                               cursor: togglingFlag[s.id] ? "not-allowed" : "pointer",
                             }}

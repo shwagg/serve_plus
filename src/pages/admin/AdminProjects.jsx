@@ -145,10 +145,33 @@ export default function AdminProjects() {
   const otherList = useMemo(
     () => sortByDate(
       statusFilter === "all"
-        ? filtered.filter(p => !isForApproval(p.status) && (p.status || "").toLowerCase() !== "draft")
+        ? filtered.filter(p =>
+            !isForApproval(p.status) &&
+            (p.status || "").toLowerCase() !== "draft" &&
+            (p.status || "").toLowerCase() !== "published"
+          )
         : filtered
     ),
     [filtered, statusFilter]
+  );
+
+  const archivedFromAll = useMemo(() => {
+    if (statusFilter !== "all") return [];
+    return projects.filter(p => {
+      if ((p.status || "").toLowerCase() !== "archived") return false;
+      if (searchTerm.trim()) return (p.title || "").toLowerCase().includes(searchTerm.toLowerCase());
+      return true;
+    });
+  }, [projects, statusFilter, searchTerm]);
+
+  const publishedSectionList = useMemo(
+    () => statusFilter === "all"
+      ? sortByDate([
+          ...filtered.filter(p => (p.status || "").toLowerCase() === "published"),
+          ...archivedFromAll,
+        ])
+      : [],
+    [filtered, archivedFromAll, statusFilter]
   );
 
   function getStatusBadgeClass(status = "") {
@@ -165,7 +188,8 @@ export default function AdminProjects() {
     if (!status) return "Ready for Publishing";
     if (status.toLowerCase() === "draft") return "Ready for Publishing";
     if (isForApproval(status)) return "Pending";
-    if (status === "archived") return "Archived";
+    if (status.toLowerCase() === "published") return "Active · Open";
+    if (status.toLowerCase() === "archived") return "Archived";
     return status.charAt(0).toUpperCase() + status.slice(1);
   }
 
@@ -350,7 +374,7 @@ export default function AdminProjects() {
   }
 
   const currentLabel = FILTER_OPTIONS.find(f => f.key === statusFilter)?.label ?? "All Projects";
-  const isEmpty = forApprovalList.length === 0 && forPublishingList.length === 0 && otherList.length === 0;
+  const isEmpty = forApprovalList.length === 0 && forPublishingList.length === 0 && publishedSectionList.length === 0 && otherList.length === 0;
 
   return (
     <div className="admin-projects-page">
@@ -359,9 +383,13 @@ export default function AdminProjects() {
         <h1 className="page-title">Project Proposals</h1>
         <div className="ap-controls">
           <div className="search-wrapper">
+            <svg className="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="7" cy="7" r="5" stroke="#9CA3AF" strokeWidth="1.5"/>
+              <path d="M10.5 10.5L13.5 13.5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
             <input
               type="text"
-              placeholder="Search here..."
+              placeholder="Search proposals..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="search-input"
@@ -432,11 +460,21 @@ export default function AdminProjects() {
                 </div>
               )}
 
-              {/* Remaining / filtered projects */}
+              {/* Published Proposals — active (published) + archived */}
+              {statusFilter === "all" && publishedSectionList.length > 0 && (
+                <div className="ap-section">
+                  <span className="ap-section-heading">Published Proposals</span>
+                  <div className="rp-card-grid">
+                    {publishedSectionList.map(renderCard)}
+                  </div>
+                </div>
+              )}
+
+              {/* Completed / other projects */}
               {otherList.length > 0 && (
                 <div className="ap-section">
                   {statusFilter === "all" && (
-                    <span className="ap-section-heading">Published Projects</span>
+                    <span className="ap-section-heading">Completed Projects</span>
                   )}
                   <div className="rp-card-grid">
                     {otherList.map(renderCard)}

@@ -11,32 +11,32 @@
 
 /* ── Coloured action buttons (extend .rp-review-btn) ─────────── */
 .rp-btn-publish {
-  background: #15803d;
+  background: #137333;
   color: #fff;
   border-color: transparent;
 }
 .rp-btn-publish:hover {
-  background: #166534;
+  background: #0d6128;
   border-color: transparent;
 }
 
 .rp-btn-cancel-proposal {
-  background: #dc2626;
+  background: #d93025;
   color: #fff;
   border-color: transparent;
 }
 .rp-btn-cancel-proposal:hover {
-  background: #b91c1c;
+  background: #b52a1d;
   border-color: transparent;
 }
 
 .rp-btn-archive {
-  background: #6b7280;
+  background: #5f6368;
   color: #fff;
   border-color: transparent;
 }
 .rp-btn-archive:hover {
-  background: #4b5563;
+  background: #3c4043;
   border-color: transparent;
 }
 
@@ -62,6 +62,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  font-family: 'Inter', sans-serif;
 }
 
 .ap-cancel-modal__header {
@@ -74,11 +75,11 @@
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-  color: #dc2626;
+  color: #d93025;
 }
 
 .ap-cancel-modal__close {
-  background: #1f2937;
+  background: #3c4043;
   border: none;
   border-radius: 50%;
   width: 32px;
@@ -96,7 +97,7 @@
   flex-shrink: 0;
   transition: background 0.15s, transform 0.15s;
 }
-.ap-cancel-modal__close:hover { background: #374151; transform: scale(1.05); }
+.ap-cancel-modal__close:hover { background: #5f6368; transform: scale(1.05); }
 .ap-cancel-modal__close:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -105,7 +106,7 @@
 .ap-cancel-modal__body {
   margin: 0;
   font-size: 14px;
-  color: #374151;
+  color: #3c4043;
 }
 
 .ap-cancel-modal__field {
@@ -117,25 +118,29 @@
 .ap-cancel-modal__label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: #3c4043;
 }
 
 .ap-cancel-modal__required {
-  color: #dc2626;
+  color: #d93025;
 }
 
 .ap-cancel-modal__textarea {
   resize: vertical;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
   padding: 10px 12px;
   font-size: 14px;
-  color: #111827;
+  color: #202124;
   outline: none;
-  font-family: inherit;
+  font-family: 'Inter', sans-serif;
+  transition: border-color 0.2s;
+}
+.ap-cancel-modal__textarea:focus {
+  border-color: #30bdb7;
 }
 .ap-cancel-modal__textarea:disabled {
-  background: #f9fafb;
+  background: #f8f9fa;
   cursor: not-allowed;
 }
 
@@ -146,14 +151,20 @@
 }
 
 .ap-cancel-modal__btn-back {
-  padding: 8px 18px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-  color: #374151;
+  padding: 8px 20px;
+  border-radius: 16px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8f9fa;
+  color: #3c4043;
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ap-cancel-modal__btn-back:hover {
+  background: #f1f3f4;
+  border-color: #bdc1c6;
 }
 .ap-cancel-modal__btn-back:disabled {
   cursor: not-allowed;
@@ -161,30 +172,36 @@
 }
 
 .ap-cancel-modal__btn-confirm {
-  padding: 8px 18px;
-  border-radius: 8px;
+  padding: 8px 20px;
+  border-radius: 16px;
   border: none;
-  background: #dc2626;
+  background: #d93025;
   color: #fff;
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.15s;
+}
+.ap-cancel-modal__btn-confirm:hover {
+  background: #b52a1d;
 }
 .ap-cancel-modal__btn-confirm:disabled {
-  background: #fca5a5;
+  background: #f28b82;
   cursor: not-allowed;
 }
 
 /* ── Edit modal ───────────────────────────────────────────────── */
 .ap-edit-modal {
   background: #fff;
-  border-radius: 18px;
+  border-radius: 16px;
   width: min(700px, 95vw);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   overflow: hidden;
+  font-family: 'Inter', sans-serif;
 }
 
 .ap-edit-modal__header {
@@ -192,7 +209,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e8eaed;
   flex-shrink: 0;
 }
 
@@ -200,10 +217,11 @@
   margin: 0;
   font-size: 17px;
   font-weight: 700;
+  color: #202124;
 }
 
 .ap-edit-modal__close {
-  background: #1f2937;
+  background: #3c4043;
   border: none;
   border-radius: 50%;
   width: 32px;
@@ -221,12 +239,12 @@
   flex-shrink: 0;
   transition: background 0.15s, transform 0.15s;
 }
-.ap-edit-modal__close:hover { background: #374151; transform: scale(1.05); }
+.ap-edit-modal__close:hover { background: #5f6368; transform: scale(1.05); }
 
 .ap-edit-modal__locked {
   padding: 32px;
   text-align: center;
-  color: #64748b;
+  color: #80868b;
 }
 
 .ap-edit-modal__lock-icon {
@@ -237,7 +255,7 @@
 .ap-edit-modal__lock-title {
   font-weight: 700;
   font-size: 1rem;
-  color: #1e293b;
+  color: #202124;
   margin-bottom: 8px;
 }
 

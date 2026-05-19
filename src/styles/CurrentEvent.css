@@ -76,7 +76,7 @@
 
 /* ── Slight left-border accent on event cards ────────────────────────── */
 .ce-event-card {
-  border-left: 3px solid #30bdb7;
+  border-left: 3px solid #1a73e8;
 }
 
 .current-events-horizontal-container {
@@ -138,7 +138,7 @@
 
 .mission-header h3 {
   font-size: 18px;
-  color: #234e7b;
+  color: #000;
   font-weight: 700;
 }
 
@@ -190,7 +190,7 @@
 .mission-title {
   font-size: 18px;
   font-weight: 700;
-  color: #234e7b;
+  color: #000;
   margin: 0;
 }
 .mission-header {
@@ -254,7 +254,7 @@
   margin-top: 20px;
   background: white;
   table-layout: fixed; /* 🔥 Important */
-  color: #234e7b;
+  color: #000;
 }
 
 .admin-table thead {
@@ -306,7 +306,7 @@
   display: flex;
   gap: 6px;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 .section-header {
   margin-top: 30px;
@@ -316,7 +316,7 @@
 .section-header h3 {
   font-size: 16px;
   font-weight: 700;
-  color: #234e7b;
+  color: #000;
 }
 
 .empty-label {
@@ -340,5 +340,83 @@
 
 .approved-table thead {
   background: #f3f3f3;
+}
+
+/* ── Mobile ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cem-header, .section-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+/* Tab nav row: allow horizontal scroll instead of wrapping/clipping */
+.ce-tab-nav {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.ce-tab-nav::-webkit-scrollbar { display: none; }
+
+/* Tab buttons */
+.ce-tab-btn {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.01em;
+  border-radius: 6px 6px 0 0;
+  white-space: nowrap;
+}
+.ce-tab-btn:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.ce-tab-btn.active {
+  background: #eff6ff;
+  color: #1a73e8;
+  font-weight: 600;
+  border-bottom: 2px solid #1a73e8;
+}
+
+/* Outline action buttons in the action strip */
+.ce-action-btn {
+  padding: 8px 14px;
+  background: transparent;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.ce-action-btn:hover,
+.ce-action-btn:focus-visible {
+  color: #1a73e8;
+  border-color: #1a73e8;
+  background: #eff6ff;
+  outline: none;
+}
+.ce-action-btn:active {
+  background: #dbeafe;
+}
+.ce-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
