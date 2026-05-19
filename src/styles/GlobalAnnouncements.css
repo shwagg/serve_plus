@@ -385,7 +385,7 @@
 }
 
 .modal-title {
-  color: #234e7b;
+  color: #000;
   margin: 0 0 14px;
   font-size: 22px;
   text-align: center;
@@ -421,7 +421,7 @@
 }
 
 .modal-section-title {
-  color: #234e7b;
+  color: #000;
   font-size: 15px;
   font-weight: 600;
   margin: 0 0 6px;
@@ -443,7 +443,7 @@
 }
 
 .modal-date-badge strong {
-  color: #234e7b;
+  color: #000;
 }
 
 .modal-date-badge span {
