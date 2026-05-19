@@ -42,7 +42,7 @@
 .settings-title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1f3c88;
+  color: #000;
   letter-spacing: 0.1px;
 }
 
@@ -141,6 +141,7 @@
   background: #e6f7f6;
   color: #0f766e;
   font-weight: 600;
+  border-radius: 10px;
 }
 
 .settings-nav-item.active::before {
@@ -158,6 +159,7 @@
 .settings-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 26px 28px;
   min-width: 0;
   scrollbar-width: thin;
@@ -224,7 +226,7 @@
 .settings-save-btn {
   height: 38px;
   padding: 0 22px;
-  border-radius: 32px;
+  border-radius: 16px;
   background: #30bdb7;
   border: none;
   color: #fff;
@@ -247,9 +249,9 @@
 
 .settings-primary-btn {
   width: 100%;
-  max-width: 300px;
+  max-width: 100%;
   height: 42px;
-  border-radius: 32px;
+  border-radius: 16px;
   background: #30bdb7;
   border: none;
   color: #fff;
@@ -269,35 +271,130 @@
   cursor: not-allowed;
 }
 
-/* ── Terms & Privacy ── */
-.settings-terms-links {
+/* ── Blackboard SSO banner ── */
+.settings-sso-banner {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.settings-terms-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 18px;
-  border: 1.5px solid #e2e8f0;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 10px;
-  color: #234e7b;
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-size: 13px;
+  color: #1d4ed8;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+/* ── Profile info table ── */
+.settings-info-table {
   background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-.settings-terms-btn:hover {
-  background: #e6f7f6;
-  border-color: #30bdb7;
-  color: #0f766e;
+.settings-info-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 16px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
+.settings-info-row:last-child {
+  border-bottom: none;
+}
+
+.settings-info-key {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  width: 76px;
+  flex-shrink: 0;
+}
+
+.settings-info-val {
+  font-size: 14px;
+  color: #111827;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Username row — view mode */
+.settings-username-view {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+
+.settings-edit-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.settings-edit-icon-btn:hover {
+  background: #e2e8f0;
+}
+
+/* Username row — edit mode: stays centered, content wraps within the value cell */
+.settings-info-row--username {
+  align-items: center;
+}
+
+.settings-username-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.settings-username-wrap {
+  height: 34px;
+  border-radius: 16px;
+  flex: 1;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.settings-cancel-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.settings-cancel-btn:hover {
+  background: #e2e8f0;
+}
+
+/* ── Terms & Privacy accepted note ── */
 .settings-accepted-note {
   font-size: 12.5px;
   color: #475569;
@@ -307,6 +404,86 @@
   padding: 10px 14px;
   margin-top: 4px;
   line-height: 1.5;
+}
+
+/* ── Agreement inline viewer ── */
+.settings-agreement-tabs {
+  display: flex;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.settings-agreement-tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings-agreement-tab:first-child {
+  border-right: 1px solid #e2e8f0;
+}
+
+.settings-agreement-tab.active {
+  background: #30bdb7;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+.settings-agreement-tab:hover:not(.active) {
+  background: #e6f7f6;
+  color: #0f766e;
+  border-radius: 10px;
+}
+
+.settings-agreement-body {
+  overflow-y: auto;
+  max-height: 420px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 18px;
+  background: #f8fafc;
+  font-size: 13.5px;
+  color: #374151;
+  line-height: 1.6;
+  scrollbar-width: thin;
+  scrollbar-color: #ddd transparent;
+}
+
+.settings-agreement-body::-webkit-scrollbar { width: 4px; }
+.settings-agreement-body::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+
+.settings-agreement-body p {
+  margin: 0 0 8px 0;
+}
+
+.settings-agreement-heading {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #111827;
+  margin: 14px 0 6px 0;
+}
+
+.settings-agreement-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 10px 0;
+}
+
+.settings-agreement-version {
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin: 0 0 4px 0;
 }
 
 /* ── Notification toggle ── */
@@ -368,6 +545,14 @@
 
 .settings-toggle.on .settings-toggle-thumb {
   left: 21px;
+}
+
+/* ── Disabled toggle card (role doesn't have this feature) ── */
+.settings-toggle-row.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: default;
+  background: #f1f5f9;
 }
 
 /* ── Audit log ── */
@@ -447,6 +632,81 @@
   padding: 32px 0;
 }
 
+/* ── Documents list ── */
+.settings-doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-doc-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #111827;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-doc-item:hover {
+  background: #e6f7f6;
+  border-color: #30bdb7;
+  color: #0f766e;
+}
+
+.settings-doc-icon {
+  font-size: 22px !important;
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.settings-doc-item:hover .settings-doc-icon,
+.settings-doc-item:hover .settings-doc-action {
+  color: #0f766e;
+}
+
+.settings-doc-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-doc-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+
+.settings-doc-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+.settings-doc-item:hover .settings-doc-desc {
+  color: #0f766e;
+}
+
+.settings-doc-action {
+  font-size: 20px !important;
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+
+/* ── Password inputs match button width ── */
+.settings-group .ui-input-pass-wrap {
+  max-width: 100%;
+}
+
 /* ── SSO notice ── */
 .settings-sso-notice {
   padding: 12px 16px;
@@ -503,5 +763,43 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
+  }
+
+  /* Info table on mobile: keep rows horizontal so value + icon stay together.
+     Right padding (18px) and last-child bottom padding (14px) both exceed
+     the table's border-radius (12px) so the corner arc never clips content. */
+  .settings-info-row {
+    padding: 10px 18px 10px 14px;
+    gap: 8px;
+  }
+
+  .settings-info-row:last-child {
+    padding-bottom: 14px;
+  }
+
+  .settings-info-key {
+    width: 70px;
+  }
+
+  /* Edit mode: let input grow and buttons wrap below if needed */
+  .settings-username-inline {
+    flex-wrap: wrap;
+  }
+
+  .settings-username-wrap {
+    flex: 1;
+    min-width: 90px;
+    max-width: unset;
+  }
+
+  /* Compact edit buttons on mobile */
+  .settings-username-inline .settings-save-btn {
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .settings-username-inline .settings-cancel-btn {
+    padding: 0 10px;
+    font-size: 12.5px;
   }
 }

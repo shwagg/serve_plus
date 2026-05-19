@@ -44,6 +44,10 @@ import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
 import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
+import GavelRoundedIcon from '@mui/icons-material/GavelRounded';
+import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
+import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 
 
 export {
@@ -88,4 +92,8 @@ export {
     PlaceOutlinedIcon,
     PeopleOutlinedIcon,
     IosShareRoundedIcon,
+    GavelRoundedIcon,
+    NotificationsNoneRoundedIcon,
+    ArticleOutlinedIcon,
+    FileDownloadOutlinedIcon,
 };
