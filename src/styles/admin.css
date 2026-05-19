@@ -67,15 +67,15 @@
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
   padding: 0 20px;
-  z-index: 890;
-  transition: left 0.25s ease, padding-left 0.25s ease;
+  z-index: 1060;
+  transition: left 0.25s ease;
 }
 
 .admin-page.sidebar-collapsed .admin-context-strip {
   left: 0;
-  padding-left: 56px; /* make room for the floating toggle button */
 }
 
 .sidebar-toggle-btn {
@@ -89,6 +89,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: auto;
   transition: background 0.15s;
 }
 
@@ -102,19 +103,6 @@
   user-select: none;
 }
 
-/* Floating toggle — single button that slides between sidebar and strip */
-.sidebar-toggle-floating {
-  position: fixed;
-  top: calc(var(--header-height) + var(--context-height) / 2);
-  transform: translateY(-50%);
-  left: calc(var(--sidebar-width) - 44px);
-  z-index: 900;
-  transition: left 0.25s ease;
-}
-
-.sidebar-toggle-floating.collapsed {
-  left: 12px;
-}
 
 /* ── Left sidebar panel ──────────────────────────── */
 .admin-sidebar {
@@ -550,9 +538,10 @@
 }
 /* ── Mobile / Phone Responsive ──────────────────── */
 @media (max-width: 768px) {
-  /* Keep context strip visible — shows toggle + breadcrumbs above page heading */
+  /* Context strip always spans full width on mobile — sidebar is overlay, not push */
   .admin-context-strip {
     display: flex;
+    left: 0 !important;
   }
 
   /* Sidebar slides over content (overlay), not push */

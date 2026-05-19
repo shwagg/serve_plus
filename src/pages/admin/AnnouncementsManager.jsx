@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { db } from "../../firebaseConfig";
 import {
   collection, getDocs, addDoc, deleteDoc,
@@ -7,6 +7,7 @@ import {
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
 import "../../styles/ticker.css";
+import servePlusIcon from '../../assets/serve_plus_icon.svg';
 
 export default function AnnouncementsManager() {
   const [announcements, setAnnouncements] = useState([]);
@@ -82,9 +83,13 @@ export default function AnnouncementsManager() {
     ...(draftPreview.title ? [draftPreview] : []),
     ...announcements,
   ];
-  const previewTickerText = previewItems.length > 0
-    ? previewItems.map(a => a.title + (a.body ? ` — ${a.body}` : '')).join('  ◆  ')
-    : 'No announcements posted yet — your text will scroll here';
+  const renderPreviewItems = (items, keyPrefix = '') =>
+    items.map((a, i) => (
+      <Fragment key={keyPrefix + i}>
+        {i > 0 && <img src={servePlusIcon} className="ticker-sep" alt="" aria-hidden="true" />}
+        {a.title}{a.body ? ` — ${a.body}` : ''}
+      </Fragment>
+    ));
 
   return (
     <div className="admin-outlet content">
@@ -137,12 +142,12 @@ export default function AnnouncementsManager() {
               <div className="ticker-track">
                 {previewItems.length === 0 ? (
                   <span style={{ fontSize: 12, color: '#475569', paddingLeft: 16 }}>
-                    {previewTickerText}
+                    No announcements posted yet — your text will scroll here
                   </span>
                 ) : (
                   <div className="ticker-content">
-                    <span className="ticker-text">{previewTickerText}</span>
-                    <span className="ticker-text" aria-hidden="true">{previewTickerText}</span>
+                    <span className="ticker-text">{renderPreviewItems(previewItems)}</span>
+                    <span className="ticker-text" aria-hidden="true">{renderPreviewItems(previewItems, 'd-')}</span>
                   </div>
                 )}
               </div>
