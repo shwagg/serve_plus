@@ -32,6 +32,13 @@
     ],
     "rewrites": [
       {
+        "source": "/preview/**",
+        "run": {
+          "serviceId": "eventpreview",
+          "region": "asia-southeast1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
