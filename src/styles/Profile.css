@@ -494,7 +494,7 @@
 
 /* Achievements grid */
 .achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
-.achievement-card { background: linear-gradient(135deg,#f0fdf4,#ecfdf5); border: 1.5px solid #6ee7b7; border-radius: 12px; padding: 14px 10px; text-align: center; transition: transform .15s, box-shadow .15s; }
+.achievement-card { background: #f5f5f5; border-radius: 12px; padding: 14px 10px; text-align: center; transition: transform .15s, box-shadow .15s; }
 .achievement-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16,185,129,0.15); }
 .achievement-icon { font-size: 28px; }
 .achievement-name { font-weight: 700; font-size: 12px; color: #065f46; margin-top: 6px; }
@@ -527,12 +527,128 @@
 .task-status-badge.task-status-in_progress { background: #dbeafe; color: #1e40af; }
 .task-points { font-size: 11px; color: #000; font-weight: 700; }
 
-/* Certificates */
+/* ── Certificate list preview cards ──────────────────────────────────────── */
+.cert-list { display: flex; flex-direction: column; }
+
+.cert-list-item {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 6px; cursor: pointer;
+  border-radius: 8px; transition: background 0.15s;
+}
+.cert-list-item:hover { background: #f8fafc; }
+
+/* Mini certificate thumbnail — scaled-down iframe of the actual PDF template */
+.cert-thumb {
+  width: 100px; height: 70px; flex-shrink: 0;
+  border-radius: 7px; border: 1.5px solid #b8d4fb;
+  overflow: hidden; position: relative;
+  box-shadow: 0 1px 5px rgba(35,78,123,0.1);
+  background: #f0f4ff;
+}
+.cert-thumb-iframe {
+  position: absolute; top: 0; left: 0;
+  width: 800px; height: 560px;
+  transform: scale(0.125);
+  transform-origin: 0 0;
+  pointer-events: none;
+  border: none;
+}
+
+.cert-list-details { flex: 1; min-width: 0; }
+.cert-list-label { font-size: 0.72rem; color: #64748b; margin-bottom: 2px; }
+.cert-list-course {
+  font-weight: 700; font-size: 0.95rem; color: #1e293b;
+  margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cert-list-cta { color: #1a73e8; font-size: 0.8rem; font-weight: 600; }
+.cert-list-date { font-size: 0.75rem; color: #94a3b8; margin-top: 3px; }
+
+/* ── Certificate viewer modal ─────────────────────────────────────────────── */
+.cert-modal-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,0.72);
+  z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.cert-modal-box {
+  background: #fff; border-radius: 14px;
+  width: min(920px, 96vw); max-height: 92vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.38);
+}
+.cert-modal-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+}
+.cert-modal-header-info { flex: 1; min-width: 0; }
+.cert-modal-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.cert-modal-course {
+  font-weight: 700; font-size: 1.05rem; color: #1e293b;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cert-modal-date { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+.cert-modal-close {
+  background: none; border: none; font-size: 1.5rem; cursor: pointer;
+  color: #94a3b8; padding: 4px 8px; border-radius: 6px; line-height: 1;
+  flex-shrink: 0; transition: background 0.15s, color 0.15s;
+}
+.cert-modal-close:hover { background: #f1f5f9; color: #475569; }
+.cert-modal-body {
+  flex: 1; overflow: hidden; min-height: 420px; display: flex; flex-direction: column;
+}
+.cert-modal-iframe { width: 100%; height: 100%; min-height: 420px; border: none; display: block; flex: 1; }
+.cert-modal-loading {
+  display: flex; align-items: center; justify-content: center;
+  flex: 1; min-height: 420px; gap: 12px; color: #64748b; font-size: 0.9rem;
+}
+.cert-modal-spinner {
+  width: 26px; height: 26px; border: 3px solid #e2e8f0;
+  border-top-color: #1a73e8; border-radius: 50%;
+  animation: spin 0.8s linear infinite; flex-shrink: 0;
+}
+.cert-modal-unavailable {
+  display: flex; align-items: center; justify-content: center;
+  flex: 1; flex-direction: column; gap: 10px; color: #94a3b8; min-height: 300px;
+  font-size: 0.85rem;
+}
+.cert-modal-footer {
+  display: flex; gap: 10px; padding: 14px 20px;
+  border-top: 1px solid #e2e8f0; justify-content: flex-end; flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.cert-modal-share-btn {
+  background: #f1f5f9; color: #334155; border: none; border-radius: 8px;
+  padding: 9px 20px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+  transition: background 0.2s, color 0.2s; white-space: nowrap;
+}
+.cert-modal-share-btn.copied { background: #10b981; color: #fff; }
+.cert-modal-share-btn:not(.copied):hover { background: #e2e8f0; }
+.cert-modal-download-btn {
+  background: #1a73e8; color: #fff; border-radius: 8px;
+  padding: 9px 20px; font-weight: 600; font-size: 0.85rem;
+  text-decoration: none; display: inline-block; white-space: nowrap;
+  transition: background 0.15s;
+}
+.cert-modal-download-btn:hover { background: #1558c0; }
+
+@media (max-width: 600px) {
+  .cert-modal-box { width: 96vw; max-height: 88vh; border-radius: 10px; }
+  .cert-modal-header { padding: 12px 14px; gap: 8px; }
+  .cert-modal-course { font-size: 0.92rem; }
+  .cert-modal-body { min-height: 280px; }
+  .cert-modal-iframe { min-height: 280px; }
+  .cert-modal-loading { min-height: 280px; }
+  .cert-modal-footer { padding: 10px 14px; flex-direction: column; gap: 8px; }
+  .cert-modal-share-btn, .cert-modal-download-btn { width: 100%; text-align: center; }
+  .cert-thumb { width: 78px; height: 56px; }
+  .cert-thumb-iframe { width: 625px; height: 450px; transform: scale(0.125); }
+  .cert-list-item { gap: 12px; }
+  .cert-list-course { font-size: 0.88rem; }
+}
+
+/* Legacy cert card styles (kept for backwards compat) */
 .certificates-list { display: flex; flex-direction: column; gap: 10px; }
 .certificate-card { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg,#fffbeb,#fef3c7); border: 1.5px solid #fcd34d; border-radius: 12px; padding: 14px 16px; }
 .cert-icon { font-size: 28px; flex-shrink: 0; }
 .cert-body { flex: 1; min-width: 0; }
-.cert-course { font-weight: 700; color: #92400e; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cert-meta { font-size: 12px; color: #b45309; margin-top: 2px; }
 .cert-link { flex-shrink: 0; background: #f59e0b; color: #fff; font-weight: 700; font-size: 12px; padding: 6px 14px; border-radius: 8px; text-decoration: none; transition: background .15s; white-space: nowrap; }
 .cert-link:hover { background: #d97706; }
