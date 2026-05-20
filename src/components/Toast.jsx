@@ -3,22 +3,22 @@ import ReactDOM from 'react-dom';
 
 let toastId = 0;
 
+const TOAST_BG = '#f0f0f0';
+
 const sharedStyle = {
-  background: '#ffffff',
-  borderRadius: 10,
-  fontFamily: 'system-ui, Avenir, Helvetica, Arial, sans-serif',
+  background: TOAST_BG,
+  borderRadius: '16px',
+  fontFamily: "'Inter', sans-serif",
   fontWeight: 400,
   fontSize: 14,
   letterSpacing: '0.01em',
-  boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+  boxShadow: 'none',
   pointerEvents: 'auto',
-  minWidth: 'fit-content',
-  maxWidth: 360,
 };
 
 export default function ToastContainer() {
   const [toasts, setToasts] = useState([]);
-  const [confirm, setConfirm] = useState(null); // { message, resolve }
+  const [confirm, setConfirm] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -64,42 +64,47 @@ export default function ToastContainer() {
     setConfirm(null);
   };
 
+  const itemSizing = { width: '100%', boxSizing: 'border-box' };
+
+  const containerStyle = isMobile
+    ? { position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10, pointerEvents: 'none', maxWidth: 'calc(100vw - 32px)' }
+    : { position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10, pointerEvents: 'none', width: 440 };
+
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', bottom: isMobile ? 14 : 32, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, pointerEvents: 'none', width: isMobile ? 'calc(100vw - 24px)' : 'auto', maxWidth: isMobile ? 'calc(100vw - 24px)' : 'none' }}>
+    <div style={containerStyle}>
 
       {/* Confirm dialog — shown above toasts */}
       {confirm && (
         <div style={{
           ...sharedStyle,
-          padding: '10px 14px',
-          width: isMobile ? '100%' : undefined,
-          minWidth: isMobile ? 0 : sharedStyle.minWidth,
-          maxWidth: isMobile ? '100%' : sharedStyle.maxWidth,
+          ...itemSizing,
+          padding: '12px 16px',
           color: '#1a1a1a',
           pointerEvents: 'auto',
           display: 'flex',
-          alignItems: isMobile ? 'stretch' : 'center',
-          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: 'center',
+          flexDirection: 'row',
           gap: 12,
         }}>
           <span style={{ flex: 1, lineHeight: 1.5, wordBreak: 'break-word', fontSize: 14 }}>
             {confirm.message}
           </span>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'flex-end' : 'initial' }}>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
             <button
               onClick={() => handleConfirm(false)}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#e2e2e2'}
+              onMouseLeave={(e) => e.currentTarget.style.background = TOAST_BG}
               style={{
                 padding: '5px 12px',
                 borderRadius: 6,
-                border: '1.5px solid #e2e8f0',
-                background: '#fff',
-                color: '#4a5568',
+                border: '1.5px solid #000',
+                background: TOAST_BG,
+                color: '#1a1a1a',
                 fontSize: 12,
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'background 0.15s',
+                fontFamily: "'Inter', sans-serif",
               }}
             >
               Cancel
@@ -118,6 +123,7 @@ export default function ToastContainer() {
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'background 0.15s',
+                fontFamily: "'Inter', sans-serif",
               }}
             >
               Confirm
@@ -132,38 +138,41 @@ export default function ToastContainer() {
           key={t.id}
           style={{
             ...sharedStyle,
+            ...itemSizing,
             color: '#1a1a1a',
-            padding: isMobile ? '12px 14px' : '14px 18px',
-            width: isMobile ? '100%' : undefined,
-            minWidth: isMobile ? 0 : sharedStyle.minWidth,
-            maxWidth: isMobile ? '100%' : sharedStyle.maxWidth,
-            boxSizing: 'border-box',
+            padding: isMobile ? '14px 44px 14px 16px' : '12px 16px',
+            position: 'relative',
             transform: t.visible ? 'translateY(0)' : 'translateY(20px)',
             opacity: t.visible ? 1 : 0,
             transition: 'transform 0.3s cubic-bezier(.2,.8,.4,1), opacity 0.25s',
             whiteSpace: 'normal',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span style={{ lineHeight: 1.5, wordBreak: 'break-word' }}>{t.message}</span>
+          <div style={{ display: isMobile ? 'block' : 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span style={{ display: 'block', flex: 1, minWidth: 0, lineHeight: 1.5, overflowWrap: 'break-word', wordBreak: 'normal' }}>{t.message}</span>
             <button
               onClick={() => removeToast(t.id)}
               onMouseEnter={(e) => e.currentTarget.style.color = '#30bdb7'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#888'}
               style={{
+                position: isMobile ? 'absolute' : 'static',
+                top: isMobile ? '50%' : 'auto',
+                right: isMobile ? 14 : 'auto',
+                transform: isMobile ? 'translateY(-50%)' : 'none',
                 background: 'transparent',
                 border: 'none',
                 color: '#888',
-                fontSize: 14,
+                fontSize: isMobile ? 18 : 14,
                 fontWeight: 400,
                 cursor: 'pointer',
-                padding: 0,
+                padding: isMobile ? 4 : 0,
                 lineHeight: 1,
                 transition: 'color 0.2s',
                 flexShrink: 0,
               }}
+              aria-label="Dismiss notification"
             >
-              ✕
+              &times;
             </button>
           </div>
         </div>

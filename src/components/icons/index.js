@@ -48,6 +48,7 @@ import GavelRoundedIcon from '@mui/icons-material/GavelRounded';
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined';
 
 
 export {
@@ -96,4 +97,5 @@ export {
     NotificationsNoneRoundedIcon,
     ArticleOutlinedIcon,
     FileDownloadOutlinedIcon,
+    PersonOffOutlinedIcon,
 };

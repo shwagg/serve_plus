@@ -148,7 +148,7 @@ input {
 .ui-btn {
   width: 180px;
   height: 38px;
-  border-radius: 10px; /*modern roundness*/
+  border-radius: 16px; /*modern roundness*/
   background: #30bdb7;
   border: 1.5px solid #30bdb7; 
   color: #ffffff;

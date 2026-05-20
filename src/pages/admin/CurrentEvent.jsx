@@ -18,6 +18,12 @@ import MissionSubmissionsTable from "./MissionSubmissionsTable";
 import { computeAverageRating, getProgramMultiplier } from "../../hooks/rewardSystem";
 
 // ── helpers ───────────────────────────────────────────────────────────
+function getInitials(name) {
+  const parts = (name || "?").trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (name || "?").slice(0, 2).toUpperCase();
+}
+
 function getDateUrgency(targetDate) {
   if (!targetDate) return null;
   const today = new Date();
@@ -190,6 +196,8 @@ export default function CurrentEvent() {
   const [assigningRole, setAssigningRole] = useState({});   // userId → true while saving
   const [editingRoleFor, setEditingRoleFor] = useState(null); // userId whose role is being edited
   const [pendingRole, setPendingRole] = useState("");         // selected value in the dropdown
+  const [volunteerCard, setVolunteerCard] = useState(null);   // { volunteer, x, y }
+
 
   // ── edit details state ────────────────────────────────────────────
   const [editingDetails, setEditingDetails] = useState(false);
@@ -365,6 +373,9 @@ export default function CurrentEvent() {
         name: uData.name || "Unknown",
         level: uData.level || "--",
         email: uData.email || "",
+        department: uData.department || "",
+        photoURL: (() => { const p = uData.avatar || uData.photoURL || uData.profilePhoto || ""; return p.includes("ui-avatars.com") ? "" : p; })(),
+        totalPoints: uData.totalPoints || 0,
         role: vData.role || "volunteer",
         joinedAt: vData.joinedAt,
         registrationStatus: vData.registrationStatus || "pending",
@@ -382,6 +393,13 @@ export default function CurrentEvent() {
     if (!missionId) return;
     fetchMissionVolunteers();
   }, [missionId]);
+
+  useEffect(() => {
+    if (!volunteerCard) return;
+    const close = () => setVolunteerCard(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [volunteerCard]);
 
   useEffect(() => {
     if (!missionId || activeTab !== "feedback") return;
@@ -976,7 +994,7 @@ export default function CurrentEvent() {
       await updateDoc(doc(db, "missions", missionId), update);
       const refreshed = await getDoc(doc(db, "missions", missionId));
       if (refreshed.exists()) setMissionData({ id: refreshed.id, ...refreshed.data() });
-      showToast(`Feedback form ${action}d.`);
+      showToast(`Feedback form ${isActive ? 'closed' : 'opened'}.`);
     } catch {
       showToast(`Failed to ${action} feedback form. Try again.`);
     } finally {
@@ -1141,7 +1159,7 @@ export default function CurrentEvent() {
             </button>
 
             {/* Divider */}
-            <div style={{ width: 1, height: 28, background: "#e8eaed", margin: "0 4px" }} />
+            <div className="ce-action-divider" style={{ width: 1, height: 28, background: "#e8eaed", margin: "0 4px" }} />
 
             {/* Admin actions */}
             <div className="ce-tooltip-wrap">
@@ -1239,6 +1257,7 @@ export default function CurrentEvent() {
                         {rosterVolunteers.length}
                       </span>
                     </th>
+                    {!isFaculty && <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Flag</th>}
                     <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Level</th>
                     <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Joined</th>
                     {!isFaculty && <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Attendance</th>}
@@ -1250,18 +1269,35 @@ export default function CurrentEvent() {
                     <tr key={v.id} style={{ borderBottom: idx < rosterVolunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
                       <td style={{ padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{
-                            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-                            background: v.role === "lead_organizer" ? "#f3e8ff" : v.role === "organizer" ? "#e8f0fe" : "#f1f3f4",
-                            color: v.role === "lead_organizer" ? "#7c3aed" : v.role === "organizer" ? "#1a73e8" : "#5f6368",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontWeight: 700, fontSize: "0.88rem",
-                          }}>
-                            {(v.name || "?").charAt(0).toUpperCase()}
-                          </div>
+                          {v.photoURL ? (
+                            <img src={v.photoURL} alt={v.name}
+                              style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, objectFit: "cover", border: "1.5px solid #e8eaed" }} />
+                          ) : (
+                            <div style={{
+                              width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                              background: "#30bdb7", color: "#fff",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontWeight: 700, fontSize: "0.88rem",
+                            }}>
+                              {getInitials(v.name)}
+                            </div>
+                          )}
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                              <span style={{ fontWeight: 600, color: "#202124" }}>{v.name}</span>
+                              <span
+                                style={{ fontWeight: 600, color: "#202124", cursor: "pointer" }}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const r = e.currentTarget.getBoundingClientRect();
+                                  setVolunteerCard(prev => prev?.volunteer.id === v.id ? null : { volunteer: v, x: r.right + 8, y: r.top });
+                                }}
+                              >{v.name}</span>
+                              {v.isFlagged && (
+                                <span
+                                  title={`Flagged${v.flagExpiry ? " until " + v.flagExpiry.toLocaleDateString() : ""}`}
+                                  style={{ fontSize: 13, lineHeight: 1 }}
+                                >🚩</span>
+                              )}
                               {(v.role === "organizer" || v.role === "lead_organizer") && (
                                 <span style={{
                                   padding: "1px 7px",
@@ -1273,29 +1309,32 @@ export default function CurrentEvent() {
                                   {v.role === "lead_organizer" ? "🎯 Lead" : "📋 Organizer"}
                                 </span>
                               )}
-                              {v.isFlagged && (
-                                <span title={`Flagged${v.flagExpiry ? " until " + v.flagExpiry.toLocaleDateString() : ""}`} style={{ fontSize: 13 }}>🚩</span>
-                              )}
                             </div>
                             {v.email && <div style={{ fontSize: "0.72rem", color: "#80868b", marginTop: 1 }}>{v.email}</div>}
-                            {v.isFlagged && !isFaculty && (
-                              <button
-                                disabled={!!togglingFlag[v.id]}
-                                onClick={() => handleToggleFlag(v.id, true)}
-                                style={{
-                                  marginTop: 3, padding: "1px 7px",
-                                  background: togglingFlag[v.id] ? "#f1f3f4" : "#e6f4ea",
-                                  color: togglingFlag[v.id] ? "#9aa0a6" : "#137333",
-                                  border: "none", borderRadius: 4, fontSize: 10.5, fontWeight: 600,
-                                  cursor: togglingFlag[v.id] ? "not-allowed" : "pointer",
-                                }}
-                              >
-                                {togglingFlag[v.id] ? "…" : "✔ Unflag"}
-                              </button>
-                            )}
                           </div>
                         </div>
                       </td>
+                      {!isFaculty && (
+                        <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                          {v.isFlagged ? (
+                            <button
+                              disabled={!!togglingFlag[v.id]}
+                              onClick={() => handleToggleFlag(v.id, true)}
+                              style={{
+                                padding: "1px 7px",
+                                background: togglingFlag[v.id] ? "#f1f3f4" : "#e6f4ea",
+                                color: togglingFlag[v.id] ? "#9aa0a6" : "#137333",
+                                border: "none", borderRadius: 4, fontSize: 10.5, fontWeight: 600,
+                                cursor: togglingFlag[v.id] ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              {togglingFlag[v.id] ? "…" : "✔ Unflag"}
+                            </button>
+                          ) : (
+                            <span style={{ color: "#dadce0", fontSize: 15 }}>—</span>
+                          )}
+                        </td>
+                      )}
                       <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>{v.level}</td>
                       <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>
                         {v.joinedAt ? new Date(v.joinedAt).toLocaleDateString() : "—"}
@@ -1768,8 +1807,8 @@ export default function CurrentEvent() {
             >
               {/* header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #e5e7eb" }}>
-                <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#1e293b" }}>📍 Pick Attendance Location</h3>
-                <button onClick={() => setShowLocationPicker(false)} style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#1e293b" }}>Pick Attendance Location</h3>
+                <button className="admin-modal-close" onClick={() => setShowLocationPicker(false)}>×</button>
               </div>
               {/* hint */}
               <div style={{ padding: "8px 18px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: "0.78rem", color: "#475569" }}>
@@ -1829,8 +1868,8 @@ export default function CurrentEvent() {
               style={{ background: "#fff", borderRadius: 18, width: "min(420px, 94vw)", boxShadow: "0 8px 40px rgba(0,0,0,0.22)", overflow: "hidden" }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
-                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📱 Attendance QR</h3>
-                <button onClick={() => setShowAttQR(false)} style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Attendance QR</h3>
+                <button className="admin-modal-close" onClick={() => setShowAttQR(false)}>×</button>
               </div>
               <div style={{ padding: "24px 20px", textAlign: "center" }}>
                 {missionData?.validQRTimestamp ? (
@@ -1908,8 +1947,8 @@ export default function CurrentEvent() {
               style={{ background: "#fff", borderRadius: 18, width: "min(420px, 94vw)", boxShadow: "0 8px 40px rgba(0,0,0,0.22)", overflow: "hidden" }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
-                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>📋 Partner Feedback QR</h3>
-                <button onClick={() => setShowFeedbackQR(false)} style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Partner Feedback QR</h3>
+                <button className="admin-modal-close" onClick={() => setShowFeedbackQR(false)}>×</button>
               </div>
               <div style={{ padding: "20px", textAlign: "center" }}>
                 {/* status pill */}
@@ -1989,6 +2028,68 @@ export default function CurrentEvent() {
           </div>
         )}
 
+      {/* volunteer contact card popover – detail view */}
+      {volunteerCard && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: Math.min(volunteerCard.y, window.innerHeight - 220),
+            left: Math.min(volunteerCard.x, window.innerWidth - 272),
+            zIndex: 999,
+            background: "#fff",
+            borderRadius: 10,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+            border: "1px solid #e8eaed",
+            width: 260,
+            padding: "16px 18px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {volunteerCard.volunteer.photoURL ? (
+              <img
+                src={volunteerCard.volunteer.photoURL}
+                alt={volunteerCard.volunteer.name}
+                style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1.5px solid #e8eaed" }}
+              />
+            ) : (
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%", background: "#30bdb7",
+                color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18, fontWeight: 700, flexShrink: 0,
+              }}>
+                {getInitials(volunteerCard.volunteer.name)}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: "0.93rem", color: "#202124", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {volunteerCard.volunteer.name}
+              </div>
+              {volunteerCard.volunteer.email && (
+                <div style={{ fontSize: "0.72rem", color: "#5f6368", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {volunteerCard.volunteer.email}
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ borderTop: "1px solid #f1f3f4", paddingTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+            {[
+              { label: "Department", value: /\(([^)]+)\)$/.exec(volunteerCard.volunteer.department)?.[1] || volunteerCard.volunteer.department },
+              { label: "Level", value: volunteerCard.volunteer.level },
+              { label: "Points", value: volunteerCard.volunteer.totalPoints ?? "—" },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+                <span style={{ color: "#80868b" }}>{label}</span>
+                <span style={{ color: "#202124", fontWeight: 600 }}>{value || "—"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       </div>
     );
   }
@@ -2012,6 +2113,19 @@ export default function CurrentEvent() {
               onChange={e => setSearchTerm(e.target.value)}
               className="search-input"
             />
+            <svg
+              className="search-icon"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
           </div>
           {!isFaculty && (
           <div className="ce-tooltip-wrap">
@@ -2019,11 +2133,11 @@ export default function CurrentEvent() {
               onClick={() => { setShowFlaggedModal(true); fetchFlaggedStudents(); }}
               style={{
                 padding: "7px 14px", background: "#fff", color: "#1a73e8",
-                border: "1px solid #1a73e8", borderRadius: 8, fontWeight: 600,
+                border: "1px solid #1a73e8", borderRadius: 16, fontWeight: 600,
                 fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap",
               }}
             >
-              📄 Flagged Volunteers
+              Flagged Volunteers
             </button>
             <span className="ce-tooltip">Shows a list of all volunteers currently flagged for absence. You can manually remove flags from here.</span>
           </div>
@@ -2037,11 +2151,11 @@ export default function CurrentEvent() {
                 padding: "7px 14px",
                 background: globalFlagging ? "#f8f9fa" : "#ea4335",
                 color: globalFlagging ? "#9aa0a6" : "#fff",
-                border: "none", borderRadius: 8, fontWeight: 600,
+                border: "none", borderRadius: 16, fontWeight: 600,
                 fontSize: "0.82rem", cursor: globalFlagging ? "not-allowed" : "pointer", whiteSpace: "nowrap",
               }}
             >
-              {globalFlagging ? "Flagging..." : "🚩 Flag All Events"}
+              {globalFlagging ? "Flagging..." : "Flag All Events"}
             </button>
             <span className="ce-tooltip">Scans every past event and flags volunteers who missed attendance. This may take a while.</span>
           </div>
@@ -2087,6 +2201,69 @@ export default function CurrentEvent() {
         </div>
       )}
 
+      {/* volunteer contact card popover */}
+      {volunteerCard && (
+        <>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              top: Math.min(volunteerCard.y, window.innerHeight - 220),
+              left: Math.min(volunteerCard.x, window.innerWidth - 272),
+              zIndex: 999,
+              background: "#fff",
+              borderRadius: 10,
+              boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+              border: "1px solid #e8eaed",
+              width: 260,
+              padding: "16px 18px 14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {volunteerCard.volunteer.photoURL ? (
+                <img
+                  src={volunteerCard.volunteer.photoURL}
+                  alt={volunteerCard.volunteer.name}
+                  style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1.5px solid #e8eaed" }}
+                />
+              ) : (
+                <div style={{
+                  width: 48, height: 48, borderRadius: "50%", background: "#e8f0fe",
+                  color: "#1a73e8", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 20, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {(volunteerCard.volunteer.name || "?").charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: "0.93rem", color: "#202124", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {volunteerCard.volunteer.name}
+                </div>
+                {volunteerCard.volunteer.email && (
+                  <div style={{ fontSize: "0.72rem", color: "#5f6368", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {volunteerCard.volunteer.email}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ borderTop: "1px solid #f1f3f4", paddingTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+              {[
+                { label: "Department", value: /\(([^)]+)\)$/.exec(volunteerCard.volunteer.department)?.[1] || volunteerCard.volunteer.department },
+                { label: "Level", value: volunteerCard.volunteer.level },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+                  <span style={{ color: "#80868b" }}>{label}</span>
+                  <span style={{ color: "#202124", fontWeight: 600 }}>{value || "—"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* flagged students modal */}
       {showFlaggedModal && (
         <div
@@ -2109,8 +2286,8 @@ export default function CurrentEvent() {
               <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 600, color: "#202124" }}>🚩 Flagged Absent Volunteers</h3>
               <button
                 onClick={() => setShowFlaggedModal(false)}
-                style={{ background: "#f1f3f4", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#5f6368", cursor: "pointer", flexShrink: 0 }}
-              >✕</button>
+                className="admin-modal-close"
+              >×</button>
             </div>
             {flaggedLoading ? (
               <div style={{ color: "#6b7280", padding: 16 }}>Loading…</div>

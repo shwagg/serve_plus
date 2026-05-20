@@ -312,12 +312,12 @@
   border-radius: 16px;
   overflow: hidden;
   border: none;
-  background: #30bdb7;
+  background: rgb(26, 115, 232);
 }
 
 .ap-split-label {
   padding: 7px 14px;
-  background: #30bdb7;
+  background: rgb(26, 115, 232);
   color: #fff;
   font-size: 0.87rem;
   font-weight: 600;
@@ -329,7 +329,7 @@
 
 .ap-split-arrow {
   padding: 7px 10px;
-  background: #27a8a2;
+  background: rgb(24, 107, 216);
   color: #fff;
   border: none;
   border-left: 1px solid rgba(255, 255, 255, 0.3);
@@ -342,7 +342,7 @@
 }
 
 .ap-split-arrow:hover {
-  background: #1f9490;
+  background: rgb(26, 115, 232);
 }
 
 .ap-dropdown {

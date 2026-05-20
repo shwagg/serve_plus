@@ -5,6 +5,20 @@
   display: inline-flex;
 }
 
+@media (max-width: 480px) {
+  .ce-tooltip-wrap {
+    width: 100%;
+  }
+  .ce-tooltip-wrap .ce-action-btn {
+    width: 100%;
+  }
+  .ce-action-divider {
+    width: 100% !important;
+    height: 1px !important;
+    margin: 4px 0 !important;
+  }
+}
+
 .ce-tooltip {
   pointer-events: none;
   position: absolute;

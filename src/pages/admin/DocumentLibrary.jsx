@@ -246,27 +246,10 @@ export default function DocumentLibrary() {
             onClick={e => e.stopPropagation()}
           >
             <button
-              className="submission-modal-close"
-              style={{
-                position: 'absolute',
-                top: 14,
-                right: 14,
-                background: '#1f2937',
-                border: 'none',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16,
-                fontWeight: 700,
-                cursor: 'pointer',
-                color: '#fff',
-              }}
+              className="submission-modal-close admin-modal-close admin-modal-close--absolute"
               onClick={() => setShowSubmissionsModal(false)}
             >
-              ✕
+              ×
             </button>
 
             <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#000' }}>Submissions</h2>

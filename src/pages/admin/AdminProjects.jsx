@@ -506,7 +506,7 @@ export default function AdminProjects() {
                 className="ap-cancel-modal__close"
                 onClick={() => { setShowCancelModal(false); setCancelProject(null); setCancelReason(""); }}
                 disabled={cancelling}
-              >✕</button>
+              >×</button>
             </div>
             <p className="ap-cancel-modal__body">
               You are cancelling <strong>{cancelProject.title || "Untitled"}</strong>.
@@ -556,12 +556,12 @@ export default function AdminProjects() {
             <div className="ap-edit-modal" onClick={e => e.stopPropagation()}>
               <div className="ap-edit-modal__header">
                 <h3 className="ap-edit-modal__title">
-                  {editProject.projectType === "sl" ? "📝 Service Learning Proposal" : "📝 Community Engagement Proposal"}
+                  {editProject.projectType === "sl" ? "Service Learning Proposal" : "Community Engagement Proposal"}
                 </h3>
                 <button
                   className="ap-edit-modal__close"
                   onClick={() => { setShowEditModal(false); setEditProject(null); }}
-                >✕</button>
+                >×</button>
               </div>
               {allSigned && !canEditForm ? (
                 <div className="ap-edit-modal__locked">

@@ -102,7 +102,7 @@ function Modal({ title, subtitle, onClose, children }) {
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: G.text }}>{title}</h3>
             {subtitle && <p style={{ margin: "4px 0 0", fontSize: 13, color: G.sub }}>{subtitle}</p>}
           </div>
-          <button onClick={onClose} style={{ border: `1px solid ${G.border}`, background: G.white, borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontSize: 17, color: G.sub, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 16 }}>
+          <button className="admin-modal-close" onClick={onClose} style={{ marginLeft: 16 }}>
             ×
           </button>
         </div>
