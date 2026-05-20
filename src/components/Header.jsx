@@ -35,7 +35,7 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
     <div className="cp-overlay" onClick={onClose}>
       <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
         <div className="cp-header">
-          <h3>📝 Create Project Proposal</h3>
+          <h3>Create Project Proposal</h3>
           <button className="cp-close-btn" onClick={onClose}>
             <CloseIcon fontSize="small" />
           </button>
@@ -312,7 +312,7 @@ export default function Header() {
           <div className="ea-modal-card" style={{ maxWidth: 700 }} onClick={(e) => e.stopPropagation()}>
             <div className="ea-modal-header">
               <h3 className="ea-modal-title">
-                {selectedProjectType === 'service-learning' ? '📝 Service Learning Proposal' : '📝 Community Engagement Proposal'}
+                {selectedProjectType === 'service-learning' ? 'Service Learning Proposal' : 'Community Engagement Proposal'}
               </h3>
               <button className="ea-modal-close" onClick={handleCloseProposalForm}>✕</button>
             </div>

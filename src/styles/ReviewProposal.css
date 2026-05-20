@@ -375,6 +375,18 @@
 
 .ap-dropdown-item:hover { background: #f8f9fa; }
 
+.ap-dropdown-item--create {
+  color: #202124;
+  font-weight: 700;
+}
+.ap-dropdown-item--create:hover { background: #f1f3f4; border-radius: 0 0 0 0}
+
+.ap-dropdown-divider {
+  margin: 3px 0;
+  border: none;
+  border-top: 1.5px solid #e8eaed;
+}
+
 .ap-dropdown-item.active {
   font-weight: 700;
   color: #202124;
