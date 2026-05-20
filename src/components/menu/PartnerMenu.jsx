@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import dashboardIcon from "../../assets/menuassets/Dashboard.svg";
 import infoIcon from "../../assets/menuassets/Info.svg";
 import projectListIcon from "../../assets/menuassets/List.svg";
-import privacyPol from "../../assets/menuassets/PrivacyPolicy.svg";
 import settingsIcon from "../../assets/menuassets/Settings.svg";
 import supportIcon from "../../assets/menuassets/Support.svg";
 import viewIcon from "../../assets/menuassets/View.svg";
@@ -82,24 +81,10 @@ export default function PartnerMenu({
         </button>
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/verify-certificate")}
-        >
-          <img src={viewIcon} alt="Verify Certificate" className="menu-icon" />
-          Verify Certificate
-        </button>
-        <button
-          className="menu-item"
           onClick={() => handleMenuClick("/global/menu/about")}
         >
           <img src={infoIcon} alt="About Us" className="menu-icon" />
           About Us
-        </button>
-        <button
-          className="menu-item"
-          onClick={() => handleMenuClick("/global/terms-condition")}
-        >
-          <img src={privacyPol} alt="Terms and Privacy" className="menu-icon" />
-          Terms and Privacy
         </button>
       </div>
       <div className="menu-divider"></div>

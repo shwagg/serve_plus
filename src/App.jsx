@@ -42,6 +42,8 @@ import AnnouncementsManager from "./pages/admin/AnnouncementsManager";
 import PartnerHub from "./pages/admin/PartnerHub";
 import BadgeEarnedModal from "./components/badges/BadgeEarnedModal";
 import { useBadgeEarnedPopup } from "./hooks/useBadgeEarnedPopup";
+import CertEarnedModal from "./components/CertEarnedModal";
+import { useCertEarnedPopup } from "./hooks/useCertEarnedPopup";
 import Profile from "./pages/global/Profile";
 import ProjectList from "./pages/global/ProjectList";
 import ProposeProject from "./pages/global/ProposeProject";
@@ -66,6 +68,16 @@ function BadgePopupManager() {
   return <BadgeEarnedModal badgeQueue={badgeQueue} onDismiss={dismissBadge} />;
 }
 
+function CertPopupManager() {
+  const [uid, setUid] = useState(null);
+  useEffect(() => {
+    const auth = getAuth();
+    return onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null));
+  }, []);
+  const { certQueue, dismissCert } = useCertEarnedPopup(uid);
+  return <CertEarnedModal certQueue={certQueue} onDismiss={dismissCert} />;
+}
+
 function App() {
   // Check for upcoming events and create notifications
   useUpcomingEventNotifications();
@@ -77,6 +89,7 @@ function App() {
     <SessionProvider>
       <ToastContainer />
       <BadgePopupManager />
+      <CertPopupManager />
       <Router>
         <Routes>
                     <Route path="/verify-certificate" element={<VerifyCertificatePage />} />

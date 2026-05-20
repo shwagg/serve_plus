@@ -176,10 +176,12 @@ service cloud.firestore {
       match /volunteer/{userId} {
         allow read: if request.auth != null;
         allow create: if request.auth != null && request.auth.uid == userId;
-        allow update, delete: if request.auth != null && 
-          (request.auth.uid == userId || 
+        allow update, delete: if request.auth != null &&
+          (request.auth.uid == userId ||
            request.auth.token.role == "admin" ||
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin" ||
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "faculty");
       }
       
       // Tasks subcollection
