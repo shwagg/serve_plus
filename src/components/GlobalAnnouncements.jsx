@@ -537,13 +537,6 @@ const GlobalAnnouncements = () => {
           >
             ✓ Mark all read
           </button>
-          <button
-            className="mark-all-btn secondary"
-            onClick={markAllAsUnread}
-            aria-label="Mark all announcements as unread"
-          >
-            ↻ Reset
-          </button>
         </div>
       </div>
 
@@ -955,6 +948,7 @@ export default GlobalAnnouncements;
 export const GlobalNotificationButton = ({ unreadCount, onClick, isOpen }) => {
   const [top, setTop] = useState(140);
   const didDragRef = useRef(false);
+  const ignoreClickRef = useRef(false);
 
   const handleMouseDown = (e) => {
     const startY = e.clientY;
@@ -987,6 +981,10 @@ export const GlobalNotificationButton = ({ unreadCount, onClick, isOpen }) => {
     const onTouchEnd = () => {
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onTouchEnd);
+      ignoreClickRef.current = true;
+      window.setTimeout(() => {
+        ignoreClickRef.current = false;
+      }, 350);
       if (!didDragRef.current) onClick?.();
     };
     window.addEventListener('touchmove', onTouchMove, { passive: true });
@@ -994,13 +992,19 @@ export const GlobalNotificationButton = ({ unreadCount, onClick, isOpen }) => {
   };
 
   const handleClick = () => {
+    if (ignoreClickRef.current) return;
     if (!didDragRef.current) onClick?.();
   };
 
   return (
     <button
       className="global-feed-toggle"
-      style={{ top, right: isOpen ? 320 : 0, cursor: 'grab', transition: 'right 0.3s ease' }}
+      style={{
+        top,
+        right: isOpen ? 'min(320px, calc(100vw - 48px))' : 0,
+        cursor: 'grab',
+        transition: 'right 0.3s ease'
+      }}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
       onClick={handleClick}
