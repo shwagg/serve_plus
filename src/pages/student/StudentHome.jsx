@@ -125,7 +125,7 @@ const StudentHome = () => {
   useEffect(() => {
     const fetchMissions = async () => {
       try {
-        const user = auth.currentUser;
+        const user = currentUser;
 
         const querySnapshot = await getDocs(collection(db, "missions"));
         const missions = querySnapshot.docs
@@ -190,7 +190,7 @@ const StudentHome = () => {
               const data = snap.data();
               enrollmentMap[m.id] = data.registrationStatus || "pending";
               enrollmentDetailsMap[m.id] = data;
-              if (data.completionStatus === "completed") completed++;
+              if (data.completionStatus === "complete" || data.completionStatus === "graded") completed++;
             } else {
               enrollmentMap[m.id] = null;
             }
@@ -230,7 +230,7 @@ const StudentHome = () => {
   // Fetch proposals created by the current user
   useEffect(() => {
     const fetchProposals = async () => {
-      const user = auth.currentUser;
+      const user = currentUser;
       if (!user) {
         setProposalCards([]);
         return;
@@ -598,7 +598,7 @@ const StudentHome = () => {
                 </div>
               </div>
               <span className="strip-sep" aria-hidden="true">|</span>
-              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">Missions</span></span>
+              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">Mission/s</span></span>
             </div>
           </div>,
           playerStripPortal
@@ -737,7 +737,7 @@ const StudentHome = () => {
         </div>
 
         {/* MISSION */}
-        <section ref={missionsSectionRef} className="mission-section" aria-label="Missions">
+        <section ref={missionsSectionRef} className="mission-section" aria-label="Mission/s">
           <div className="mission-section-header">
             <h2 className="mission-section-title">Mission</h2>
             <p className="leaderboard-rank-text" style={{ marginBottom: 12 }}>Find your next activity here</p>
