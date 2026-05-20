@@ -373,13 +373,16 @@ export default function Profile() {
   const [certBlobUrl, setCertBlobUrl] = useState(null);
   const [certBlobLoading, setCertBlobLoading] = useState(false);
 
-  // Fetch cert PDF as blob URL so the iframe can display cross-origin Firebase Storage files
+  // Load cert PDF for the iframe viewer.
+  // Strategy: (1) fetch as blob for a same-origin blob URL; (2) if CORS blocks it, fall back to
+  // the direct Firebase Storage URL (iframes can load cross-origin PDFs without CORS); (3) if
+  // there is no downloadURL at all, rebuild the PDF locally from the stored cert fields.
   useEffect(() => {
     if (certBlobRef.current) {
       URL.revokeObjectURL(certBlobRef.current);
       certBlobRef.current = null;
     }
-    if (!selectedCert?.downloadURL) {
+    if (!selectedCert) {
       setCertBlobUrl(null);
       setCertBlobLoading(false);
       return;
@@ -387,16 +390,65 @@ export default function Profile() {
     let cancelled = false;
     setCertBlobUrl(null);
     setCertBlobLoading(true);
-    fetch(selectedCert.downloadURL)
-      .then(r => r.blob())
-      .then(blob => {
+
+    (async () => {
+      try {
+        let viewUrl = null;
+
+        // Step 1: resolve a storage URL — use saved one, or look it up from Storage by fileName
+        let storageUrl = selectedCert.downloadURL || null;
+        if (!storageUrl && selectedCert.fileName) {
+          try {
+            const user = auth.currentUser;
+            if (user) {
+              const storage = getStorage();
+              const storageRef = ref(storage, `event-certificates/${user.uid}/${selectedCert.fileName}`);
+              storageUrl = await getDownloadURL(storageRef);
+            }
+          } catch { /* file may not exist in Storage — continue to local rebuild */ }
+        }
+
+        // Step 2: convert storage URL to blob (CORS-safe); fall back to direct URL for iframe
+        if (storageUrl) {
+          try {
+            const r = await fetch(storageUrl);
+            if (!r.ok) throw new Error("fetch failed");
+            const blob = await r.blob();
         if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        certBlobRef.current = url;
-        setCertBlobUrl(url);
-        setCertBlobLoading(false);
-      })
-      .catch(() => { if (!cancelled) setCertBlobLoading(false); });
+            viewUrl = URL.createObjectURL(blob);
+            certBlobRef.current = viewUrl;
+          } catch {
+            // CORS blocked — iframes can load Firebase Storage URLs directly without CORS
+            if (!cancelled) viewUrl = storageUrl;
+          }
+        }
+
+        // Step 3: last resort — rebuild PDF locally from the stored cert fields
+        if (!viewUrl) {
+          const { buildCertificateBlob } = await import("../../utils/certificateUtils");
+          const blob = await buildCertificateBlob({
+            recipient: selectedCert.recipient || "",
+            course:    selectedCert.course    || "",
+            date:      selectedCert.date      || "",
+            loc:       selectedCert.loc       || "",
+            day:       selectedCert.day       || "",
+            month:     selectedCert.month     || "",
+            year:      selectedCert.year      || "",
+            certId:    selectedCert.certificateId || "",
+          });
+          if (cancelled) return;
+          viewUrl = URL.createObjectURL(blob);
+          certBlobRef.current = viewUrl;
+        }
+
+        if (!cancelled && viewUrl) setCertBlobUrl(viewUrl);
+      } catch {
+        // keep null — show "PDF not available"
+      } finally {
+        if (!cancelled) setCertBlobLoading(false);
+      }
+    })();
+
     return () => { cancelled = true; };
   }, [selectedCert]);
 
@@ -690,67 +742,59 @@ export default function Profile() {
       {/* ── Certificate fullscreen modal ── */}
       {selectedCert && (
         <div
-          style={{
-            position: "fixed", inset: 0, background: "rgba(15,23,42,0.72)",
-            zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 16,
-          }}
+          className="cert-modal-overlay"
           onClick={() => { setSelectedCert(null); setCertShareCopied(false); }}
         >
-          <div
-            style={{
-              background: "#fff", borderRadius: 14,
-              width: "min(920px, 96vw)", maxHeight: "92vh",
-              display: "flex", flexDirection: "column", overflow: "hidden",
-              boxShadow: "0 24px 80px rgba(0,0,0,0.38)",
-            }}
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="cert-modal-box" onClick={e => e.stopPropagation()}>
+
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderBottom: "1px solid #e2e8f0", flexShrink: 0 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "0.72rem", color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>SerVe+ · Mission</div>
-                <div style={{ fontWeight: 700, fontSize: "1.05rem", color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {selectedCert.course}
-                </div>
+            <div className="cert-modal-header">
+              <div className="cert-modal-header-info">
+                <div className="cert-modal-label">SerVe+ · Mission</div>
+                <div className="cert-modal-course">{selectedCert.course}</div>
                 {(selectedCert.month || selectedCert.date) && (
-                  <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 2 }}>
+                  <div className="cert-modal-date">
                     Completed {selectedCert.month} {selectedCert.year || selectedCert.date}
                   </div>
                 )}
               </div>
               <button
+                className="cert-modal-close"
                 onClick={() => { setSelectedCert(null); setCertShareCopied(false); }}
-                style={{ background: "none", border: "none", fontSize: "1.4rem", cursor: "pointer", color: "#94a3b8", padding: "4px 8px", borderRadius: 6, lineHeight: 1 }}
-              >✕</button>
+                aria-label="Close"
+              >×</button>
             </div>
 
             {/* PDF body */}
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 420, display: "flex", flexDirection: "column" }}>
+            <div className="cert-modal-body">
               {certBlobLoading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 420, gap: 12, color: "#64748b", fontSize: "0.9rem" }}>
-                  <div style={{ width: 26, height: 26, border: "3px solid #e2e8f0", borderTopColor: "#1a73e8", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+                <div className="cert-modal-loading">
+                  <div className="cert-modal-spinner" />
                   Loading certificate…
                 </div>
               ) : certBlobUrl ? (
                 <iframe
                   src={certBlobUrl}
                   title="Certificate"
-                  style={{ width: "100%", height: "100%", minHeight: 420, border: "none", display: "block", flex: 1 }}
+                  className="cert-modal-iframe"
                 />
               ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, flexDirection: "column", gap: 10, color: "#94a3b8", minHeight: 300 }}>
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  <span style={{ fontSize: "0.85rem" }}>PDF not available</span>
+                <div className="cert-modal-unavailable">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  <span>PDF not available</span>
                 </div>
               )}
             </div>
 
             {/* Footer actions */}
-            <div style={{ display: "flex", gap: 10, padding: "14px 20px", borderTop: "1px solid #e2e8f0", justifyContent: "flex-end", flexShrink: 0 }}>
+            <div className="cert-modal-footer">
+              {selectedCert.downloadURL && (
               <button
+                  className={`cert-modal-share-btn${certShareCopied ? " copied" : ""}`}
                 onClick={async () => {
-                  if (!selectedCert.downloadURL) return;
                   if (navigator.share) {
                     try { await navigator.share({ title: `SerVe+ Certificate — ${selectedCert.course}`, url: selectedCert.downloadURL }); } catch {}
                   } else {
@@ -759,27 +803,17 @@ export default function Profile() {
                     setTimeout(() => setCertShareCopied(false), 2200);
                   }
                 }}
-                style={{
-                  background: certShareCopied ? "#10b981" : "#f1f5f9",
-                  color: certShareCopied ? "#fff" : "#334155",
-                  border: "none", borderRadius: 8, padding: "9px 20px",
-                  fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
-                  transition: "background 0.2s",
-                }}
               >
                 {certShareCopied ? "✓ Link copied!" : "↗ Share"}
               </button>
-              {selectedCert.downloadURL && (
+              )}
+              {(selectedCert.downloadURL || certBlobUrl) && (
                 <a
-                  href={selectedCert.downloadURL}
+                  href={selectedCert.downloadURL || certBlobUrl}
                   download={`SerVe+_Certificate_${(selectedCert.course || "certificate").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    background: "#1a73e8", color: "#fff", borderRadius: 8,
-                    padding: "9px 20px", fontWeight: 600, fontSize: "0.85rem",
-                    textDecoration: "none", display: "inline-block",
-                  }}
+                  className="cert-modal-download-btn"
                 >
                   ↓ Download PDF
                 </a>
@@ -1228,53 +1262,32 @@ export default function Profile() {
                   {certificates.length === 0
                     ? <p className="muted-text">No certificates yet.</p>
                     : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      <div className="cert-list">
                         {certificates.map((cert, idx) => (
                           <div
                             key={cert.id}
                             onClick={() => setSelectedCert(cert)}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 16,
-                              padding: "16px 0",
-                              borderBottom: idx < certificates.length - 1 ? "1px solid #e2e8f0" : "none",
-                              cursor: "pointer",
-                              borderRadius: 8,
-                              transition: "background 0.15s",
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
-                            onMouseLeave={e => e.currentTarget.style.background = ""}
+                            className="cert-list-item"
+                            style={{ borderBottom: idx < certificates.length - 1 ? "1px solid #e2e8f0" : "none" }}
                           >
-                            {/* Certificate thumbnail */}
-                            <div style={{
-                              width: 80, height: 57, flexShrink: 0,
-                              borderRadius: 6, border: "1px solid #c5d9fd",
-                              background: "linear-gradient(135deg, #f0f7ff 0%, #e8f4ff 100%)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <svg width="30" height="36" viewBox="0 0 30 36" fill="none">
-                                <rect x="1" y="1" width="22" height="32" rx="3" fill="#fff" stroke="#c5d9fd" strokeWidth="1.5"/>
-                                <path d="M17 1v8h8" stroke="#c5d9fd" strokeWidth="1.5" fill="none"/>
-                                <rect x="5" y="13" width="13" height="2" rx="1" fill="#93c5fd"/>
-                                <rect x="5" y="18" width="10" height="2" rx="1" fill="#bfdbfe"/>
-                                <rect x="5" y="23" width="8" height="2" rx="1" fill="#bfdbfe"/>
-                                <circle cx="22" cy="28" r="7" fill="#1a73e8"/>
-                                <path d="M19 28l2 2 4-4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
+                            {/* Scaled-down PDF template preview */}
+                            <div className="cert-thumb">
+                              <iframe
+                                src="/assets/SERVE+ Certificate.pdf#toolbar=0&navpanes=0&scrollbar=0"
+                                title="Certificate preview"
+                                className="cert-thumb-iframe"
+                                tabIndex={-1}
+                                scrolling="no"
+                              />
                             </div>
 
                             {/* Details */}
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 2 }}>
-                                SerVe+ &middot; Mission
-                              </div>
-                              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1e293b", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {cert.course}
-                              </div>
-                              <div style={{ color: "#1a73e8", fontSize: "0.8rem", fontWeight: 600 }}>
-                                View certificate ↗
-                              </div>
+                            <div className="cert-list-details">
+                              <div className="cert-list-label">SerVe+ · Mission</div>
+                              <div className="cert-list-course">{cert.course}</div>
+                              <div className="cert-list-cta">View certificate ↗</div>
                               {(cert.month || cert.date) && (
-                                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 3 }}>
+                                <div className="cert-list-date">
                                   Completed {cert.month} {cert.year || cert.date}
                                 </div>
                               )}
@@ -1359,7 +1372,8 @@ export default function Profile() {
                   {/* Divider */}
                   <div style={{ height: 1, background: '#e0e7ef' }} />
 
-                  {/* Achievements */}
+                  {/* Achievements — students only */}
+                  {profile?.role === "student" && (
                   <div>
                     <div style={{ fontWeight: 700, color: '#000', fontSize: 15, marginBottom: 12 }}>Achievements <span style={{ color: '#30bdb7', fontWeight: 500, fontSize: 13 }}>({earnedBadges.length})</span></div>
                     {earnedBadges.length === 0 ? (
@@ -1382,6 +1396,7 @@ export default function Profile() {
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* Divider */}
                   <div style={{ height: 1, background: '#e0e7ef' }} />
