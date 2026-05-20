@@ -2,7 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import QRCode from "qrcode";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { app, db } from "../firebaseConfig";
-import { doc, collection, addDoc, serverTimestamp, updateDoc, getDocs } from "firebase/firestore";
+import { doc, collection, addDoc, serverTimestamp, getDocs } from "firebase/firestore";
 
 export function generateCertificateId() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -46,7 +46,8 @@ export async function buildCertificateBlob({ recipient, course, date, loc, day, 
 
 /**
  * Generates a certificate PDF and saves it to the volunteer's Firestore + Storage.
- * Returns the Firestore cert doc ID and the Storage download URL.
+ * Upload happens BEFORE addDoc so the onSnapshot listener always sees a complete document
+ * (with downloadURL included from the start, no second updateDoc needed).
  */
 export async function issueCertificate({ userId, recipient, course, date, loc, day, month, year }) {
   // Idempotency guard — return existing cert if already issued for this course
@@ -62,7 +63,14 @@ export async function issueCertificate({ userId, recipient, course, date, loc, d
   const safeCourse = (course || "event").replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `${safeRecipient}_${safeCourse}.pdf`;
 
-  const certData = {
+  // Build and upload first so downloadURL is available before the Firestore doc is created.
+  const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId });
+  const storage = getStorage(app);
+  const storageRef = ref(storage, `event-certificates/${userId}/${fileName}`);
+  await uploadBytes(storageRef, blob);
+  const downloadURL = await getDownloadURL(storageRef);
+
+  await addDoc(collection(doc(db, "users", userId), "certificates"), {
     fileName,
     recipient,
     course,
@@ -72,16 +80,9 @@ export async function issueCertificate({ userId, recipient, course, date, loc, d
     month,
     year,
     certificateId: certId,
+    downloadURL,
     releasedAt: serverTimestamp(),
-  };
-  const certDocRef = await addDoc(collection(doc(db, "users", userId), "certificates"), certData);
-
-  const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId });
-  const storage = getStorage(app);
-  const storageRef = ref(storage, `event-certificates/${userId}/${fileName}`);
-  await uploadBytes(storageRef, blob);
-  const downloadURL = await getDownloadURL(storageRef);
-  await updateDoc(certDocRef, { downloadURL });
+  });
 
   await addDoc(collection(doc(db, "users", userId), "notifications"), {
     type: "certificate_obtained",
@@ -89,6 +90,7 @@ export async function issueCertificate({ userId, recipient, course, date, loc, d
     event: course,
     createdAt: serverTimestamp(),
     read: false,
+    popupShown: false,
   });
 
   return { certId, downloadURL };

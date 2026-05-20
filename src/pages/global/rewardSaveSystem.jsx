@@ -79,12 +79,24 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
 
     const finalPoints = breakdown.finalPoints;
 
+    // Sum approved task-journal points for this volunteer
+    const tasksSnap = await getDocs(collection(db, "missions", missionId, "task"));
+    let approvedTaskPoints = 0;
+    for (const taskDoc of tasksSnap.docs) {
+        const pRef = doc(db, "missions", missionId, "task", taskDoc.id, "participants", volunteerId);
+        const pSnap = await getDoc(pRef);
+        if (pSnap.exists() && pSnap.data().adminApprovalStatus === "approved") {
+            approvedTaskPoints += Number(pSnap.data().pendingPoints) || 0;
+        }
+    }
+    const totalPoints = finalPoints + approvedTaskPoints;
+
     // Increment user totalPoints
     if (volunteerData.userId) {
         await updateDoc(
             doc(db, "users", volunteerData.userId),
             {
-                totalPoints: increment(finalPoints)
+                totalPoints: increment(totalPoints)
             }
         );
     }
@@ -106,7 +118,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     }
 
     await updateDoc(volunteerRef, {
-        pointsEarned: finalPoints,
+        pointsEarned: totalPoints,
         completionStatus: "graded",
         releasedAt: serverTimestamp(),
         releasedBy: adminName,
@@ -120,12 +132,12 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         missionId,
         targetUserId: volunteerId,
         targetUserName: volunteerData.displayName || volunteerData.name || "",
-        pointsEarned: finalPoints,
+        pointsEarned: totalPoints,
       },
     });
 
     // Check and assign any newly earned badges after grading
     await checkAndAssignBadges(volunteerId);
 
-    return finalPoints;
+    return totalPoints;
 };

@@ -112,6 +112,9 @@ export const checkAndAssignBadges = async (userId) => {
  */
 export const awardBadge = async (userId, badgeId, awardedBy = null) => {
   try {
+    const userSnap = await getDoc(doc(db, "users", userId));
+    if (!userSnap.exists() || userSnap.data().role !== "student") return false;
+
     const userBadgeRef = doc(db, "users", userId, "badges", badgeId);
     const existing = await getDoc(userBadgeRef);
     if (existing.exists()) return false; // already earned — badges are permanent
