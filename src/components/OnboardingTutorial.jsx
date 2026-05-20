@@ -7,32 +7,32 @@ const STEPS = [
   {
     icon: '🌟',
     title: 'Welcome to SERVE+!',
-    body: "SERVE+ is your hub for volunteering, service learning, and community engagement. Let's take a quick tour to get you started.",
+    body: "SERVE+ is your platform for service learning and community engagement. Here you can browse and join missions, complete requirements, track your points, and even propose your own projects. Let's walk you through the basics!",
   },
   {
     icon: '🗺️',
-    title: 'Browse Missions',
-    body: 'Explore available missions on your home page. Each card shows the date, location, volunteer hours, and assigned tasks.',
+    title: 'Browse & Join Missions',
+    body: "Your home page shows available missions as cards. Use the tabs — All, Enrolled, and Proposals — to filter the list. Each card shows the mission date, location, and how many volunteers have joined. Click a card to open it.",
   },
   {
-    icon: '✅',
-    title: 'Join a Mission',
-    body: "Click on any mission to see its full details, then hit 'Join Mission' to enroll.",
+    icon: '📋',
+    title: 'Inside a Mission',
+    body: "Each mission has four tabs: Content (details & description), Requirements (Pre-Activity Survey, Parent Consent Form, and Attendance QR), Task Assignment (tasks you can complete for points), and Leaderboard (see how you rank among volunteers). Complete each requirement to earn points!",
   },
   {
     icon: '📝',
     title: 'Create a Proposal',
-    body: "Have a project idea? Open the menu (☰) and select 'Create Proposal' to submit a Service Learning or Community Engagement proposal.",
+    body: "Have a project idea? Open the menu (top-right) and select 'Create Proposal'. Choose between a Service Learning or Community Engagement proposal, fill out the form, preview it, then submit. It goes through Program Chair → College Dean → Admin → Director for approval.",
   },
   {
     icon: '🏅',
-    title: 'Earn Badges & Points',
-    body: 'Complete missions, tasks, and surveys to earn points and unlock badges. Track all your achievements on your Profile page.',
+    title: 'Points, Badges & Leaderboard',
+    body: "Every requirement and task you complete earns you points, shown in the header. Accumulate points to unlock badges and climb the Leaderboard — visible on your home page and inside each mission. Check your Profile to see all your badges and achievements.",
   },
   {
     icon: '🔔',
     title: "You're All Set!",
-    body: "Use the notification bell to stay updated on approvals and events. Your profile avatar (next to the ☰ menu) takes you to your profile. Good luck, volunteer!",
+    body: "Use the notification bell to stay updated on mission approvals and announcements. The chat icon lets you message within a mission. Access Settings, Support, and more from the top-right menu. Good luck, volunteer!",
   },
 ];
 
