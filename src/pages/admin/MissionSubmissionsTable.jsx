@@ -48,7 +48,7 @@ const POST_LIKERT = [
  *   missionId    – Firestore mission document ID (required)
  *   missionTitle – Display name for certificate navigation (optional)
  */
-export default function MissionSubmissionsTable({ missionId, missionTitle }) {
+export default function MissionSubmissionsTable({ missionId, missionTitle, refreshKey }) {
   const navigate = useNavigate();
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +62,9 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
   const [issuingCertFor, setIssuingCertFor] = useState(null);
   const [isReleasingFor, setIsReleasingFor] = useState(null);
   const [volunteerCard, setVolunteerCard] = useState(null);
+  const [showJournalModal, setShowJournalModal] = useState(false);
+  const [journalModalVolunteer, setJournalModalVolunteer] = useState(null);
+  const [approvingJournal, setApprovingJournal] = useState(null);
 
   useEffect(() => {
     if (!volunteerCard) return;
@@ -74,7 +77,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
     if (!missionId) return;
     loadVolunteers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionId]);
+  }, [missionId, refreshKey]);
 
   const loadVolunteers = async () => {
     setLoading(true);
@@ -90,6 +93,9 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
       const snap = await getDocs(collection(db, "missions", missionId, "volunteer"));
       const usersSnap = await getDocs(collection(db, "users"));
       const usersMap = new Map(usersSnap.docs.map(d => [d.id, d.data()]));
+
+      const tasksSnap = await getDocs(collection(db, "missions", missionId, "task"));
+      const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const result = await Promise.all(snap.docs.map(async (d) => {
         const userId = d.id;
@@ -114,6 +120,42 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
           postSurveyAnswers = null;
         }
 
+        const journals = [];
+        for (const task of tasks) {
+          try {
+            const pSnap = await getDoc(doc(db, "missions", missionId, "task", task.id, "participants", userId));
+            if (pSnap.exists()) {
+              const pData = pSnap.data();
+              if (pData.reflection && pData.reflection.trim()) {
+                if (task.type === "grouped" && pData.groupId) {
+                  const groupSnap = await getDoc(doc(db, "missions", missionId, "task", task.id, "group", pData.groupId));
+                  const groupData = groupSnap.exists() ? groupSnap.data() : {};
+                  journals.push({
+                    taskId: task.id,
+                    taskTitle: task.title || `Task ${task.id}`,
+                    type: "grouped",
+                    groupId: pData.groupId,
+                    reflection: groupData.reflection || pData.reflection,
+                    adminApprovalStatus: groupData.adminApprovalStatus || pData.adminApprovalStatus || "pending",
+                    pendingPoints: pData.pendingPoints || Number(task.points) || 0,
+                  });
+                } else {
+                  journals.push({
+                    taskId: task.id,
+                    taskTitle: task.title || `Task ${task.id}`,
+                    type: task.type || "individual",
+                    reflection: pData.reflection,
+                    adminApprovalStatus: pData.adminApprovalStatus || "pending",
+                    pendingPoints: pData.pendingPoints || 0,
+                  });
+                }
+              }
+            }
+          } catch {
+            // skip tasks that fail to load
+          }
+        }
+
         return {
           ...vData,
           id: userId,
@@ -125,6 +167,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
           totalPoints: userData?.totalPoints || 0,
           preSurveyAnswers,
           postSurveyAnswers,
+          journals,
         };
       }));
 
@@ -221,6 +264,65 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
     setShowAnswerModal(true);
   };
 
+  const handleJournalApproval = async (volunteer, journal, decision) => {
+    const { taskId, type, groupId } = journal;
+    const volunteerId = volunteer.id;
+    const approvalData = { adminApprovalStatus: decision, adminReviewedAt: new Date().toISOString() };
+    setApprovingJournal({ volunteerId, taskId });
+    try {
+      if (type === "grouped" && groupId) {
+        await updateDoc(doc(db, "missions", missionId, "task", taskId, "group", groupId), approvalData);
+        const membersSnap = await getDocs(collection(db, "missions", missionId, "task", taskId, "participants"));
+        for (const memberDoc of membersSnap.docs) {
+          if (memberDoc.data().groupId === groupId) {
+            await updateDoc(memberDoc.ref, approvalData);
+          }
+        }
+        setVolunteers(prev => prev.map(v => ({
+          ...v,
+          journals: v.journals.map(j =>
+            j.taskId === taskId && j.groupId === groupId ? { ...j, adminApprovalStatus: decision } : j
+          ),
+        })));
+      } else {
+        await updateDoc(doc(db, "missions", missionId, "task", taskId, "participants", volunteerId), approvalData);
+        setVolunteers(prev => prev.map(v => {
+          if (v.id !== volunteerId) return v;
+          return { ...v, journals: v.journals.map(j => j.taskId === taskId ? { ...j, adminApprovalStatus: decision } : j) };
+        }));
+      }
+
+      if (journalModalVolunteer?.id === volunteerId) {
+        setJournalModalVolunteer(prev => ({
+          ...prev,
+          journals: prev.journals.map(j =>
+            j.taskId === taskId ? { ...j, adminApprovalStatus: decision } : j
+          ),
+        }));
+      }
+
+      try {
+        await createNotification(volunteerId, {
+          type: decision === "approved" ? "journal_approved" : "journal_rejected",
+          title: `Journal ${decision === "approved" ? "Approved" : "Rejected"}`,
+          message: `Your journal for "${journal.taskTitle}" has been ${decision}.`,
+          link: `/event/${missionId}/activity`,
+        });
+      } catch { /* notification failure is non-fatal */ }
+
+      logAudit({
+        action: `JOURNAL_${decision.toUpperCase()}`,
+        category: "event",
+        details: { missionId, targetUserId: volunteerId, taskId, taskTitle: journal.taskTitle },
+      });
+      showToast(`Journal ${decision === "approved" ? "approved" : "rejected"}.`);
+    } catch {
+      showToast("Failed to update journal approval status.");
+    } finally {
+      setApprovingJournal(null);
+    }
+  };
+
   if (loading) return <p style={{ color: "#888", padding: 16 }}>Loading submissions…</p>;
 
   return (
@@ -247,6 +349,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Pre-Survey</th>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Consent Form</th>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Post-Survey</th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Journal</th>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Participation</th>
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Done %</th>
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Points</th>
@@ -256,7 +359,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
           <tbody>
             {volunteers.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>No submissions found.</td>
+                <td colSpan={11} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>No submissions found.</td>
               </tr>
             ) : volunteers.map((v, idx) => {
               const rawRoles = v.preSurveyAnswers?.engagement?.participation || [];
@@ -266,9 +369,20 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
               const consentReviewStatus = v.consentSubmission?.reviewStatus || "";
               const isConsentApproved = consentReviewStatus === "approved";
 
+              const journals = v.journals || [];
+              const approvedJournalCount = journals.filter(j => j.adminApprovalStatus === "approved").length;
+              const allJournalsApproved = journals.length === 0 || approvedJournalCount === journals.length;
+
               const requiredItems = isDonorOnly
                 ? [v.participationStatus]
-                : [v.preSurveyAnswers, v.postSurveyAnswers, isConsentApproved, v.progress?.attendance === "present", v.participationStatus];
+                : [
+                    v.preSurveyAnswers,
+                    v.postSurveyAnswers,
+                    isConsentApproved,
+                    v.progress?.attendance === "present",
+                    v.participationStatus,
+                    ...(journals.length > 0 ? [allJournalsApproved] : []),
+                  ];
 
               const completedItems = requiredItems.filter(Boolean).length;
               const individualCompletion = Math.round((completedItems / requiredItems.length) * 100);
@@ -349,6 +463,24 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
                     {v.postSurveyAnswers
                       ? <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1a73e8", background: "#fff", color: "#1a73e8", cursor: "pointer", fontWeight: 600, fontSize: "0.78rem", whiteSpace: "nowrap" }} onClick={() => handleViewAnswers(v, "post")}>View</button>
                       : <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>—</span>}
+                  </td>
+                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                    {journals.length === 0 ? (
+                      <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>—</span>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontSize: "0.78rem", fontWeight: 700, color: allJournalsApproved ? "#137333" : "#202124" }}>
+                          {approvedJournalCount}/{journals.length}
+                        </span>
+                        <button
+                          disabled={!!v.releasedAt}
+                          style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #30bdb7", background: "#fff", color: "#30bdb7", cursor: !!v.releasedAt ? "not-allowed" : "pointer", fontWeight: 600, fontSize: "0.75rem", whiteSpace: "nowrap" }}
+                          onClick={() => { setJournalModalVolunteer(v); setShowJournalModal(true); }}
+                        >
+                          Review
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     <select
@@ -467,6 +599,73 @@ export default function MissionSubmissionsTable({ missionId, missionTitle }) {
         </table>
         </div>
       </div>
+
+      {/* Journal Review Modal */}
+      {showJournalModal && journalModalVolunteer && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 11000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowJournalModal(false)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 480, maxWidth: "90vw", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", position: "relative", color: "#202124", maxHeight: "82vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button className="admin-modal-close admin-modal-close--absolute" onClick={() => setShowJournalModal(false)}>×</button>
+            <h2 style={{ textAlign: "center", marginBottom: 4, color: "#202124", fontSize: "1.05rem", fontWeight: 700 }}>Journal Submissions</h2>
+            <p style={{ textAlign: "center", color: "#5f6368", fontSize: "0.85rem", marginBottom: 24 }}>{journalModalVolunteer.name}</p>
+            {journalModalVolunteer.journals.length === 0 ? (
+              <p style={{ textAlign: "center", color: "#9aa0a6" }}>No journal submissions found.</p>
+            ) : journalModalVolunteer.journals.map(journal => {
+              const isApproving = approvingJournal?.volunteerId === journalModalVolunteer.id && approvingJournal?.taskId === journal.taskId;
+              return (
+                <div key={journal.taskId} style={{ marginBottom: 20, border: "1px solid #e8eaed", borderRadius: 10, padding: "16px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#202124" }}>{journal.taskTitle}</span>
+                      <span style={{ marginLeft: 8, fontSize: "0.72rem", color: "#80868b", background: "#f1f3f4", borderRadius: 99, padding: "1px 7px" }}>
+                        {journal.type === "grouped" ? "Group" : "Individual"}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.78rem", fontWeight: 600, color: journal.adminApprovalStatus === "approved" ? "#137333" : journal.adminApprovalStatus === "rejected" ? "#d93025" : "#f9ab00" }}>
+                      {journal.adminApprovalStatus === "approved" ? "Approved" : journal.adminApprovalStatus === "rejected" ? "Rejected" : "Pending"}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#3c4043", lineHeight: 1.6, margin: "0 0 12px 0", background: "#f8f9fa", borderRadius: 6, padding: "10px 12px" }}>
+                    {journal.reflection}
+                  </p>
+                  {journal.adminApprovalStatus === "pending" && (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        disabled={isApproving}
+                        onClick={() => handleJournalApproval(journalModalVolunteer, journal, "approved")}
+                        style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: isApproving ? "#e6f4ea" : "#137333", color: isApproving ? "#137333" : "#fff", fontWeight: 600, fontSize: "0.78rem", cursor: isApproving ? "not-allowed" : "pointer" }}
+                      >
+                        {isApproving ? "Saving…" : "Approve"}
+                      </button>
+                      <button
+                        disabled={isApproving}
+                        onClick={() => handleJournalApproval(journalModalVolunteer, journal, "rejected")}
+                        style={{ padding: "5px 14px", borderRadius: 6, border: "1px solid #d93025", background: "#fff", color: "#d93025", fontWeight: 600, fontSize: "0.78rem", cursor: isApproving ? "not-allowed" : "pointer" }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                  {journal.adminApprovalStatus !== "pending" && !journalModalVolunteer.releasedAt && (
+                    <button
+                      disabled={isApproving}
+                      onClick={() => handleJournalApproval(journalModalVolunteer, journal, "pending")}
+                      style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #dadce0", background: "#fff", color: "#5f6368", fontWeight: 600, fontSize: "0.72rem", cursor: isApproving ? "not-allowed" : "pointer" }}
+                    >
+                      Reset to Pending
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Answer Modal */}
       {showAnswerModal && (

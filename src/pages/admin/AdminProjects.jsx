@@ -410,6 +410,13 @@ export default function AdminProjects() {
             </div>
             {dropdownOpen && (
               <div className="ap-dropdown">
+                <button
+                  className="ap-dropdown-item ap-dropdown-item--create"
+                  onClick={() => { setDropdownOpen(false); navigate("/admin/projects/new"); }}
+                >
+                  + Add Project
+                </button>
+                <div className="ap-dropdown-divider" />
                 {FILTER_OPTIONS.map(opt => (
                   <button
                     key={opt.key}

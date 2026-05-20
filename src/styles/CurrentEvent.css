@@ -79,6 +79,35 @@
 }
 
 /* ── Date urgency strip at bottom of card ────────────────────────────── */
+.ce-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.ce-detail-title-block {
+  min-width: 0;
+  flex: 1;
+}
+
+.ce-detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ce-detail-header-actions .admin-modal-close:disabled svg {
+  animation: ce-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes ce-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
 .ce-urgency-bar {
   font-size: 0.73rem;
   font-weight: 700;

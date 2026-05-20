@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useContext } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { SessionContext } from "../../context/SessionContext";
 import { QRCodeCanvas } from "qrcode.react";
+import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import "../../styles/CurrentEvent.css";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import "../../styles/ReviewProposal.css";
@@ -189,6 +190,8 @@ export default function CurrentEvent() {
   const [rosterVolunteers, setRosterVolunteers] = useState([]);
   const [missionTitle, setMissionTitle] = useState("");
   const [missionData, setMissionData] = useState(null);
+  const [refreshingDetails, setRefreshingDetails] = useState(false);
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState("roster");
   const [flagging, setFlagging] = useState(false);
   const [flagResult, setFlagResult] = useState(null);
@@ -267,9 +270,11 @@ export default function CurrentEvent() {
   }, [missionId]);
 
   // ── fetch mission title + full data for detail view ───────────────
-  useEffect(() => {
+  const loadMissionDetails = async ({ silent = false } = {}) => {
     if (!missionId) return;
-    getDoc(doc(db, "missions", missionId)).then(d => {
+    if (!silent) setRefreshingDetails(true);
+    try {
+      const d = await getDoc(doc(db, "missions", missionId));
       if (d.exists()) {
         const data = d.data();
         setMissionTitle(data.title || "Event");
@@ -289,7 +294,14 @@ export default function CurrentEvent() {
           studentOutcomes: data.studentOutcomes || "",
         });
       }
-    });
+      await fetchMissionVolunteers();
+    } finally {
+      if (!silent) setRefreshingDetails(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMissionDetails({ silent: true });
   }, [missionId]);
 
   const handleSaveDetails = async () => {
@@ -407,7 +419,7 @@ export default function CurrentEvent() {
     getDocs(collection(db, "missions", missionId, "feedbackResponses")).then(snap => {
       setFeedbackResponses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }).finally(() => setFeedbackLoading(false));
-  }, [missionId, activeTab]);
+  }, [missionId, activeTab, detailRefreshKey]);
 
   // ── flagging helpers ──────────────────────────────────────────────
   const flagMission = async (missionDoc, now, todayStr, { allowReFlag = true } = {}) => {
@@ -623,6 +635,8 @@ export default function CurrentEvent() {
           ? { ...v, attendanceStatus: isPresent ? null : "present", tookAttendanceAt: isPresent ? null : new Date() }
           : v
       ));
+    } catch {
+      showToast("Failed to update attendance. Try again.");
     } finally {
       setTogglingAttendance(prev => ({ ...prev, [userId]: false }));
     }
@@ -1069,7 +1083,7 @@ export default function CurrentEvent() {
     const tabs = [
       { key: "roster",  label: "Roster" },
       { key: "details", label: "Project Details" },
-      ...(!isFaculty ? [{ key: "docs", label: "Document Library" }] : []),
+      { key: "docs", label: "Document Library" },
       { key: "feedback", label: "Community Feedback" },
     ];
 
@@ -1099,7 +1113,8 @@ export default function CurrentEvent() {
           marginBottom: 16, border: "1px solid #e8eaed",
           boxShadow: "0 1px 3px rgba(60,64,67,0.05)",
         }}>
-          <div style={{ marginBottom: 14 }}>
+          <div className="ce-detail-header">
+            <div className="ce-detail-title-block">
             <h2 style={{ margin: "0 0 10px", color: "#202124", fontSize: "1.25rem", fontWeight: 700, lineHeight: 1.3 }}>
               {missionTitle || "Loading…"}
             </h2>
@@ -1123,6 +1138,7 @@ export default function CurrentEvent() {
               <span style={{ background: "#f8f9fa", color: "#5f6368", padding: "3px 10px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 600, border: "1px solid #e8eaed" }}>
                 {rosterVolunteers.length}{missionData?.maxStudents ? ` / ${missionData.maxStudents}` : ""} volunteers
               </span>
+            </div>
             </div>
           </div>
 
@@ -1148,67 +1164,67 @@ export default function CurrentEvent() {
         </div>
 
         {/* ── action strip ── */}
-        {!isFaculty && (
-          <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            {/* QR + Feedback group */}
-            <button className="ce-action-btn" onClick={() => setShowAttQR(true)}>
-              Attendance QR
-            </button>
-            <button className="ce-action-btn" onClick={() => setShowFeedbackQR(true)}>
-              Feedback QR
-            </button>
+        <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {/* QR buttons — visible to all roles */}
+          <button className="ce-action-btn" onClick={() => setShowAttQR(true)}>
+            Attendance QR
+          </button>
+          <button className="ce-action-btn" onClick={() => setShowFeedbackQR(true)}>
+            Feedback QR
+          </button>
 
-            {/* Divider */}
-            <div className="ce-action-divider" style={{ width: 1, height: 28, background: "#e8eaed", margin: "0 4px" }} />
-
-            {/* Admin actions */}
-            <div className="ce-tooltip-wrap">
-              <button
-                className="ce-action-btn"
-                onClick={handleFlagThisEvent}
-                disabled={flagging}
-              >
-                {flagging ? "Flagging…" : "Flag Absent"}
-              </button>
-              <span className="ce-tooltip">Marks volunteers who missed attendance in this event. Flagged volunteers cannot join new missions for {FLAG_DURATION_DAYS} days.</span>
-            </div>
-            {missionData?.status === "published" && (
-              <button
-                onClick={handleCloseEvent}
-                disabled={closingEvent}
-                style={{
-                  padding: "8px 14px",
-                  background: closingEvent ? "#f8f9fa" : "#ea4335",
-                  color: closingEvent ? "#9aa0a6" : "#fff",
-                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.82rem",
-                  cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-                }}
-              >
-                {closingEvent ? "Closing…" : "✓ Close Event"}
-              </button>
-            )}
-            {(missionData?.status === "completed" || missionData?.status === "cancelled") && (
-              <button
-                onClick={handleReopenEvent}
-                disabled={closingEvent}
-                style={{
-                  padding: "8px 14px",
-                  background: closingEvent ? "#f8f9fa" : "#137333",
-                  color: closingEvent ? "#9aa0a6" : "#fff",
-                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.82rem",
-                  cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-                }}
-              >
-                {closingEvent ? "Reopening…" : "↺ Reopen Event"}
-              </button>
-            )}
-            {flagResult && (
-              <span style={{ fontSize: 12, color: flagResult.ok ? "#137333" : "#d93025", fontWeight: 600 }}>
-                {flagResult.ok ? `${flagResult.count} flagged` : `Error: ${flagResult.error}`}
-              </span>
-            )}
-          </div>
-        )}
+          {/* Admin-only actions */}
+          {!isFaculty && (
+            <>
+              <div className="ce-action-divider" style={{ width: 1, height: 28, background: "#e8eaed", margin: "0 4px" }} />
+              <div className="ce-tooltip-wrap">
+                <button
+                  className="ce-action-btn"
+                  onClick={handleFlagThisEvent}
+                  disabled={flagging}
+                >
+                  {flagging ? "Flagging…" : "Flag Absent"}
+                </button>
+                <span className="ce-tooltip">Marks volunteers who missed attendance in this event. Flagged volunteers cannot join new missions for {FLAG_DURATION_DAYS} days.</span>
+              </div>
+              {missionData?.status === "published" && (
+                <button
+                  onClick={handleCloseEvent}
+                  disabled={closingEvent}
+                  style={{
+                    padding: "8px 14px",
+                    background: closingEvent ? "#f8f9fa" : "#ea4335",
+                    color: closingEvent ? "#9aa0a6" : "#fff",
+                    border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.82rem",
+                    cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                  }}
+                >
+                  {closingEvent ? "Closing…" : "✓ Close Event"}
+                </button>
+              )}
+              {(missionData?.status === "completed" || missionData?.status === "cancelled") && (
+                <button
+                  onClick={handleReopenEvent}
+                  disabled={closingEvent}
+                  style={{
+                    padding: "8px 14px",
+                    background: closingEvent ? "#f8f9fa" : "#137333",
+                    color: closingEvent ? "#9aa0a6" : "#fff",
+                    border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.82rem",
+                    cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                  }}
+                >
+                  {closingEvent ? "Reopening…" : "↺ Reopen Event"}
+                </button>
+              )}
+              {flagResult && (
+                <span style={{ fontSize: 12, color: flagResult.ok ? "#137333" : "#d93025", fontWeight: 600 }}>
+                  {flagResult.ok ? `${flagResult.count} flagged` : `Error: ${flagResult.error}`}
+                </span>
+              )}
+            </>
+          )}
+        </div>
 
         {/* ── tab navigation ── */}
         <div className="ce-tab-nav" style={{ display: "flex", borderBottom: "2px solid #e8eaed", marginBottom: 20 }}>
@@ -1260,8 +1276,8 @@ export default function CurrentEvent() {
                     {!isFaculty && <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Flag</th>}
                     <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Level</th>
                     <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Joined</th>
-                    {!isFaculty && <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Attendance</th>}
-                    {!isFaculty && <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Actions</th>}
+                    <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Attendance</th>
+                    <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1339,86 +1355,84 @@ export default function CurrentEvent() {
                       <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>
                         {v.joinedAt ? new Date(v.joinedAt).toLocaleDateString() : "—"}
                       </td>
-                      {!isFaculty && (
-                        <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
-                          {v.attendanceStatus === "present"
-                            ? <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>✓ Present</span>
-                            : <span style={{ color: "#80868b", fontSize: "0.82rem" }}>—</span>}
-                        </td>
-                      )}
-                      {!isFaculty && (
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                            <button
-                              disabled={!!togglingAttendance[v.id]}
-                              onClick={() => handleToggleAttendance(v.id, v.attendanceStatus)}
-                              style={{
-                                padding: "4px 10px",
-                                background: v.attendanceStatus === "present" ? "#fce8e6" : "#e6f4ea",
-                                color: v.attendanceStatus === "present" ? "#d93025" : "#137333",
-                                border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                                cursor: togglingAttendance[v.id] ? "not-allowed" : "pointer",
-                                opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
-                              }}
-                            >
-                              {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
-                            </button>
+                      <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
+                        {v.attendanceStatus === "present"
+                          ? <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>✓ Present</span>
+                          : <span style={{ color: "#80868b", fontSize: "0.82rem" }}>—</span>}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                          <button
+                            disabled={!!togglingAttendance[v.id]}
+                            onClick={() => handleToggleAttendance(v.id, v.attendanceStatus)}
+                            style={{
+                              padding: "4px 10px",
+                              background: v.attendanceStatus === "present" ? "#fce8e6" : "#e6f4ea",
+                              color: v.attendanceStatus === "present" ? "#d93025" : "#137333",
+                              border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                              cursor: togglingAttendance[v.id] ? "not-allowed" : "pointer",
+                              opacity: togglingAttendance[v.id] ? 0.6 : 1, whiteSpace: "nowrap",
+                            }}
+                          >
+                            {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
+                          </button>
 
-                          {/* ── Assign organizer role ── */}
-                          {editingRoleFor === v.id ? (
-                            <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
-                              <select
-                                value={pendingRole}
-                                onChange={e => setPendingRole(e.target.value)}
-                                disabled={!!assigningRole[v.id]}
-                                style={{
-                                  padding: "3px 6px", border: "1px solid #dadce0",
-                                  borderRadius: 6, fontSize: 11, fontFamily: "inherit",
-                                  color: "#202124", background: "#fff", cursor: "pointer",
-                                }}
-                              >
-                                <option value="">Pick role…</option>
-                                <option value="volunteer">Volunteer</option>
-                                <option value="organizer">📋 Organizer</option>
-                                <option value="lead_organizer">🎯 Lead Organizer</option>
-                              </select>
+                          {/* ── Assign organizer role (admin only) ── */}
+                          {!isFaculty && (
+                            editingRoleFor === v.id ? (
+                              <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                                <select
+                                  value={pendingRole}
+                                  onChange={e => setPendingRole(e.target.value)}
+                                  disabled={!!assigningRole[v.id]}
+                                  style={{
+                                    padding: "3px 6px", border: "1px solid #dadce0",
+                                    borderRadius: 6, fontSize: 11, fontFamily: "inherit",
+                                    color: "#202124", background: "#fff", cursor: "pointer",
+                                  }}
+                                >
+                                  <option value="">Pick role…</option>
+                                  <option value="volunteer">Volunteer</option>
+                                  <option value="organizer">📋 Organizer</option>
+                                  <option value="lead_organizer">🎯 Lead Organizer</option>
+                                </select>
+                                <button
+                                  disabled={!pendingRole || !!assigningRole[v.id]}
+                                  onClick={() => handleAssignVolunteerRole(v.id, pendingRole)}
+                                  style={{
+                                    padding: "3px 8px", background: "#1a73e8", color: "#fff",
+                                    border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                    cursor: (!pendingRole || assigningRole[v.id]) ? "not-allowed" : "pointer",
+                                    opacity: (!pendingRole || assigningRole[v.id]) ? 0.6 : 1,
+                                  }}
+                                >
+                                  {assigningRole[v.id] ? "…" : "Save"}
+                                </button>
+                                <button
+                                  onClick={() => { setEditingRoleFor(null); setPendingRole(""); }}
+                                  style={{
+                                    padding: "3px 7px", background: "#f1f3f4", color: "#5f6368",
+                                    border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
                               <button
-                                disabled={!pendingRole || !!assigningRole[v.id]}
-                                onClick={() => handleAssignVolunteerRole(v.id, pendingRole)}
+                                onClick={() => { setEditingRoleFor(v.id); setPendingRole(v.role || "volunteer"); }}
                                 style={{
-                                  padding: "3px 8px", background: "#1a73e8", color: "#fff",
+                                  padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8",
                                   border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                                  cursor: (!pendingRole || assigningRole[v.id]) ? "not-allowed" : "pointer",
-                                  opacity: (!pendingRole || assigningRole[v.id]) ? 0.6 : 1,
+                                  cursor: "pointer", whiteSpace: "nowrap",
                                 }}
                               >
-                                {assigningRole[v.id] ? "…" : "Save"}
+                                Assign Role
                               </button>
-                              <button
-                                onClick={() => { setEditingRoleFor(null); setPendingRole(""); }}
-                                style={{
-                                  padding: "3px 7px", background: "#f1f3f4", color: "#5f6368",
-                                  border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => { setEditingRoleFor(v.id); setPendingRole(v.role || "volunteer"); }}
-                              style={{
-                                padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8",
-                                border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                                cursor: "pointer", whiteSpace: "nowrap",
-                              }}
-                            >
-                              Assign Role
-                            </button>
+                            )
                           )}
-                          </div>
-                        </td>
-                      )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1590,7 +1604,7 @@ export default function CurrentEvent() {
 
         {/* ── Document Library tab ── */}
         {activeTab === "docs" && (
-          <MissionSubmissionsTable missionId={missionId} missionTitle={missionData?.title || missionTitle || ""} />
+          <MissionSubmissionsTable missionId={missionId} missionTitle={missionData?.title || missionTitle || ""} refreshKey={detailRefreshKey} />
         )}
 
         {/* ── Community Feedback tab ── */}

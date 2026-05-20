@@ -629,15 +629,11 @@ export default function EventActivity() {
             reflectionSubmittedBy: user.uid,
             reflectionSubmittedAt: submittedAt,
             status: "completed",
+            adminApprovalStatus: "pending",
             lastUpdated: submittedAt,
           });
         });
         const groupPoints = Number(activity.points) || 0;
-        const allRequirementsDoneForGroup =
-          volunteerProgress?.preSurvey === 'submitted' &&
-          (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') &&
-          volunteerProgress?.attendance === 'present' &&
-          volunteerProgress?.postSurvey === 'submitted';
 
         const groupParticipantsRef = collection(
           db,
@@ -653,38 +649,25 @@ export default function EventActivity() {
         );
         const groupParticipantsSnap = await getDocs(groupParticipantsQuery);
         let didUpdateCurrentUser = false;
-        let currentUserPointsAdded = 0;
 
         for (const groupParticipantDoc of groupParticipantsSnap.docs) {
           const targetParticipantRef = groupParticipantDoc.ref;
           const targetParticipantData = groupParticipantDoc.data() || {};
-          const currentPoints = Number(targetParticipantData.pointsEarned) || 0;
-          const pointsToAdd = allRequirementsDoneForGroup ? Math.max(groupPoints - currentPoints, 0) : 0;
 
           try {
             await updateDoc(targetParticipantRef, {
               status: "completed",
               reflection: reflectionText,
-              pointsEarned: allRequirementsDoneForGroup ? groupPoints : 0,
-              ...(allRequirementsDoneForGroup ? { pendingPoints: deleteField() } : { pendingPoints: groupPoints }),
+              adminApprovalStatus: "pending",
+              pointsEarned: 0,
+              pendingPoints: groupPoints,
               completedAt: targetParticipantData.completedAt || submittedAt,
               lastUpdated: submittedAt,
               groupId,
             });
 
-            if (allRequirementsDoneForGroup && pointsToAdd > 0) {
-              await setDoc(
-                doc(db, "missions", id, "volunteer", groupParticipantDoc.id),
-                {
-                  pointsEarned: increment(pointsToAdd),
-                },
-                { merge: true },
-              );
-            }
-
             if (groupParticipantDoc.id === user.uid) {
               didUpdateCurrentUser = true;
-              currentUserPointsAdded = allRequirementsDoneForGroup ? pointsToAdd : 0;
             }
           } catch (groupParticipantSyncError) {
             console.warn(
@@ -698,45 +681,20 @@ export default function EventActivity() {
           await updateDoc(participantRef, {
             status: "completed",
             reflection: reflectionText,
-            pointsEarned: allRequirementsDoneForGroup ? groupPoints : 0,
-            ...(allRequirementsDoneForGroup ? { pendingPoints: deleteField() } : { pendingPoints: groupPoints }),
+            adminApprovalStatus: "pending",
+            pointsEarned: 0,
+            pendingPoints: groupPoints,
             completedAt: submittedAt,
             lastUpdated: submittedAt,
             groupId,
           });
-
-          if (allRequirementsDoneForGroup) {
-            await setDoc(
-              doc(db, "missions", id, "volunteer", user.uid),
-              {
-                pointsEarned: increment(groupPoints),
-              },
-              { merge: true },
-            );
-            currentUserPointsAdded = groupPoints;
-          }
-        }
-
-        if (currentUserPointsAdded > 0) {
-          setTotalPointsEarned((prev) => prev + currentUserPointsAdded);
         }
 
         setSubmitStatus((prev) => ({
           ...prev,
-          [activityIdx]: allRequirementsDoneForGroup
-            ? `Group reflection submitted! +${groupPoints} pts applied to your account.`
-            : `Group reflection saved. Complete all requirements to unlock your ${groupPoints} pts.`,
+          [activityIdx]: "Group reflection submitted! Awaiting admin approval.",
         }));
         setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
-
-        if (allRequirementsDoneForGroup && currentUserPointsAdded > 0) {
-          await createNotification(user.uid, {
-            type: "points_earned",
-            title: "Points Earned!",
-            message: `You earned ${groupPoints} points for group task "${activity.title}"`,
-            link: `/event/${id}/activity`,
-          });
-        }
 
         await createNotification(user.uid, {
           type: "reflection_submitted",
@@ -776,83 +734,21 @@ export default function EventActivity() {
         );
       }
 
-      const eligibleForPoints = isEnrollmentClosed(activity);
-      const allRequirementsDone =
-        volunteerProgress?.preSurvey === 'submitted' &&
-        (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') &&
-        volunteerProgress?.attendance === 'present' &&
-        volunteerProgress?.postSurvey === 'submitted';
-      const awardNow = eligibleForPoints && allRequirementsDone;
-
       await updateDoc(participantRef, {
         reflection: reflectionText,
         status: "completed",
-        pointsEarned: awardNow ? pointsToAward : 0,
-        ...(eligibleForPoints && !allRequirementsDone ? { pendingPoints: pointsToAward } : { pendingPoints: deleteField() }),
+        adminApprovalStatus: "pending",
+        pointsEarned: 0,
+        pendingPoints: pointsToAward,
         completedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       });
 
-      // Update volunteer's total points in the event
-      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
-      const volunteerSnap = await getDoc(volunteerRef);
-      if (awardNow && volunteerSnap.exists()) {
-        const currentTotal = volunteerSnap.data().pointsEarned || 0;
-        const newTotal = currentTotal + pointsToAward;
-        await updateDoc(volunteerRef, {
-          pointsEarned: newTotal,
-        });
-        await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(pointsToAward) });
-        // Update the displayed total
-        setTotalPointsEarned(newTotal);
-
-        // Check for level up (calculate across all missions)
-        const missionsRef = collection(db, "missions");
-        const missionsSnap = await getDocs(missionsRef);
-        let totalPointsAllMissions = 0;
-
-        for (const missionDoc of missionsSnap.docs) {
-          const volRef = doc(db, "missions", missionDoc.id, "volunteer", user.uid);
-          const volSnap = await getDoc(volRef);
-          if (volSnap.exists()) {
-            totalPointsAllMissions += volSnap.data().pointsEarned || 0;
-          }
-        }
-
-        // Calculate old and new level (progressive thresholds)
-        const oldLevel = getLevelInfo(totalPointsAllMissions - pointsToAward).level;
-        const newLevel = getLevelInfo(totalPointsAllMissions).level;
-
-        // Send level up notification if level increased
-        if (newLevel > oldLevel) {
-          await createNotification(user.uid, {
-            type: "level_up",
-            title: "Level Up!",
-            message: `Congratulations! You've reached Level ${newLevel}! 🎉`,
-            link: "/student"
-          });
-        }
-      }
-
       setSubmitStatus((prev) => ({
         ...prev,
-        [activityIdx]: awardNow
-          ? `Reflection submitted! +${pointsToAward} pts earned!`
-          : eligibleForPoints
-            ? `Reflection saved. Complete all requirements to unlock your ${pointsToAward} pts.`
-            : "Reflection submitted! Points will be awarded after enrollment closes.",
+        [activityIdx]: "Reflection submitted! Awaiting admin approval.",
       }));
       setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
-
-      // Send points earned notification
-      if (awardNow && pointsToAward > 0) {
-        await createNotification(user.uid, {
-          type: "points_earned",
-          title: "Points Earned!",
-          message: `You earned ${pointsToAward} points for completing "${activity.title}"`,
-          link: `/event/${id}/activity`
-        });
-      }
 
       // Send notification to student
       await createNotification(user.uid, {
@@ -996,6 +892,7 @@ export default function EventActivity() {
           reflectionEditedBy: user.uid,
           reflectionEditedAt: editedAt,
           status: "completed",
+          adminApprovalStatus: "pending",
           lastUpdated: editedAt,
         });
 
@@ -1019,7 +916,7 @@ export default function EventActivity() {
             await updateDoc(groupedParticipantDoc.ref, {
               reflection: updatedReflection,
               status: "completed",
-              pointsEarned: Number(groupedParticipantData.pointsEarned) || Number(taskDetails.points) || 0,
+              adminApprovalStatus: "pending",
               completedAt: groupedParticipantData.completedAt || editedAt,
               lastUpdated: editedAt,
               groupId,
@@ -1041,6 +938,7 @@ export default function EventActivity() {
 
       await updateDoc(participantRef, {
         reflection: updatedReflection,
+        adminApprovalStatus: "pending",
         lastUpdated: new Date().toISOString(),
       });
       setEditingJournalId(null);
@@ -1090,6 +988,7 @@ export default function EventActivity() {
           reflectionSubmittedAt: deleteField(),
           reflectionEditedBy: deleteField(),
           reflectionEditedAt: deleteField(),
+          adminApprovalStatus: deleteField(),
           lastUpdated: clearedAt,
         });
 
@@ -1098,6 +997,8 @@ export default function EventActivity() {
           reflection: "",
           status: "todo",
           pointsEarned: 0,
+          pendingPoints: deleteField(),
+          adminApprovalStatus: deleteField(),
           completedAt: deleteField(),
           lastUpdated: clearedAt,
           groupId,
@@ -1127,6 +1028,8 @@ export default function EventActivity() {
         reflection: "",
         status: "todo",
         pointsEarned: 0,
+        pendingPoints: deleteField(),
+        adminApprovalStatus: deleteField(),
         lastUpdated: new Date().toISOString(),
       });
 
