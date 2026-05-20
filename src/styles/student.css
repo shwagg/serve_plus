@@ -1783,15 +1783,26 @@
   position: relative;
   width: 100%;
   min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 .event-details-modal-content {
-  height: auto;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   padding: 0;
   background: #fff;
 }
 .event-details-center--modal {
   padding: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .event-details-image--modal {
   height: 180px;
@@ -1799,13 +1810,26 @@
 }
 .event-details-card--modal {
   margin-top: -16px;
-  padding: 16px 28px 20px;
+  padding: 16px 28px 0;
   transform: none;
   box-shadow: none;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .event-details-grid--modal {
   padding: 0;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.event-details-card--modal .event-details-cta {
+  flex-shrink: 0;
+  padding-bottom: 20px;
+  background: #f9fafb;
 }
 .event-details-card--modal .event-details-title {
   font-size: 1.5rem;
@@ -2520,8 +2544,7 @@
     border-radius: 18px 18px 0 0;
   }
   .student-event-modal {
-    height: auto;
-    overflow-y: auto;
+    overflow: hidden;
   }
   .student-proposal-modal {
     height: 92dvh;
@@ -2553,7 +2576,7 @@
   }
   .event-details-card--modal {
     margin-top: -10px;
-    padding: 14px 14px 18px;
+    padding: 14px 14px 0;
     border-radius: 14px 14px 0 0;
   }
   .event-details-icon-btn {
@@ -2680,11 +2703,6 @@
     max-height: calc(100dvh - 24px);
   }
 
-  .event-details-center--modal {
-    display: flex;
-    flex-direction: column;
-  }
-
   .event-details-image.event-details-image--modal {
     height: clamp(140px, 35dvh, 170px);
     aspect-ratio: auto;
@@ -2693,9 +2711,8 @@
 
   .event-details-card.event-details-card--modal {
     margin-top: -10px;
-    padding: 14px 14px 18px;
+    padding: 14px 14px 0;
     border-radius: 14px 14px 18px 18px;
-    overflow-y: auto;
     min-height: 0;
   }
 
