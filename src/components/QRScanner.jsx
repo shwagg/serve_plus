@@ -9,6 +9,7 @@ export default function QRScanner({ onScan, statusOverride }) {
   const html5QrRef   = useRef(null);
   const runningRef   = useRef(false);
   const initRef      = useRef(false);
+  const scannedRef   = useRef(false);
   const fileInputRef = useRef(null);
 
   const [error,        setError       ] = React.useState(null);
@@ -27,6 +28,8 @@ export default function QRScanner({ onScan, statusOverride }) {
           { facingMode: "environment" },
           { fps: 10, aspectRatio: 1 },
           (decodedText) => {
+            if (scannedRef.current) return;
+            scannedRef.current = true;
             (async () => {
               let position = null;
               try {
