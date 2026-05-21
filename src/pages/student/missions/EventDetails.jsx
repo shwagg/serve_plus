@@ -217,7 +217,6 @@ export default function EventDetails({ onClose = null, missionId = null }) {
 
       // Keep a reverse index so the chat dropdown can load instantly — non-blocking
       setDoc(doc(db, "userMissions", user.uid, "missions", id), {
-        missionId: id,
         title: mission?.title || "Untitled Mission",
         role: "volunteer",
         date: mission?.targetDate || '',

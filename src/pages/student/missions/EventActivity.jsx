@@ -9,6 +9,7 @@ import Header from "../../../components/Header";
 import { showConfirm } from "../../../utils/toast";
 import { WestIcon, ModeRoundedIcon, DeleteRoundedIcon, DeleteForeverRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon } from "../../../components/icons";
 import cloudsBg from '../../../assets/clouds-bg.jpg';
+import xpIcon from '../../../assets/xp_icon.png';
 import LoadingOverlay from '../../../components/LoadingOverlay';
 import mission1 from '../../../assets/mission1.jpg';
 import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
@@ -172,6 +173,8 @@ export default function EventActivity() {
       });
       if (attendanceIsFirst) {
         await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+        setTotalPointsEarned(prev => prev + 5);
+        window.showToast?.("+5 XP", "success", "You earned XP for your attendance.");
       }
 
       setQRStatus("Attendance Recorded");
@@ -269,16 +272,12 @@ export default function EventActivity() {
           progress: {
             consent: "submitted"
           },
-          ...(consentIsFirst ? { "requirementBonus.consent": 5 } : {}),
         },
         { merge: true }
       );
       await updateDoc(volunteerRef, {
         "consentSubmission.reviewStatus": deleteField(),
       });
-      if (consentIsFirst) {
-        await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
-      }
       setConsentSubmitted(true);
       setConsentReviewStatus("");
       setConsentFileUrl(downloadURL);
@@ -288,7 +287,6 @@ export default function EventActivity() {
       }));
       setSelectedConsentFile(null);
       setShowConsentModal(false);
-      alert(consentIsFirst ? "Consent uploaded successfully! +5 points earned." : "Consent uploaded successfully!");
     } catch (error) {
       console.error("Upload error:", error);
       alert("Upload failed.");
@@ -349,6 +347,7 @@ export default function EventActivity() {
   const [editingJournalId, setEditingJournalId] = useState(null);
   const [editingJournalText, setEditingJournalText] = useState("");
   const [enrolledTasks, setEnrolledTasks] = useState({});
+  const [taskPointsEarned, setTaskPointsEarned] = useState({});
   const [tasks, setTasks] = useState([]);
   const [volunteerProgress, setVolunteerProgress] = useState(null);
   const [volunteerCount, setVolunteerCount] = useState(null);
@@ -361,10 +360,21 @@ export default function EventActivity() {
   const [groupModalMode, setGroupModalMode] = useState("view");
   const [timerNow, setTimerNow] = useState(Date.now());
   const [playerStripPortal, setPlayerStripPortal] = useState(null);
-  const [activeNav, setActiveNav] = useState('content');
+  const [activeNav, setActiveNav] = useState(() => {
+    const saved = sessionStorage.getItem('ea_activeNav');
+    if (saved) { sessionStorage.removeItem('ea_activeNav'); return saved; }
+    return 'content';
+  });
   const [showTasksInReq, setShowTasksInReq] = useState(false);
   const [requirementBonusEarned, setRequirementBonusEarned] = useState({});
-  const hasAwardedPendingRef = useRef(false);
+  const [pullY, setPullY] = useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const postSurveyStepRef = useRef(null);
+  const [pullContainerEl, setPullContainerEl] = useState(null);
+  const pullContainerRef = useCallback((el) => setPullContainerEl(el), []);
+  const touchStartYRef = useRef(0);
+  const pullingRef = useRef(false);
+  const activeNavRef = useRef(activeNav);
 
   const compareParticipantsByEnrollment = useCallback((a, b) => {
     const aData = a?.data ? a.data() : a;
@@ -404,80 +414,13 @@ export default function EventActivity() {
     if (el) setPlayerStripPortal(el);
   }, []);
 
-  // Award pending task points when all requirements are finally completed
+
+  // Auto-expand Task Assignment when attendance is first marked present
   useEffect(() => {
-    const allDone =
-      volunteerProgress?.preSurvey === 'submitted' &&
-      (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') &&
-      volunteerProgress?.attendance === 'present' &&
-      volunteerProgress?.postSurvey === 'submitted';
-
-    if (!allDone || hasAwardedPendingRef.current || !tasks.length) return;
-
-    const user = auth.currentUser;
-    if (!user) return;
-
-    hasAwardedPendingRef.current = true;
-
-    (async () => {
-      let totalAdded = 0;
-      for (const task of tasks) {
-        if (!enrolledTasks[task.id]) continue;
-        try {
-          const participantRef = doc(db, "missions", id, "task", task.id, "participants", user.uid);
-          const participantSnap = await getDoc(participantRef);
-          if (!participantSnap.exists()) continue;
-          const data = participantSnap.data();
-          const reflection = String(data.reflection || '').trim();
-          if (!reflection) continue;
-
-          const pending = Number(data.pendingPoints) || 0;
-          const earned = Number(data.pointsEarned) || 0;
-
-          let pointsToAward = 0;
-
-          if (pending > 0) {
-            // Standard case: pendingPoints were stored at reflection time
-            pointsToAward = pending;
-          } else if (earned === 0 && isEnrollmentClosed(task)) {
-            // Reflection was submitted before enrollment closed — no pendingPoints were stored.
-            // Now that enrollment is closed and all requirements are done, calculate and award.
-            if (task.type === 'grouped') {
-              pointsToAward = Number(task.points) || 0;
-            } else {
-              const participantsSnap = await getDocs(
-                collection(db, "missions", id, "task", task.id, "participants")
-              );
-              const sortedParticipants = [...participantsSnap.docs].sort(compareParticipantsByEnrollment);
-              const positionIndex = sortedParticipants.findIndex(p => p.id === user.uid);
-              const position = positionIndex >= 0 ? positionIndex + 1 : participantsSnap.docs.length;
-              pointsToAward = calculateWeightedTaskPoints(task.points || 0, position, participantsSnap.docs.length);
-            }
-          }
-
-          if (pointsToAward <= 0) continue;
-
-          await updateDoc(participantRef, {
-            pointsEarned: pointsToAward,
-            pendingPoints: deleteField(),
-          });
-          await setDoc(
-            doc(db, "missions", id, "volunteer", user.uid),
-            { pointsEarned: increment(pointsToAward) },
-            { merge: true },
-          );
-          await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(pointsToAward) });
-          totalAdded += pointsToAward;
-        } catch (e) {
-          console.warn("Failed to award pending task points for task", task.id, e);
-        }
-      }
-      if (totalAdded > 0) {
-        setTotalPointsEarned(prev => prev + totalAdded);
-        window.showToast?.(`+${totalAdded} pts unlocked! All requirements complete.`, 'success');
-      }
-    })();
-  }, [volunteerProgress?.preSurvey, volunteerProgress?.consent, volunteerProgress?.attendance, volunteerProgress?.postSurvey, tasks, enrolledTasks]);
+    if (volunteerProgress?.attendance === 'present') {
+      setShowTasksInReq(true);
+    }
+  }, [volunteerProgress?.attendance]);
 
   const canJoinActivities = true;
   const toggleTaskExpand = (taskId) => setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
@@ -661,7 +604,7 @@ export default function EventActivity() {
               reflection: reflectionText,
               adminApprovalStatus: "pending",
               pointsEarned: 0,
-              pendingPoints: groupPoints,
+              estimatedPoints: groupPoints,
               completedAt: targetParticipantData.completedAt || submittedAt,
               lastUpdated: submittedAt,
               groupId,
@@ -684,7 +627,7 @@ export default function EventActivity() {
             reflection: reflectionText,
             adminApprovalStatus: "pending",
             pointsEarned: 0,
-            pendingPoints: groupPoints,
+            estimatedPoints: groupPoints,
             completedAt: submittedAt,
             lastUpdated: submittedAt,
             groupId,
@@ -740,7 +683,7 @@ export default function EventActivity() {
         status: "completed",
         adminApprovalStatus: "pending",
         pointsEarned: 0,
-        pendingPoints: pointsToAward,
+        estimatedPoints: pointsToAward,
         completedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       });
@@ -788,6 +731,7 @@ export default function EventActivity() {
       const tasksSnap = await getDocs(tasksRef);
 
       const journals = [];
+      let backfilledPoints = 0;
       // For each task, check if user has a participant document with a reflection
       for (const taskDoc of tasksSnap.docs) {
         const participantRef = doc(
@@ -804,18 +748,47 @@ export default function EventActivity() {
         if (participantSnap.exists()) {
           const data = participantSnap.data();
           if (data.reflection && data.reflection.trim()) {
+            let resolvedData = { ...data };
+            if (data.adminApprovalStatus === 'approved' && !Number(data.pointsEarned)) {
+              const taskData = taskDoc.data();
+              const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
+              try {
+                let pts = 0;
+                if (taskData.type === 'grouped') {
+                  pts = Number(taskData.points) || 0;
+                } else {
+                  const participantsSnap = await getDocs(collection(db, 'missions', id, 'task', taskDoc.id, 'participants'));
+                  const sorted = [...participantsSnap.docs].sort(compareParticipantsByEnrollment);
+                  const posIdx = sorted.findIndex(p => p.id === user.uid);
+                  const pos = posIdx >= 0 ? posIdx + 1 : sorted.length;
+                  pts = calculateWeightedTaskPoints(taskData.points || 0, pos, sorted.length);
+                }
+                if (pts > 0) {
+                  await updateDoc(participantRef, { pointsEarned: pts, estimatedPoints: deleteField() });
+                  await updateDoc(doc(db, 'users', user.uid), { totalPoints: increment(pts) });
+                  await updateDoc(volunteerRef, { pointsEarned: increment(pts) });
+                  resolvedData = { ...resolvedData, pointsEarned: pts };
+                  backfilledPoints += pts;
+                }
+              } catch (e) {
+                console.warn('Failed to award journal points:', e);
+              }
+            }
             journals.push({
               id: taskDoc.id,
               taskId: taskDoc.id,
               activityId: taskDoc.data().title,
               reflection: data.reflection,
-              ...data,
+              ...resolvedData,
             });
           }
         }
       }
 
       setUserJournals(journals);
+      if (backfilledPoints > 0) {
+        setTotalPointsEarned(prev => prev + backfilledPoints);
+      }
     } catch (err) {
       console.error("Error fetching journals:", err);
     }
@@ -843,6 +816,130 @@ export default function EventActivity() {
     }
     fetchEventAndJournals();
   }, [id, authChecked]);
+
+  useEffect(() => {
+    if (!authChecked || !tasks.length) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const prevStatuses = {};
+    const unsubs = tasks.map((task) => {
+      const participantRef = doc(db, 'missions', id, 'task', task.id, 'participants', user.uid);
+      let isFirst = true;
+      return onSnapshot(participantRef, async (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+
+        if (isFirst) {
+          isFirst = false;
+          prevStatuses[task.id] = data.adminApprovalStatus;
+          // Fallback: ensure enrollment and task points reflect Firestore state
+          // in case fetchEvent's enrollment check was skipped due to an error.
+          setEnrolledTasks(prev => prev[task.id] ? prev : { ...prev, [task.id]: true });
+          const pts = Number(data.pointsEarned) || 0;
+          if (pts > 0) setTaskPointsEarned(prev => prev[task.id] ? prev : { ...prev, [task.id]: pts });
+          return;
+        }
+
+        const prevStatus = prevStatuses[task.id];
+        const newStatus = data.adminApprovalStatus;
+        prevStatuses[task.id] = newStatus;
+        if (prevStatus === newStatus) return;
+
+        if (data.reflection && data.reflection.trim()) {
+          setUserJournals(prev => {
+            const exists = prev.some(j => j.taskId === task.id);
+            if (exists) return prev.map(j => j.taskId === task.id ? { ...j, ...data } : j);
+            return [...prev, { id: task.id, taskId: task.id, activityId: task.title, reflection: data.reflection, ...data }];
+          });
+        }
+
+        if (newStatus === 'approved') {
+          if (!Number(data.pointsEarned)) {
+            try {
+              let pts = 0;
+              if (task.type === 'grouped') {
+                pts = Number(task.points) || 0;
+              } else {
+                const participantsSnap = await getDocs(collection(db, 'missions', id, 'task', task.id, 'participants'));
+                const sorted = [...participantsSnap.docs].sort(compareParticipantsByEnrollment);
+                const posIdx = sorted.findIndex(p => p.id === user.uid);
+                const pos = posIdx >= 0 ? posIdx + 1 : sorted.length;
+                pts = calculateWeightedTaskPoints(task.points || 0, pos, sorted.length);
+              }
+              const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
+              await updateDoc(participantRef, { pointsEarned: pts, estimatedPoints: deleteField() });
+              await updateDoc(doc(db, 'users', user.uid), { totalPoints: increment(pts) });
+              await updateDoc(volunteerRef, { pointsEarned: increment(pts) });
+              setTaskPointsEarned(prev => ({ ...prev, [task.id]: pts }));
+              setTotalPointsEarned(prev => prev + pts);
+              setUserJournals(prev => prev.map(j => j.taskId === task.id ? { ...j, pointsEarned: pts, estimatedPoints: undefined } : j));
+              window.showToast?.(`Your journal for "${task.title}" was approved! +${pts} pts earned.`, 'success');
+            } catch (e) {
+              window.showToast?.(`Your journal for "${task.title}" was approved!`, 'success');
+            }
+          } else {
+            window.showToast?.(`Your journal for "${task.title}" was approved!`, 'success');
+          }
+        } else if (newStatus === 'rejected') {
+          window.showToast?.(`Your journal for "${task.title}" was rejected. Please re-edit.`, 'error');
+        }
+      });
+    });
+
+    return () => unsubs.forEach(u => u());
+  }, [tasks, authChecked]);
+
+  useEffect(() => { activeNavRef.current = activeNav; }, [activeNav]);
+
+  useEffect(() => {
+    const el = pullContainerEl;
+    if (!el) return;
+    const THRESHOLD = 80;
+
+    const onTouchStart = (e) => {
+      if (el.scrollTop === 0) {
+        touchStartYRef.current = e.touches[0].clientY;
+        pullingRef.current = true;
+      } else {
+        pullingRef.current = false;
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (!pullingRef.current) return;
+      const delta = e.touches[0].clientY - touchStartYRef.current;
+      if (delta > 0) {
+        e.preventDefault();
+        setPullY(Math.min(delta * 0.5, THRESHOLD + 20));
+      } else {
+        pullingRef.current = false;
+        setPullY(0);
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (!pullingRef.current) return;
+      pullingRef.current = false;
+      setPullY(prev => {
+        if (prev >= THRESHOLD) {
+          setIsPullRefreshing(true);
+          sessionStorage.setItem('ea_activeNav', activeNavRef.current);
+          setTimeout(() => window.location.reload(), 400);
+        }
+        return 0;
+      });
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [pullContainerEl]);
 
   // Edit journal handler
   const handleEditJournal = (journal) => {
@@ -998,7 +1095,7 @@ export default function EventActivity() {
           reflection: "",
           status: "todo",
           pointsEarned: 0,
-          pendingPoints: deleteField(),
+          estimatedPoints: deleteField(),
           adminApprovalStatus: deleteField(),
           completedAt: deleteField(),
           lastUpdated: clearedAt,
@@ -1029,6 +1126,7 @@ export default function EventActivity() {
         reflection: "",
         status: "todo",
         pointsEarned: 0,
+        estimatedPoints: deleteField(),
         pendingPoints: deleteField(),
         adminApprovalStatus: deleteField(),
         lastUpdated: new Date().toISOString(),
@@ -1483,6 +1581,7 @@ export default function EventActivity() {
         ...prev,
         [taskId]: remainingParticipantDocs.length,
       }));
+      setUserJournals((prev) => prev.filter((j) => j.taskId !== taskId));
 
       if (task?.type === "grouped" && leavingGroupId) {
         try {
@@ -2215,6 +2314,22 @@ export default function EventActivity() {
           // Check enrollment status for each task and get volunteer points
           const user = auth.currentUser;
           if (user) {
+            // Load existing task enrollment status and earned points for this user
+            const enrolledMap = {};
+            const pointsMap = {};
+            await Promise.allSettled(
+              tasksData.map(async (task) => {
+                const participantRef = doc(db, "missions", id, "task", task.id, "participants", user.uid);
+                const participantSnap = await getDoc(participantRef);
+                enrolledMap[task.id] = participantSnap.exists();
+                if (participantSnap.exists()) {
+                  pointsMap[task.id] = Number(participantSnap.data().pointsEarned) || 0;
+                }
+              })
+            );
+            setEnrolledTasks(enrolledMap);
+            setTaskPointsEarned(pointsMap);
+
             // Auto-enroll the proponent/organizer (event creator) into the roster
             // so they appear in the leaderboard and volunteer list without manually joining.
             const eventData = eventSnap.data();
@@ -2238,7 +2353,6 @@ export default function EventActivity() {
                 });
                 // Keep the reverse-index so chat / profile history loads correctly
                 setDoc(doc(db, "userMissions", user.uid, "missions", id), {
-                  missionId: id,
                   title: eventData.title || "Untitled Mission",
                   role: "organizer",
                   date: eventData.targetDate || "",
@@ -2329,13 +2443,17 @@ export default function EventActivity() {
                 consentSubmitted = true;
                 consentStatus = "verified";
 
-                // Award 5 pts if admin approved but bonus was never recorded at submission time
-                if (!data.requirementBonus?.consent) {
+                // Write progress.consent = 'verified' to Firestore so the leaderboard can read it.
+                // Only award the bonus if it was never awarded before (guard via progress.consent).
+                if (data.progress?.consent !== 'verified') {
                   try {
-                    await updateDoc(volunteerRef, { "requirementBonus.consent": 5 });
-                    await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                    const bonusAlreadyAwarded = Boolean(data.requirementBonus?.consent);
+                    await updateDoc(volunteerRef, { "progress.consent": "verified" });
+                    if (!bonusAlreadyAwarded) {
+                      await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                    }
                   } catch (e) {
-                    console.warn("Failed to award consent approval bonus:", e);
+                    console.warn("Failed to update consent verified status:", e);
                   }
                 }
               } else if (reviewStatus === "rejected") {
@@ -2360,47 +2478,6 @@ export default function EventActivity() {
               consent: consentStatus,
             });
             setTotalPointsEarned(pointsEarned);
-
-            // Enrollment status for each task
-            const enrollmentStatus = {};
-            for (const task of tasksData) {
-              const participantRef = doc(
-                db,
-                "missions",
-                id,
-                "task",
-                task.id,
-                "participants",
-                user.uid
-              );
-              const participantSnap = await getDoc(participantRef);
-
-              if (participantSnap.exists()) {
-                enrollmentStatus[task.id] = true;
-                continue;
-              }
-
-              if (task.type !== "grouped") {
-                enrollmentStatus[task.id] = false;
-                continue;
-              }
-
-              const groupsSnap = await getDocs(
-                collection(db, "missions", id, "task", task.id, "group"),
-              );
-
-              let isGroupedMember = false;
-              for (const groupDoc of groupsSnap.docs) {
-                const memberSnap = await getDoc(doc(groupDoc.ref, "members", user.uid));
-                if (memberSnap.exists()) {
-                  isGroupedMember = true;
-                  break;
-                }
-              }
-
-              enrollmentStatus[task.id] = isGroupedMember;
-            }
-            setEnrolledTasks(enrollmentStatus);
 
             const hadGroupedUpdates = await syncGroupedTaskCompletionForUser(tasksData, user.uid);
             if (hadGroupedUpdates) {
@@ -2454,18 +2531,22 @@ export default function EventActivity() {
         consentIsSubmitted = true;
         consentStatus = "verified";
 
-        if (!data.requirementBonus?.consent) {
+        if (data.progress?.consent !== 'verified') {
           try {
-            await updateDoc(volunteerRef, { "requirementBonus.consent": 5 });
-            await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
-            setRequirementBonusEarned(prev => ({ ...prev, consent: 5 }));
-            window.showToast?.("Consent approved! +5 pts earned.", "success");
+            const bonusAlreadyAwarded = Boolean(data.requirementBonus?.consent);
+            await updateDoc(volunteerRef, { "progress.consent": "verified" });
+            if (!bonusAlreadyAwarded) {
+              await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+              setRequirementBonusEarned(prev => ({ ...prev, consent: 5 }));
+              setTotalPointsEarned(prev => prev + 5);
+              window.showToast?.("+5 XP", "success", "You earned XP for your approved consent form.");
+            } else {
+              window.showToast?.("Your consent form has been approved!", "success");
+            }
           } catch (e) {
             console.warn("Failed to award consent approval bonus:", e);
             window.showToast?.("Your consent form has been approved!", "success");
           }
-        } else {
-          window.showToast?.("Your consent form has been approved!", "success");
         }
       } else if (reviewStatus === "rejected") {
         consentIsSubmitted = false;
@@ -2519,16 +2600,23 @@ export default function EventActivity() {
         const leaderboardData = volunteersSnap.docs.map((volunteerDoc) => {
           const userId = volunteerDoc.id;
           const userData = usersMap.get(userId) || {};
+          const volData = volunteerDoc.data();
           const name =
             userData.username ||
             userData.name ||
             userData.email?.split("@")[0] ||
             "Volunteer";
+          const progress = volData.progress || {};
+          const reqBonusTotal =
+            (progress.preSurvey === 'submitted' ? 5 : 0) +
+            (progress.attendance === 'present' ? 5 : 0) +
+            (progress.consent === 'verified' ? 5 : 0) +
+            (progress.postSurvey === 'submitted' ? 5 : 0);
 
           return {
             uid: userId,
             name,
-            points: volunteerDoc.data().pointsEarned || 0,
+            points: (volData.pointsEarned || 0) + reqBonusTotal,
             avatar:
               userData.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -2774,11 +2862,11 @@ export default function EventActivity() {
                   aria-label={`${userData?.totalPoints || 0} points`}
                 >
                   <div className="strip-pts-fill" style={{ width: `${(userData?.totalPoints || 0) % 100}%` }} />
-                  <span className="strip-pts-text">{userData?.totalPoints || 0} pts 💎</span>
+                  <span className="strip-pts-text">{userData?.totalPoints || 0} XP <img src={xpIcon} alt="XP" style={{ width: 13, height: 13, verticalAlign: 'middle', marginLeft: 8, marginBottom: 2 }} /></span>
                 </div>
               </div>
               <span className="strip-sep" aria-hidden="true">|</span>
-              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">Missions</span></span>
+              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">{completedMissions > 1 ? 'Missions' : 'Mission'}</span></span>
             </div>
           </div>,
           playerStripPortal
@@ -2860,7 +2948,12 @@ export default function EventActivity() {
         <div className={isLeaving ? 'ea-slide-out' : 'ea-slide-in'} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
           {/* SCROLLABLE BODY */}
-          <div className="ea-scrollable-body" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat', backgroundColor: '#d1efff' }}>
+          <div ref={pullContainerRef} className="ea-scrollable-body" style={{ backgroundImage: `url(${cloudsBg})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat', backgroundColor: '#d1efff' }}>
+            {(pullY > 0 || isPullRefreshing) && (
+              <div className="ptr-indicator" style={{ height: isPullRefreshing ? 60 : pullY }}>
+                <div className={`ptr-spinner${pullY >= 80 || isPullRefreshing ? ' ptr-spinner--ready' : ''}`} />
+              </div>
+            )}
             <div className="event-activity-bg">
 
               {/* Announcement */}
@@ -3069,7 +3162,13 @@ export default function EventActivity() {
                           desc: !attendanceDone ? 'Scan attendance first to unlock' : 'Pick an extra role you want to take on for this event',
                           done: false,
                           locked: !attendanceDone,
-                          onOpen: attendanceDone ? () => setShowTasksInReq(prev => !prev) : null,
+                          onOpen: attendanceDone ? () => {
+                            const wasOpen = showTasksInReq;
+                            setShowTasksInReq(prev => !prev);
+                            if (wasOpen) {
+                              setTimeout(() => postSurveyStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120);
+                            }
+                          } : null,
                           type: 'tasks',
                           previewable: false,
                           points: 0,
@@ -3095,7 +3194,8 @@ export default function EventActivity() {
                             const isActive = i === activeIndex;
                             const lineTeal = i === activeIndex - 1;
                             return (
-                              <div key={i} className={`req-timeline-item${step.done ? ' done' : isActive ? ' active' : step.locked ? ' locked' : ''}`}>
+                              <React.Fragment key={i}>
+                              <div ref={i === steps.length - 1 ? postSurveyStepRef : null} className={`req-timeline-item${step.done ? ' done' : isActive ? ' active' : step.locked ? ' locked' : ''}`} style={step.type === 'tasks' && showTasksInReq ? { alignItems: 'stretch' } : undefined}>
                                 <div className="req-timeline-left">
                                   <div className={`req-timeline-dot${isActive ? ' req-timeline-dot--active' : ''}`}>{i + 1}</div>
                                   {i < steps.length - 1 && <div className={`req-timeline-line${lineTeal ? ' req-timeline-line--teal' : ''}`} />}
@@ -3110,6 +3210,9 @@ export default function EventActivity() {
                                     )}
                                   </div>
                                   <span className="req-timeline-desc">{step.desc}</span>
+                                  {step.type === 'tasks' && (
+                                    <span style={{ fontSize: 12, color: '#0d9488', fontWeight: 600, marginTop: 2 }}>{tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined</span>
+                                  )}
                                 </div>
                                 <div className="req-timeline-action">
                                   {step.done ? (
@@ -3117,39 +3220,33 @@ export default function EventActivity() {
                                       <button className="req-view-btn" onClick={step.onPreview}>View</button>
                                     ) : (
                                       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <span className="req-done-badge">Done</span>
+                                        {/*<span className="req-done-badge">Done</span>*/}
                                         {step.type === 'qr' && isEventDay && isEditable && (
-                                          <button className="req-action-btn" onClick={() => setShowQRModal(true)} title="Scan again to update attendance">Rescan</button>
+                                          <button className="req-view-btn" onClick={() => setShowQRModal(true)} title="Scan again to update attendance">Rescan</button>
                                         )}
                                       </span>
                                     )
+                                  ) : step.type === 'tasks' ? (
+                                    attendanceDone ? (
+                                      <button className="req-chevron-btn" onClick={step.onOpen} title={showTasksInReq ? 'Collapse tasks' : 'Expand tasks'}>
+                                        {showTasksInReq ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} /> : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
+                                      </button>
+                                    ) : null
                                   ) : (
                                     <button
                                       className={`req-action-btn${step.locked ? ' req-action-btn--locked' : ''}`}
                                       disabled={step.locked}
                                       onClick={step.locked ? undefined : step.onOpen}
                                     >
-                                      {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : step.type === 'tasks' ? 'View' : 'Start'}
+                                      {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : 'Start'}
                                     </button>
                                   )}
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                        {showTasksInReq && (
-                          <div className={`event-activities-panel${!isEditable ? ' event-activities-panel--ended' : ''}`} style={{ marginTop: 16 }}>
-                            <h2 className="event-activities-title">Task Assignment</h2>
-                            <p className="event-activities-desc">Pick an extra role you want to take on for this event</p>
-                            {isEventDay && volunteerProgress?.attendance !== 'present' && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', marginBottom: 4, fontSize: 13, color: '#92400e' }}>
-                                🔒 Scan your attendance QR code first to unlock task assignment.
-                              </div>
-                            )}
-                            <p className="event-activities-subtitle">
-                              {tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined
-                            </p>
-                            <div className="task-list-scroll">
+                              {step.type === 'tasks' && showTasksInReq && (
+                                <div style={{ position: 'relative', paddingTop: 0, paddingBottom: 35 }}>
+                                  <div style={{ position: 'absolute', left: 13, top: -4, bottom: 0, width: 2, background: '#e5e7eb', zIndex: 0 }} />
+                                <div className="task-list-scroll task-list-scroll--compact" style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 40, position: 'relative', zIndex: 1 }}>
                               {tasks && (() => {
                                 const withIdx = tasks.map((t, i) => [t, i]);
                                 const joinedList = withIdx.filter(([t]) => !!enrolledTasks[t.id]);
@@ -3213,9 +3310,17 @@ export default function EventActivity() {
                                         <div className="task-card__action">
                                           {isEnrolled ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                              <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={!isEditable}>
-                                                <span className="joined-text">✓ Joined</span><span className="remove-text">✕ Unjoin</span>
-                                              </button>
+                                              {(() => {
+                                                const journalData = userJournals.find(j => j.taskId === activity.id);
+                                                const hasEarnedPoints = (taskPointsEarned[activity.id] || 0) > 0 || (journalData?.pointsEarned || 0) > 0;
+                                                const isApprovedWithPoints = journalData?.adminApprovalStatus === 'approved' && hasEarnedPoints;
+                                                const isDisabled = !isEditable || isApprovedWithPoints;
+                                                return (
+                                                  <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={isDisabled} title={isApprovedWithPoints ? "Cannot unjoin — reflection approved and points awarded." : undefined}>
+                                                    <span className="joined-text">✓ Joined</span><span className="remove-text">✕ Unjoin</span>
+                                                  </button>
+                                                );
+                                              })()}
                                               {!isEndedEnrolled && (
                                                 <button className="task-collapse-btn" onClick={(e) => { e.stopPropagation(); toggleTaskExpand(activity.id); }} aria-label={isExpanded ? 'Collapse' : 'Expand'}>
                                                   {isExpanded ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} /> : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
@@ -3244,10 +3349,12 @@ export default function EventActivity() {
                                               {editingJournalId === journal.taskId ? (
                                                 <>
                                                   <textarea value={editingJournalText} onChange={(e) => setEditingJournalText(e.target.value)} className="journal-edit-textarea" />
-                                                  <div className="journal-card-actions">
-                                                    <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
-                                                    <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
-                                                  </div>
+                                                  {journal.adminApprovalStatus !== 'rejected' && (
+                                                    <div className="journal-card-actions">
+                                                      <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
+                                                      <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
+                                                    </div>
+                                                  )}
                                                 </>
                                               ) : (
                                                 <div className="journal-text">{journal.reflection}</div>
@@ -3256,23 +3363,45 @@ export default function EventActivity() {
                                           ))}
                                           {hasSubmittedJournal ? (
                                             <div className="journal-submit-row">
-                                              <span className="journal-submitted-badge">Submitted</span>
                                               {(() => {
                                                 const j = journalsForActivity[0];
+                                                const approvalStatus = j?.adminApprovalStatus;
+                                                if (approvalStatus === 'approved') {
+                                                  return <span className="journal-submitted-badge journal-approved-badge">Approved</span>;
+                                                } else if (approvalStatus === 'rejected') {
+                                                  return <span className="journal-submitted-badge journal-rejected-badge">Rejected</span>;
+                                                }
+                                                return <span className="journal-submitted-badge">Submitted</span>;
+                                              })()}
+                                              {(() => {
+                                                const j = journalsForActivity[0];
+                                                const approvalStatus = j?.adminApprovalStatus;
                                                 const earned = Number(j?.pointsEarned) || 0;
-                                                const pending = Number(j?.pendingPoints) || 0;
+                                                const estimated = Number(j?.estimatedPoints) || 0;
                                                 if (earned > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>+{earned} pts earned</span>;
-                                                if (pending > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>{pending} pts pending</span>;
+                                                if (estimated > 0 && approvalStatus !== 'rejected' && approvalStatus !== 'approved') return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>Waiting to be checked</span>;
                                                 return null;
                                               })()}
-                                              <>
-                                                <button onClick={() => handleEditJournal(journalsForActivity[0])} className="journal-edit-icon-btn" title={isGrouped ? 'Edit group reflection' : 'Edit reflection'}>
-                                                  <ModeRoundedIcon sx={{ fontSize: 15 }} />
-                                                </button>
-                                                <button onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)} className="journal-edit-icon-btn journal-delete-icon-btn" title={isGrouped ? 'Delete group reflection' : 'Delete reflection'}>
-                                                  <DeleteRoundedIcon sx={{ fontSize: 15 }} />
-                                                </button>
-                                              </>
+                                              {journalsForActivity[0]?.adminApprovalStatus !== 'approved' && (
+                                                <>
+                                                  {journalsForActivity[0]?.adminApprovalStatus === 'rejected' ? (
+                                                    editingJournalId === journalsForActivity[0]?.taskId ? (
+                                                      <>
+                                                        <button onClick={() => handleSaveEditJournal(journalsForActivity[0])} className="journal-reedit-btn journal-reedit-btn--save">Save</button>
+                                                        <button onClick={() => setEditingJournalId(null)} className="journal-reedit-btn journal-reedit-btn--cancel">Cancel</button>
+                                                      </>
+                                                    ) : (
+                                                      <button onClick={() => handleEditJournal(journalsForActivity[0])} className="journal-reedit-btn" title={isGrouped ? 'Re-edit group reflection' : 'Re-edit reflection'}>
+                                                        <ModeRoundedIcon sx={{ fontSize: 15 }} />
+                                                        Re-edit
+                                                      </button>
+                                                    )
+                                                  ) : null}
+                                                  <button onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)} className="journal-edit-icon-btn journal-delete-icon-btn" title={isGrouped ? 'Delete group reflection' : 'Delete reflection'}>
+                                                    <DeleteRoundedIcon sx={{ fontSize: 15 }} />
+                                                  </button>
+                                                </>
+                                              )}
                                             </div>
                                           ) : (
                                             <>
@@ -3320,16 +3449,20 @@ export default function EventActivity() {
                                     {joinedList.length > 0 && unjoinedList.length > 0 && <div className="task-section-divider" />}
                                     {unjoinedList.length > 0 && (
                                       <div className="task-section">
-                                        {joinedList.length > 0 && <span className="task-section-label">Available</span>}
+                                        {joinedList.length > 0 && <span className="task-section-label" style={{ paddingTop: 5 }}>Available</span>}
                                         {unjoinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
                                       </div>
                                     )}
                                   </>
                                 );
                               })()}
-                            </div>
-                          </div>
-                        )}
+                                </div>
+                                </div>
+                              )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
                         </>
                       );
                     })()}
@@ -3406,10 +3539,11 @@ export default function EventActivity() {
                       )}
                     </div>
                   )}
-                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                  <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'center' }}>
                     {scanSuccess && (
                       <button
                         className="ea-retry-btn"
+                        style={{ width: '100%' }}
                         onClick={() => {
                           setQRStatus("");
                           setScannedLocation(null);
@@ -3550,6 +3684,7 @@ export default function EventActivity() {
                   );
                   if (preSurveyIsFirst) {
                     await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                    setTotalPointsEarned(prev => prev + 5);
                   }
 
                   setVolunteerProgress((prev) => ({
@@ -3558,7 +3693,12 @@ export default function EventActivity() {
                     consent: "open"
                   }));
                   setShowPreSurveyModal(false);
-                  alert("Pre-Activity Survey submitted! +5 points earned.");
+                  if (preSurveyIsFirst) {
+                    window.showToast?.("+5 XP", "success", "You earned XP for completing the pre-activity survey.");
+                  } else {
+                    window.showToast?.("Pre-Activity Survey submitted!", "success");
+                  }
+                  sessionStorage.setItem('ea_activeNav', activeNavRef.current);
                   window.location.reload();
                 }}
               />
@@ -3641,6 +3781,7 @@ export default function EventActivity() {
                 );
                 if (postSurveyIsFirst) {
                   await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                  setTotalPointsEarned(prev => prev + 5);
                 }
                 setVolunteerProgress(prev => ({
                   ...prev,
@@ -3649,7 +3790,12 @@ export default function EventActivity() {
                 }));
 
                 setShowPostSurveyModal(false);
-                alert(postSurveyIsFirst ? "Post-Activity Survey submitted! +5 points earned." : "Post-Activity Survey submitted!");
+                if (postSurveyIsFirst) {
+                  window.showToast?.("+5 XP", "success", "You earned XP for completing the post-activity survey.");
+                } else {
+                  window.showToast?.("Post-Activity Survey submitted!", "success");
+                }
+                sessionStorage.setItem('ea_activeNav', activeNavRef.current);
                 window.location.reload();
               }}
             />

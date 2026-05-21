@@ -18,6 +18,7 @@ import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
 import emptyFile from '../../assets/empty_file.svg';
 import servePlusIcon from '../../assets/serve_plus_icon.svg';
+import xpIcon from '../../assets/xp_icon.png';
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
   const radius = (size - stroke) / 2;
@@ -594,11 +595,11 @@ const StudentHome = () => {
                   aria-label={`${currentPoints} points`}
                 >
                   <div className="strip-pts-fill" style={{ width: `${currentPoints % 100}%` }} />
-                  <span className="strip-pts-text">{currentPoints} pts 💎</span>
+                  <span className="strip-pts-text">{currentPoints} XP <img src={xpIcon} alt="XP" style={{ width: 13, height: 13, verticalAlign: 'middle', marginLeft: 8, marginBottom: 2 }} /></span>
                 </div>
               </div>
               <span className="strip-sep" aria-hidden="true">|</span>
-              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">Mission/s</span></span>
+              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">{completedMissions > 1 ? 'Missions' : 'Mission'}</span></span>
             </div>
           </div>,
           playerStripPortal

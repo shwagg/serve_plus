@@ -23,9 +23,9 @@ export default function ToastContainer() {
 
   useEffect(() => {
     const toastHandler = (e) => {
-      const { message, type } = e.detail;
+      const { message, type, subtitle } = e.detail;
       const id = ++toastId;
-      setToasts(prev => [...prev, { id, message, type, visible: true }]);
+      setToasts(prev => [...prev, { id, message, type, subtitle, visible: true }]);
       setTimeout(() => {
         setToasts(prev => prev.map(t => t.id === id ? { ...t, visible: false } : t));
         setTimeout(() => {
@@ -149,7 +149,10 @@ export default function ToastContainer() {
           }}
         >
           <div style={{ display: isMobile ? 'block' : 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            <span style={{ display: 'block', flex: 1, minWidth: 0, lineHeight: 1.5, overflowWrap: 'break-word', wordBreak: 'normal' }}>{t.message}</span>
+            <div style={{ display: 'block', flex: 1, minWidth: 0, overflowWrap: 'break-word', wordBreak: 'normal' }}>
+              <span style={{ display: 'block', lineHeight: 1.4, fontWeight: t.subtitle ? 600 : 400 }}>{t.message}</span>
+              {t.subtitle && <span style={{ display: 'block', lineHeight: 1.4, fontSize: 13, color: '#555', marginTop: 1 }}>{t.subtitle}</span>}
+            </div>
             <button
               onClick={() => removeToast(t.id)}
               onMouseEnter={(e) => e.currentTarget.style.color = '#30bdb7'}
@@ -162,7 +165,7 @@ export default function ToastContainer() {
                 background: 'transparent',
                 border: 'none',
                 color: '#888',
-                fontSize: isMobile ? 18 : 14,
+                fontSize: isMobile ? 18 : 20,
                 fontWeight: 400,
                 cursor: 'pointer',
                 padding: isMobile ? 4 : 0,

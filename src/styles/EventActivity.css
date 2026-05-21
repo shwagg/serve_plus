@@ -46,6 +46,28 @@
   to { transform: rotate(360deg); }
 }
 
+/* Pull-to-refresh indicator */
+.ptr-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ptr-spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid rgba(0, 51, 102, 0.2);
+  border-top-color: #003366;
+  border-radius: 50%;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.ptr-spinner--ready {
+  opacity: 1;
+  animation: eaSpin 0.7s linear infinite;
+}
+
 /*EVENT ACTIVITY.JSX*/
 .event-activity-container h1,
 .event-activity-container h2,
@@ -523,6 +545,29 @@
   color: #374151;
   white-space: nowrap;
 }
+.req-chevron-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #e5e7eb;
+  background: #f8fafc;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+.req-chevron-btn:hover {
+  background: #f0fdfc;
+  border-color: #5eead4;
+  color: #0d9488;
+}
 .req-action-btn {
   padding: 5px 14px;
   min-width: 72px;
@@ -631,6 +676,9 @@
   gap: 8px;
   padding-top: 4px;
 }
+.journal-submit-row .journal-submitted-badge {
+  margin-right: auto;
+}
 .journal-delete-icon-btn {
   background: #fff0f0;
   color: #ef4444;
@@ -655,12 +703,65 @@
 .journal-submitted-badge {
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.2;
   color: #30bdb7;
   background: #f0fdfc;
   border: 1px solid #99f6e4;
   border-radius: 20px;
   padding: 3px 10px;
   white-space: nowrap;
+}
+.journal-approved-badge {
+  color: #16a34a;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+.journal-rejected-badge {
+  color: #dc2626;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+.journal-reedit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #dc2626;
+  background: #fee2e2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.journal-reedit-btn:hover {
+  background: #fecaca;
+  border-color: #f87171;
+  color: #b91c1c;
+}
+.journal-reedit-btn--save {
+  color: #0f766e;
+  background: #f0fdfc;
+  border-color: #5eead4;
+}
+.journal-reedit-btn--save:hover {
+  background: #ccfbf1;
+  border-color: #2dd4bf;
+  color: #0f766e;
+}
+.journal-reedit-btn--cancel {
+  color: #6b7280;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.journal-reedit-btn--cancel:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+  color: #374151;
 }
 .journal-group-note {
   font-size: 11px;
@@ -676,10 +777,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  min-height: 26px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   border-radius: 50%;
   border: none;
   background: #f1f5f9;
@@ -1339,6 +1439,29 @@
   gap: 10px;
 }
 
+/* compact variant used when cards are inlined inside the requirements timeline */
+.task-list-scroll--compact { gap: 6px; }
+.task-list-scroll--compact .task-section { gap: 20px; }
+.task-list-scroll--compact .task-card {
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 0;
+}
+.task-list-scroll--compact .task-card--locked {
+  padding: 7px 12px;
+  border-radius: 8px;
+  margin-bottom: 0;
+}
+.task-list-scroll--compact .task-card__row { gap: 8px; }
+.task-list-scroll--compact .task-card__emoji { font-size: 20px; }
+.task-list-scroll--compact .task-card__info { gap: 3px; }
+.task-list-scroll--compact .task-card__title { font-size: 13px; }
+.task-list-scroll--compact .task-card__meta { gap: 5px; }
+.task-list-scroll--compact .task-join-btn { padding: 5px 12px; font-size: 12px; }
+.task-list-scroll--compact .task-enrolled-badge { padding: 4px 8px; font-size: 11px; }
+.task-list-scroll--compact .task-participants-indicator { padding: 2px 7px; font-size: 10px; }
+.task-list-scroll--compact .task-deadline-chip { padding: 2px 7px; font-size: 10px; }
+
 /* ── TASK CARDS ───────────────────────────────── */
 .task-card {
   background: #fff;
@@ -1377,10 +1500,13 @@
 .task-participants-indicator {
   width: fit-content;
   border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  padding: 4px 10px;
+  border-radius: 20px;
+  padding: 3px 10px;
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.2;
+  min-height: unset;
+  height: auto;
   color: #1d4ed8;
   background: #eff6ff;
   cursor: pointer;
@@ -1435,11 +1561,12 @@
 .task-deadline-chip {
   font-size: 11px;
   font-weight: 700;
+  line-height: 1.2;
   color: #0f766e;
   background: #ecfeff;
   border: 1px solid #a5f3fc;
-  border-radius: 999px;
-  padding: 4px 8px;
+  border-radius: 20px;
+  padding: 3px 10px;
   width: fit-content;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -1500,16 +1627,20 @@
   transition: background 0.2s, color 0.2s, border-color 0.2s;
   white-space: nowrap;
 }
-.task-enrolled-badge:hover {
+.task-enrolled-badge:hover:not(:disabled) {
   background: #fee2e2;
   border-color: #fca5a5;
   color: #dc2626;
 }
+.task-enrolled-badge:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
 /* default: hide remove, show joined */
 .task-enrolled-badge .remove-text { display: none; }
-.task-enrolled-badge:hover .joined-text { display: none; }
-.task-enrolled-badge:hover .remove-text { display: inline; font-weight: 700; }
+.task-enrolled-badge:hover:not(:disabled) .joined-text { display: none; }
+.task-enrolled-badge:hover:not(:disabled) .remove-text { display: inline; font-weight: 700; }
 .task-collapse-btn {
   display: flex;
   align-items: center;
@@ -2323,18 +2454,23 @@
 
 /* ── VIEW BUTTON (on done steps) ───────────────── */
 .req-view-btn {
-  font-size: 11px;
-  font-weight: 600;
+  padding: 5px 14px;
+  min-width: 72px;
+  text-align: center;
+  border-radius: 20px;
+  border: 1.5px solid #30bdb7;
+  background: transparent;
   color: #30bdb7;
-  background: none;
-  border: none;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
   white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
 }
 .req-view-btn:hover {
+  background: #f0fdfc;
   color: #249e9a;
+  border-color: #249e9a;
 }
 
 /* ── PRE-SURVEY PREVIEW MODAL ───────────────────── */
