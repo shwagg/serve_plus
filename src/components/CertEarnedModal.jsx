@@ -1,25 +1,119 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const CONFETTI = [
-  { color: '#FFD700', x: 12,  y: 18, w: 8,  h: 8,  r: '50%',  delay: 0,    dur: 1.8 },
-  { color: '#30bdb7', x: 82,  y: 12, w: 7,  h: 5,  r: '2px',  delay: 0.1,  dur: 2.1 },
-  { color: '#4ECDC4', x: 88,  y: 42, w: 9,  h: 9,  r: '50%',  delay: 0.2,  dur: 1.6 },
-  { color: '#234e7b', x: 8,   y: 58, w: 6,  h: 4,  r: '2px',  delay: 0.05, dur: 2.3 },
-  { color: '#96CEB4', x: 72,  y: 72, w: 10, h: 10, r: '50%',  delay: 0.15, dur: 1.9 },
-  { color: '#FFEAA7', x: 22,  y: 78, w: 7,  h: 7,  r: '50%',  delay: 0.25, dur: 2.0 },
-  { color: '#30bdb7', x: 58,  y: 88, w: 8,  h: 5,  r: '2px',  delay: 0.1,  dur: 1.7 },
-  { color: '#234e7b', x: 4,   y: 32, w: 6,  h: 6,  r: '50%',  delay: 0.3,  dur: 2.2 },
-  { color: '#F7DC6F', x: 84,  y: 22, w: 9,  h: 6,  r: '2px',  delay: 0.05, dur: 1.5 },
-  { color: '#BB8FCE', x: 38,  y: 8,  w: 7,  h: 7,  r: '50%',  delay: 0.2,  dur: 2.4 },
-  { color: '#5DADE2', x: 68,  y: 52, w: 6,  h: 4,  r: '2px',  delay: 0.15, dur: 1.8 },
-  { color: '#58D68D', x: 18,  y: 44, w: 8,  h: 8,  r: '50%',  delay: 0.25, dur: 2.0 },
-  { color: '#FF9F43', x: 50,  y: 5,  w: 6,  h: 6,  r: '50%',  delay: 0.1,  dur: 1.9 },
-  { color: '#234e7b', x: 92,  y: 65, w: 7,  h: 5,  r: '2px',  delay: 0.35, dur: 2.1 },
-  { color: '#A29BFE', x: 30,  y: 92, w: 8,  h: 8,  r: '50%',  delay: 0.05, dur: 1.6 },
+const COLORS = [
+  '#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+  '#FFEAA7', '#DDA0DD', '#F7DC6F', '#BB8FCE', '#5DADE2',
+  '#58D68D', '#FF9F43', '#EE5A24', '#A29BFE', '#FD79A8',
+  '#6C5CE7', '#00B894', '#E17055', '#FDCB6E', '#74B9FF',
 ];
+
+const SHAPES = ['rect', 'rect', 'circle', 'ribbon', 'triangle', 'star', 'star', 'heart', 'diamond'];
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+function makeParticle(cx, cy, fast = false) {
+  const angle = rnd(0, Math.PI * 2);
+  const speed = rnd(2, 7);
+  const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+  const w = rnd(7, 16);
+  return {
+    x: cx, y: cy,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed - rnd(5, 12),
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    shape, w,
+    h: shape === 'ribbon' ? rnd(3, 7) : w * rnd(0.6, 1.1),
+    rot: rnd(0, Math.PI * 2),
+    rotV: rnd(-0.05, 0.05),
+    gravity: fast ? rnd(0.03, 0.07) : rnd(0.05, 0.15),
+    drag: fast ? rnd(0.988, 0.997) : rnd(0.975, 0.995),
+    alpha: 1,
+    decay: fast ? rnd(0.004, 0.008) : rnd(0.007, 0.013),
+  };
+}
+
+function drawStar(ctx, r) {
+  const pts = 5, step = Math.PI / pts;
+  ctx.beginPath();
+  for (let i = 0; i < pts * 2; i++) {
+    const radius = i % 2 === 0 ? r : r * 0.42;
+    const a = i * step - Math.PI / 2;
+    i === 0 ? ctx.moveTo(Math.cos(a) * radius, Math.sin(a) * radius)
+             : ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+function drawHeart(ctx, r) {
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.35);
+  ctx.bezierCurveTo( r,  r * 0.35,  r, -r * 0.35, 0, -r * 0.35);
+  ctx.bezierCurveTo(-r, -r * 0.35, -r,  r * 0.35, 0,  r * 0.35);
+  ctx.fill();
+}
+
+function drawDiamond(ctx, r) {
+  ctx.beginPath();
+  ctx.moveTo(0, -r); ctx.lineTo(r * 0.6, 0);
+  ctx.lineTo(0, r);  ctx.lineTo(-r * 0.6, 0);
+  ctx.closePath(); ctx.fill();
+}
+
+function drawParticle(ctx, p) {
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, p.alpha);
+  ctx.fillStyle = p.color;
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.rot);
+  const r = p.w / 2;
+  if      (p.shape === 'circle')   { ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); }
+  else if (p.shape === 'triangle') { ctx.beginPath(); ctx.moveTo(0,-r); ctx.lineTo(r,r); ctx.lineTo(-r,r); ctx.closePath(); ctx.fill(); }
+  else if (p.shape === 'star')     { drawStar(ctx, r); }
+  else if (p.shape === 'heart')    { drawHeart(ctx, r); }
+  else if (p.shape === 'diamond')  { drawDiamond(ctx, r); }
+  else                             { ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); }
+  ctx.restore();
+}
+
+function runConfetti({ canvas, count, fast, cx, cy }) {
+  canvas.width  = canvas.width  || canvas.offsetWidth  || 300;
+  canvas.height = canvas.height || canvas.offsetHeight || 400;
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+
+  const burst = () => {
+    particles.push(...Array.from({ length: count }, () => makeParticle(cx ?? canvas.width / 2, cy ?? canvas.height * 0.3, fast)));
+  };
+
+  burst();
+  const intervalId = setInterval(burst, 3000);
+
+  let rafId;
+  const tick = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles = particles.filter(p => p.alpha > 0);
+    for (const p of particles) {
+      p.vx *= p.drag; p.vy = p.vy * p.drag + p.gravity;
+      p.x += p.vx; p.y += p.vy; p.rot += p.rotV; p.alpha -= p.decay;
+      drawParticle(ctx, p);
+    }
+    rafId = requestAnimationFrame(tick);
+  };
+  rafId = requestAnimationFrame(tick);
+
+  const onHide = () => { if (document.hidden) particles = []; else burst(); };
+  document.addEventListener('visibilitychange', onHide);
+
+  return () => {
+    clearInterval(intervalId);
+    cancelAnimationFrame(rafId);
+    document.removeEventListener('visibilitychange', onHide);
+  };
+}
 
 export default function CertEarnedModal({ certQueue = [], onDismiss }) {
   const [visible, setVisible] = useState(false);
+  const innerCanvasRef = useRef(null);
   const current = certQueue[0] ?? null;
 
   useEffect(() => {
@@ -31,6 +125,46 @@ export default function CertEarnedModal({ certQueue = [], onDismiss }) {
     }
   }, [current?.notifId]);
 
+  useEffect(() => {
+    if (!visible) return;
+
+    // Full-screen canvas on body — particles escape beyond the modal
+    const bodyCanvas = document.createElement('canvas');
+    bodyCanvas.width = window.innerWidth;
+    bodyCanvas.height = window.innerHeight;
+    bodyCanvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10000;';
+    document.body.appendChild(bodyCanvas);
+
+    const stopBody = runConfetti({
+      canvas: bodyCanvas,
+      count: 180,
+      fast: false,
+      cx: bodyCanvas.width / 2,
+      cy: bodyCanvas.height * 0.6,
+    });
+
+    // Inner canvas inside the card — confetti within the modal
+    const inner = innerCanvasRef.current;
+    let stopInner = () => {};
+    if (inner) {
+      inner.width  = inner.offsetWidth;
+      inner.height = inner.offsetHeight;
+      stopInner = runConfetti({
+        canvas: inner,
+        count: 80,
+        fast: true,
+        cx: inner.width / 2,
+        cy: inner.height * 0.3,
+      });
+    }
+
+    return () => {
+      stopBody();
+      stopInner();
+      bodyCanvas.remove();
+    };
+  }, [visible]);
+
   if (!current) return null;
 
   const handleClose = () => {
@@ -41,30 +175,15 @@ export default function CertEarnedModal({ certQueue = [], onDismiss }) {
   return (
     <div
       className={`badge-earned-overlay${visible ? " badge-earned-visible" : ""}`}
-      aria-modal="true"
-      role="dialog"
-      aria-label="Certificate received"
+      aria-modal="true" role="dialog" aria-label="Certificate received"
       onClick={handleClose}
     >
       <div
         className={`badge-earned-card${visible ? " badge-earned-card-visible" : ""}`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="badge-earned-confetti" aria-hidden="true">
-          {CONFETTI.map((p, i) => (
-            <span
-              key={i}
-              className="confetti-piece"
-              style={{
-                left: `${p.x}%`, top: `${p.y}%`,
-                width: p.w, height: p.h,
-                borderRadius: p.r, background: p.color,
-                animationDuration: `${p.dur}s`,
-                animationDelay: `${p.delay}s`,
-              }}
-            />
-          ))}
-        </div>
+        {/* Confetti inside the card */}
+        <canvas ref={innerCanvasRef} className="badge-earned-confetti-canvas" aria-hidden="true" />
 
         <div className="badge-earned-icon-wrap">
           <div style={{
@@ -81,10 +200,11 @@ export default function CertEarnedModal({ certQueue = [], onDismiss }) {
           </div>
         </div>
 
-        <p className="badge-earned-subtitle">Certificate Received!</p>
+        <p className="badge-earned-subtitle">Congratulations!</p>
         <h2 className="badge-earned-name" style={{ color: "#234e7b" }}>{current.course}</h2>
         <p className="badge-earned-desc">
-          Your SerVe+ certificate has been issued and added to your portfolio.
+          Mission Complete.
+          <br />Your SERVE+ certificate has now been added to your portfolio.
         </p>
 
         {certQueue.length > 1 && (
@@ -96,9 +216,12 @@ export default function CertEarnedModal({ certQueue = [], onDismiss }) {
         <button
           className="badge-earned-btn"
           style={{ background: "#234e7b" }}
-          onClick={handleClose}
+          onClick={() => {
+            handleClose();
+            if (certQueue.length === 1) window.location.href = "/profile#certificates";
+          }}
         >
-          {certQueue.length > 1 ? "Close" : "View in Portfolio!"}
+          {certQueue.length > 1 ? "Close" : "View in Portfolio"}
         </button>
       </div>
     </div>

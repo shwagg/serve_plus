@@ -11,6 +11,7 @@ import {
 } from "../utils/notificationUtils";
 import { playNotificationSound } from "../utils/soundUtils";
 import BadgeEarnedModal from "./badges/BadgeEarnedModal";
+import CertEarnedModal from "./CertEarnedModal";
 import "./styles/NotificationBell.css";
 
 export default function NotificationBell() {
@@ -23,6 +24,7 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState(null);
   const [replayBadgeId, setReplayBadgeId] = useState(null);
+  const [replayCert, setReplayCert] = useState(null);
   const dropdownRef = useRef(null);
   const bellButtonRef = useRef(null);
   const prevPointsRef = useRef(null);
@@ -99,6 +101,11 @@ export default function NotificationBell() {
     if (notification.type === "badge_earned" && notification.badgeId) {
       setIsOpen(false);
       setReplayBadgeId(notification.badgeId);
+    }
+    if ((notification.type === "certificate_obtained" || notification.type === "certificate_ready") &&
+        (notification.event || notification.course)) {
+      setIsOpen(false);
+      setReplayCert({ notifId: notification.id, course: notification.event || notification.course });
     }
   }, [userId]);
 
@@ -262,6 +269,13 @@ export default function NotificationBell() {
         <BadgeEarnedModal
           badgeQueue={[replayBadgeId]}
           onDismiss={() => setReplayBadgeId(null)}
+        />
+      )}
+
+      {replayCert && (
+        <CertEarnedModal
+          certQueue={[replayCert]}
+          onDismiss={() => setReplayCert(null)}
         />
       )}
     </div>

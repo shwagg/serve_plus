@@ -110,7 +110,7 @@ export const checkAndAssignBadges = async (userId) => {
  * Safe to call for both auto and manual badges.
  * Returns true if newly awarded, false if already had the badge.
  */
-export const awardBadge = async (userId, badgeId, awardedBy = null) => {
+export const awardBadge = async (userId, badgeId, awardedBy = null, badgeDef = null) => {
   try {
     const userSnap = await getDoc(doc(db, "users", userId));
     if (!userSnap.exists() || userSnap.data().role !== "student") return false;
@@ -119,7 +119,7 @@ export const awardBadge = async (userId, badgeId, awardedBy = null) => {
     const existing = await getDoc(userBadgeRef);
     if (existing.exists()) return false; // already earned — badges are permanent
 
-    const definition = BADGE_BY_ID[badgeId];
+    const definition = badgeDef ?? BADGE_BY_ID[badgeId];
     if (!definition) {
       console.warn(`awardBadge: unknown badgeId "${badgeId}"`);
       return false;

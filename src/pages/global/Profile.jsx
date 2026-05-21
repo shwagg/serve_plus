@@ -351,7 +351,6 @@ const mockProfile = {
 export default function Profile() {
   const { refreshUserData } = useSession();
   const [profile, setProfile] = useState(null);
-  const [rewards, setRewards] = useState([]);
   const [earnedBadges, setEarnedBadges] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
@@ -567,13 +566,8 @@ export default function Profile() {
         setProfile(profileData);
         setLoading(false); // Show the page now — events load in background
 
-        // Phase 2: Fetch missions and rewards in parallel
-        const [missionsSnap, rewardsSnap] = await Promise.all([
-          getDocs(collection(db, "missions")),
-          getDocs(collection(db, "users", user.uid, "rewards")),
-        ]);
-
-        setRewards(rewardsSnap.docs.map(r => ({ id: r.id, ...r.data() })));
+        // Phase 2: Fetch missions
+        const missionsSnap = await getDocs(collection(db, "missions"));
 
         // Real-time badge listener — updates whenever a badge is awarded
         const badgesRef = collection(db, "users", user.uid, "badges");
@@ -1257,7 +1251,7 @@ export default function Profile() {
                 </div>
 
                 {/* Certificates */}
-                <div className="portfolio-section">
+                <div id="certificates" className="portfolio-section">
                   <div className="card-title">🎓 Certificates <span className="muted-count">({certificates.length})</span></div>
                   {certificates.length === 0
                     ? <p className="muted-text">No certificates yet.</p>

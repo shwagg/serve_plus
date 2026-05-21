@@ -29,10 +29,10 @@ const SIZE_MAP = { sm: 40, md: 80, lg: 120 };
  *   size     – "sm" | "md" | "lg"  (default "md")
  *   onClick  – function (optional)
  */
-export default function BadgeIcon({ badgeId, earned, isNew = false, size = "md", onClick }) {
+export default function BadgeIcon({ badgeId, svgId, imageUrl, earned, isNew = false, size = "md", onClick }) {
   const px = SIZE_MAP[size] ?? 80;
-  // Always use the actual badge SVG — grayscale filter is applied when not earned
-  const src = SVG_URLS[badgeId] ?? SVG_URLS["locked"];
+  // imageUrl takes priority (custom uploaded badge), then svgId override, then static map
+  const src = imageUrl || (SVG_URLS[svgId ?? badgeId] ?? SVG_URLS["locked"]);
 
   return (
     <div

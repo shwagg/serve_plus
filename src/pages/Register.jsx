@@ -146,15 +146,7 @@ function Register() {
                 agreementVersion: null,
             });
 
-            // 4. Create rewards subcollection with welcome achievement
-            await setDoc(doc(db, "users", uid, "rewards", "welcome"), {
-                id: "welcome",
-                name: "Welcome!",
-                description: "Awarded for creating an account",
-                createdAt: serverTimestamp()
-            });
-
-            // 5. Redirect to login
+            // 4. Redirect to login
             alert("Account created! You can now log in.");
             navigate("/", { replace: true });
         } catch (err) {

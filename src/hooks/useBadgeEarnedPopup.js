@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
   query,
@@ -15,13 +15,22 @@ import { db } from "../firebaseConfig";
  * Subscribes to the current user's notifications for unshown badge_earned events.
  * Returns:
  *   badgeQueue  – array of badgeId strings pending display (oldest first)
- *   dismissBadge(notificationId) – marks popup as shown in Firestore & shifts queue
+ *   dismissBadge(badgeId) – removes the badge from the local display queue
+ *
+ * Notifications are marked popupShown:true in Firestore immediately on load so
+ * they never re-appear on subsequent logins regardless of whether the user
+ * dismisses the modal.
  */
 export function useBadgeEarnedPopup(userId) {
-  const [pendingNotifs, setPendingNotifs] = useState([]); // [{ id, badgeId }]
+  const [displayQueue, setDisplayQueue] = useState([]); // [{ id, badgeId }] – local session only
+  const seenIds = useRef(new Set()); // prevents adding the same notif twice if snapshot re-fires
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setDisplayQueue([]);
+      seenIds.current = new Set();
+      return;
+    }
 
     const notificationsRef = collection(db, "users", userId, "notifications");
     const q = query(
@@ -31,34 +40,36 @@ export function useBadgeEarnedPopup(userId) {
     );
 
     const unsub = onSnapshot(q, (snap) => {
-      const items = snap.docs
+      const fresh = snap.docs
         .map((d) => ({ id: d.id, badgeId: d.data().badgeId, createdAt: d.data().createdAt }))
-        .filter((n) => n.badgeId)
+        .filter((n) => n.badgeId && !seenIds.current.has(n.id))
         .sort((a, b) => {
-          // oldest first
           const ta = a.createdAt?.toMillis?.() ?? 0;
           const tb = b.createdAt?.toMillis?.() ?? 0;
           return ta - tb;
         });
-      setPendingNotifs(items);
+
+      if (fresh.length === 0) return;
+
+      // Mark as shown in Firestore immediately so they don't re-appear next login
+      fresh.forEach((n) => {
+        seenIds.current.add(n.id);
+        updateDoc(doc(db, "users", userId, "notifications", n.id), {
+          popupShown: true,
+        }).catch(() => {});
+      });
+
+      // Append to local display queue for this session
+      setDisplayQueue((prev) => [...prev, ...fresh]);
     });
 
     return () => unsub();
   }, [userId]);
 
-  const badgeQueue = pendingNotifs.map((n) => n.badgeId);
+  const badgeQueue = displayQueue.map((n) => n.badgeId);
 
-  const dismissBadge = async (badgeId) => {
-    // Find the matching notification record
-    const notif = pendingNotifs.find((n) => n.badgeId === badgeId);
-    if (!notif) return;
-    try {
-      await updateDoc(doc(db, "users", userId, "notifications", notif.id), {
-        popupShown: true,
-      });
-    } catch (e) {
-      console.error("dismissBadge error:", e);
-    }
+  const dismissBadge = (badgeId) => {
+    setDisplayQueue((prev) => prev.filter((n) => n.badgeId !== badgeId));
   };
 
   return { badgeQueue, dismissBadge };
