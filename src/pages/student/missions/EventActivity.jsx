@@ -362,6 +362,7 @@ export default function EventActivity() {
   const [timerNow, setTimerNow] = useState(Date.now());
   const [playerStripPortal, setPlayerStripPortal] = useState(null);
   const [activeNav, setActiveNav] = useState('content');
+  const [showTasksInReq, setShowTasksInReq] = useState(false);
   const [requirementBonusEarned, setRequirementBonusEarned] = useState({});
   const hasAwardedPendingRef = useRef(false);
 
@@ -2825,7 +2826,6 @@ export default function EventActivity() {
           {[
             { id: 'content', label: 'Content' },
             { id: 'requirements', label: 'Requirements' },
-            { id: 'tasks', label: 'Task Assignment' },
             { id: 'leaderboard', label: 'Leaderboard' },
           ].map(tab => (
             <button
@@ -3065,6 +3065,17 @@ export default function EventActivity() {
                           bonusKey: 'attendance',
                         },
                         {
+                          label: 'Task Assignment',
+                          desc: !attendanceDone ? 'Scan attendance first to unlock' : 'Pick an extra role you want to take on for this event',
+                          done: false,
+                          locked: !attendanceDone,
+                          onOpen: attendanceDone ? () => setShowTasksInReq(prev => !prev) : null,
+                          type: 'tasks',
+                          previewable: false,
+                          points: 0,
+                          bonusKey: null,
+                        },
+                        {
                           label: 'Post-Activity Survey',
                           desc: postLocked ? 'Complete the previous requirements first' : 'Fill out after the event',
                           done: postSurveyDone,
@@ -3078,6 +3089,7 @@ export default function EventActivity() {
                       ];
                       const activeIndex = steps.findIndex(s => !s.done);
                       return (
+                        <>
                         <div className="req-timeline">
                           {steps.map((step, i) => {
                             const isActive = i === activeIndex;
@@ -3117,7 +3129,7 @@ export default function EventActivity() {
                                       disabled={step.locked}
                                       onClick={step.locked ? undefined : step.onOpen}
                                     >
-                                      {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : 'Start'}
+                                      {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : step.type === 'tasks' ? 'View' : 'Start'}
                                     </button>
                                   )}
                                 </div>
@@ -3125,203 +3137,202 @@ export default function EventActivity() {
                             );
                           })}
                         </div>
+                        {showTasksInReq && (
+                          <div className={`event-activities-panel${!isEditable ? ' event-activities-panel--ended' : ''}`} style={{ marginTop: 16 }}>
+                            <h2 className="event-activities-title">Task Assignment</h2>
+                            <p className="event-activities-desc">Pick an extra role you want to take on for this event</p>
+                            {isEventDay && volunteerProgress?.attendance !== 'present' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', marginBottom: 4, fontSize: 13, color: '#92400e' }}>
+                                🔒 Scan your attendance QR code first to unlock task assignment.
+                              </div>
+                            )}
+                            <p className="event-activities-subtitle">
+                              {tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined
+                            </p>
+                            <div className="task-list-scroll">
+                              {tasks && (() => {
+                                const withIdx = tasks.map((t, i) => [t, i]);
+                                const joinedList = withIdx.filter(([t]) => !!enrolledTasks[t.id]);
+                                const unjoinedList = withIdx.filter(([t]) => !enrolledTasks[t.id]);
+
+                                const renderTaskCard = (activity, idx) => {
+                                  const isEnrolled = !!enrolledTasks[activity.id];
+                                  const isGrouped = activity.type === 'grouped';
+                                  const filledSlots = taskParticipantCounts[activity.id] || 0;
+                                  const groupedSlots = taskGroupCounts[activity.id] || 0;
+                                  const participantsText = isGrouped ? `${groupedSlots}` : `${filledSlots}`;
+                                  const maxSlots = Number.isFinite(Number(activity.maxParticipants)) ? Number(activity.maxParticipants) : null;
+                                  const isTaskCapacityFull = !isGrouped && maxSlots !== null && filledSlots >= maxSlots;
+                                  const isDeadlineClosed = isEnrollmentClosed(activity);
+                                  const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
+                                  const hasSubmittedJournal = journalsForActivity.length > 0;
+                                  const enrollmentCountdown = getEnrollmentCountdown(activity);
+
+                                  const attendanceDoneLocal = volunteerProgress?.attendance === 'present';
+                                  if (!isEnrolled && (!isEventDay || !attendanceDoneLocal)) {
+                                    return (
+                                      <div key={idx} className="task-card task-card--locked">
+                                        <span className="task-card__title-only">{activity.title}</span>
+                                        {isEventDay && !attendanceDoneLocal && (
+                                          <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to unlock</span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
+                                  const isExpanded = expandedTasks[activity.id] !== false;
+                                  const isEndedEnrolled = !isEditable && isEnrolled;
+
+                                  return (
+                                    <div key={idx} className={`task-card${isEnrolled ? ' task-card--enrolled' : ''}${isEndedEnrolled ? ' task-card--ended' : ''}`}>
+                                      <div className="task-card__row" style={isEnrolled && !isEndedEnrolled ? { cursor: 'pointer' } : {}} onClick={isEnrolled && !isEndedEnrolled ? () => toggleTaskExpand(activity.id) : undefined}>
+                                        <span className="task-card__emoji">{activity.emoji || '🎯'}</span>
+                                        <div className="task-card__info">
+                                          <span className="task-card__title">{activity.title}</span>
+                                          <div className="task-card__meta">
+                                            <span className="task-card__pts">{activity.points} PTS</span>
+                                            {isEventDay && (
+                                              <button
+                                                className="task-participants-indicator"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (isGrouped) { setGroupModalMode('view'); setSelectedTaskForGroups(activity); } else { setSelectedTaskForParticipants(activity); }
+                                                }}
+                                                aria-label={`View ${isGrouped ? 'groups' : 'participants'} for ${activity.title}`}
+                                              >
+                                                {isGrouped ? 'Groups' : 'Participants'}: {participantsText}
+                                              </button>
+                                            )}
+                                            {enrollmentCountdown && (
+                                              <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
+                                                {enrollmentCountdown.label}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="task-card__action">
+                                          {isEnrolled ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                              <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={!isEditable}>
+                                                <span className="joined-text">✓ Joined</span><span className="remove-text">✕ Unjoin</span>
+                                              </button>
+                                              {!isEndedEnrolled && (
+                                                <button className="task-collapse-btn" onClick={(e) => { e.stopPropagation(); toggleTaskExpand(activity.id); }} aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+                                                  {isExpanded ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} /> : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
+                                                </button>
+                                              )}
+                                            </div>
+                                          ) : isTaskCapacityFull ? (
+                                            <span className="task-slot-full-badge">Full</span>
+                                          ) : isDeadlineClosed ? (
+                                            <span className="req-status locked">Closed</span>
+                                          ) : !isEditable ? (
+                                            <span className="req-status locked">Ended</span>
+                                          ) : canJoinActivities ? (
+                                            <button className="task-join-btn" onClick={() => handleJoinActivity(activity.id, activity)} disabled={!isEditable || joiningTaskId === activity.id}>
+                                              {joiningTaskId === activity.id ? 'Joining…' : 'Join'}
+                                            </button>
+                                          ) : (
+                                            <span className="req-status locked">Closed</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {isEnrolled && isExpanded && !isEndedEnrolled && (
+                                        <div className="task-journal-section">
+                                          {journalsForActivity.map((journal) => (
+                                            <div key={journal.id} className="journal-card">
+                                              {editingJournalId === journal.taskId ? (
+                                                <>
+                                                  <textarea value={editingJournalText} onChange={(e) => setEditingJournalText(e.target.value)} className="journal-edit-textarea" />
+                                                  <div className="journal-card-actions">
+                                                    <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
+                                                    <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
+                                                  </div>
+                                                </>
+                                              ) : (
+                                                <div className="journal-text">{journal.reflection}</div>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {hasSubmittedJournal ? (
+                                            <div className="journal-submit-row">
+                                              <span className="journal-submitted-badge">Submitted</span>
+                                              {(() => {
+                                                const j = journalsForActivity[0];
+                                                const earned = Number(j?.pointsEarned) || 0;
+                                                const pending = Number(j?.pendingPoints) || 0;
+                                                if (earned > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>+{earned} pts earned</span>;
+                                                if (pending > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>{pending} pts pending</span>;
+                                                return null;
+                                              })()}
+                                              <>
+                                                <button onClick={() => handleEditJournal(journalsForActivity[0])} className="journal-edit-icon-btn" title={isGrouped ? 'Edit group reflection' : 'Edit reflection'}>
+                                                  <ModeRoundedIcon sx={{ fontSize: 15 }} />
+                                                </button>
+                                                <button onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)} className="journal-edit-icon-btn journal-delete-icon-btn" title={isGrouped ? 'Delete group reflection' : 'Delete reflection'}>
+                                                  <DeleteRoundedIcon sx={{ fontSize: 15 }} />
+                                                </button>
+                                              </>
+                                            </div>
+                                          ) : (
+                                            <>
+                                              <textarea
+                                                placeholder={!isHalfwayDone ? 'Journal will unlock once the event has started' : isGrouped ? 'Only one member needs to submit this reflection for your group.' : 'Write your reflection for this task...'}
+                                                className="journal-textarea"
+                                                value={journalReflections[idx] || ''}
+                                                onChange={(e) => handleJournalChange(idx, e.target.value)}
+                                                disabled={!isHalfwayDone}
+                                              />
+                                              <div className="journal-submit-row">
+                                                {submitStatus[idx] && (
+                                                  <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
+                                                )}
+                                                <button className="activity-submit-button journal-submit-compact" disabled={!isHalfwayDone || !journalReflections[idx]?.trim()} onClick={() => handleJournalSubmit(idx, activity)}>
+                                                  {!isHalfwayDone ? 'LOCKED' : isGrouped ? 'SUBMIT FOR GROUP' : 'SUBMIT'}
+                                                </button>
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                };
+
+                                if (withIdx.length === 0) {
+                                  return (
+                                    <div className="ea-empty-state" style={{ padding: '24px 0', textAlign: 'center' }}>
+                                      <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>📋</span>
+                                      <h4 style={{ color: '#374151', margin: 0 }}>No tasks yet</h4>
+                                      <p style={{ color: '#6b7280', margin: '8px 0 0' }}>You can still complete the event requirements while waiting for tasks to be added.</p>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    {joinedList.length > 0 && (
+                                      <div className="task-section">
+                                        <span className="task-section-label">Joined</span>
+                                        {joinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
+                                      </div>
+                                    )}
+                                    {joinedList.length > 0 && unjoinedList.length > 0 && <div className="task-section-divider" />}
+                                    {unjoinedList.length > 0 && (
+                                      <div className="task-section">
+                                        {joinedList.length > 0 && <span className="task-section-label">Available</span>}
+                                        {unjoinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                        </>
                       );
                     })()}
-                  </div>
-                )}
-
-                {/* TASK ASSIGNMENT TAB */}
-                {activeNav === 'tasks' && (
-                  <div className={`event-activities-panel${!isEditable ? ' event-activities-panel--ended' : ''}`}>
-                    <h2 className="event-activities-title">Task Assignment</h2>
-                    <p className="event-activities-desc">Pick an extra role you want to take on for this event</p>
-                    {isEventDay && volunteerProgress?.attendance !== 'present' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', marginBottom: 4, fontSize: 13, color: '#92400e' }}>
-                        🔒 Scan your attendance QR code first to unlock task assignment.
-                      </div>
-                    )}
-                    <p className="event-activities-subtitle">
-                      {tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined
-                    </p>
-                    <div className="task-list-scroll">
-                      {tasks && (() => {
-                        const withIdx = tasks.map((t, i) => [t, i]);
-                        const joinedList = withIdx.filter(([t]) => !!enrolledTasks[t.id]);
-                        const unjoinedList = withIdx.filter(([t]) => !enrolledTasks[t.id]);
-
-                        const renderTaskCard = (activity, idx) => {
-                          const isEnrolled = !!enrolledTasks[activity.id];
-                          const isGrouped = activity.type === 'grouped';
-                          const filledSlots = taskParticipantCounts[activity.id] || 0;
-                          const groupedSlots = taskGroupCounts[activity.id] || 0;
-                          const participantsText = isGrouped ? `${groupedSlots}` : `${filledSlots}`;
-                          const maxSlots = Number.isFinite(Number(activity.maxParticipants)) ? Number(activity.maxParticipants) : null;
-                          const isTaskCapacityFull = !isGrouped && maxSlots !== null && filledSlots >= maxSlots;
-                          const isDeadlineClosed = isEnrollmentClosed(activity);
-                          const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
-                          const hasSubmittedJournal = journalsForActivity.length > 0;
-                          const enrollmentCountdown = getEnrollmentCountdown(activity);
-
-                          const attendanceDone = volunteerProgress?.attendance === 'present';
-                          if (!isEnrolled && (!isEventDay || !attendanceDone)) {
-                            return (
-                              <div key={idx} className="task-card task-card--locked">
-                                <span className="task-card__title-only">{activity.title}</span>
-                                {isEventDay && !attendanceDone && (
-                                  <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to unlock</span>
-                                )}
-                              </div>
-                            );
-                          }
-
-                          const isExpanded = expandedTasks[activity.id] !== false;
-                          const isEndedEnrolled = !isEditable && isEnrolled;
-
-                          return (
-                            <div key={idx} className={`task-card${isEnrolled ? ' task-card--enrolled' : ''}${isEndedEnrolled ? ' task-card--ended' : ''}`}>
-                              <div className="task-card__row" style={isEnrolled && !isEndedEnrolled ? { cursor: 'pointer' } : {}} onClick={isEnrolled && !isEndedEnrolled ? () => toggleTaskExpand(activity.id) : undefined}>
-                                <span className="task-card__emoji">{activity.emoji || '🎯'}</span>
-                                <div className="task-card__info">
-                                  <span className="task-card__title">{activity.title}</span>
-                                  <div className="task-card__meta">
-                                    <span className="task-card__pts">{activity.points} PTS</span>
-                                    {isEventDay && (
-                                      <button
-                                        className="task-participants-indicator"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (isGrouped) { setGroupModalMode('view'); setSelectedTaskForGroups(activity); } else { setSelectedTaskForParticipants(activity); }
-                                        }}
-                                        aria-label={`View ${isGrouped ? 'groups' : 'participants'} for ${activity.title}`}
-                                      >
-                                        {isGrouped ? 'Groups' : 'Participants'}: {participantsText}
-                                      </button>
-                                    )}
-                                    {enrollmentCountdown && (
-                                      <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
-                                        {enrollmentCountdown.label}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="task-card__action">
-                                  {isEnrolled ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={!isEditable}>
-                                        <span className="joined-text">✓ Joined</span><span className="remove-text">✕ Unjoin</span>
-                                      </button>
-                                      {!isEndedEnrolled && (
-                                        <button className="task-collapse-btn" onClick={(e) => { e.stopPropagation(); toggleTaskExpand(activity.id); }} aria-label={isExpanded ? 'Collapse' : 'Expand'}>
-                                          {isExpanded ? <ExpandLessRoundedIcon sx={{ fontSize: 20 }} /> : <ExpandMoreRoundedIcon sx={{ fontSize: 20 }} />}
-                                        </button>
-                                      )}
-                                    </div>
-                                  ) : isTaskCapacityFull ? (
-                                    <span className="task-slot-full-badge">Full</span>
-                                  ) : isDeadlineClosed ? (
-                                    <span className="req-status locked">Closed</span>
-                                  ) : !isEditable ? (
-                                    <span className="req-status locked">Ended</span>
-                                  ) : canJoinActivities ? (
-                                    <button className="task-join-btn" onClick={() => handleJoinActivity(activity.id, activity)} disabled={!isEditable || joiningTaskId === activity.id}>
-                                      {joiningTaskId === activity.id ? 'Joining…' : 'Join'}
-                                    </button>
-                                  ) : (
-                                    <span className="req-status locked">Closed</span>
-                                  )}
-                                </div>
-                              </div>
-                              {isEnrolled && isExpanded && !isEndedEnrolled && (
-                                <div className="task-journal-section">
-                                  {journalsForActivity.map((journal) => (
-                                    <div key={journal.id} className="journal-card">
-                                      {editingJournalId === journal.taskId ? (
-                                        <>
-                                          <textarea value={editingJournalText} onChange={(e) => setEditingJournalText(e.target.value)} className="journal-edit-textarea" />
-                                          <div className="journal-card-actions">
-                                            <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
-                                            <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <div className="journal-text">{journal.reflection}</div>
-                                      )}
-                                    </div>
-                                  ))}
-                                  {hasSubmittedJournal ? (
-                                    <div className="journal-submit-row">
-                                      <span className="journal-submitted-badge">Submitted</span>
-                                      {(() => {
-                                        const j = journalsForActivity[0];
-                                        const earned = Number(j?.pointsEarned) || 0;
-                                        const pending = Number(j?.pendingPoints) || 0;
-                                        if (earned > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>+{earned} pts earned</span>;
-                                        if (pending > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>{pending} pts pending</span>;
-                                        return null;
-                                      })()}
-                                      <>
-                                        <button onClick={() => handleEditJournal(journalsForActivity[0])} className="journal-edit-icon-btn" title={isGrouped ? 'Edit group reflection' : 'Edit reflection'}>
-                                          <ModeRoundedIcon sx={{ fontSize: 15 }} />
-                                        </button>
-                                        <button onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)} className="journal-edit-icon-btn journal-delete-icon-btn" title={isGrouped ? 'Delete group reflection' : 'Delete reflection'}>
-                                          <DeleteRoundedIcon sx={{ fontSize: 15 }} />
-                                        </button>
-                                      </>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <textarea
-                                        placeholder={!isHalfwayDone ? 'Journal will unlock once the event has started' : isGrouped ? 'Only one member needs to submit this reflection for your group.' : 'Write your reflection for this task...'}
-                                        className="journal-textarea"
-                                        value={journalReflections[idx] || ''}
-                                        onChange={(e) => handleJournalChange(idx, e.target.value)}
-                                        disabled={!isHalfwayDone}
-                                      />
-                                      <div className="journal-submit-row">
-                                        {submitStatus[idx] && (
-                                          <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
-                                        )}
-                                        <button className="activity-submit-button journal-submit-compact" disabled={!isHalfwayDone || !journalReflections[idx]?.trim()} onClick={() => handleJournalSubmit(idx, activity)}>
-                                          {!isHalfwayDone ? 'LOCKED' : isGrouped ? 'SUBMIT FOR GROUP' : 'SUBMIT'}
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        };
-
-                        if (withIdx.length === 0) {
-                          return (
-                            <div className="ea-empty-state" style={{ padding: '24px 0', textAlign: 'center' }}>
-                              <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>📋</span>
-                              <h4 style={{ color: '#374151', margin: 0 }}>No tasks yet</h4>
-                              <p style={{ color: '#6b7280', margin: '8px 0 0' }}>You can still complete the event requirements while waiting for tasks to be added.</p>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <>
-                            {joinedList.length > 0 && (
-                              <div className="task-section">
-                                <span className="task-section-label">Joined</span>
-                                {joinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
-                              </div>
-                            )}
-                            {joinedList.length > 0 && unjoinedList.length > 0 && <div className="task-section-divider" />}
-                            {unjoinedList.length > 0 && (
-                              <div className="task-section">
-                                {joinedList.length > 0 && <span className="task-section-label">Available</span>}
-                                {unjoinedList.map(([activity, idx]) => renderTaskCard(activity, idx))}
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
                   </div>
                 )}
 
