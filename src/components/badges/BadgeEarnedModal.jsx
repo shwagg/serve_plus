@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import BadgeIcon from "./BadgeIcon";
 import { BADGE_BY_ID } from "../../constants/badgeDefinitions";
+import { playBadgeEarnedSound } from "../../utils/soundUtils";
 
 const CONFETTI = [
   { color: '#FFD700', x: 12,  y: 18, w: 8,  h: 8,  r: '50%',  delay: 0,    dur: 1.8 },
@@ -36,7 +37,10 @@ export default function BadgeEarnedModal({ badgeQueue = [], onDismiss }) {
 
   useEffect(() => {
     if (currentId) {
-      const t = setTimeout(() => setVisible(true), 80);
+      const t = setTimeout(() => {
+        setVisible(true);
+        playBadgeEarnedSound();
+      }, 80);
       return () => clearTimeout(t);
     } else {
       setVisible(false);

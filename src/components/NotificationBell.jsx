@@ -9,6 +9,7 @@ import {
   markAllNotificationsAsRead,
   createNotification,
 } from "../utils/notificationUtils";
+import { playNotificationSound } from "../utils/soundUtils";
 import BadgeEarnedModal from "./badges/BadgeEarnedModal";
 import "./styles/NotificationBell.css";
 
@@ -25,6 +26,7 @@ export default function NotificationBell() {
   const dropdownRef = useRef(null);
   const bellButtonRef = useRef(null);
   const prevPointsRef = useRef(null);
+  const prevNotifCountRef = useRef(0);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
@@ -42,7 +44,15 @@ export default function NotificationBell() {
 
     const unsubscribe = subscribeToNotifications(userId, (items) => {
       setNotifications(items);
-      setUnreadCount(items.filter((n) => !n.read).length);
+      const unread = items.filter((n) => !n.read).length;
+      
+      // Play sound if new unread notifications arrived
+      if (unread > prevNotifCountRef.current) {
+        playNotificationSound();
+      }
+      
+      prevNotifCountRef.current = unread;
+      setUnreadCount(unread);
     });
 
     return () => unsubscribe();
