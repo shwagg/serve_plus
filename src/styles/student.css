@@ -2258,7 +2258,8 @@
     font-size: 11px;
   }
   .strip-missions-label {
-    display: none;
+    display: inline;
+    font-size: 10px;
   }
   .strip-pts-text {
     font-size: 10px;

@@ -246,7 +246,7 @@ export default function Header() {
           <div className="header-actions">
             {userRole === 'student' && (
               <button
-                className="notification-bell-button"
+                className="notification-bell-button tutorial-header-btn"
                 aria-label="Help / Tutorial"
                 title="Help"
                 onClick={() => setShowTutorial(true)}
@@ -288,6 +288,16 @@ export default function Header() {
         </div>
       </header>
       <div className="header-fade-gradient" aria-hidden="true" />
+      {userRole === 'student' && (
+        <button
+          className="tutorial-fab"
+          aria-label="Help / Tutorial"
+          title="Help"
+          onClick={() => setShowTutorial(true)}
+        >
+          <HelpOutlineRoundedIcon style={{ fontSize: 22, color: '#6b7280' }} />
+        </button>
+      )}
       {userRole !== 'admin' && announcementsEnabled && (
         <>
           <GlobalNotificationButton

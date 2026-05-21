@@ -261,6 +261,40 @@
   z-index: 98;
 }
 
+/* Tutorial floating action button — visible only on small screens */
+.tutorial-fab {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  transition: background 0.2s, transform 0.15s;
+}
+.tutorial-fab:hover {
+  background: #d1d5db;
+  transform: scale(1.08);
+}
+.tutorial-fab:active {
+  transform: scale(0.96);
+}
+@media (max-width: 600px) {
+  .tutorial-header-btn {
+    display: none !important;
+  }
+  .tutorial-fab {
+    display: flex;
+  }
+}
+
 /* Modal Styles */
 .cp-overlay {
   position: fixed;
