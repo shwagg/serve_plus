@@ -1,5 +1,5 @@
-export function showToast(message, type = 'success') {
-  window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type } }));
+export function showToast(message, type = 'success', subtitle = null) {
+  window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type, subtitle } }));
 }
 
 export function showConfirm(message) {
