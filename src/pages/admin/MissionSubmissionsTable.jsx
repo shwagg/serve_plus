@@ -66,6 +66,14 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const [journalModalVolunteer, setJournalModalVolunteer] = useState(null);
   const [approvingJournal, setApprovingJournal] = useState(null);
 
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterRole, setFilterRole] = useState("");
+  const [filterAttendance, setFilterAttendance] = useState("");
+  const [filterPreSurvey, setFilterPreSurvey] = useState("");
+  const [filterConsent, setFilterConsent] = useState("");
+  const [filterPostSurvey, setFilterPostSurvey] = useState("");
+
   useEffect(() => {
     if (!volunteerCard) return;
     const close = () => setVolunteerCard(null);
@@ -325,6 +333,29 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
 
   if (loading) return <p style={{ color: "#888", padding: 16 }}>Loading submissions…</p>;
 
+  const filteredVolunteers = volunteers.filter(v => {
+    if (searchQuery && !v.name.toLowerCase().includes(searchQuery.toLowerCase()) && !v.email.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (filterRole) {
+      const rawRoles = (v.preSurveyAnswers?.engagement?.participation || []).map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
+      if (!rawRoles.includes(filterRole)) return false;
+    }
+    if (filterAttendance === "present" && v.progress?.attendance !== "present") return false;
+    if (filterAttendance === "absent" && v.progress?.attendance === "present") return false;
+    if (filterPreSurvey === "submitted" && !v.preSurveyAnswers) return false;
+    if (filterPreSurvey === "not_submitted" && !!v.preSurveyAnswers) return false;
+    if (filterConsent) {
+      const reviewStatus = v.consentSubmission?.reviewStatus || "";
+      const hasFile = Boolean(v.consentSubmission?.fileUrl);
+      const effectiveStatus = hasFile ? (reviewStatus || "pending") : "none";
+      if (effectiveStatus !== filterConsent) return false;
+    }
+    if (filterPostSurvey === "submitted" && !v.postSurveyAnswers) return false;
+    if (filterPostSurvey === "not_submitted" && !!v.postSurveyAnswers) return false;
+    return true;
+  });
+
+  const activeFilterCount = [searchQuery, filterRole, filterAttendance, filterPreSurvey, filterConsent, filterPostSurvey].filter(Boolean).length;
+
   return (
     <>
       {isFeedbackActive && (
@@ -334,6 +365,104 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       )}
 
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8eaed" }}>
+        {/* ── Filter bar ── */}
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f3f4", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {/* Search */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <input
+              type="text"
+              placeholder="Search by name or email…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                padding: "6px 10px 6px 30px",
+                border: "1px solid #dadce0",
+                borderRadius: 8,
+                fontSize: "0.8rem",
+                fontFamily: "inherit",
+                color: "#202124",
+                width: 200,
+                outline: "none",
+              }}
+            />
+            <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#80868b", fontSize: "0.82rem", pointerEvents: "none" }}>🔍</span>
+          </div>
+
+          {/* Role filter */}
+          <select
+            value={filterRole}
+            onChange={e => setFilterRole(e.target.value)}
+            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterRole ? "#1a73e8" : "#5f6368", background: filterRole ? "#e8f0fe" : "#fff", cursor: "pointer" }}
+          >
+            <option value="">All Roles</option>
+            <option value="participant">Participant</option>
+            <option value="donor">Donor</option>
+            <option value="facilitator">Facilitator</option>
+            <option value="organizer">Organizer</option>
+            <option value="observer">Observer</option>
+          </select>
+
+          {/* Attendance filter */}
+          <select
+            value={filterAttendance}
+            onChange={e => setFilterAttendance(e.target.value)}
+            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterAttendance ? "#1a73e8" : "#5f6368", background: filterAttendance ? "#e8f0fe" : "#fff", cursor: "pointer" }}
+          >
+            <option value="">All Attendance</option>
+            <option value="present">Present</option>
+            <option value="absent">Not yet</option>
+          </select>
+
+          {/* Pre-Survey filter */}
+          <select
+            value={filterPreSurvey}
+            onChange={e => setFilterPreSurvey(e.target.value)}
+            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterPreSurvey ? "#1a73e8" : "#5f6368", background: filterPreSurvey ? "#e8f0fe" : "#fff", cursor: "pointer" }}
+          >
+            <option value="">All Pre-Survey</option>
+            <option value="submitted">Submitted</option>
+            <option value="not_submitted">Not Submitted</option>
+          </select>
+
+          {/* Consent filter */}
+          <select
+            value={filterConsent}
+            onChange={e => setFilterConsent(e.target.value)}
+            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterConsent ? "#1a73e8" : "#5f6368", background: filterConsent ? "#e8f0fe" : "#fff", cursor: "pointer" }}
+          >
+            <option value="">All Consent</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending Review</option>
+            <option value="rejected">Rejected</option>
+            <option value="none">Not Submitted</option>
+          </select>
+
+          {/* Post-Survey filter */}
+          <select
+            value={filterPostSurvey}
+            onChange={e => setFilterPostSurvey(e.target.value)}
+            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterPostSurvey ? "#1a73e8" : "#5f6368", background: filterPostSurvey ? "#e8f0fe" : "#fff", cursor: "pointer" }}
+          >
+            <option value="">All Post-Survey</option>
+            <option value="submitted">Submitted</option>
+            <option value="not_submitted">Not Submitted</option>
+          </select>
+
+          {/* Clear filters */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => { setSearchQuery(""); setFilterRole(""); setFilterAttendance(""); setFilterPreSurvey(""); setFilterConsent(""); setFilterPostSurvey(""); }}
+              style={{ padding: "6px 10px", border: "1px solid #dadce0", borderRadius: 8, background: "#fff", color: "#d93025", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}
+            >
+              Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+            </button>
+          )}
+
+          {/* Results count */}
+          <span style={{ marginLeft: "auto", color: "#80868b", fontSize: "0.78rem", whiteSpace: "nowrap" }}>
+            {filteredVolunteers.length} of {volunteers.length} volunteer{volunteers.length !== 1 ? "s" : ""}
+          </span>
+        </div>
         <div style={{ width: "100%", overflowX: "auto" }}>
         <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: "0.84rem" }}>
           <thead>
@@ -341,7 +470,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>
                 Volunteer
                 <span style={{ marginLeft: 8, background: "#f1f3f4", color: "#5f6368", borderRadius: 99, fontSize: "0.68rem", padding: "2px 7px", fontWeight: 600 }}>
-                  {volunteers.length}
+                  {filteredVolunteers.length}
                 </span>
               </th>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Role</th>
@@ -357,11 +486,11 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
             </tr>
           </thead>
           <tbody>
-            {volunteers.length === 0 ? (
+            {filteredVolunteers.length === 0 ? (
               <tr>
-                <td colSpan={11} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>No submissions found.</td>
+                <td colSpan={11} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>{volunteers.length === 0 ? "No submissions found." : "No volunteers match the current filters."}</td>
               </tr>
-            ) : volunteers.map((v, idx) => {
+            ) : filteredVolunteers.map((v, idx) => {
               const rawRoles = v.preSurveyAnswers?.engagement?.participation || [];
               const normalizedRoles = rawRoles.map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
               const isDonorOnly = normalizedRoles.includes("donor") && !normalizedRoles.includes("participant");
@@ -400,7 +529,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                 !v.releasedAt;
 
               return (
-                <tr key={v.id} style={{ borderBottom: idx < volunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
+                <tr key={v.id} style={{ borderBottom: idx < filteredVolunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
                   <td style={{ padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {v.photoURL ? (
