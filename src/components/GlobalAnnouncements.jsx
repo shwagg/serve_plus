@@ -405,8 +405,9 @@ const GlobalAnnouncements = () => {
 
   // Helper: is event fully booked (default threshold 3 volunteers)
   const isFullyBooked = (event) => {
-    const count = Number(event?.volunteerCount || 0);
-    return count >= 3;
+    const limit = event?.participantLimit ? Number(event.participantLimit) : null;
+    if (!limit || limit <= 0) return false;
+    return Number(event?.volunteerCount || 0) >= limit;
   };
 
   const getIconAndClass = (event) => {

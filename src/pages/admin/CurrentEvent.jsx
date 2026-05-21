@@ -1525,6 +1525,7 @@ export default function CurrentEvent() {
                   <DetailField label="Prepared By"    value={missionData.preparedBy} />
                   <DetailField label="Max Volunteers" value={missionData.maxStudents} />
                   <DetailField label="Volunteer Hours" value={missionData.volunteerHours} />
+                  <DetailField label="Participant Limit" value={missionData.participantLimit ? `${missionData.participantLimit} students` : null} />
                   <DetailField label="Points"         value={missionData.points} />
                   <DetailField label="Budget"         value={missionData.budget} />
                 </div>

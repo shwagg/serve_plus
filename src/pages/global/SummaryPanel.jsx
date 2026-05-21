@@ -64,6 +64,7 @@ function SummaryPanel({
           selectedRecommendedBy: formData.recommendedBy || '',
           affiliatedDepartment: formData.affiliatedDepartment || '',
           partnerSchool: formData.partnerSchool || '',
+          participantLimit: formData.participantLimit ? Math.min(Number(formData.participantLimit), 50) : null,
         };
         if (projectType === 'service-learning') {
           updateData.slFields = {
@@ -157,6 +158,7 @@ function SummaryPanel({
         // Department & Partner
         affiliatedDepartment: formData.affiliatedDepartment || '',
         partnerSchool: formData.partnerSchool || '',
+        participantLimit: formData.participantLimit ? Math.min(Number(formData.participantLimit), 50) : null,
 
         // Activities
         activities: [],

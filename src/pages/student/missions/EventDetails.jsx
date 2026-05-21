@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
 
 import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
@@ -166,6 +166,13 @@ export default function EventDetails({ onClose = null, missionId = null }) {
       return;
     }
 
+    // Enforce participant limit
+    const limit = mission?.participantLimit ? Number(mission.participantLimit) : null;
+    if (limit && volunteerCount >= limit) {
+      alert(`This event is full. Maximum of ${limit} participants allowed.`);
+      return;
+    }
+
     setJoining(true);
     try {
       const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
@@ -183,6 +190,30 @@ export default function EventDetails({ onClose = null, missionId = null }) {
           postSurvey: "locked"
         },
       });
+
+      // If this join fills the last slot, stamp fullBookedTime and notify all enrolled volunteers
+      if (limit && volunteerCount + 1 >= limit) {
+        updateDoc(doc(db, "missions", id), { fullBookedTime: serverTimestamp() })
+          .catch(e => console.warn("Failed to stamp fullBookedTime:", e));
+
+        // Notify every enrolled volunteer (fire-and-forget)
+        getDocs(collection(db, "missions", id, "volunteer"))
+          .then(volSnap => {
+            const eventTitle = mission?.title || "this event";
+            const notifPayload = {
+              type: "event_full",
+              title: "Event Now Full",
+              message: `"${eventTitle}" has reached its maximum of ${limit} participant${limit !== 1 ? "s" : ""}. No more slots available.`,
+              link: `/event/${id}/activity?mode=active`,
+              eventId: id,
+            };
+            volSnap.docs.forEach(vDoc => {
+              createNotification(vDoc.id, notifPayload)
+                .catch(e => console.warn("Failed to send event_full notification:", e));
+            });
+          })
+          .catch(e => console.warn("Failed to fetch volunteers for full-event notification:", e));
+      }
 
       // Keep a reverse index so the chat dropdown can load instantly — non-blocking
       setDoc(doc(db, "userMissions", user.uid, "missions", id), {
@@ -410,7 +441,24 @@ export default function EventDetails({ onClose = null, missionId = null }) {
                       Restriction lifts on {attendanceFlag.expiry?.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.
                     </p>
                   </div>
-                ) : volunteer?.registrationStatus === "approved" ? null : (
+                ) : volunteer?.registrationStatus === "approved" ? null : mission?.participantLimit && volunteerCount >= Number(mission.participantLimit) ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <button
+                      className="event-details-join-btn"
+                      disabled
+                      style={{
+                        background: 'linear-gradient(135deg, #9ca3af, #6b7280)',
+                        cursor: 'not-allowed',
+                        opacity: 0.9,
+                      }}
+                    >
+                      🔒 EVENT FULL
+                    </button>
+                    <p style={{ marginTop: 8, fontSize: 12, color: '#6b7280', fontWeight: 500, maxWidth: 260 }}>
+                      This event has reached its maximum of {mission.participantLimit} participants.
+                    </p>
+                  </div>
+                ) : (
                   <button
                     className="event-details-join-btn"
                     disabled={joining}

@@ -118,6 +118,7 @@ export default function NotificationBell() {
       case "certificate_ready":  return "📜";
       case "attendance_flag":       return "🚩";
       case "attendance_flag_admin": return "🚩";
+      case "event_full":            return "🔒";
       default:                   return "🔔";
     }
   };

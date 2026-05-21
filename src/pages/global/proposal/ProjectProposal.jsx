@@ -176,6 +176,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     studentOutcomes: '',
     alt: '',
     partnerSchool: '',
+    participantLimit: '',
   });
   // Department options for dropdown
   const departments = [
@@ -307,6 +308,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       affiliatedDepartment: p.affiliatedDepartment || '',
       alt: p.alt || '',
       partnerSchool: p.partnerSchool || '',
+      participantLimit: p.participantLimit ? String(p.participantLimit) : '',
     });
     if (p.projectType === 'sl' && p.slFields) {
       setSlFields({
@@ -398,7 +400,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     clearDraft();
     submittedRef.current = false;
     hasUserInputRef.current = false;
-    setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '' });
+    setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '' });
     setSlFields({ section: '', course: '', courseCode: '', assignedFaculty: slFieldsRef.current?.assignedFaculty || '' });
     setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '', assignedFaculty: '' });
     setDraftRestored(false);
@@ -784,6 +786,20 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     onChange={handleInputChange}
                     required
                     min="0"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="participantLimit">Participant Limit</label>
+                  <input
+                    type="number"
+                    id="participantLimit"
+                    name="participantLimit"
+                    value={formData.participantLimit}
+                    onChange={handleInputChange}
+                    min="1"
+                    max="50"
+                    placeholder="Max participants (optional, up to 50)"
                   />
                 </div>
               </div>
