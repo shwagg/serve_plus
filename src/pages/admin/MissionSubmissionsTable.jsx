@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc, deleteField, increment } from "firebase/firestore";
-import { computeFinalPoints } from "../../hooks/rewardSystem";
+import { computeFinalPoints, getProgramMultiplier, ROLE_POINTS } from "../../hooks/rewardSystem";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
@@ -49,7 +48,6 @@ const POST_LIKERT = [
  *   missionTitle – Display name for certificate navigation (optional)
  */
 export default function MissionSubmissionsTable({ missionId, missionTitle, refreshKey }) {
-  const navigate = useNavigate();
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFeedbackActive, setIsFeedbackActive] = useState(true);
@@ -59,12 +57,12 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const [showAnswerModal, setShowAnswerModal] = useState(false);
   const [answerModalTitle, setAnswerModalTitle] = useState("");
   const [answerModalData, setAnswerModalData] = useState(null);
-  const [issuingCertFor, setIssuingCertFor] = useState(null);
-  const [isReleasingFor, setIsReleasingFor] = useState(null);
   const [volunteerCard, setVolunteerCard] = useState(null);
   const [showJournalModal, setShowJournalModal] = useState(false);
   const [journalModalVolunteer, setJournalModalVolunteer] = useState(null);
   const [approvingJournal, setApprovingJournal] = useState(null);
+  const autoReleasedIdsRef = useRef(new Set());
+  const isAutoReleasingRef = useRef(false);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -185,25 +183,6 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
     }
   };
 
-  const handleParticipationChange = async (volunteerId, value) => {
-    try {
-      await updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId), { participationStatus: value });
-      logAudit({
-        action: "VOLUNTEER_PARTICIPATION_UPDATED",
-        category: "event",
-        details: {
-          missionId,
-          targetUserId: volunteerId,
-          targetUserName: volunteers.find(v => v.id === volunteerId)?.name || "",
-          participationStatus: value,
-        },
-      });
-      setVolunteers(prev => prev.map(v => v.id === volunteerId ? { ...v, participationStatus: value } : v));
-    } catch {
-      showToast("Failed to update participation status.");
-    }
-  };
-
   const handleConsentReviewChange = async (volunteerId, value) => {
     try {
       const selectedVolunteer = volunteers.find(v => v.id === volunteerId);
@@ -213,11 +192,18 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       let shouldRevokeBonus = false;
       if (value === "rejected") {
         const volunteerDocSnap = await getDoc(volunteerDocRef);
-        shouldRevokeBonus = volunteerDocSnap.exists() && !!volunteerDocSnap.data().requirementBonus?.consent;
+        if (volunteerDocSnap.exists()) {
+          const volData = volunteerDocSnap.data();
+          // Check both new (progress.consent) and old (requirementBonus.consent) tracking fields
+          shouldRevokeBonus = volData.progress?.consent === 'verified' || Boolean(volData.requirementBonus?.consent);
+        }
       }
 
       const updateData = { "consentSubmission.reviewStatus": value };
-      if (shouldRevokeBonus) updateData["requirementBonus.consent"] = deleteField();
+      if (shouldRevokeBonus) {
+        updateData["progress.consent"] = "submitted";
+        updateData["requirementBonus.consent"] = deleteField();
+      }
 
       await updateDoc(volunteerDocRef, updateData);
 
@@ -331,6 +317,72 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
     }
   };
 
+  // Auto-release points + issue certificate for volunteers who meet all requirements
+  // once the community feedback form is closed.
+  useEffect(() => {
+    if (isFeedbackActive || loading || volunteers.length === 0) return;
+    if (isAutoReleasingRef.current) return;
+
+    const pending = volunteers.filter(v => {
+      if (v.releasedAt || autoReleasedIdsRef.current.has(v.id)) return false;
+      const journals = v.journals || [];
+      const allJournalsApproved = journals.length === 0 || journals.every(j => j.adminApprovalStatus === "approved");
+      const isConsentApproved = v.consentSubmission?.reviewStatus === "approved";
+      const requiredItems = [
+        v.preSurveyAnswers,
+        v.postSurveyAnswers,
+        isConsentApproved,
+        v.progress?.attendance === "present",
+        ...(journals.length > 0 ? [allJournalsApproved] : []),
+      ];
+      return requiredItems.every(Boolean);
+    });
+
+    if (pending.length === 0) return;
+
+    isAutoReleasingRef.current = true;
+    (async () => {
+      for (const v of pending) {
+        autoReleasedIdsRef.current.add(v.id);
+        try {
+          const finalPoints = await releaseVolunteerPoints(missionId, v.id);
+          await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { completionStatus: "complete" });
+
+          const certDate = missionDate || new Date();
+          const certDay = String(certDate.getDate());
+          const certMonth = certDate.toLocaleString("en-US", { month: "long" });
+          const certYear = String(certDate.getFullYear());
+
+          let certIssued = false;
+          try {
+            await issueCertificate({
+              userId: v.id,
+              recipient: v.name,
+              course: missionTitle || "",
+              date: `${certMonth} ${certDay}, ${certYear}`,
+              loc: missionLocation,
+              day: certDay,
+              month: certMonth,
+              year: certYear,
+            });
+            await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { certIssuedAt: new Date().toISOString() });
+            certIssued = true;
+          } catch { /* cert failure is non-fatal */ }
+
+          setVolunteers(prev => prev.map(vol => vol.id === v.id ? {
+            ...vol,
+            pointsEarned: finalPoints,
+            releasedAt: new Date().toISOString(),
+            ...(certIssued ? { certIssuedAt: new Date().toISOString() } : {}),
+          } : vol));
+        } catch {
+          autoReleasedIdsRef.current.delete(v.id);
+        }
+      }
+      isAutoReleasingRef.current = false;
+    })();
+  }, [volunteers, isFeedbackActive, loading]);
+
   if (loading) return <p style={{ color: "#888", padding: 16 }}>Loading submissions…</p>;
 
   const filteredVolunteers = volunteers.filter(v => {
@@ -358,9 +410,24 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
 
   return (
     <>
-      {isFeedbackActive && (
-        <div style={{ background: "#e8f0fe", color: "#1a73e8", padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontWeight: 600, border: "1px solid #c5d9fd", fontSize: "0.85rem" }}>
-          ⚠ Community feedback form is still active. Points cannot be released yet.
+      {isFeedbackActive ? (
+        <div style={{ background: "#fff8e1", color: "#92400e", padding: "14px 18px", borderRadius: 10, marginBottom: 16, border: "2px solid #f59e0b", fontSize: "0.87rem", lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: 4 }}>⚠ Community feedback form is still open</div>
+          <div style={{ fontWeight: 400 }}>
+            Points and certificates will be <b>automatically released</b> once the feedback form is closed.
+            The final avg rating determines the points multiplier for all volunteers.
+            {missionAvgRating > 0 && (
+              <span> Current avg rating: <b>{missionAvgRating}</b> → multiplier will be <b>{getProgramMultiplier(missionAvgRating)}×</b>.</span>
+            )}
+          </div>
+        </div>
+      ) : missionAvgRating === 0 ? (
+        <div style={{ background: "#fef3c7", color: "#78350f", padding: "10px 16px", borderRadius: 8, marginBottom: 16, border: "1px solid #fde68a", fontSize: "0.84rem", fontWeight: 500 }}>
+          No feedback responses received — points multiplier will be <b>1.0×</b> (no bonus).
+        </div>
+      ) : (
+        <div style={{ background: "#ecfdf5", color: "#065f46", padding: "10px 16px", borderRadius: 8, marginBottom: 16, border: "1px solid #6ee7b7", fontSize: "0.84rem", fontWeight: 500 }}>
+          Feedback closed · Avg rating: <b>{missionAvgRating}</b> · Multiplier: <b>{getProgramMultiplier(missionAvgRating)}×</b> · Points auto-release is active.
         </div>
       )}
 
@@ -464,7 +531,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
           </span>
         </div>
         <div style={{ width: "100%", overflowX: "auto" }}>
-        <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: "0.84rem" }}>
+        <table style={{ width: "100%", minWidth: 980, borderCollapse: "collapse", fontSize: "0.84rem" }}>
           <thead>
             <tr style={{ borderBottom: "1.5px solid #e8eaed" }}>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>
@@ -479,21 +546,18 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Consent Form</th>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Post-Survey</th>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Journal</th>
-              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Participation</th>
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Done %</th>
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Points</th>
-              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Release</th>
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Status</th>
             </tr>
           </thead>
           <tbody>
             {filteredVolunteers.length === 0 ? (
               <tr>
-                <td colSpan={11} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>{volunteers.length === 0 ? "No submissions found." : "No volunteers match the current filters."}</td>
+                <td colSpan={10} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>{volunteers.length === 0 ? "No submissions found." : "No volunteers match the current filters."}</td>
               </tr>
             ) : filteredVolunteers.map((v, idx) => {
               const rawRoles = v.preSurveyAnswers?.engagement?.participation || [];
-              const normalizedRoles = rawRoles.map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
-              const isDonorOnly = normalizedRoles.includes("donor") && !normalizedRoles.includes("participant");
               const hasConsentSubmission = Boolean(v.consentSubmission?.fileUrl);
               const consentReviewStatus = v.consentSubmission?.reviewStatus || "";
               const isConsentApproved = consentReviewStatus === "approved";
@@ -502,31 +566,23 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               const approvedJournalCount = journals.filter(j => j.adminApprovalStatus === "approved").length;
               const allJournalsApproved = journals.length === 0 || approvedJournalCount === journals.length;
 
-              const requiredItems = isDonorOnly
-                ? [v.participationStatus]
-                : [
-                    v.preSurveyAnswers,
-                    v.postSurveyAnswers,
-                    isConsentApproved,
-                    v.progress?.attendance === "present",
-                    v.participationStatus,
-                    ...(journals.length > 0 ? [allJournalsApproved] : []),
-                  ];
+              const requiredItems = [
+                v.preSurveyAnswers,
+                v.postSurveyAnswers,
+                isConsentApproved,
+                v.progress?.attendance === "present",
+                ...(journals.length > 0 ? [allJournalsApproved] : []),
+              ];
 
               const completedItems = requiredItems.filter(Boolean).length;
               const individualCompletion = Math.round((completedItems / requiredItems.length) * 100);
 
               let previewPoints = null;
               let breakdown = null;
-              if (v.participationStatus && rawRoles.length > 0) {
-                breakdown = computeFinalPoints(rawRoles, missionAvgRating, v.participationStatus.toLowerCase());
+              if (rawRoles.length > 0) {
+                breakdown = computeFinalPoints(rawRoles, missionAvgRating, "verified");
                 previewPoints = breakdown.finalPoints;
               }
-
-              const isReadyToRelease =
-                (individualCompletion === 100 || v.participationStatus === "no_show") &&
-                !isFeedbackActive &&
-                !v.releasedAt;
 
               return (
                 <tr key={v.id} style={{ borderBottom: idx < filteredVolunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
@@ -611,114 +667,71 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                    <select
-                      value={v.participationStatus || ""}
-                      disabled={!!v.releasedAt}
-                      onChange={e => handleParticipationChange(v.id, e.target.value)}
-                      style={{ padding: "4px 8px", border: "1px solid #dadce0", borderRadius: 6, fontSize: "0.78rem", fontFamily: "inherit", color: "#202124", background: "#fff", cursor: !!v.releasedAt ? "not-allowed" : "pointer", maxWidth: 110 }}
-                    >
-                      <option value="">Select</option>
-                      <option value="verified">Verified</option>
-                      <option value="partial">Partial</option>
-                      <option value="minimal">Minimal</option>
-                      <option value="no_show">No-show</option>
-                    </select>
-                  </td>
                   <td style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, background: "#f8f9fa", color: individualCompletion === 100 ? "#137333" : "#202124" }}>
                     {individualCompletion}%
                   </td>
                   <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
-                    {v.releasedAt
-                      ? <span style={{ fontWeight: 700, color: "#202124" }}>{v.pointsEarned}</span>
-                      : individualCompletion === 100 && previewPoints !== null
-                        ? <span title={breakdown ? `Base: ${breakdown.base} | ×${breakdown.multiplier} | Factor: ${breakdown.factor}` : ""} style={{ cursor: "help", fontWeight: 600, color: "#5f6368" }}>{previewPoints}</span>
-                        : <span style={{ color: "#9aa0a6" }}>—</span>}
+                    {(() => {
+                      if (!breakdown) return <span style={{ color: "#9aa0a6" }}>—</span>;
+
+                      const roleLines = rawRoles
+                        .map(r => {
+                          const key = r.trim().toLowerCase().replace(/\s+/g, "_");
+                          const pts = ROLE_POINTS[key] || 0;
+                          const label = r.trim().replace(/\b\w/g, c => c.toUpperCase());
+                          return pts > 0 ? `  ${label}: ${pts} pts` : null;
+                        })
+                        .filter(Boolean)
+                        .join("\n");
+
+                      if (v.releasedAt) {
+                        const journalBonus = (v.pointsEarned || 0) - breakdown.finalPoints;
+                        const lines = [
+                          "── Role Breakdown ──",
+                          roleLines,
+                          `  Base Total: ${breakdown.base} pts`,
+                          `  × ${breakdown.multiplier} (avg rating: ${missionAvgRating})`,
+                          `  = ${breakdown.finalPoints} pts`,
+                          ...(journalBonus > 0 ? [`  + Journal/Task: ${journalBonus} pts`] : []),
+                          "────────────────────",
+                          `  Points Earned: ${v.pointsEarned} pts`,
+                        ].join("\n");
+                        return (
+                          <span title={lines} style={{ fontWeight: 700, color: "#202124", cursor: "help" }}>
+                            {v.pointsEarned}
+                          </span>
+                        );
+                      }
+
+                      const lines = [
+                        "── Role Breakdown ──",
+                        roleLines,
+                        `  Base Total: ${breakdown.base} pts`,
+                        `  × ${breakdown.multiplier} (avg rating: ${missionAvgRating})`,
+                        "────────────────────",
+                        `  Expected: ${breakdown.finalPoints} pts`,
+                      ].join("\n");
+                      return (
+                        <span title={lines} style={{ cursor: "help", fontWeight: 600, color: "#5f6368" }}>
+                          {previewPoints}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     {v.releasedAt ? (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                        <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.8rem" }}>✓ Released</span>
-                        {!v.certIssuedAt && (
-                          <button
-                            disabled={issuingCertFor === v.id}
-                            style={{ padding: "3px 8px", background: issuingCertFor === v.id ? "#f1f3f4" : "#fff", color: "#1a73e8", border: "1px solid #1a73e8", borderRadius: 6, fontWeight: 600, fontSize: "0.72rem", cursor: issuingCertFor === v.id ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}
-                            onClick={async () => {
-                              setIssuingCertFor(v.id);
-                              try {
-                                const certDate = missionDate || new Date();
-                                const certDay = String(certDate.getDate());
-                                const certMonth = certDate.toLocaleString("en-US", { month: "long" });
-                                const certYear = String(certDate.getFullYear());
-                                await issueCertificate({
-                                  userId: v.id,
-                                  recipient: v.name,
-                                  course: missionTitle || "",
-                                  date: `${certMonth} ${certDay}, ${certYear}`,
-                                  loc: missionLocation,
-                                  day: certDay,
-                                  month: certMonth,
-                                  year: certYear,
-                                });
-                                await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { certIssuedAt: new Date().toISOString() });
-                                setVolunteers(prev => prev.map(vol => vol.id === v.id ? { ...vol, certIssuedAt: new Date().toISOString() } : vol));
-                                showToast("Certificate issued successfully!");
-                              } catch (err) {
-                                showToast("Failed to issue certificate: " + err.message);
-                              } finally {
-                                setIssuingCertFor(null);
-                              }
-                            }}
-                          >
-                            {issuingCertFor === v.id ? "Issuing…" : "Issue Cert"}
-                          </button>
-                        )}
-                        {v.certIssuedAt && (
-                          <span style={{ color: "#1a73e8", fontSize: "0.72rem", fontWeight: 600 }}>🎓 Cert issued</span>
-                        )}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                        <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>✓ Completed</span>
+                        {v.certIssuedAt
+                          ? <span style={{ color: "#1a73e8", fontSize: "0.72rem", fontWeight: 600 }}>🎓 Cert Issued</span>
+                          : <span style={{ color: "#f9ab00", fontSize: "0.72rem", fontWeight: 600 }}>Cert pending…</span>}
                       </div>
-                    ) : isReadyToRelease ? (
-                      <button
-                        disabled={isReleasingFor === v.id}
-                        style={{ padding: "4px 12px", background: isReleasingFor === v.id ? "#e8f0fe" : "#1a73e8", color: isReleasingFor === v.id ? "#1a73e8" : "#fff", border: isReleasingFor === v.id ? "1px solid #1a73e8" : "none", borderRadius: 6, fontWeight: 600, fontSize: "0.78rem", cursor: isReleasingFor === v.id ? "not-allowed" : "pointer" }}
-                        onClick={async () => {
-                          setIsReleasingFor(v.id);
-                          try {
-                            const finalPoints = await releaseVolunteerPoints(missionId, v.id);
-                            await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { completionStatus: "complete" });
-                            setVolunteers(prev => prev.map(vol => vol.id === v.id ? { ...vol, pointsEarned: finalPoints, releasedAt: new Date().toISOString() } : vol));
-
-                            const certDate = missionDate || new Date();
-                            const certDay = String(certDate.getDate());
-                            const certMonth = certDate.toLocaleString("en-US", { month: "long" });
-                            const certYear = String(certDate.getFullYear());
-                            const certDateStr = `${certMonth} ${certDay}, ${certYear}`;
-
-                            try {
-                              await issueCertificate({
-                                userId: v.id,
-                                recipient: v.name,
-                                course: missionTitle || "",
-                                date: certDateStr,
-                                loc: missionLocation,
-                                day: certDay,
-                                month: certMonth,
-                                year: certYear,
-                              });
-                              await updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { certIssuedAt: new Date().toISOString() });
-                              setVolunteers(prev => prev.map(vol => vol.id === v.id ? { ...vol, certIssuedAt: new Date().toISOString() } : vol));
-                            } catch {
-                              showToast("Points released, but certificate could not be generated automatically.");
-                            }
-                          } catch (err) {
-                            showToast(err.message);
-                          } finally {
-                            setIsReleasingFor(null);
-                          }
-                        }}
-                      >{isReleasingFor === v.id ? "Releasing…" : "Release"}</button>
+                    ) : individualCompletion === 100 && !isFeedbackActive ? (
+                      <span style={{ color: "#5f6368", fontSize: "0.8rem", fontWeight: 600 }}>Processing…</span>
+                    ) : individualCompletion === 100 ? (
+                      <span style={{ color: "#b45309", fontSize: "0.79rem", fontWeight: 600 }}>Awaiting feedback close</span>
                     ) : (
-                      <span style={{ color: "#dadce0", fontWeight: 600, fontSize: "0.8rem" }}>—</span>
+                      <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>Incomplete</span>
                     )}
                   </td>
                 </tr>

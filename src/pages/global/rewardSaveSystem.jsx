@@ -28,11 +28,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     }
 
     const missionData = missionSnap.data();
-    const avgRating = missionData.feedback?.avgRating;
-
-    if (avgRating === undefined || avgRating === null) {
-        throw new Error("Mission feedback not computed yet.");
-    }
+    const avgRating = missionData.feedback?.avgRating ?? 0;
 
     const volunteerRef = doc(db, "missions", missionId, "volunteer", volunteerId);
     const volunteerSnap = await getDoc(volunteerRef);
@@ -44,10 +40,6 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     const volunteerData = volunteerSnap.data();
     if (volunteerData.releasedAt) {
         throw new Error("Points already released for this volunteer.");
-    }
-
-    if (!volunteerData.participationStatus) {
-        throw new Error("Participation status not set.");
     }
 
     const preDoc = await getDoc(
@@ -65,17 +57,9 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         throw new Error("Role not found.");
     }
 
-    // computeFinalPoints handles both string and array roles
     const role = rawRole;
 
-    const normalizedParticipation =
-        volunteerData.participationStatus?.toLowerCase();
-
-    const breakdown = computeFinalPoints(
-        role,
-        avgRating,
-        volunteerData.participationStatus?.toLowerCase()
-    );
+    const breakdown = computeFinalPoints(role, avgRating, "verified");
 
     const finalPoints = breakdown.finalPoints;
 

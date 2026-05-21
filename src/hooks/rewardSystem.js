@@ -20,11 +20,11 @@ export function getProgramMultiplier(avgRating) {
 }
 
 //Role points - for students
-const ROLE_POINTS = {
-    donor: 8,
-    participant: 15,
-    organizer: 30,
-    lead_organizer: 40,
+export const ROLE_POINTS = {
+    participant: 0,
+    donor: 10,
+    organizer: 20,
+    lead_organizer: 30,
 };
 
 //Participation Factor - to be decided by faculty & verified by admin
@@ -63,7 +63,7 @@ export function computeFinalPoints(roles, avgRating, participationStatus) {
 }
 
 // Progressive level thresholds — cumulative points required to reach each level.
-// Index 0 = Level 1 (0 pts), Index 1 = Level 2 (20 pts), etc.
+// Index 0 = Level 1 (0 pts), Index 9 = Level 10 (715 pts). Level 10 is the max.
 const LEVEL_THRESHOLDS = [
     0,    // Level 1
     20,   // Level 2  (+20)
@@ -75,19 +75,10 @@ const LEVEL_THRESHOLDS = [
     415,  // Level 8  (+110)
     550,  // Level 9  (+135)
     715,  // Level 10 (+165)
-    915,  // Level 11 (+200)
-    1155, // Level 12 (+240)
-    1440, // Level 13 (+285)
-    1775, // Level 14 (+335)
-    2165, // Level 15 (+390)
 ];
 
-/**
- * Returns level info derived from cumulative totalPoints.
- * @param {number} totalPoints
- * @returns {{ level: number, progress: number, pointsInLevel: number, pointsForLevel: number, pointsToNextLevel: number }}
- *   progress is 0-100 (percentage through the current level).
- */
+const MAX_LEVEL = 10;
+
 export function getLevelInfo(totalPoints) {
     const pts = Math.max(0, totalPoints || 0);
 
@@ -101,21 +92,24 @@ export function getLevelInfo(totalPoints) {
     }
 
     const level = levelIndex + 1;
-    const currentThreshold = LEVEL_THRESHOLDS[levelIndex];
+    const isMaxLevel = level >= MAX_LEVEL;
 
-    // If beyond defined thresholds, keep growing the gap by 50 per extra level
-    let nextThreshold;
-    if (levelIndex + 1 < LEVEL_THRESHOLDS.length) {
-        nextThreshold = LEVEL_THRESHOLDS[levelIndex + 1];
-    } else {
-        const lastGap = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1] - LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 2];
-        nextThreshold = currentThreshold + lastGap + 50;
+    if (isMaxLevel) {
+        return {
+            level: MAX_LEVEL,
+            progress: 100,
+            pointsInLevel: pts - LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1],
+            pointsForLevel: null,
+            pointsToNextLevel: 0,
+        };
     }
 
+    const currentThreshold = LEVEL_THRESHOLDS[levelIndex];
+    const nextThreshold = LEVEL_THRESHOLDS[levelIndex + 1];
     const pointsInLevel = pts - currentThreshold;
     const pointsForLevel = nextThreshold - currentThreshold;
     const progress = Math.min(100, Math.round((pointsInLevel / pointsForLevel) * 100));
-    const pointsToNextLevel = Math.max(0, nextThreshold - pts);
+    const pointsToNextLevel = nextThreshold - pts;
 
     return { level, progress, pointsInLevel, pointsForLevel, pointsToNextLevel };
 }
