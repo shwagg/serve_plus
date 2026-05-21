@@ -189,10 +189,10 @@ export default function ChatModal() {
           });
           // Self-heal: write reverse index so next open is instant
           setDoc(doc(db, 'userMissions', user.uid, 'missions', mId), {
-            missionId: mId,
-            title:     mData.title || 'Untitled Mission',
+            title:    mData.title || 'Untitled Mission',
             role,
-            date:      mData.targetDate || '',
+            date:     mData.targetDate || '',
+            joinedAt: serverTimestamp(),
           }).catch(() => {});
         }
       }));
