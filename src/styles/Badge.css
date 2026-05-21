@@ -146,23 +146,14 @@
   transform: translateY(0);
 }
 
-/* Confetti */
-.badge-earned-confetti {
+/* Confetti canvas */
+.badge-earned-confetti-canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  overflow: hidden;
-}
-
-.confetti-piece {
-  position: absolute;
-  animation: confetti-float linear infinite;
-}
-
-@keyframes confetti-float {
-  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
-  80%  { opacity: 0.8; }
-  100% { transform: translateY(-30px) rotate(180deg); opacity: 0; }
+  z-index: 0;
 }
 
 .badge-earned-icon-wrap {
@@ -259,31 +250,39 @@
 
 .bm-tabs {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   border-bottom: 2px solid #e5e7eb;
   margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.bm-tabs::-webkit-scrollbar { display: none; }
 
 .bm-tab {
-  padding: 9px 22px;
+  padding: 10px 20px;
   border: none;
   background: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #64748b;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #6b7280;
   cursor: pointer;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   margin-bottom: -2px;
-  transition: color 0.15s, border-color 0.15s;
+  border-radius: 6px 6px 0 0;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
 }
 
 .bm-tab.active {
-  color: #0f766e;
-  border-bottom-color: #0f766e;
+  background: #eff6ff;
+  color: #1a73e8;
+  font-weight: 600;
+  border-bottom-color: #1a73e8;
 }
 
 .bm-tab:hover:not(.active) {
-  color: #0f766e;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 /* Catalog */
@@ -291,13 +290,269 @@
   margin-bottom: 28px;
 }
 
+.bm-catalog-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .bm-catalog-group-title {
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin: 0 0 12px;
+  margin: 0;
 }
+
+/* Add-new card (sits inside the grid) */
+.bm-add-card {
+  border: 2px dashed #93c5fd !important;
+  background: #eff6ff !important;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 80px;
+}
+.bm-add-card:hover {
+  background: #dbeafe !important;
+  border-color: #1a73e8 !important;
+}
+
+.bm-add-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  color: #1a73e8;
+}
+
+.bm-add-card-icon {
+  font-size: 1.6rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.bm-add-card-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* Add form embedded as a card */
+.bm-add-form-card {
+  border: 2px dashed #93c5fd !important;
+  background: #eff6ff !important;
+  align-items: flex-start !important;
+}
+
+/* (bm-edit-form-card no longer used — form is embedded inside the card) */
+
+.bm-edit-form-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1a73e8;
+  margin-bottom: 12px;
+}
+
+.bm-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bm-edit-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.bm-edit-input,
+.bm-edit-textarea,
+.bm-edit-select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  color: #1e293b;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.bm-edit-input:focus,
+.bm-edit-textarea:focus,
+.bm-edit-select:focus {
+  border-color: #1a73e8;
+}
+.bm-edit-textarea {
+  resize: vertical;
+}
+
+/* ── Inline image upload slot (same position as BadgeIcon) ── */
+.bm-img-slot-edit {
+  width: 40px;
+  height: 44px;
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.bm-img-slot-edit:hover .bm-img-slot-overlay { opacity: 1; }
+
+.bm-img-slot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.bm-img-slot-empty {
+  width: 100%;
+  height: 100%;
+  border: 1.5px dashed #93c5fd;
+  border-radius: 6px;
+  background: #eff6ff;
+}
+
+.bm-img-slot-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 115, 232, 0.6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.15s;
+  border-radius: 6px;
+}
+
+/* ── Inline editable fields (replace text in-place) ── */
+.bm-field-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e293b;
+  border: none;
+  border-bottom: 1.5px solid #e2e8f0;
+  background: transparent;
+  width: 100%;
+  padding: 2px 0;
+  margin-bottom: 4px;
+  outline: none;
+  font-family: inherit;
+}
+.bm-field-name:focus { border-bottom-color: #1a73e8; }
+.bm-field-name::placeholder { color: #cbd5e1; font-weight: 400; }
+
+.bm-field-criteria {
+  font-size: 0.78rem;
+  color: #64748b;
+  border: none;
+  border-bottom: 1.5px solid #e2e8f0;
+  background: transparent;
+  width: 100%;
+  padding: 2px 0;
+  outline: none;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.45;
+  min-height: 48px;
+  display: block;
+}
+.bm-field-criteria:focus { border-bottom-color: #1a73e8; }
+.bm-field-criteria::placeholder { color: #cbd5e1; }
+
+/* Edit / delete actions row */
+.bm-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bm-save-btn {
+  padding: 7px 18px;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bm-save-btn:hover:not(:disabled) { background: #1558c0; }
+.bm-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.bm-cancel-btn {
+  padding: 7px 18px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bm-cancel-btn:hover { background: #e2e8f0; }
+
+/* Inline edit inside a card */
+.bm-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Card footer: type badge + action buttons */
+.bm-catalog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.bm-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.bm-edit-btn {
+  padding: 3px 12px;
+  background: #eff6ff;
+  color: #1a73e8;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bm-edit-btn:hover { background: #dbeafe; }
+
+.bm-delete-btn {
+  padding: 3px 12px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bm-delete-btn:hover:not(:disabled) { background: #fee2e2; }
+.bm-delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .bm-catalog-grid {
   display: grid;
@@ -307,7 +562,7 @@
 
 .bm-catalog-card {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 14px;
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -319,6 +574,8 @@
 .bm-catalog-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .bm-catalog-name {
@@ -583,7 +840,8 @@
   margin-bottom: 4px;
 }
 
-.bm-institutional-desc {
+.bm-institutional-desc,
+.bm-institutional-criteria {
   font-size: 0.8rem;
   color: #64748b;
   line-height: 1.4;
