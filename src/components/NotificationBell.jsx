@@ -136,6 +136,7 @@ export default function NotificationBell() {
       case "attendance_flag":       return "🚩";
       case "attendance_flag_admin": return "🚩";
       case "event_full":            return "🔒";
+      case "event_announcement":    return "📢";
       default:                   return "🔔";
     }
   };

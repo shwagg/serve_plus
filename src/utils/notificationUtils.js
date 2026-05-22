@@ -34,6 +34,26 @@ export async function notifyUsersByRoles(roles, notificationData) {
   );
 }
 
+export async function notifyEventParticipants(missionId, notificationData) {
+  if (!missionId) return;
+
+  try {
+    // Get all volunteers who joined this mission
+    const volunteersRef = collection(db, "missions", missionId, "volunteer");
+    const volunteersSnapshot = await getDocs(volunteersRef);
+
+    await Promise.allSettled(
+      volunteersSnapshot.docs.map((docSnap) => createNotification(docSnap.id, {
+        ...notificationData,
+        eventId: missionId,
+      }))
+    );
+  } catch (error) {
+    console.error("Error notifying event participants:", error);
+    throw error;
+  }
+}
+
 export async function markNotificationAsRead(userId, notificationId) {
   const notificationRef = doc(db, "users", userId, "notifications", notificationId);
   await updateDoc(notificationRef, { read: true });

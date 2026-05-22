@@ -6,18 +6,31 @@ import {
 } from "firebase/firestore";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
+import { notifyEventParticipants } from "../../utils/notificationUtils";
 import "../../styles/ticker.css";
 import servePlusIcon from '../../assets/serve_plus_icon.svg';
 
 export default function AnnouncementsManager() {
   const [announcements, setAnnouncements] = useState([]);
-  const [form, setForm] = useState({ title: "", body: "" });
+  const [missions, setMissions] = useState([]);
+  const [form, setForm] = useState({ title: "", body: "", type: "global", eventId: null });
   const [draftPreview, setDraftPreview] = useState({ title: "", body: "" });
   const [posting, setPosting] = useState(false);
 
   useEffect(() => {
     loadAnnouncements();
+    loadMissions();
   }, []);
+
+  const loadMissions = async () => {
+    try {
+      const q = query(collection(db, "missions"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      setMissions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (error) {
+      console.error("Error loading missions:", error);
+    }
+  };
 
   const loadAnnouncements = async () => {
     try {
@@ -31,23 +44,54 @@ export default function AnnouncementsManager() {
 
   const postAnnouncement = async () => {
     if (!form.title.trim()) return;
+    
+    // For event-specific announcements, require event selection
+    if (form.type === "event" && !form.eventId) {
+      showToast("Please select an event.", "error");
+      return;
+    }
+
     setPosting(true);
     try {
-      await addDoc(collection(db, "adminAnnouncements"), {
-        title: form.title.trim(),
-        body: form.body.trim(),
-        createdAt: serverTimestamp(),
-      });
+      // Only save GLOBAL announcements to the database
+      if (form.type === "global") {
+        await addDoc(collection(db, "adminAnnouncements"), {
+          title: form.title.trim(),
+          body: form.body.trim(),
+          type: "global",
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      // If it's an event-specific announcement, notify all participants (don't save to DB)
+      if (form.type === "event") {
+        const selectedMission = missions.find(m => m.id === form.eventId);
+        await notifyEventParticipants(form.eventId, {
+          type: "event_announcement",
+          title: form.title.trim(),
+          message: form.body.trim(),
+          link: `/event/${form.eventId}/activity?mode=active`,
+        }).catch(err => {
+          console.warn("Failed to notify participants:", err);
+          throw err;
+        });
+      }
+
       logAudit({
-        action: "ANNOUNCEMENT_POSTED",
+        action: form.type === "event" ? "EVENT_ANNOUNCEMENT_POSTED" : "ANNOUNCEMENT_POSTED",
         category: "system",
-        details: { announcementTitle: form.title.trim() },
+        details: {
+          announcementTitle: form.title.trim(),
+          ...(form.type === "event" && { eventId: form.eventId, eventTitle: missions.find(m => m.id === form.eventId)?.title }),
+        },
       });
-      setForm({ title: "", body: "" });
+
+      setForm({ title: "", body: "", type: "global", eventId: null });
       setDraftPreview({ title: "", body: "" });
-      showToast("Announcement posted!", "success");
+      showToast(form.type === "event" ? "Event announcement posted and notifications sent!" : "Announcement posted!", "success");
       loadAnnouncements();
-    } catch {
+    } catch (error) {
+      console.error("Error posting announcement:", error);
       showToast("Failed to post announcement.", "error");
     } finally {
       setPosting(false);
@@ -80,7 +124,7 @@ export default function AnnouncementsManager() {
   };
 
   const previewItems = [
-    ...(draftPreview.title ? [draftPreview] : []),
+    ...(form.type === "global" && draftPreview.title ? [draftPreview] : []),
     ...announcements,
   ];
   const renderPreviewItems = (items, keyPrefix = '') =>
@@ -100,6 +144,58 @@ export default function AnnouncementsManager() {
         <div className="card-header">Post Announcement</div>
         <div className="card-body">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Announcement Type Toggle */}
+            <div style={{ display: "flex", gap: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="announcementType"
+                  value="global"
+                  checked={form.type === "global"}
+                  onChange={(e) => setForm(f => ({ ...f, type: e.target.value, eventId: null }))}
+                />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Global Announcement</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="announcementType"
+                  value="event"
+                  checked={form.type === "event"}
+                  onChange={(e) => setForm(f => ({ ...f, type: e.target.value }))}
+                />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Event-Specific Announcement</span>
+              </label>
+            </div>
+
+            {/* Event Selection - only show for event-specific announcements */}
+            {form.type === "event" && (
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6, color: "#475569" }}>
+                  Select Mission/Event *
+                </label>
+                <select
+                  value={form.eventId || ""}
+                  onChange={(e) => setForm(f => ({ ...f, eventId: e.target.value }))}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <option value="">-- Select an event --</option>
+                  {missions.map((mission) => (
+                    <option key={mission.id} value={mission.id}>
+                      {mission.title || "Untitled Mission"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <input
               className="ann-input"
               placeholder="Title"
@@ -115,11 +211,16 @@ export default function AnnouncementsManager() {
               onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
               onBlur={handleInputBlur}
             />
+            {form.type === "event" && (
+              <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 8px" }}>
+                ℹ️ This announcement will only appear as a notification to students who joined this event.
+              </p>
+            )}
             <button
               className="btn-primary"
               style={{ alignSelf: "flex-start" }}
               onClick={postAnnouncement}
-              disabled={posting || !form.title.trim()}
+              disabled={posting || !form.title.trim() || (form.type === "event" && !form.eventId)}
             >
               {posting ? "Posting…" : "Post"}
             </button>
