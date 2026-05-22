@@ -201,10 +201,11 @@ export default function EventActivity() {
           : geocode(parsed.location.lat, parsed.location.lng),
       ]);
 
-      if (scannedName) {
-        await updateDoc(volunteerRef, { "scanAttendance.locationName": scannedName });
-        locData.name = scannedName;
-      }
+      await updateDoc(volunteerRef, {
+        ...(scannedName ? { "scanAttendance.locationName": scannedName } : {}),
+        "scanAttendance.location": deleteField(),
+      });
+      if (scannedName) locData.name = scannedName;
 
       setQRStatus("Attendance Recorded");
 
@@ -2587,15 +2588,59 @@ export default function EventActivity() {
   useEffect(() => {
     async function fetchEventLeaderboard() {
       try {
-        const usersSnap = await getDocs(collection(db, "users"));
-        const volunteersSnap = await getDocs(
-          collection(db, "missions", id, "volunteer")
-        );
+        const [usersSnap, volunteersSnap, tasksSnap] = await Promise.all([
+          getDocs(collection(db, "users")),
+          getDocs(collection(db, "missions", id, "volunteer")),
+          getDocs(collection(db, "missions", id, "task")),
+        ]);
 
         const usersMap = new Map();
         usersSnap.docs.forEach((userDoc) => {
           usersMap.set(userDoc.id, userDoc.data());
         });
+
+        // Compute task points per user directly from participant docs
+        const taskPointsMap = new Map();
+        await Promise.all(tasksSnap.docs.map(async (taskDoc) => {
+          const taskData = taskDoc.data();
+          const participantsSnap = await getDocs(
+            collection(db, "missions", id, "task", taskDoc.id, "participants")
+          );
+          if (taskData.type === "grouped") {
+            // Grouped: pointsEarned is set on participant doc by syncGroupedTaskCompletionForUser
+            participantsSnap.docs.forEach((pDoc) => {
+              const pts = Number(pDoc.data().pointsEarned) || 0;
+              if (pts > 0) taskPointsMap.set(pDoc.id, (taskPointsMap.get(pDoc.id) || 0) + pts);
+            });
+          } else {
+            // Individual: weighted by enrollment position among all participants
+            const sorted = [...participantsSnap.docs].sort((a, b) => {
+              const aData = a.data(); const bData = b.data();
+              const aOrder = Number(aData?.enrollmentOrder);
+              const bOrder = Number(bData?.enrollmentOrder);
+              const aHasOrder = Number.isFinite(aOrder) && aOrder > 0;
+              const bHasOrder = Number.isFinite(bOrder) && bOrder > 0;
+              if (aHasOrder && bHasOrder && aOrder !== bOrder) return aOrder - bOrder;
+              if (aHasOrder) return -1;
+              if (bHasOrder) return 1;
+              const aJoined = String(aData?.joinedAt || "");
+              const bJoined = String(bData?.joinedAt || "");
+              if (aJoined !== bJoined) return aJoined.localeCompare(bJoined);
+              return a.id.localeCompare(b.id);
+            });
+            sorted.forEach((pDoc, idx) => {
+              const pData = pDoc.data();
+              const existingPts = Number(pData.pointsEarned) || 0;
+              if (existingPts > 0) {
+                taskPointsMap.set(pDoc.id, (taskPointsMap.get(pDoc.id) || 0) + existingPts);
+              } else if (pData.adminApprovalStatus === "approved") {
+                const pos = idx + 1;
+                const pts = calculateWeightedTaskPoints(taskData.points || 0, pos, sorted.length);
+                taskPointsMap.set(pDoc.id, (taskPointsMap.get(pDoc.id) || 0) + pts);
+              }
+            });
+          }
+        }));
 
         const leaderboardData = volunteersSnap.docs.map((volunteerDoc) => {
           const userId = volunteerDoc.id;
@@ -2612,11 +2657,11 @@ export default function EventActivity() {
             (progress.attendance === 'present' ? 5 : 0) +
             (progress.consent === 'verified' ? 5 : 0) +
             (progress.postSurvey === 'submitted' ? 5 : 0);
-
+          const taskPoints = taskPointsMap.get(userId) || 0;
           return {
             uid: userId,
             name,
-            points: (volData.pointsEarned || 0) + reqBonusTotal,
+            points: taskPoints + reqBonusTotal,
             avatar:
               userData.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(
