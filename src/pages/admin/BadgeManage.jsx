@@ -305,11 +305,57 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
 
 // ─── Award Badges Tab ────────────────────────────────────────────────────────
 
+const getInitials = (name) => {
+  const parts = (name || "?").trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (name || "?").slice(0, 2).toUpperCase();
+};
+
+function Podium({ students }) {
+  const top3 = [...students]
+    .sort((a, b) => b.totalPoints - a.totalPoints)
+    .slice(0, 3);
+  if (top3.length === 0) return null;
+
+  const spots = [
+    { student: top3[1] || null, rank: 2 },
+    { student: top3[0] || null, rank: 1 },
+    { student: top3[2] || null, rank: 3 },
+  ];
+
+  return (
+    <div className="bm-podium-wrap">
+      <div className="bm-podium-label">Top Volunteers by Points</div>
+      <div className="bm-podium">
+        {spots.map(({ student, rank }) => (
+          <div key={rank} className={`bm-podium-item bm-podium-rank-${rank}${!student ? " bm-podium-empty" : ""}`}>
+            {student && (
+              <>
+                <div className="bm-podium-avatar" style={!student.avatar ? { background: '#30bdb7', color: '#fff' } : {}}>
+                  {student.avatar
+                    ? <img src={student.avatar} alt="" />
+                    : <span style={{ fontWeight: 700 }}>{getInitials(student.displayName)}</span>}
+                </div>
+                <div className="bm-podium-name" title={student.displayName}>{student.displayName}</div>
+                <div className="bm-podium-pts">{student.totalPoints} pts</div>
+              </>
+            )}
+            <div className="bm-podium-step">
+              <span className="bm-podium-rank">#{rank}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AwardBadgesTab({ mergedDefs, mergedById }) {
   const { user } = useContext(SessionContext);
   const [students, setStudents]               = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [search, setSearch]                   = useState("");
+  const [sortBy, setSortBy]                   = useState("points");
   const [selected, setSelected]               = useState(null);
   const [studentBadges, setStudentBadges]     = useState([]);
   const [loadingBadges, setLoadingBadges]     = useState(false);
@@ -332,7 +378,8 @@ function AwardBadgesTab({ mergedDefs, mergedById }) {
             uid: d.id,
             displayName: d.data().name || d.data().username || d.data().email || d.id,
             email: d.data().email || "",
-            avatar: d.data().avatar || d.data().photoURL || "",
+            avatar: (() => { const p = d.data().avatar || d.data().photoURL || d.data().profilePhoto || ""; return p.includes("ui-avatars.com") ? "" : p; })(),
+            totalPoints: d.data().totalPoints || 0,
           }))
         );
       } catch (e) {
@@ -395,9 +442,15 @@ function AwardBadgesTab({ mergedDefs, mergedById }) {
       s.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  const sorted = sortBy === "points"
+    ? [...filtered].sort((a, b) => b.totalPoints - a.totalPoints)
+    : [...filtered].sort((a, b) => a.displayName.localeCompare(b.displayName));
+
   const earnedSet = new Set(studentBadges.map((b) => b.badgeId ?? b.id));
 
   return (
+    <>
+    {!loadingStudents && students.length > 0 && <Podium students={students} />}
     <div className="bm-award-layout">
       <div className="bm-student-panel">
         <div className="bm-search-wrap">
@@ -408,26 +461,37 @@ function AwardBadgesTab({ mergedDefs, mergedById }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <div className="bm-sort-row">
+            <button
+              className={`bm-sort-btn${sortBy === "points" ? " active" : ""}`}
+              onClick={() => setSortBy("points")}
+            >By Points</button>
+            <button
+              className={`bm-sort-btn${sortBy === "name" ? " active" : ""}`}
+              onClick={() => setSortBy("name")}
+            >By Name</button>
+          </div>
         </div>
         {loadingStudents ? (
           <p className="bm-loading">Loading volunteers…</p>
-        ) : filtered.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <p className="bm-empty">No volunteers found.</p>
         ) : (
           <div className="bm-student-list">
-            {filtered.map((s) => (
+            {sorted.map((s) => (
               <div
                 key={s.uid}
                 className={`bm-student-row${selected?.uid === s.uid ? " selected" : ""}`}
                 onClick={() => selectStudent(s)}
               >
-                <div className="bm-student-avatar">
-                  {s.avatar ? <img src={s.avatar} alt="" /> : <span>{(s.displayName[0] || "?").toUpperCase()}</span>}
+                <div className="bm-student-avatar" style={!s.avatar ? { background: '#30bdb7', color: '#fff' } : {}}>
+                  {s.avatar ? <img src={s.avatar} alt="" /> : <span>{getInitials(s.displayName)}</span>}
                 </div>
                 <div className="bm-student-info">
                   <div className="bm-student-name">{s.displayName}</div>
                   <div className="bm-student-email">{s.email}</div>
                 </div>
+                <div className="bm-student-pts-badge">{s.totalPoints}</div>
               </div>
             ))}
           </div>
@@ -442,8 +506,8 @@ function AwardBadgesTab({ mergedDefs, mergedById }) {
         ) : (
           <>
             <div className="bm-student-header">
-              <div className="bm-student-avatar large">
-                {selected.avatar ? <img src={selected.avatar} alt="" /> : <span>{(selected.displayName[0] || "?").toUpperCase()}</span>}
+              <div className="bm-student-avatar large" style={!selected.avatar ? { background: '#30bdb7', color: '#fff' } : {}}>
+                {selected.avatar ? <img src={selected.avatar} alt="" /> : <span>{getInitials(selected.displayName)}</span>}
               </div>
               <div>
                 <div className="bm-selected-name">{selected.displayName}</div>
@@ -506,6 +570,7 @@ function AwardBadgesTab({ mergedDefs, mergedById }) {
 
       {toast && <div className="bm-toast">{toast}</div>}
     </div>
+    </>
   );
 }
 
