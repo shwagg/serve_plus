@@ -218,7 +218,10 @@ export default function CertEarnedModal({ certQueue = [], onDismiss }) {
           style={{ background: "#234e7b" }}
           onClick={() => {
             handleClose();
-            if (certQueue.length === 1) window.location.href = "/profile#certificates";
+            if (certQueue.length === 1) {
+              sessionStorage.setItem("profileScrollTo", "certificates");
+              window.location.href = "/profile";
+            }
           }}
         >
           {certQueue.length > 1 ? "Close" : "View in Portfolio"}

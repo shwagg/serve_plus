@@ -353,6 +353,7 @@ export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [earnedBadges, setEarnedBadges] = useState([]);
   const [certificates, setCertificates] = useState([]);
+  const [certsLoaded, setCertsLoaded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(true);
@@ -371,6 +372,28 @@ export default function Profile() {
   const [certShareCopied, setCertShareCopied] = useState(false);
   const [certBlobUrl, setCertBlobUrl] = useState(null);
   const [certBlobLoading, setCertBlobLoading] = useState(false);
+
+  const [scrollToCerts, setScrollToCerts] = useState(false);
+  const [highlightFirstCert, setHighlightFirstCert] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("profileScrollTo") !== "certificates") return;
+    sessionStorage.removeItem("profileScrollTo");
+    setActiveTab("Portfolio");
+    setScrollToCerts(true);
+  }, []);
+
+  useEffect(() => {
+    if (!scrollToCerts || activeTab !== "Portfolio" || !certsLoaded) return;
+    const t = setTimeout(() => {
+      document.getElementById("certificates")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setScrollToCerts(false);
+      setHighlightFirstCert(true);
+      setTimeout(() => setHighlightFirstCert(false), 2000);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [scrollToCerts, activeTab, certsLoaded]);
+
 
   // Load cert PDF for the iframe viewer.
   // Strategy: (1) fetch as blob for a same-origin blob URL; (2) if CORS blocks it, fall back to
@@ -592,6 +615,7 @@ export default function Profile() {
         const certsRef = collection(db, "users", user.uid, "certificates");
         onSnapshot(certsRef, (snapshot) => {
           setCertificates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+          setCertsLoaded(true);
         });
 
         // Check all volunteer docs in parallel (instead of sequential for-loop)
@@ -1261,7 +1285,7 @@ export default function Profile() {
                           <div
                             key={cert.id}
                             onClick={() => setSelectedCert(cert)}
-                            className="cert-list-item"
+                            className={`cert-list-item${idx === 0 && highlightFirstCert ? " cert-list-item--highlight" : ""}`}
                             style={{ borderBottom: idx < certificates.length - 1 ? "1px solid #e2e8f0" : "none" }}
                           >
                             {/* Scaled-down PDF template preview */}

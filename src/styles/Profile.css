@@ -407,7 +407,7 @@
     background: #fff;   /* ensure it draws over the button if any overlap */
   }
   .profile-tab-btn {
-    padding: 10px 16px;
+    padding: 7px 14px;
     font-size: 14px;
   }
   .profile-username {
@@ -474,9 +474,9 @@
 .profile-interest-badge { background: #30bdb7; color: #fff; padding: 6px 10px; border-radius: 16px; font-weight: 600; }
 
 /* Export and tabs */
-.profile-tab-row { display: flex; gap: 0; border-bottom: 2px solid #e0e7ef; margin-bottom: 4px; }
-.profile-tab-btn { padding: 10px 28px; background: none; border: none; border-bottom: 3px solid transparent; color: #888; font-weight: 500; font-size: 15px; cursor: pointer; transition: all .2s; }
-.profile-tab-btn.active { border-bottom-color: #234e7b; color: #000; font-weight: 700; }
+.profile-tab-row { display: flex; gap: 4px; border-bottom: none; margin-bottom: 4px; background: none; }
+.profile-tab-btn { padding: 8px 22px; background: none; border: none; border-radius: 8px; color: #94a3b8; font-weight: 500; font-size: 15px; cursor: pointer; transition: all .2s; }
+.profile-tab-btn.active { background: #cef0ee; color: #1a3a4a; font-weight: 700; }
 .export-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
 .profile-export-btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#234e7b,#30bdb7); color: #fff; border: none; border-radius: 10px; padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(35,78,123,0.18); transition: all .2s; }
 .profile-export-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
@@ -536,6 +536,14 @@
   border-radius: 8px; transition: background 0.15s;
 }
 .cert-list-item:hover { background: #f8fafc; }
+.cert-list-item--highlight {
+  animation: cert-highlight 2s ease-out forwards;
+}
+@keyframes cert-highlight {
+  0%   { background: #dbeafe; box-shadow: 0 0 0 3px #93c5fd; }
+  60%  { background: #eff6ff; box-shadow: 0 0 0 2px #bfdbfe; }
+  100% { background: transparent; box-shadow: none; }
+}
 
 /* Mini certificate thumbnail — scaled-down iframe of the actual PDF template */
 .cert-thumb {
