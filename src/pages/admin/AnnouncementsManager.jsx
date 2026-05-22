@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { db } from "../../firebaseConfig";
 import {
   collection, getDocs, addDoc, deleteDoc,
-  doc, serverTimestamp, orderBy, query,
+  doc, serverTimestamp, orderBy, query, where,
 } from "firebase/firestore";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
@@ -24,7 +24,7 @@ export default function AnnouncementsManager() {
 
   const loadMissions = async () => {
     try {
-      const q = query(collection(db, "missions"), orderBy("createdAt", "desc"));
+      const q = query(collection(db, "missions"), where("status", "==", "published"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
       setMissions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (error) {

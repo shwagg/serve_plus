@@ -327,3 +327,131 @@
     border-radius: 14px;
   }
 }
+
+/* ── Event Announcement Modal ───────────────────────── */
+.event-announcement-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.2s ease forwards;
+  padding: 16px;
+}
+
+.event-announcement-modal-content {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.12);
+  max-width: 500px;
+  width: 100%;
+  padding: 36px 28px 28px;
+  position: relative;
+  animation: slideDown 0.3s ease forwards;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.event-announcement-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  width: 32px;
+  height: 32px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.event-announcement-modal-close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.event-announcement-modal-close:focus-visible {
+  outline: 2px solid #30bdb7;
+  outline-offset: 2px;
+}
+
+.event-announcement-modal-icon {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.event-announcement-modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a3a5c;
+  margin: 0 0 16px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.event-announcement-modal-message {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0 0 24px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.event-announcement-modal-footer {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.event-announcement-modal-cta {
+  display: inline-block;
+  background: linear-gradient(135deg, #30bdb7 0%, #1a9e99 100%);
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.event-announcement-modal-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(48, 189, 183, 0.3);
+}
+
+.event-announcement-modal-cta:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .event-announcement-modal-content {
+    max-width: 100%;
+    padding: 24px 20px 20px;
+  }
+
+  .event-announcement-modal-title {
+    font-size: 18px;
+  }
+
+  .event-announcement-modal-message {
+    font-size: 13px;
+  }
+}

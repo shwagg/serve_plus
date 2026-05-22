@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 import { auth, db } from "../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useSession } from "../context/SessionContext";
@@ -25,6 +26,7 @@ export default function NotificationBell() {
   const [userId, setUserId] = useState(null);
   const [replayBadgeId, setReplayBadgeId] = useState(null);
   const [replayCert, setReplayCert] = useState(null);
+  const [eventAnnouncementModal, setEventAnnouncementModal] = useState(null);
   const dropdownRef = useRef(null);
   const bellButtonRef = useRef(null);
   const prevPointsRef = useRef(null);
@@ -106,6 +108,9 @@ export default function NotificationBell() {
         (notification.event || notification.course)) {
       setIsOpen(false);
       setReplayCert({ notifId: notification.id, course: notification.event || notification.course });
+    }
+    if (notification.type === "event_announcement") {
+      setEventAnnouncementModal(notification);
     }
   }, [userId]);
 
@@ -278,6 +283,47 @@ export default function NotificationBell() {
           certQueue={[replayCert]}
           onDismiss={() => setReplayCert(null)}
         />
+      )}
+
+      {eventAnnouncementModal && ReactDOM.createPortal(
+        <div
+          className="event-announcement-modal-overlay"
+          onClick={() => setEventAnnouncementModal(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="event-announcement-title"
+        >
+          <div className="event-announcement-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="event-announcement-modal-close"
+              onClick={() => setEventAnnouncementModal(null)}
+              aria-label="Close announcement"
+            >
+              ×
+            </button>
+            <div className="event-announcement-modal-icon">📢</div>
+            <h2 id="event-announcement-title" className="event-announcement-modal-title">
+              {eventAnnouncementModal.title}
+            </h2>
+            {eventAnnouncementModal.message && (
+              <p className="event-announcement-modal-message">
+                {eventAnnouncementModal.message}
+              </p>
+            )}
+            <div className="event-announcement-modal-footer">
+              {eventAnnouncementModal.link && (
+                <a 
+                  href={eventAnnouncementModal.link} 
+                  className="event-announcement-modal-cta"
+                  onClick={() => setEventAnnouncementModal(null)}
+                >
+                  Go to Event
+                </a>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
