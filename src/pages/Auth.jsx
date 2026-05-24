@@ -41,6 +41,21 @@ function checkDeactivation(data) {
   return { daysLeft };
 }
 
+function getLoginAttemptKey(loginId) {
+  const trimmed = String(loginId || "").trim();
+  return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
+}
+
+function shouldRecordLoginFailure(err) {
+  const code = err?.code || "";
+  return [
+    "functions/unauthenticated",
+    "auth/invalid-credential",
+    "auth/user-not-found",
+    "auth/wrong-password",
+  ].includes(code);
+}
+
 function Auth() {
   const [loginId, setLoginId] = useState(""); // email or username
   const [password, setPassword] = useState("");
@@ -225,6 +240,8 @@ function Auth() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    const submittedLoginId = loginId.trim();
+    const loginAttemptKey = getLoginAttemptKey(submittedLoginId);
     setError("");
     setVerificationMessage("");
     setVerificationRequired(null);
@@ -232,13 +249,13 @@ function Auth() {
     try {
       const startPasswordLogin = httpsCallable(functions, "startPasswordLogin");
       const result = await startPasswordLogin({
-        loginId: loginId.trim(),
+        loginId: submittedLoginId,
         password,
       });
       const authStep = result.data;
 
       if (authStep.status === "EMAIL_VERIFICATION_REQUIRED") {
-        setVerificationRequired(authStep.email || loginId.trim());
+        setVerificationRequired(authStep.email || submittedLoginId);
         setVerificationMessage("Verify your email before continuing.");
         return;
       }
@@ -269,28 +286,31 @@ function Auth() {
     } catch (err) {
       if (isDev) console.error("Login error:", err);
 
-      //Record login failure
-      try {
-        const recordLoginFailure = httpsCallable(
-          functions,
-          "recordLoginFailure",
-        );
-        const failureResult = await recordLoginFailure({ email: loginId });
-
-        if (failureResult.data?.isLocked) {
-          const lockUntil = new Date(failureResult.data.lockUntil);
-          const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
-          setError(
-            `Too many failed attempts. Account locked for ${minutesLeft} minute(s).`,
+      if (shouldRecordLoginFailure(err) && loginAttemptKey) {
+        try {
+          const recordLoginFailure = httpsCallable(
+            functions,
+            "recordLoginFailure",
           );
-          return;
-        } else if (failureResult.data?.attempts) {
-          const attemptsLeft =
-            failureResult.data.maxAttempts - failureResult.data.attempts;
-          console.log(`${attemptsLeft} attempts remaining before account lock`);
+          const failureResult = await recordLoginFailure({
+            email: loginAttemptKey,
+          });
+
+          if (failureResult.data?.isLocked) {
+            const lockUntil = new Date(failureResult.data.lockUntil);
+            const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
+            setError(
+              `Too many failed attempts. Account locked for ${minutesLeft} minute(s).`,
+            );
+            return;
+          } else if (failureResult.data?.attempts) {
+            const attemptsLeft =
+              failureResult.data.maxAttempts - failureResult.data.attempts;
+            console.log(`${attemptsLeft} attempts remaining before account lock`);
+          }
+        } catch (recordErr) {
+          console.warn("Failed to record login failure:", recordErr);
         }
-      } catch (recordErr) {
-        console.warn("Failed to record login failure:", recordErr);
       }
 
       const code = err?.code || "";

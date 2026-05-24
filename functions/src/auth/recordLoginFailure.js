@@ -4,10 +4,15 @@ const { FieldValue, Timestamp } = require("firebase-admin/firestore");
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME_MINUTES = 10;
 
+function getLoginAttemptKey(value) {
+  const trimmed = String(value || "").trim();
+  return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
+}
+
 async function recordLoginFailure(request) {
   try {
     // In firebase-functions v7, data is accessed via request.data
-    const email = request.data?.email;
+    const email = getLoginAttemptKey(request.data?.email);
     
     console.log("Recording login failure for email:", email);
 

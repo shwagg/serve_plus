@@ -1,7 +1,12 @@
 const admin = require("firebase-admin");
 
+function getLoginAttemptKey(value) {
+  const trimmed = String(value || "").trim();
+  return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
+}
+
 async function resetLoginAttempts(request) {
-  const email = request.data?.email;
+  const email = getLoginAttemptKey(request.data?.email);
 
   if (!email) {
     throw new Error("Email is required");
