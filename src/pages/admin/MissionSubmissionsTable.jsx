@@ -71,6 +71,8 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const [filterPreSurvey, setFilterPreSurvey] = useState("");
   const [filterConsent, setFilterConsent] = useState("");
   const [filterPostSurvey, setFilterPostSurvey] = useState("");
+  // Which column-header filter dropdown is open
+  const [openFilter, setOpenFilter] = useState(null);
 
   useEffect(() => {
     if (!volunteerCard) return;
@@ -78,6 +80,13 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [volunteerCard]);
+
+  useEffect(() => {
+    if (!openFilter) return;
+    const close = () => setOpenFilter(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [openFilter]);
 
   useEffect(() => {
     if (!missionId) return;
@@ -455,66 +464,6 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
             <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#80868b", fontSize: "0.82rem", pointerEvents: "none" }}>🔍</span>
           </div>
 
-          {/* Role filter */}
-          <select
-            value={filterRole}
-            onChange={e => setFilterRole(e.target.value)}
-            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterRole ? "#1a73e8" : "#5f6368", background: filterRole ? "#e8f0fe" : "#fff", cursor: "pointer" }}
-          >
-            <option value="">All Roles</option>
-            <option value="participant">Participant</option>
-            <option value="donor">Donor</option>
-            <option value="facilitator">Facilitator</option>
-            <option value="organizer">Organizer</option>
-            <option value="observer">Observer</option>
-          </select>
-
-          {/* Attendance filter */}
-          <select
-            value={filterAttendance}
-            onChange={e => setFilterAttendance(e.target.value)}
-            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterAttendance ? "#1a73e8" : "#5f6368", background: filterAttendance ? "#e8f0fe" : "#fff", cursor: "pointer" }}
-          >
-            <option value="">All Attendance</option>
-            <option value="present">Present</option>
-            <option value="absent">Not yet</option>
-          </select>
-
-          {/* Pre-Survey filter */}
-          <select
-            value={filterPreSurvey}
-            onChange={e => setFilterPreSurvey(e.target.value)}
-            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterPreSurvey ? "#1a73e8" : "#5f6368", background: filterPreSurvey ? "#e8f0fe" : "#fff", cursor: "pointer" }}
-          >
-            <option value="">All Pre-Survey</option>
-            <option value="submitted">Submitted</option>
-            <option value="not_submitted">Not Submitted</option>
-          </select>
-
-          {/* Consent filter */}
-          <select
-            value={filterConsent}
-            onChange={e => setFilterConsent(e.target.value)}
-            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterConsent ? "#1a73e8" : "#5f6368", background: filterConsent ? "#e8f0fe" : "#fff", cursor: "pointer" }}
-          >
-            <option value="">All Consent</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending Review</option>
-            <option value="rejected">Rejected</option>
-            <option value="none">Not Submitted</option>
-          </select>
-
-          {/* Post-Survey filter */}
-          <select
-            value={filterPostSurvey}
-            onChange={e => setFilterPostSurvey(e.target.value)}
-            style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: 8, fontSize: "0.8rem", fontFamily: "inherit", color: filterPostSurvey ? "#1a73e8" : "#5f6368", background: filterPostSurvey ? "#e8f0fe" : "#fff", cursor: "pointer" }}
-          >
-            <option value="">All Post-Survey</option>
-            <option value="submitted">Submitted</option>
-            <option value="not_submitted">Not Submitted</option>
-          </select>
-
           {/* Clear filters */}
           {activeFilterCount > 0 && (
             <button
@@ -534,17 +483,129 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
         <table style={{ width: "100%", minWidth: 980, borderCollapse: "collapse", fontSize: "0.84rem" }}>
           <thead>
             <tr style={{ borderBottom: "1.5px solid #e8eaed" }}>
+              {/* Volunteer column — no filter dropdown */}
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>
                 Volunteer
                 <span style={{ marginLeft: 8, background: "#f1f3f4", color: "#5f6368", borderRadius: 99, fontSize: "0.68rem", padding: "2px 7px", fontWeight: 600 }}>
                   {filteredVolunteers.length}
                 </span>
               </th>
-              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Role</th>
-              <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Attendance</th>
-              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Pre-Survey</th>
-              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Consent Form</th>
-              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Post-Survey</th>
+
+              {/* Role ▼ */}
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "left", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed", userSelect: "none" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 4, position: "relative" }}>
+                  Role
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpenFilter(openFilter === "role" ? null : "role"); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", lineHeight: 1, color: filterRole ? "#1a73e8" : "#9aa0a6", fontSize: "0.65rem" }}
+                    title="Filter by role"
+                  >▼</button>
+                  {filterRole && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
+                  {openFilter === "role" && (
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400 }}>
+                      {[["", "All Roles"], ["participant", "Participant"], ["donor", "Donor"], ["facilitator", "Facilitator"], ["organizer", "Organizer"], ["observer", "Observer"]].map(([val, label]) => (
+                        <div key={val} onClick={() => { setFilterRole(val); setOpenFilter(null); }}
+                          style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterRole === val ? "#1a73e8" : "#202124", background: filterRole === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </th>
+
+              {/* Attendance ▼ */}
+              <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed", userSelect: "none" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 4, position: "relative" }}>
+                  Attendance
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpenFilter(openFilter === "attendance" ? null : "attendance"); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", lineHeight: 1, color: filterAttendance ? "#1a73e8" : "#9aa0a6", fontSize: "0.65rem" }}
+                    title="Filter by attendance"
+                  >▼</button>
+                  {filterAttendance && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
+                  {openFilter === "attendance" && (
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 150, padding: "6px 0", fontWeight: 400 }}>
+                      {[["", "All Attendance"], ["present", "Present"], ["absent", "Not Yet"]].map(([val, label]) => (
+                        <div key={val} onClick={() => { setFilterAttendance(val); setOpenFilter(null); }}
+                          style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterAttendance === val ? "#1a73e8" : "#202124", background: filterAttendance === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </th>
+
+              {/* Pre-Survey ▼ */}
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed", userSelect: "none" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 4, position: "relative" }}>
+                  Pre-Survey
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpenFilter(openFilter === "preSurvey" ? null : "preSurvey"); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", lineHeight: 1, color: filterPreSurvey ? "#1a73e8" : "#9aa0a6", fontSize: "0.65rem" }}
+                    title="Filter by pre-survey"
+                  >▼</button>
+                  {filterPreSurvey && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
+                  {openFilter === "preSurvey" && (
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400 }}>
+                      {[["", "All"], ["submitted", "Submitted"], ["not_submitted", "Not Submitted"]].map(([val, label]) => (
+                        <div key={val} onClick={() => { setFilterPreSurvey(val); setOpenFilter(null); }}
+                          style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterPreSurvey === val ? "#1a73e8" : "#202124", background: filterPreSurvey === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </th>
+
+              {/* Consent Form ▼ */}
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed", userSelect: "none" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 4, position: "relative" }}>
+                  Consent Form
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpenFilter(openFilter === "consent" ? null : "consent"); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", lineHeight: 1, color: filterConsent ? "#1a73e8" : "#9aa0a6", fontSize: "0.65rem" }}
+                    title="Filter by consent form"
+                  >▼</button>
+                  {filterConsent && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
+                  {openFilter === "consent" && (
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 170, padding: "6px 0", fontWeight: 400 }}>
+                      {[["", "All"], ["approved", "Approved"], ["pending", "Pending Review"], ["rejected", "Rejected"], ["none", "Not Submitted"]].map(([val, label]) => (
+                        <div key={val} onClick={() => { setFilterConsent(val); setOpenFilter(null); }}
+                          style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterConsent === val ? "#1a73e8" : "#202124", background: filterConsent === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </th>
+
+              {/* Post-Survey ▼ */}
+              <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed", userSelect: "none" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 4, position: "relative" }}>
+                  Post-Survey
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpenFilter(openFilter === "postSurvey" ? null : "postSurvey"); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", lineHeight: 1, color: filterPostSurvey ? "#1a73e8" : "#9aa0a6", fontSize: "0.65rem" }}
+                    title="Filter by post-survey"
+                  >▼</button>
+                  {filterPostSurvey && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
+                  {openFilter === "postSurvey" && (
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400 }}>
+                      {[["", "All"], ["submitted", "Submitted"], ["not_submitted", "Not Submitted"]].map(([val, label]) => (
+                        <div key={val} onClick={() => { setFilterPostSurvey(val); setOpenFilter(null); }}
+                          style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterPostSurvey === val ? "#1a73e8" : "#202124", background: filterPostSurvey === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </th>
+
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Journal</th>
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Done %</th>
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Points</th>
