@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { auth, functions, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
-import { signOut } from "firebase/auth";
+import { getIdTokenResult, signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { showToast } from "../utils/toast";
 
@@ -15,6 +15,7 @@ const SESSION_TIMEOUTS = {
   partner:  30 * 60 * 1000,  // 30 minutes
 };
 const DEFAULT_TIMEOUT = 10 * 60 * 1000;
+const MFA_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
 
 export function SessionProvider({ children }) {
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -116,6 +117,19 @@ export function SessionProvider({ children }) {
             if (userSnap.exists()) {
               const data = userSnap.data();
               console.log("SessionContext - Fetched user data:", data);
+
+              const tokenResult = await getIdTokenResult(user);
+              if (
+                MFA_REQUIRED_ROLES.has(data.role) &&
+                tokenResult.claims?.provider !== "blackboard" &&
+                tokenResult.claims?.mfa !== true
+              ) {
+                await signOut(auth);
+                setUserData(null);
+                setIsSessionActive(false);
+                return;
+              }
+
               setUserData(data);
 
               // Award SERVE Ready badge on login (idempotent — won't duplicate)

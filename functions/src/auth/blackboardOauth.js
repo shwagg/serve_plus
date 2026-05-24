@@ -3,6 +3,11 @@
 const admin = require("firebase-admin");
 const axios = require("axios");
 const crypto = require("crypto");
+const {FieldValue} = require("firebase-admin/firestore");
+const {
+  normalizeEmail,
+  isAllowedEmailDomain,
+} = require("./emailPolicy");
 
 const STATE_COOKIE = "blackboard_oauth_state";
 const STATE_MAX_AGE_SECONDS = 10 * 60;
@@ -303,7 +308,7 @@ function extractBlackboardUser(profile) {
   return {
     uid: `blackboard_${blackboardId}`,
     blackboardId: String(blackboardId),
-    email,
+    email: normalizeEmail(email),
     displayName,
     username: profile.userName || profile.preferred_username || "",
   };
@@ -389,7 +394,7 @@ async function createOrUpdateUserProfile(user) {
     authProvider: "blackboard",
     hasServePassword: user.hasServePassword === true,
     lastLoginVia: "blackboard",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   };
 
   if (existing.exists) {
@@ -401,7 +406,7 @@ async function createOrUpdateUserProfile(user) {
     ...updateData,
     role: "student",
     status: "active",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   });
 }
 
@@ -479,14 +484,41 @@ async function handleBlackboardCallback(req, res) {
 
     let blackboardUser = extractBlackboardUser(profile);
 
+    if (!isAllowedEmailDomain(blackboardUser.email)) {
+      return redirectToAuthError(
+        res,
+        config.frontendUrl,
+        "Please use an accepted email address.",
+      );
+    }
+
     blackboardUser = await createOrUpdateFirebaseUser(blackboardUser);
     await createOrUpdateUserProfile(blackboardUser);
+
+    const userSnap = await admin
+      .firestore()
+      .collection("users")
+      .doc(blackboardUser.uid)
+      .get();
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const role = userData.role || "student";
+
+    if (userData.status && userData.status !== "active") {
+      return redirectToAuthError(
+        res,
+        config.frontendUrl,
+        "Your account is blocked.",
+      );
+    }
 
     const customToken = await admin.auth().createCustomToken(
       blackboardUser.uid,
       {
         provider: "blackboard",
         blackboardId: blackboardUser.blackboardId,
+        role,
+        mfa: false,
+        mfaRequired: false,
       },
     );
 

@@ -1,6 +1,6 @@
 // Authorization page for password and Blackboard sign-in.
 
-import { getRedirectResult, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { signInWithCustomToken, signOut } from "firebase/auth";
 import { collection, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
@@ -16,6 +16,7 @@ import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import { auth, db, functions } from "../firebaseConfig";
 import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
+import { getMfaRouteForAction, saveMfaSession } from "../utils/mfaSession";
 
 function getBlackboardRedirectPath(role) {
   if (role === "admin") return "/admin/dashboard";
@@ -27,22 +28,6 @@ function getBlackboardRedirectPath(role) {
 
 function getPrivilegedRedirectPath(role) {
   return role === "sysadmin" ? "/sysadmin/roster" : "/admin/dashboard";
-}
-
-const BLACKBOARD_PASSWORD_REQUIRED_MESSAGE =
-  'This account is linked to Blackboard. Please select "Sign in with Blackboard" to continue.';
-
-function isBlackboardLinkedAccount(userData) {
-  return Boolean(
-    userData &&
-      (userData.authProvider === "blackboard" ||
-        userData.blackboardId ||
-        userData.blackboardAuthUid),
-  );
-}
-
-function requiresBlackboardSignIn(userData) {
-  return isBlackboardLinkedAccount(userData) && userData.hasServePassword !== true;
 }
 
 function checkDeactivation(data) {
@@ -69,8 +54,13 @@ function Auth() {
 
   const intendedPath = location.state?.from || null;
   const blackboardComplete = Boolean(location.state?.blackboardComplete);
+  const mfaComplete = Boolean(location.state?.mfaComplete);
+  const passwordComplete = Boolean(location.state?.passwordComplete);
   const [showPassword, setShowPassword] = useState(false);
   const [emailStatus, setEmailStatus] = useState(null); // null | "checking" | "found" | "not-found"
+  const [verificationRequired, setVerificationRequired] = useState(null);
+  const [verificationSending, setVerificationSending] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState("");
 
   // Agreement modal state
   const [showAgreement, setShowAgreement] = useState(false);
@@ -88,10 +78,10 @@ function Auth() {
   useEffect(() => {
     let cancelled = false;
 
-    const completeBlackboardSignIn = async (firebaseUser) => {
+    const completeAuthenticatedSignIn = async (firebaseUser, fallbackProvider) => {
       const uid = firebaseUser.uid;
       const email = firebaseUser.email || "";
-      console.log("Blackboard sign-in successful, uid:", uid);
+      console.log("Sign-in successful, uid:", uid);
 
       const userRef = doc(db, "users", uid);
       let userSnap = await getDoc(userRef);
@@ -100,11 +90,11 @@ function Auth() {
         await setDoc(userRef, {
           uid,
           email,
-          name: firebaseUser.displayName || email || "Blackboard User",
+          name: firebaseUser.displayName || email || "SERVE+ User",
           role: "student",
           status: "active",
-          authProvider: "blackboard",
-          hasServePassword: false,
+          authProvider: fallbackProvider,
+          hasServePassword: fallbackProvider === "password",
           createdAt: new Date(),
         });
 
@@ -115,19 +105,27 @@ function Auth() {
         }
       }
 
-      const deactivationStateBb = checkDeactivation(userSnap.data());
-      if (deactivationStateBb === "permanent") {
+      const userData = userSnap.data();
+      const authProvider = fallbackProvider || userData.authProvider || "password";
+      const deactivationState = checkDeactivation(userData);
+      if (deactivationState === "permanent") {
         await signOut(auth);
         setError("This account has been permanently deleted and cannot be recovered.");
         return;
       }
-      if (deactivationStateBb) {
-        setPendingReactivation({ uid, role: userSnap.data().role, email, authProvider: "blackboard", daysLeft: deactivationStateBb.daysLeft });
+      if (deactivationState) {
+        setPendingReactivation({
+          uid,
+          role: userData.role,
+          email,
+          authProvider,
+          daysLeft: deactivationState.daysLeft,
+        });
         setShowReactivatePrompt(true);
         return;
       }
 
-      const { role, status } = userSnap.data();
+      const { role, status } = userData;
       if (status !== "active") {
         setError("Your account is blocked.");
         return;
@@ -136,76 +134,69 @@ function Auth() {
       const logLogin = httpsCallable(functions, "logLogin");
       logLogin({ uid }).catch((err) => console.warn("Audit log failed:", err));
 
-      const userAgreementVersion = userSnap.data().agreementVersion || null;
+      const resetLoginAttempts = httpsCallable(functions, "resetLoginAttempts");
+      resetLoginAttempts({ email }).catch((err) => {
+        console.warn("Failed to reset login attempts:", err);
+      });
+
+      const userAgreementVersion = userData.agreementVersion || null;
       const currentVersion = await fetchCurrentAgreementVersion();
       if (userAgreementVersion !== currentVersion) {
         setPendingNavigation({
           role,
           uid,
-          authProvider: "blackboard",
+          authProvider,
         });
         setShowAgreement(true);
         return;
       }
 
-      navigate(getBlackboardRedirectPath(role), { replace: true });
-    };
-
-    const handleBlackboardAuthResult = async () => {
-      try {
-        const userCred = await getRedirectResult(auth);
-
-        if (cancelled) return;
-
-        if (userCred?.user) {
-          await completeBlackboardSignIn(userCred.user);
-          return;
-        }
-
-        if (blackboardComplete) {
-          if (!auth.currentUser) {
-            setError("Blackboard sign-in could not be completed.");
-            return;
-          }
-
-          await completeBlackboardSignIn(auth.currentUser);
-          return;
-        }
-      } catch (err) {
-        if (cancelled) return;
-        if (isDev) console.error("Blackboard login error:", err);
-        setError("Blackboard sign-in failed. Please try again.");
+      if (authProvider === "blackboard") {
+        navigate(getBlackboardRedirectPath(role), { replace: true });
+      } else if (role === "admin" || role === "sysadmin") {
+        navigate(getPrivilegedRedirectPath(role), { replace: true });
+      } else if (role === "faculty") {
+        navigate(intendedPath || "/faculty/current-event", { replace: true });
+      } else if (role === "partner") {
+        navigate(intendedPath || "/partner/dashboard", { replace: true });
+      } else {
+        navigate(intendedPath || "/student/home", { replace: true });
       }
     };
 
-    handleBlackboardAuthResult();
+    const handleCompletedAuthResult = async () => {
+      try {
+        if (!blackboardComplete && !mfaComplete && !passwordComplete) return;
+
+        if (!auth.currentUser) {
+          setError("Sign-in could not be completed.");
+          return;
+        }
+
+        const fallbackProvider = blackboardComplete ? "blackboard" : "password";
+        if (!cancelled) {
+          await completeAuthenticatedSignIn(auth.currentUser, fallbackProvider);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        if (isDev) console.error("Completed login error:", err);
+        setError("Sign-in failed. Please try again.");
+      }
+    };
+
+    handleCompletedAuthResult();
 
     return () => {
       cancelled = true;
     };
-  }, [blackboardComplete, isDev, navigate]);
-
-  // if it contains "@" treat as email, otherwise look up username
-  const resolveLoginAccount = async (input) => {
-    if (input.includes("@")) {
-      const usersRef = collection(db, "users");
-      const snap = await getDocs(query(usersRef, where("email", "==", input)));
-      return {
-        email: snap.empty ? input : snap.docs[0].data().email || input,
-        userData: snap.empty ? null : snap.docs[0].data(),
-      };
-    }
-
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("username", "==", input));
-    const snap = await getDocs(q);
-    if (snap.empty) throw new Error("No account found for this username.");
-    const userData = snap.docs[0].data();
-    return {
-      email: userData.email,
-      userData,
-    };
-  };
+  }, [
+    blackboardComplete,
+    mfaComplete,
+    passwordComplete,
+    intendedPath,
+    isDev,
+    navigate,
+  ]);
 
   const handleEmailBlur = async () => {
     const input = loginId.trim();
@@ -214,7 +205,8 @@ function Auth() {
     try {
       const usersRef = collection(db, "users");
       const field = input.includes("@") ? "email" : "username";
-      const snap = await getDocs(query(usersRef, where(field, "==", input)));
+      const lookupValue = field === "email" ? input.toLowerCase() : input;
+      const snap = await getDocs(query(usersRef, where(field, "==", lookupValue)));
       setEmailStatus(snap.empty ? "not-found" : "found");
     } catch {
       setEmailStatus(null);
@@ -234,111 +226,46 @@ function Auth() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setVerificationMessage("");
+    setVerificationRequired(null);
 
     try {
-      // ✅ 1. Resolve username to email if needed, then authenticate
-      const { email, userData: resolvedUserData } = await resolveLoginAccount(loginId.trim());
+      const startPasswordLogin = httpsCallable(functions, "startPasswordLogin");
+      const result = await startPasswordLogin({
+        loginId: loginId.trim(),
+        password,
+      });
+      const authStep = result.data;
 
-      if (requiresBlackboardSignIn(resolvedUserData)) {
-        setError(BLACKBOARD_PASSWORD_REQUIRED_MESSAGE);
+      if (authStep.status === "EMAIL_VERIFICATION_REQUIRED") {
+        setVerificationRequired(authStep.email || loginId.trim());
+        setVerificationMessage("Verify your email before continuing.");
         return;
       }
 
-      const userCred = await signInWithEmailAndPassword(auth, email, password);
-      const uid = userCred.user.uid;
-      console.log("Login successfully, uid:", uid);
-
-      // ✅ 2. Fetch user profile from Firestore
-      const userRef = doc(db, "users", uid);
-      let userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        // User document missing, create minimal profile
-        try {
-          await setDoc(userRef, {
-            uid,
-            email,
-            name: userCred.user.displayName || email,
-            role: "student",
-            status: "active",
-            authProvider: "password",
-            hasServePassword: true,
-            createdAt: new Date(),
-          });
-
-          userSnap = await getDoc(userRef);
-          if (!userSnap.exists()) {
-            setError("Failed to create user profile.");
-            return;
-          }
-        } catch {
-          setError("User profile not found and could not be created.");
-          return;
-        }
-      }
-
-      const deactivationState = checkDeactivation(userSnap.data());
-      if (deactivationState === "permanent") {
-        await signOut(auth);
-        setError("This account has been permanently deleted and cannot be recovered.");
-        return;
-      }
-      if (deactivationState) {
-        setPendingReactivation({ uid, role: userSnap.data().role, email, authProvider: "password", daysLeft: deactivationState.daysLeft });
-        setShowReactivatePrompt(true);
-        return;
-      }
-
-      const { role, status } = userSnap.data();
-
-      if (status !== "active") {
-        setError("Your account is blocked.");
-        return;
-      }
-
-      if (userSnap.data().hasServePassword !== true) {
-        setDoc(userRef, {
-          hasServePassword: true,
-          updatedAt: new Date(),
-        }, { merge: true }).catch((err) => {
-          console.warn("Failed to mark password sign-in availability:", err);
+      if (
+        authStep.status === "MFA_SETUP_REQUIRED" ||
+        authStep.status === "MFA_REQUIRED"
+      ) {
+        saveMfaSession({
+          sessionToken: authStep.sessionToken,
+          action: authStep.status,
+          from: intendedPath,
         });
-      }
-      // REMOVED 'AWAIT' TO IMPROVE FASTER LOGIN TIME. THEY STILL RUN IN THE BACKGROUND
-      // ✅ 3. CALL BACKEND TO CREATE AUDIT LOG
-      const logLogin = httpsCallable(functions, "logLogin");
-      logLogin({ uid }).catch((err) => {
-        // <-- THIS is what writes to auditLogs
-        console.warn("Audit log failed:", err);
-      });
-
-      // Reset login attempts on successful login
-      const resetLoginAttempts = httpsCallable(functions, "resetLoginAttempts");
-      resetLoginAttempts({ email }).catch((err) => {
-        console.warn("Failed to reset login attempts:", err);
-      });
-
-      // ✅ 4. CHECK AGREEMENT VERSION before redirecting
-      const userAgreementVersion = userSnap.data().agreementVersion || null;
-      const currentVersion = await fetchCurrentAgreementVersion();
-
-      if (userAgreementVersion !== currentVersion) {
-        // show modal when user hasn't accepted the latest agreements
-        setPendingNavigation({ role, uid });
-        setShowAgreement(true);
+        navigate(getMfaRouteForAction(authStep.status), { replace: true });
         return;
       }
 
-      // ✅ 5. RBAC REDIRECTION using useNavigate to avoid reloading of the full app; redirecting only react router to certain page.
-      if (role === "admin" || role === "sysadmin") {
-        navigate(getPrivilegedRedirectPath(role), { replace: true });
-      } else if (role === "faculty") {
-        navigate(intendedPath || "/faculty/current-event", { replace: true });
-      } else if (role === "partner") {
-        navigate(intendedPath || "/partner/dashboard", { replace: true });
-      } else {
-        navigate(intendedPath || "/student/home", { replace: true });
+      if (authStep.status === "AUTHENTICATED" && authStep.customToken) {
+        await signInWithCustomToken(auth, authStep.customToken);
+        navigate("/auth", {
+          replace: true,
+          state: { passwordComplete: true, from: intendedPath },
+        });
+        return;
       }
+
+      setError("Login failed. Please try again.");
     } catch (err) {
       if (isDev) console.error("Login error:", err);
 
@@ -386,6 +313,31 @@ function Auth() {
       }
 
       setError(userMsg);
+    }
+  };
+
+  const handleSendVerificationEmail = async () => {
+    setError("");
+    setVerificationMessage("");
+    setVerificationSending(true);
+
+    try {
+      const sendVerification = httpsCallable(
+        functions,
+        "sendEmailVerificationForLogin",
+      );
+      const result = await sendVerification({
+        loginId: loginId.trim(),
+        password,
+      });
+      const email = result.data?.email || verificationRequired || loginId.trim();
+      setVerificationRequired(email);
+      setVerificationMessage(`Verification email sent to ${email}.`);
+    } catch (err) {
+      if (isDev) console.error("Verification email error:", err);
+      setError(err?.message || "Unable to send verification email.");
+    } finally {
+      setVerificationSending(false);
     }
   };
 
@@ -558,7 +510,12 @@ function Auth() {
                   type="text"
                   placeholder="Email or Username"
                   value={loginId}
-                  onChange={(e) => { setLoginId(e.target.value); setEmailStatus(null); }}
+                  onChange={(e) => {
+                    setLoginId(e.target.value);
+                    setEmailStatus(null);
+                    setVerificationRequired(null);
+                    setVerificationMessage("");
+                  }}
                   onBlur={handleEmailBlur}
                   required
                 />
@@ -576,7 +533,11 @@ function Auth() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setVerificationRequired(null);
+                      setVerificationMessage("");
+                    }}
                     required
                   />
                   {password.length > 0 && (
@@ -599,9 +560,30 @@ function Auth() {
                 Login
               </button>
 
+              {verificationRequired && (
+                <p className="ui-smallText" style={{ marginTop: 0 }}>
+                  Didn&apos;t receive it?{" "}
+                  <a
+                    href="#send-verification"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      if (!verificationSending) handleSendVerificationEmail();
+                    }}
+                  >
+                    {verificationSending ? "sending..." : "send verification email"}
+                  </a>
+                </p>
+              )}
+
               <p className="ui-link" style={{ margin: "6px 0 0", textAlign: "center" }}>
                 New to SERVE+? <Link to="/register">Sign up here</Link>
               </p>
+
+              {verificationMessage && (
+                <p className="ui-success" style={{ textAlign: "center" }}>
+                  {verificationMessage}
+                </p>
+              )}
 
               {error && <p className="ui-error" style={{ textAlign: "center" }}>{error}</p>}
 

@@ -21,6 +21,8 @@ import Auth from "./pages/Auth"; //changed login to authorization page
 import ForgotPass from "./pages/ForgotPass";
 import OAuthCallback from "./pages/OAuthCallback";
 import Register from "./pages/Register";
+import MfaSetup from "./pages/MfaSetup";
+import MfaVerify from "./pages/MfaVerify";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSupport from "./pages/admin/AdminSupport";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -95,6 +97,8 @@ function App() {
                     <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/blackboard/complete" element={<OAuthCallback />} />
+          <Route path="/auth/mfa/setup" element={<MfaSetup />} />
+          <Route path="/auth/mfa/verify" element={<MfaVerify />} />
           <Route path="/oauth-callback" element={<OAuthCallback />} />
           <Route path="/reset-password" element={<ForgotPass />} />
           <Route path="/register" element={<Register />} />

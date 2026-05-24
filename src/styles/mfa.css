@@ -1,0 +1,95 @@
+.mfa-heading {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+}
+
+.mfa-heading h1 {
+  margin: 4px 0 4px;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.mfa-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.mfa-qr-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 196px;
+  height: 196px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.mfa-key-wrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 340px;
+  min-height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.mfa-key-wrap span {
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px;
+  color: #334155;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.mfa-key-wrap button {
+  align-self: stretch;
+  border: 0;
+  border-left: 1px solid #e5e7eb;
+  background: #fff;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.mfa-link,
+.mfa-text-link {
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mfa-link:hover,
+.mfa-text-link:hover {
+  text-decoration: underline;
+}
+
+.mfa-help-text {
+  width: 100%;
+  max-width: 340px;
+  margin: -4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.mfa-code-input {
+  max-width: 340px;
+  text-align: center;
+  letter-spacing: 0;
+}

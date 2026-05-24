@@ -1,0 +1,712 @@
+const admin = require("firebase-admin");
+const crypto = require("crypto");
+const {FieldValue} = require("firebase-admin/firestore");
+const {HttpsError} = require("firebase-functions/v2/https");
+const {
+  TOTP,
+  NobleCryptoPlugin,
+  ScureBase32Plugin,
+  generateSecret,
+  generateURI,
+} = require("otplib");
+const {
+  normalizeEmail,
+  isAllowedEmailDomain,
+} = require("./emailPolicy");
+
+const REQUIRED_MFA_ROLES = new Set(["student", "faculty", "admin"]);
+const EXEMPT_MFA_ROLES = new Set(["partner", "sysadmin"]);
+const MFA_SESSION_TTL_MS = 10 * 60 * 1000;
+const MAX_MFA_ATTEMPTS = 5;
+const TOTP_STEP_SECONDS = 30;
+const TOTP_WINDOW = 1;
+const TOTP_ISSUER = "SERVE+";
+const SESSION_COLLECTION = "mfaSessions";
+const FACTOR_COLLECTION = "mfaFactors";
+
+const totpOptions = {
+  crypto: new NobleCryptoPlugin(),
+  base32: new ScureBase32Plugin(),
+  digits: 6,
+  period: TOTP_STEP_SECONDS,
+  window: TOTP_WINDOW,
+};
+
+function getDb() {
+  return admin.firestore();
+}
+
+function getRole(userData) {
+  return userData?.role || "student";
+}
+
+function requiresMfaRole(role) {
+  return REQUIRED_MFA_ROLES.has(role);
+}
+
+function isMfaExemptRole(role) {
+  return EXEMPT_MFA_ROLES.has(role);
+}
+
+function isBlackboardLinked(userData) {
+  return Boolean(
+    userData &&
+      (userData.authProvider === "blackboard" ||
+        userData.blackboardId ||
+        userData.blackboardAuthUid),
+  );
+}
+
+function requiresBlackboardSignIn(userData) {
+  return isBlackboardLinked(userData) && userData.hasServePassword !== true;
+}
+
+function getApiKey() {
+  if (process.env.IDENTITY_TOOLKIT_API_KEY) {
+    return process.env.IDENTITY_TOOLKIT_API_KEY;
+  }
+
+  if (process.env.FUNCTIONS_EMULATOR) return "emulator-api-key";
+  throw new HttpsError(
+    "failed-precondition",
+    "IDENTITY_TOOLKIT_API_KEY must be configured for password login.",
+  );
+}
+
+function getIdentityToolkitUrl(path) {
+  const key = getApiKey();
+  const authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+
+  if (authEmulatorHost) {
+    return `http://${authEmulatorHost}/identitytoolkit.googleapis.com/v1/` +
+      `${path}?key=${key}`;
+  }
+
+  return `https://identitytoolkit.googleapis.com/v1/${path}?key=${key}`;
+}
+
+async function identityToolkitRequest(path, body) {
+  const response = await fetch(getIdentityToolkitUrl(path), {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message = data?.error?.message || "Authentication failed.";
+    throw new HttpsError("unauthenticated", mapIdentityToolkitError(message));
+  }
+
+  return data;
+}
+
+function mapIdentityToolkitError(message) {
+  if (message.includes("INVALID_PASSWORD")) return "Invalid email or password.";
+  if (message.includes("EMAIL_NOT_FOUND")) return "Invalid email or password.";
+  if (message.includes("INVALID_LOGIN_CREDENTIALS")) {
+    return "Invalid email or password.";
+  }
+  if (message.includes("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+    return "Too many login attempts. Please wait and try again.";
+  }
+  return "Authentication failed. Please try again.";
+}
+
+async function resolveLoginAccount(loginId) {
+  const input = String(loginId || "").trim();
+  if (!input) {
+    throw new HttpsError("invalid-argument", "Email or username is required.");
+  }
+
+  if (input.includes("@")) {
+    const email = normalizeEmail(input);
+    const snap = await getDb()
+      .collection("users")
+      .where("email", "==", email)
+      .limit(1)
+      .get();
+
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      return {
+        email,
+        uid: doc.id,
+        userData: doc.data(),
+      };
+    }
+
+    return {email, userData: null, uid: null};
+  }
+
+  const snap = await getDb()
+    .collection("users")
+    .where("username", "==", input)
+    .limit(1)
+    .get();
+
+  if (snap.empty) {
+    throw new HttpsError("not-found", "No account found for this username.");
+  }
+
+  const doc = snap.docs[0];
+  const userData = doc.data();
+  return {
+    email: normalizeEmail(userData.email),
+    uid: doc.id,
+    userData,
+  };
+}
+
+async function verifyPassword(email, password) {
+  return identityToolkitRequest("accounts:signInWithPassword", {
+    email,
+    password,
+    returnSecureToken: true,
+  });
+}
+
+async function sendVerificationEmail(idToken) {
+  return identityToolkitRequest("accounts:sendOobCode", {
+    requestType: "VERIFY_EMAIL",
+    idToken,
+  });
+}
+
+async function getOrCreateUserProfile(userRecord, resolvedUserData) {
+  const userRef = getDb().collection("users").doc(userRecord.uid);
+  const existing = await userRef.get();
+
+  if (existing.exists) {
+    const userData = existing.data();
+    if (
+      userData.authProvider !== "blackboard" &&
+      userData.hasServePassword !== true
+    ) {
+      await userRef.set({
+        hasServePassword: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, {merge: true});
+      return {...userData, hasServePassword: true};
+    }
+    return userData;
+  }
+
+  const fallbackData = resolvedUserData || {};
+  const email = normalizeEmail(userRecord.email || fallbackData.email);
+  const userData = {
+    uid: userRecord.uid,
+    email,
+    name: userRecord.displayName || email,
+    role: "student",
+    status: "active",
+    authProvider: "password",
+    hasServePassword: true,
+    createdAt: FieldValue.serverTimestamp(),
+  };
+
+  await userRef.set(userData);
+  return userData;
+}
+
+function getSecurityMaterial(name, fallbackLabel) {
+  const configured = process.env[name];
+
+  if (configured) {
+    if (/^[0-9a-f]{64}$/i.test(configured)) {
+      return Buffer.from(configured, "hex");
+    }
+
+    const base64 = Buffer.from(configured, "base64");
+    if (base64.length >= 32) return base64.subarray(0, 32);
+
+    return crypto.createHash("sha256").update(configured).digest();
+  }
+
+  if (process.env.FUNCTIONS_EMULATOR) {
+    return crypto
+      .createHash("sha256")
+      .update(`serve-plus-local-${fallbackLabel}`)
+      .digest();
+  }
+
+  throw new HttpsError(
+    "failed-precondition",
+    `${name} must be configured before MFA can be used.`,
+  );
+}
+
+function getEncryptionKey() {
+  return getSecurityMaterial("MFA_ENCRYPTION_KEY", "mfa-encryption-key");
+}
+
+function encryptSecret(secret) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(secret, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+
+  return {
+    iv: iv.toString("base64"),
+    ciphertext: ciphertext.toString("base64"),
+    tag: tag.toString("base64"),
+  };
+}
+
+function decryptSecret(encrypted) {
+  if (!encrypted?.iv || !encrypted?.ciphertext || !encrypted?.tag) {
+    throw new HttpsError("failed-precondition", "MFA secret is missing.");
+  }
+
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    getEncryptionKey(),
+    Buffer.from(encrypted.iv, "base64"),
+  );
+  decipher.setAuthTag(Buffer.from(encrypted.tag, "base64"));
+  const plaintext = Buffer.concat([
+    decipher.update(Buffer.from(encrypted.ciphertext, "base64")),
+    decipher.final(),
+  ]);
+
+  return plaintext.toString("utf8");
+}
+
+function createSessionToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function hashSessionToken(sessionToken) {
+  return crypto
+    .createHash("sha256")
+    .update(String(sessionToken || ""))
+    .digest("hex");
+}
+
+function normalizeTotpCode(code) {
+  return String(code || "").replace(/\s+/g, "");
+}
+
+async function validateTotpCode(secret, code, lastAcceptedCounter) {
+  const token = normalizeTotpCode(code);
+  if (!/^\d{6}$/.test(token)) {
+    return {valid: false, reason: "Enter the 6-digit code."};
+  }
+
+  const totp = new TOTP({
+    ...totpOptions,
+    secret,
+  });
+  const verification = await totp.verify(token);
+
+  if (!verification?.valid) {
+    return {valid: false, reason: "Invalid authenticator code."};
+  }
+
+  const acceptedCounter = verification.timeStep;
+
+  if (
+    typeof lastAcceptedCounter === "number" &&
+    acceptedCounter <= lastAcceptedCounter
+  ) {
+    return {valid: false, reason: "This authenticator code was already used."};
+  }
+
+  return {valid: true, acceptedCounter};
+}
+
+async function createMfaSession({uid, email, role, provider, purpose}) {
+  const sessionToken = createSessionToken();
+  const sessionHash = hashSessionToken(sessionToken);
+  const expiresAt = new Date(Date.now() + MFA_SESSION_TTL_MS);
+
+  await getDb().collection(SESSION_COLLECTION).doc(sessionHash).set({
+    uid,
+    email: normalizeEmail(email),
+    role,
+    provider,
+    purpose,
+    attempts: 0,
+    consumed: false,
+    expiresAt,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  return sessionToken;
+}
+
+async function readValidSession(sessionToken, expectedPurpose) {
+  const sessionHash = hashSessionToken(sessionToken);
+  const sessionRef = getDb().collection(SESSION_COLLECTION).doc(sessionHash);
+  const sessionSnap = await sessionRef.get();
+
+  if (!sessionSnap.exists) {
+    throw new HttpsError("unauthenticated", "MFA session expired.");
+  }
+
+  const session = sessionSnap.data();
+  const expiresAt = session.expiresAt?.toDate ?
+    session.expiresAt.toDate() :
+    new Date(session.expiresAt);
+
+  if (
+    session.consumed === true ||
+    session.purpose !== expectedPurpose ||
+    expiresAt <= new Date()
+  ) {
+    throw new HttpsError("unauthenticated", "MFA session expired.");
+  }
+
+  if ((session.attempts || 0) >= MAX_MFA_ATTEMPTS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Too many MFA attempts. Sign in again.",
+    );
+  }
+
+  return {sessionRef, session};
+}
+
+async function rejectMfaAttempt(sessionRef, reason) {
+  const nextAttempts = await getDb().runTransaction(async (transaction) => {
+    const snap = await transaction.get(sessionRef);
+    const attempts = (snap.data()?.attempts || 0) + 1;
+    transaction.update(sessionRef, {
+      attempts,
+      consumed: attempts >= MAX_MFA_ATTEMPTS,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return attempts;
+  });
+
+  if (nextAttempts >= MAX_MFA_ATTEMPTS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Too many MFA attempts. Sign in again.",
+    );
+  }
+
+  throw new HttpsError("unauthenticated", reason);
+}
+
+async function createCustomToken({
+  uid,
+  role,
+  provider,
+  mfaComplete,
+  mfaRequired,
+}) {
+  const requiresTotp = typeof mfaRequired === "boolean" ?
+    mfaRequired :
+    provider !== "blackboard" && requiresMfaRole(role);
+
+  return admin.auth().createCustomToken(uid, {
+    role,
+    provider,
+    mfa: mfaComplete === true,
+    mfaRequired: requiresTotp,
+  });
+}
+
+async function getMfaFactor(uid) {
+  const factorSnap = await getDb().collection(FACTOR_COLLECTION).doc(uid).get();
+  return {
+    exists: factorSnap.exists,
+    data: factorSnap.exists ? factorSnap.data() : null,
+  };
+}
+
+async function createAuthStep({uid, email, role, provider}) {
+  if (isMfaExemptRole(role) || !requiresMfaRole(role)) {
+    const customToken = await createCustomToken({
+      uid,
+      role,
+      provider,
+      mfaComplete: false,
+      mfaRequired: false,
+    });
+
+    return {
+      status: "AUTHENTICATED",
+      customToken,
+      role,
+      email: normalizeEmail(email),
+    };
+  }
+
+  const factor = await getMfaFactor(uid);
+  const isEnabled = factor.exists && factor.data?.enabled === true;
+  const purpose = isEnabled ? "verify" : "setup";
+  const sessionToken = await createMfaSession({
+    uid,
+    email,
+    role,
+    provider,
+    purpose,
+  });
+
+  return {
+    status: isEnabled ? "MFA_REQUIRED" : "MFA_SETUP_REQUIRED",
+    sessionToken,
+    role,
+    email: normalizeEmail(email),
+  };
+}
+
+async function startPasswordLogin(request) {
+  const {loginId, password} = request.data || {};
+  const resolved = await resolveLoginAccount(loginId);
+  const email = normalizeEmail(resolved.email);
+
+  if (!isAllowedEmailDomain(email)) {
+    throw new HttpsError(
+      "permission-denied",
+      "Please use an accepted email address.",
+    );
+  }
+
+  if (requiresBlackboardSignIn(resolved.userData)) {
+    throw new HttpsError(
+      "permission-denied",
+      "This account is linked to Blackboard. Please sign in with Blackboard.",
+    );
+  }
+
+  const authResult = await verifyPassword(email, password);
+  const userRecord = await admin.auth().getUser(authResult.localId);
+  const userData = await getOrCreateUserProfile(userRecord, resolved.userData);
+  const role = getRole(userData);
+
+  if (requiresBlackboardSignIn(userData)) {
+    throw new HttpsError(
+      "permission-denied",
+      "This account is linked to Blackboard. Please sign in with Blackboard.",
+    );
+  }
+
+  if (userData.status && userData.status !== "active") {
+    throw new HttpsError("permission-denied", "Your account is blocked.");
+  }
+
+  if (!userRecord.emailVerified) {
+    return {
+      status: "EMAIL_VERIFICATION_REQUIRED",
+      email,
+      role,
+    };
+  }
+
+  return createAuthStep({
+    uid: userRecord.uid,
+    email,
+    role,
+    provider: "password",
+  });
+}
+
+async function sendEmailVerificationForLogin(request) {
+  const {loginId, password} = request.data || {};
+  const resolved = await resolveLoginAccount(loginId);
+  const email = normalizeEmail(resolved.email);
+
+  if (!isAllowedEmailDomain(email)) {
+    throw new HttpsError(
+      "permission-denied",
+      "Please use an accepted email address.",
+    );
+  }
+
+  if (requiresBlackboardSignIn(resolved.userData)) {
+    throw new HttpsError(
+      "permission-denied",
+      "This account is linked to Blackboard. Please sign in with Blackboard.",
+    );
+  }
+
+  const authResult = await verifyPassword(email, password);
+  const userRecord = await admin.auth().getUser(authResult.localId);
+
+  if (userRecord.emailVerified) {
+    return {status: "ALREADY_VERIFIED", email};
+  }
+
+  await sendVerificationEmail(authResult.idToken);
+  return {status: "VERIFICATION_SENT", email};
+}
+
+async function beginTotpEnrollment(request) {
+  const {sessionToken} = request.data || {};
+  const sessionHash = hashSessionToken(sessionToken);
+  const sessionRef = getDb().collection(SESSION_COLLECTION).doc(sessionHash);
+  const candidateSecret = generateSecret(totpOptions);
+
+  const {session, secret} = await getDb().runTransaction(
+    async (transaction) => {
+      const sessionSnap = await transaction.get(sessionRef);
+
+      if (!sessionSnap.exists) {
+        throw new HttpsError("unauthenticated", "MFA session expired.");
+      }
+
+      const currentSession = sessionSnap.data();
+      const expiresAt = currentSession.expiresAt?.toDate ?
+        currentSession.expiresAt.toDate() :
+        new Date(currentSession.expiresAt);
+
+      if (
+        currentSession.consumed === true ||
+        currentSession.purpose !== "setup" ||
+        expiresAt <= new Date()
+      ) {
+        throw new HttpsError("unauthenticated", "MFA session expired.");
+      }
+
+      if ((currentSession.attempts || 0) >= MAX_MFA_ATTEMPTS) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "Too many MFA attempts. Sign in again.",
+        );
+      }
+
+      if (currentSession.pendingSecret) {
+        return {
+          session: currentSession,
+          secret: decryptSecret(currentSession.pendingSecret),
+        };
+      }
+
+      const pendingSecret = encryptSecret(candidateSecret);
+      transaction.update(sessionRef, {
+        pendingSecret,
+        setupStartedAt: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        session: {
+          ...currentSession,
+          pendingSecret,
+        },
+        secret: candidateSecret,
+      };
+    },
+  );
+
+  return {
+    status: "TOTP_ENROLLMENT_STARTED",
+    email: session.email,
+    issuer: TOTP_ISSUER,
+    secret,
+    otpauthUrl: generateURI({
+      strategy: "totp",
+      issuer: TOTP_ISSUER,
+      label: session.email,
+      secret,
+      digits: 6,
+      period: TOTP_STEP_SECONDS,
+    }),
+  };
+}
+
+async function verifyTotpEnrollment(request) {
+  const {sessionToken, code} = request.data || {};
+  const {sessionRef, session} = await readValidSession(sessionToken, "setup");
+
+  if (!session.pendingSecret) {
+    throw new HttpsError("failed-precondition", "TOTP setup was not started.");
+  }
+
+  const secret = decryptSecret(session.pendingSecret);
+  const validation = await validateTotpCode(secret, code, null);
+
+  if (!validation.valid) {
+    await rejectMfaAttempt(sessionRef, validation.reason);
+  }
+
+  const factorRef = getDb().collection(FACTOR_COLLECTION).doc(session.uid);
+  await factorRef.set({
+    uid: session.uid,
+    enabled: true,
+    secret: encryptSecret(secret),
+    lastAcceptedCounter: validation.acceptedCounter,
+    enrolledAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, {merge: true});
+
+  await sessionRef.update({
+    consumed: true,
+    verifiedAt: FieldValue.serverTimestamp(),
+  });
+
+  const customToken = await createCustomToken({
+    uid: session.uid,
+    role: session.role,
+    provider: session.provider,
+    mfaComplete: true,
+    mfaRequired: true,
+  });
+
+  return {
+    status: "AUTHENTICATED",
+    customToken,
+    role: session.role,
+    email: session.email,
+  };
+}
+
+async function verifyTotpLogin(request) {
+  const {sessionToken, code} = request.data || {};
+  const {sessionRef, session} = await readValidSession(sessionToken, "verify");
+  const factor = await getMfaFactor(session.uid);
+
+  if (!factor.exists || factor.data?.enabled !== true) {
+    throw new HttpsError("failed-precondition", "TOTP is not enrolled.");
+  }
+
+  const secret = decryptSecret(factor.data.secret);
+  const validation = await validateTotpCode(
+    secret,
+    code,
+    factor.data.lastAcceptedCounter,
+  );
+
+  if (!validation.valid) {
+    await rejectMfaAttempt(sessionRef, validation.reason);
+  }
+
+  await getDb().collection(FACTOR_COLLECTION).doc(session.uid).update({
+    lastAcceptedCounter: validation.acceptedCounter,
+    lastVerifiedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  await sessionRef.update({
+    consumed: true,
+    verifiedAt: FieldValue.serverTimestamp(),
+  });
+
+  const customToken = await createCustomToken({
+    uid: session.uid,
+    role: session.role,
+    provider: session.provider,
+    mfaComplete: true,
+    mfaRequired: true,
+  });
+
+  return {
+    status: "AUTHENTICATED",
+    customToken,
+    role: session.role,
+    email: session.email,
+  };
+}
+
+module.exports = {
+  startPasswordLogin,
+  sendEmailVerificationForLogin,
+  beginTotpEnrollment,
+  verifyTotpEnrollment,
+  verifyTotpLogin,
+};

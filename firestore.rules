@@ -104,6 +104,15 @@ service cloud.firestore {
       allow write: if false; // Cloud Functions use Admin SDK, bypasses this
     }
 
+    // MFA records are server-only. Cloud Functions use Admin SDK and bypass rules.
+    match /mfaFactors/{userId} {
+      allow read, write: if false;
+    }
+
+    match /mfaSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
     // Fallback — allow read on anything not explicitly covered above
     // Write is denied unless a specific rule above grants it
     match /{document=**} {

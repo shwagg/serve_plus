@@ -19,6 +19,13 @@ const { checkLoginAttempts } = require("./src/auth/checkLoginAttempts");
 const {
   backfillBlackboardPasswordStatus,
 } = require("./src/auth/backfillBlackboardPasswordStatus");
+const {
+  startPasswordLogin,
+  sendEmailVerificationForLogin,
+  beginTotpEnrollment,
+  verifyTotpEnrollment,
+  verifyTotpLogin,
+} = require("./src/auth/mfa");
 
 // Export as callable Cloud Functions with region
 // Export using v2
@@ -39,6 +46,26 @@ exports.checkLoginAttempts = onCall(
 exports.backfillBlackboardPasswordStatus = onCall(
   { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
   backfillBlackboardPasswordStatus
+);
+exports.startPasswordLogin = onCall(
+  { region: "asia-southeast1" },
+  startPasswordLogin
+);
+exports.sendEmailVerificationForLogin = onCall(
+  { region: "asia-southeast1" },
+  sendEmailVerificationForLogin
+);
+exports.beginTotpEnrollment = onCall(
+  { region: "asia-southeast1" },
+  beginTotpEnrollment
+);
+exports.verifyTotpEnrollment = onCall(
+  { region: "asia-southeast1" },
+  verifyTotpEnrollment
+);
+exports.verifyTotpLogin = onCall(
+  { region: "asia-southeast1" },
+  verifyTotpLogin
 );
 
 // Blackboard OAuth bridge (HTTP request handler, not callable)

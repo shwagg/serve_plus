@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
-import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
 import loginPosterGif from "../assets/login_poster_loop.gif";
 import loginPosterFallback from "../assets/login_poster_img.svg";
 import "../styles/ui.css";
+import { isAllowedEmailDomain, normalizeEmail } from "../utils/emailPolicy";
 
 function Register() {
     const [firstName, setFirstName] = useState("");
@@ -49,9 +50,16 @@ function Register() {
         }
 
         // Password strength validation
-        const pwRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+        const pwRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+=\-[\]{};':"\\|,.<>/?]).{8,}$/;
         if (!pwRegex.test(password)) {
             setError("Password must be at least 8 characters and include an uppercase letter, a number, and a symbol (e.g., !@#$).");
+            setLoading(false);
+            return;
+        }
+
+        const normalizedEmail = normalizeEmail(email);
+        if (!isAllowedEmailDomain(normalizedEmail)) {
+            setError("Please use an accepted email address.");
             setLoading(false);
             return;
         }
@@ -66,7 +74,11 @@ function Register() {
             }
 
             // 1. Create user in Firebase Auth
-            const userCred = await createUserWithEmailAndPassword(auth, email, password);
+            const userCred = await createUserWithEmailAndPassword(
+                auth,
+                normalizedEmail,
+                password,
+            );
             const uid = userCred.user.uid;
 
             // 2. Fetch upcoming event
@@ -128,7 +140,7 @@ function Register() {
                 uid,
                 name: fullName,
                 username,
-                email,
+                email: normalizedEmail,
                 role: "student", // Default role for new registrations
                 status: "active",
                 authProvider: "password",
@@ -146,9 +158,12 @@ function Register() {
                 agreementVersion: null,
             });
 
+            await sendEmailVerification(userCred.user);
+            await signOut(auth);
+
             // 4. Redirect to login
-            alert("Account created! You can now log in.");
-            navigate("/", { replace: true });
+            alert("Account created! Check your email to verify your account before logging in.");
+            navigate("/auth", { replace: true });
         } catch (err) {
             console.error(err);
             setError(err.message || "Registration failed. Please try again.");
