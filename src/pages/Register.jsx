@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
-import { auth, db } from "../firebaseConfig";
-import { doc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { auth, db, functions } from "../firebaseConfig";
+import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
 import loginPosterGif from "../assets/login_poster_loop.gif";
@@ -73,6 +74,9 @@ function Register() {
                 return;
             }
 
+            const validateRegistrationEmail = httpsCallable(functions, "validateRegistrationEmail");
+            await validateRegistrationEmail({ email: normalizedEmail });
+
             // 1. Create user in Firebase Auth
             const userCred = await createUserWithEmailAndPassword(
                 auth,
@@ -141,6 +145,9 @@ function Register() {
                 name: fullName,
                 username,
                 email: normalizedEmail,
+                emailVerified: false,
+                emailVerificationPending: true,
+                emailVerificationSentAt: serverTimestamp(),
                 role: "student", // Default role for new registrations
                 status: "active",
                 authProvider: "password",

@@ -209,6 +209,29 @@ async function getOrCreateUserProfile(userRecord, resolvedUserData) {
   return userData;
 }
 
+async function syncVerifiedEmailProfile(userRecord, userData) {
+  if (!userRecord.emailVerified) return userData;
+  if (
+    userData?.emailVerified === true &&
+    userData?.emailVerificationPending !== true
+  ) {
+    return userData;
+  }
+
+  await getDb().collection("users").doc(userRecord.uid).set({
+    emailVerified: true,
+    emailVerificationPending: FieldValue.delete(),
+    emailVerificationSentAt: FieldValue.delete(),
+    emailVerifiedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, {merge: true});
+
+  const syncedUserData = {...userData, emailVerified: true};
+  delete syncedUserData.emailVerificationPending;
+  delete syncedUserData.emailVerificationSentAt;
+  return syncedUserData;
+}
+
 function getSecurityMaterial(name, fallbackLabel) {
   const configured = process.env[name];
 
@@ -477,7 +500,7 @@ async function startPasswordLogin(request) {
 
   const authResult = await verifyPassword(email, password);
   const userRecord = await admin.auth().getUser(authResult.localId);
-  const userData = await getOrCreateUserProfile(userRecord, resolved.userData);
+  let userData = await getOrCreateUserProfile(userRecord, resolved.userData);
   const role = getRole(userData);
 
   if (requiresBlackboardSignIn(userData)) {
@@ -498,6 +521,8 @@ async function startPasswordLogin(request) {
       role,
     };
   }
+
+  await syncVerifiedEmailProfile(userRecord, userData);
 
   return createAuthStep({
     uid: userRecord.uid,

@@ -26,6 +26,7 @@ const {
   verifyTotpEnrollment,
   verifyTotpLogin,
 } = require("./src/auth/mfa");
+const { validateRegistrationEmail, cleanupUnverifiedRegistrations, } = require("./src/auth/registrationEmail");
 
 // Export as callable Cloud Functions with region
 // Export using v2
@@ -67,6 +68,11 @@ exports.verifyTotpLogin = onCall(
   { region: "asia-southeast1" },
   verifyTotpLogin
 );
+exports.validateRegistrationEmail = onCall(
+  { region: "asia-southeast1" },
+  validateRegistrationEmail
+);
+exports.cleanupUnverifiedRegistrations = cleanupUnverifiedRegistrations;
 
 // Blackboard OAuth bridge (HTTP request handler, not callable)
 const {
