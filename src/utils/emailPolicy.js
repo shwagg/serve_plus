@@ -3,6 +3,7 @@ export const ALLOWED_EMAIL_DOMAINS = [
   "@mcl.edu.ph",
   "@outlook.com",
   "@gmail.com",
+  "@outlook.ph",
 ];
 
 export function normalizeEmail(email) {
