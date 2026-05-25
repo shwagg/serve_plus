@@ -95,13 +95,38 @@ async function identityToolkitRequest(path, body) {
 
   if (!response.ok) {
     const message = data?.error?.message || "Authentication failed.";
-    throw new HttpsError("unauthenticated", mapIdentityToolkitError(message));
+    console.warn("Identity Toolkit request failed", {
+      path,
+      status: response.status,
+      code: message,
+    });
+    throw new HttpsError(
+      mapIdentityToolkitErrorCode(message),
+      mapIdentityToolkitErrorMessage(message),
+    );
   }
 
   return data;
 }
 
-function mapIdentityToolkitError(message) {
+function mapIdentityToolkitErrorCode(message) {
+  if (
+    message.includes("API_KEY") ||
+    message.includes("KEY_RESTRICTION") ||
+    message.includes("CONFIGURATION_NOT_FOUND") ||
+    message.includes("OPERATION_NOT_ALLOWED")
+  ) {
+    return "failed-precondition";
+  }
+
+  if (message.includes("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+    return "resource-exhausted";
+  }
+
+  return "unauthenticated";
+}
+
+function mapIdentityToolkitErrorMessage(message) {
   if (message.includes("INVALID_PASSWORD")) return "Invalid email or password.";
   if (message.includes("EMAIL_NOT_FOUND")) return "Invalid email or password.";
   if (message.includes("INVALID_LOGIN_CREDENTIALS")) {
@@ -109,6 +134,15 @@ function mapIdentityToolkitError(message) {
   }
   if (message.includes("TOO_MANY_ATTEMPTS_TRY_LATER")) {
     return "Too many login attempts. Please wait and try again.";
+  }
+  if (message.includes("API_KEY") || message.includes("KEY_RESTRICTION")) {
+    return "Authentication service key is not configured for server use.";
+  }
+  if (message.includes("CONFIGURATION_NOT_FOUND")) {
+    return "Firebase Authentication is not configured for this project.";
+  }
+  if (message.includes("OPERATION_NOT_ALLOWED")) {
+    return "Password authentication is not enabled.";
   }
   return "Authentication failed. Please try again.";
 }

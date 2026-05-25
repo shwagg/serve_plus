@@ -223,6 +223,7 @@ const cleanupUnverifiedRegistrations = onSchedule(
     timeZone: "Asia/Manila",
     timeoutSeconds: 540,
     memory: "512MiB",
+    maxInstances: 1,
   },
   runCleanupUnverifiedRegistrations,
 );

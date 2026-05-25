@@ -5,10 +5,29 @@ if (process.env.FUNCTIONS_EMULATOR) {
   } process.env.FIREBASE_STORAGE_EMULATOR_HOST = "localhost:9199";
 }
 
+const { setGlobalOptions } = require("firebase-functions/v2");
 const { onCall } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
+
+const REGION = "asia-southeast1";
+const DEFAULT_MAX_INSTANCES = 2;
+const HEAVY_JOB_MAX_INSTANCES = 1;
+
+setGlobalOptions({
+  region: REGION,
+  cpu: "gcf_gen1",
+  maxInstances: DEFAULT_MAX_INSTANCES,
+});
+
+const defaultFunctionOptions = { region: REGION };
+const heavyJobOptions = {
+  ...defaultFunctionOptions,
+  timeoutSeconds: 540,
+  memory: "1GiB",
+  maxInstances: HEAVY_JOB_MAX_INSTANCES,
+};
 
 // Import functions
 const { logLogin } = require("./src/auth/logLogin");
@@ -30,46 +49,46 @@ const { validateRegistrationEmail, cleanupUnverifiedRegistrations, } = require("
 
 // Export as callable Cloud Functions with region
 // Export using v2
-exports.logLogin = onCall({ region: "asia-southeast1" }, logLogin);
-exports.logLogout = onCall({ region: "asia-southeast1" }, logLogout);
+exports.logLogin = onCall(defaultFunctionOptions, logLogin);
+exports.logLogout = onCall(defaultFunctionOptions, logLogout);
 exports.recordLoginFailure = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   recordLoginFailure
 );
 exports.resetLoginAttempts = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   resetLoginAttempts
 );
 exports.checkLoginAttempts = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   checkLoginAttempts
 );
 exports.backfillBlackboardPasswordStatus = onCall(
-  { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
+  heavyJobOptions,
   backfillBlackboardPasswordStatus
 );
 exports.startPasswordLogin = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   startPasswordLogin
 );
 exports.sendEmailVerificationForLogin = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   sendEmailVerificationForLogin
 );
 exports.beginTotpEnrollment = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   beginTotpEnrollment
 );
 exports.verifyTotpEnrollment = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   verifyTotpEnrollment
 );
 exports.verifyTotpLogin = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   verifyTotpLogin
 );
 exports.validateRegistrationEmail = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   validateRegistrationEmail
 );
 exports.cleanupUnverifiedRegistrations = cleanupUnverifiedRegistrations;
@@ -90,21 +109,21 @@ const { deleteBackup } = require("./src/backup/deleteBackup");
 const { scheduledBackup } = require("./src/backup/scheduledBackup");
 
 exports.createBackup = onCall(
-  { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
+  heavyJobOptions,
   createBackup,
 );
 exports.restoreBackup = onCall(
-  { region: "asia-southeast1", timeoutSeconds: 540, memory: "1GiB" },
+  heavyJobOptions,
   restoreBackup,
 );
-exports.listBackups = onCall({ region: "asia-southeast1" }, listBackups);
-exports.deleteBackup = onCall({ region: "asia-southeast1" }, deleteBackup);
+exports.listBackups = onCall(defaultFunctionOptions, listBackups);
+exports.deleteBackup = onCall(defaultFunctionOptions, deleteBackup);
 exports.scheduledBackup = scheduledBackup;
 
 // Attendance flagging
 const { scheduledFlagAbsentVolunteers, manualFlagAbsentVolunteers } = require("./src/attendance/flagAbsentVolunteers");
 exports.scheduledFlagAbsentVolunteers = scheduledFlagAbsentVolunteers;
 exports.manualFlagAbsentVolunteers = onCall(
-  { region: "asia-southeast1" },
+  defaultFunctionOptions,
   manualFlagAbsentVolunteers
 );

@@ -156,6 +156,7 @@ const scheduledFlagAbsentVolunteers = onSchedule(
     schedule: "0 0 * * *",
     region: "asia-southeast1",
     timeZone: "Asia/Manila",
+    maxInstances: 1,
   },
   async () => {
     const db = admin.firestore();

@@ -1,15 +1,23 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser, sendEmailVerification, signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { auth, db, functions } from "../firebaseConfig";
-import { doc, setDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, query, where, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
 import loginPosterGif from "../assets/login_poster_loop.gif";
 import loginPosterFallback from "../assets/login_poster_img.svg";
 import "../styles/ui.css";
 import { isAllowedEmailDomain, normalizeEmail } from "../utils/emailPolicy";
+
+function getRegistrationErrorMessage(err) {
+    if (err?.code === "auth/invalid-sender") {
+        return "Registration email could not be sent because Firebase Authentication has an invalid sender email configured. Please contact the administrator.";
+    }
+
+    return err?.message || "Registration failed. Please try again.";
+}
 
 function Register() {
     const [firstName, setFirstName] = useState("");
@@ -65,6 +73,10 @@ function Register() {
             return;
         }
 
+        let createdUser = null;
+        let createdUserDocRef = null;
+        let verificationEmailSent = false;
+
         try {
             // Check username uniqueness
             const usernameSnap = await getDocs(query(collection(db, "users"), where("username", "==", username.trim())));
@@ -83,6 +95,7 @@ function Register() {
                 normalizedEmail,
                 password,
             );
+            createdUser = userCred.user;
             const uid = userCred.user.uid;
 
             // 2. Fetch upcoming event
@@ -140,7 +153,8 @@ function Register() {
             const fullName = [firstName.trim(), middleInitial.trim() ? middleInitial.trim().toUpperCase() : null, lastName.trim()]
                 .filter(Boolean).join(" ");
 
-            await setDoc(doc(db, "users", uid), {
+            createdUserDocRef = doc(db, "users", uid);
+            await setDoc(createdUserDocRef, {
                 uid,
                 name: fullName,
                 username,
@@ -166,6 +180,7 @@ function Register() {
             });
 
             await sendEmailVerification(userCred.user);
+            verificationEmailSent = true;
             await signOut(auth);
 
             // 4. Redirect to login
@@ -173,7 +188,20 @@ function Register() {
             navigate("/auth", { replace: true });
         } catch (err) {
             console.error(err);
-            setError(err.message || "Registration failed. Please try again.");
+            if (createdUser && !verificationEmailSent) {
+                try {
+                    if (createdUserDocRef) await deleteDoc(createdUserDocRef);
+                    await deleteUser(createdUser);
+                } catch (cleanupErr) {
+                    console.warn("Could not clean up failed registration:", cleanupErr);
+                }
+
+                try {
+                    await signOut(auth);
+                } catch (_) {}
+            }
+
+            setError(getRegistrationErrorMessage(err));
         } finally {
             setLoading(false);
         }

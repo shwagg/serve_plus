@@ -19,6 +19,7 @@ const scheduledBackup = onSchedule(
     timeZone: "Asia/Manila",
     timeoutSeconds: 540,
     memory: "1GiB",
+    maxInstances: 1,
   },
   async () => {
     const db = admin.firestore();
