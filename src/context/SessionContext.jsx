@@ -118,8 +118,10 @@ export function SessionProvider({ children }) {
               const data = userSnap.data();
               console.log("SessionContext - Fetched user data:", data);
 
+              const isEmulator = import.meta.env.VITE_USE_EMULATORS === "true";
               const tokenResult = await getIdTokenResult(user);
               if (
+                !isEmulator &&
                 MFA_REQUIRED_ROLES.has(data.role) &&
                 tokenResult.claims?.provider !== "blackboard" &&
                 tokenResult.claims?.mfa !== true
