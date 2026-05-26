@@ -17,6 +17,7 @@ import { logAudit } from "../../utils/auditLogger";
 
 import MissionSubmissionsTable from "./MissionSubmissionsTable";
 import { computeAverageRating, getProgramMultiplier } from "../../hooks/rewardSystem";
+import { exportAccomplishmentPDF } from "../global/exportAccomplishmentPDF";
 
 // ── helpers ───────────────────────────────────────────────────────────
 function getInitials(name) {
@@ -192,7 +193,12 @@ export default function CurrentEvent() {
   const [missionData, setMissionData] = useState(null);
   const [refreshingDetails, setRefreshingDetails] = useState(false);
   const [detailRefreshKey, setDetailRefreshKey] = useState(0);
-  const [activeTab, setActiveTab] = useState("roster");
+  const [activeTab, setActiveTab] = useState(() => {
+    // Allow deep-linking to a tab via ?tab=accomplishment etc.
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    return ["roster","details","docs","feedback","accomplishment"].includes(tab) ? tab : "roster";
+  });
   const [flagging, setFlagging] = useState(false);
   const [flagResult, setFlagResult] = useState(null);
   const [togglingAttendance, setTogglingAttendance] = useState({});
@@ -210,6 +216,16 @@ export default function CurrentEvent() {
   // ── community feedback tab state ─────────────────────────────────
   const [feedbackResponses, setFeedbackResponses] = useState([]);
   const [feedbackLoading, setFeedbackLoading]     = useState(false);
+
+  // ── accomplishment report tab state ───────────────────────────────
+  const [accomplishmentReport, setAccomplishmentReport]       = useState(null);
+  const [accomplishmentLoading, setAccomplishmentLoading]     = useState(false);
+  const [accomplishmentReviewing, setAccomplishmentReviewing] = useState(false);
+  const [accomplishmentExporting, setAccomplishmentExporting] = useState(false);
+  const [accomplishmentPreviewUrl, setAccomplishmentPreviewUrl] = useState(null);
+  const [accomplishmentPreviewGenerating, setAccomplishmentPreviewGenerating] = useState(false);
+  const [revisionNote, setRevisionNote]                       = useState("");
+  const accomplishmentPreviewUrlRef = useRef(null);
 
   // ── doc library answer modal state ────────────────────────────────
   // (handled by MissionSubmissionsTable)
@@ -420,6 +436,103 @@ export default function CurrentEvent() {
       setFeedbackResponses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }).finally(() => setFeedbackLoading(false));
   }, [missionId, activeTab, detailRefreshKey]);
+
+  useEffect(() => {
+    if (!missionId || activeTab !== "accomplishment") return;
+    setAccomplishmentLoading(true);
+    getDoc(doc(db, "missions", missionId, "accomplishmentReport", "submission"))
+      .then(snap => setAccomplishmentReport(snap.exists() ? snap.data() : null))
+      .catch(() => setAccomplishmentReport(null))
+      .finally(() => setAccomplishmentLoading(false));
+  }, [missionId, activeTab, detailRefreshKey]);
+
+  const getAccomplishmentPdfPayload = (report) => ({
+    projectType: report?.reportType || "sl",
+    formData: {
+      ...(report?.formData || {}),
+      declarationDate: new Date().toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }),
+    },
+  });
+
+  useEffect(() => {
+    if (activeTab !== "accomplishment" || !accomplishmentReport) {
+      if (accomplishmentPreviewUrlRef.current) {
+        URL.revokeObjectURL(accomplishmentPreviewUrlRef.current);
+        accomplishmentPreviewUrlRef.current = null;
+      }
+      setAccomplishmentPreviewUrl(null);
+      setAccomplishmentPreviewGenerating(false);
+      return;
+    }
+
+    let cancelled = false;
+    setAccomplishmentPreviewGenerating(true);
+
+    const generatePreview = async () => {
+      try {
+        const url = await exportAccomplishmentPDF({
+          ...getAccomplishmentPdfPayload(accomplishmentReport),
+          returnUrl: true,
+        });
+        if (cancelled) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+        if (accomplishmentPreviewUrlRef.current) {
+          URL.revokeObjectURL(accomplishmentPreviewUrlRef.current);
+        }
+        accomplishmentPreviewUrlRef.current = url;
+        setAccomplishmentPreviewUrl(url);
+      } catch {
+        if (!cancelled) setAccomplishmentPreviewUrl(null);
+      } finally {
+        if (!cancelled) setAccomplishmentPreviewGenerating(false);
+      }
+    };
+
+    generatePreview();
+    return () => { cancelled = true; };
+  }, [activeTab, accomplishmentReport]);
+
+  useEffect(() => {
+    return () => {
+      if (accomplishmentPreviewUrlRef.current) {
+        URL.revokeObjectURL(accomplishmentPreviewUrlRef.current);
+      }
+    };
+  }, []);
+
+  const handleAccomplishmentReview = async (status) => {
+    if (!missionId) return;
+    setAccomplishmentReviewing(true);
+    try {
+      const reportRef = doc(db, "missions", missionId, "accomplishmentReport", "submission");
+      await updateDoc(reportRef, {
+        status,
+        reviewedAt: serverTimestamp(),
+        ...(status === "revision_needed" ? { revisionNote } : { revisionNote: "" }),
+      });
+      setAccomplishmentReport(prev => prev ? { ...prev, status, ...(status === "revision_needed" ? { revisionNote } : { revisionNote: "" }) } : prev);
+      // Notify the submitter
+      if (accomplishmentReport?.submittedBy) {
+        await createNotification(accomplishmentReport.submittedBy, {
+          type: status === "approved" ? "accomplishment_report_approved" : "accomplishment_report_revision",
+          title: status === "approved" ? "Accomplishment Report Approved" : "Accomplishment Report: Revision Needed",
+          message: status === "approved"
+            ? "Your accomplishment report has been approved by the admin."
+            : `Your accomplishment report requires revision: ${revisionNote || "Please review and resubmit."}`,
+          link: `/event/${missionId}/activity`,
+          missionId,
+        });
+      }
+      showToast(status === "approved" ? "Report approved." : "Revision request sent.", "success");
+      setRevisionNote("");
+    } catch (e) {
+      showToast("Failed to update report status.", "error");
+    } finally {
+      setAccomplishmentReviewing(false);
+    }
+  };
 
   // ── flagging helpers ──────────────────────────────────────────────
   const flagMission = async (missionDoc, now, todayStr, { allowReFlag = true } = {}) => {
@@ -1081,10 +1194,11 @@ export default function CurrentEvent() {
   // ── DETAIL VIEW ───────────────────────────────────────────────────
   if (missionId) {
     const tabs = [
-      { key: "roster",  label: "Roster" },
-      { key: "details", label: "Project Details" },
-      { key: "docs", label: "Document Library" },
-      { key: "feedback", label: "Community Feedback" },
+      { key: "roster",         label: "Roster" },
+      { key: "details",        label: "Project Details" },
+      { key: "docs",           label: "Document Library" },
+      { key: "feedback",       label: "Community Feedback" },
+      { key: "accomplishment", label: "Accomplishment Report" },
     ];
 
     const typeLabel =
@@ -1251,6 +1365,19 @@ export default function CurrentEvent() {
                   borderRadius: 99, fontSize: "0.68rem", fontWeight: 700, padding: "1px 7px",
                 }}>
                   {feedbackResponses.length > 0 ? feedbackResponses.length : "✓"}
+                </span>
+              )}
+              {t.key === "accomplishment" && accomplishmentReport && (
+                <span style={{
+                  background: accomplishmentReport.status === "approved"
+                    ? "#16a34a"
+                    : accomplishmentReport.status === "revision_needed"
+                      ? "#d97706"
+                      : activeTab === "accomplishment" ? "#1a73e8" : "#e8eaed",
+                  color: (accomplishmentReport.status === "approved" || accomplishmentReport.status === "revision_needed" || activeTab === "accomplishment") ? "#fff" : "#5f6368",
+                  borderRadius: 99, fontSize: "0.68rem", fontWeight: 700, padding: "1px 7px",
+                }}>
+                  {accomplishmentReport.status === "approved" ? "✓" : accomplishmentReport.status === "revision_needed" ? "!" : "●"}
                 </span>
               )}
             </button>
@@ -1804,6 +1931,188 @@ export default function CurrentEvent() {
                       </div>
                     )}
                   </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── Accomplishment Report tab ── */}
+        {activeTab === "accomplishment" && (() => {
+          const fd = accomplishmentReport?.formData || {};
+          const photoUrls = accomplishmentReport?.photoUrls || [];
+          const statusColors = {
+            submitted: { bg: "#dbeafe", color: "#1e40af", label: "Submitted — Awaiting Review" },
+            approved:  { bg: "#dcfce7", color: "#166534", label: "Approved" },
+            revision_needed: { bg: "#fef3c7", color: "#92400e", label: "Revision Requested" },
+          };
+          const statusInfo = statusColors[accomplishmentReport?.status] || null;
+
+          const SectionRow = ({ label, value }) => value ? (
+            <div style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px dashed #f1f5f9" }}>
+              <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#64748b", minWidth: 200, flexShrink: 0 }}>{label}</span>
+              <span style={{ fontSize: "0.85rem", color: "#1e293b", flex: 1 }}>{value}</span>
+            </div>
+          ) : null;
+
+          return (
+            <div>
+              {accomplishmentLoading ? (
+                <div style={{ padding: 32, textAlign: "center", color: "#64748b" }}>Loading report…</div>
+              ) : !accomplishmentReport ? (
+                <div style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8" }}>
+                  <div style={{ fontSize: "2.5rem", marginBottom: 8 }}>📝</div>
+                  <p style={{ fontWeight: 600, color: "#64748b" }}>No Accomplishment Report submitted yet.</p>
+                  <p style={{ fontSize: "0.82rem" }}>The event organizer will submit this after the event ends.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Status + meta */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+                    {statusInfo && (
+                      <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: "4px 12px", borderRadius: 99, fontSize: "0.78rem", fontWeight: 700 }}>
+                        {statusInfo.label}
+                      </span>
+                    )}
+                    {accomplishmentReport.reportType && (
+                      <span style={{ background: "#f1f5f9", color: "#475569", padding: "4px 12px", borderRadius: 99, fontSize: "0.78rem", fontWeight: 600 }}>
+                        {accomplishmentReport.reportType === "sl" ? "Service-Learning" : "Community Engagement"}
+                      </span>
+                    )}
+                    {accomplishmentReport.submittedAt && (
+                      <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
+                        Submitted: {accomplishmentReport.submittedAt?.toDate?.()?.toLocaleString?.() || "—"}
+                      </span>
+                    )}
+                    {/* Export PDF */}
+                    <button
+                      onClick={async () => {
+                        setAccomplishmentExporting(true);
+                        try {
+                          await exportAccomplishmentPDF({
+                            ...getAccomplishmentPdfPayload(accomplishmentReport),
+                            returnUrl: false,
+                          });
+                        } catch (e) {
+                          showToast("PDF export failed: " + e.message);
+                        } finally {
+                          setAccomplishmentExporting(false);
+                        }
+                      }}
+                      disabled={accomplishmentExporting}
+                      style={{ marginLeft: "auto", padding: "7px 16px", background: "#0d9488", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: "0.82rem", cursor: accomplishmentExporting ? "not-allowed" : "pointer", opacity: accomplishmentExporting ? 0.6 : 1, whiteSpace: "nowrap" }}
+                    >
+                      {accomplishmentExporting ? "Exporting…" : "⬇ Export PDF"}
+                    </button>
+                  </div>
+
+                  {/* PDF Preview */}
+                  <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+                    <div style={{ padding: "10px 14px", background: "#f1f5f9", borderBottom: "1px solid #e2e8f0", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>
+                      PDF Preview (for verification)
+                    </div>
+                    {accomplishmentPreviewGenerating ? (
+                      <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "0.84rem" }}>
+                        Generating preview…
+                      </div>
+                    ) : accomplishmentPreviewUrl ? (
+                      <iframe
+                        src={`${accomplishmentPreviewUrl}#navpanes=0&toolbar=0`}
+                        title="Accomplishment Report PDF Preview"
+                        style={{ width: "100%", height: 340, border: "none", background: "#fff" }}
+                      />
+                    ) : (
+                      <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "0.84rem" }}>
+                        Preview unavailable.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section I */}
+                  <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#0d9488", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Section I — Background Information</div>
+                    <SectionRow label="Faculty-in-Charge / Student Leader" value={fd.leaderName} />
+                    <SectionRow label="Activity Title" value={fd.activityTitle} />
+                    <SectionRow label="Location" value={fd.location} />
+                    <SectionRow label="Summary Details" value={fd.summaryDetails} />
+                    <SectionRow label="SDG(s)" value={fd.sdgs} />
+                    <SectionRow label="Volunteer Hours Rendered" value={fd.volunteerHours} />
+                    <SectionRow label="Planned Start → End" value={fd.plannedStart && fd.plannedEnd ? `${fd.plannedStart} → ${fd.plannedEnd}` : null} />
+                    <SectionRow label="Actual Start → End" value={fd.actualStart && fd.actualEnd ? `${fd.actualStart} → ${fd.actualEnd}` : null} />
+                    <SectionRow label="Proposed Budget" value={fd.proposedBudget} />
+                    <SectionRow label="Budget Incurred" value={fd.incurredBudget} />
+                    {fd.ceNature && <SectionRow label="Nature of CE" value={fd.ceNature} />}
+                  </div>
+
+                  {/* Section II */}
+                  <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#0d9488", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Section II — Results & Beneficiaries</div>
+                    <SectionRow label="Goals & Objectives" value={fd.goalsObjectives} />
+                    <SectionRow label="Extent Achieved" value={fd.extentAchieved} />
+                    <SectionRow label="Recommendations" value={fd.recommendations} />
+                    <SectionRow label="Who Benefited" value={fd.beneWho} />
+                    <SectionRow label="What Benefits / Involvement" value={fd.beneWhat} />
+                    <SectionRow label="Number of Beneficiaries" value={fd.beneCount} />
+                  </div>
+
+                  {/* Section III–IV */}
+                  {(fd.followUpPlans || fd.comments) && (
+                    <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#0d9488", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Section III–IV — Follow-Up & Comments</div>
+                      <SectionRow label="Follow-Up Plans" value={fd.followUpPlans} />
+                      <SectionRow label="Comments / Recommendations" value={fd.comments} />
+                    </div>
+                  )}
+
+                  {/* Section V — Photos */}
+                  {photoUrls.length > 0 && (
+                    <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#0d9488", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Section V — Photographs ({photoUrls.length})</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
+                        {photoUrls.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                            <img src={url} alt={`Photo ${i + 1}`} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb", display: "block" }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Admin review actions */}
+                  {accomplishmentReport.status !== "approved" && (
+                    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Admin Review</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
+                        <button
+                          onClick={() => handleAccomplishmentReview("approved")}
+                          disabled={accomplishmentReviewing}
+                          style={{ padding: "9px 20px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: accomplishmentReviewing ? 0.6 : 1 }}
+                        >
+                          ✓ Approve Report
+                        </button>
+                        <div style={{ display: "flex", flex: 1, gap: 8, minWidth: 240 }}>
+                          <input
+                            style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: "0.85rem" }}
+                            placeholder="Revision note (optional)…"
+                            value={revisionNote}
+                            onChange={e => setRevisionNote(e.target.value)}
+                          />
+                          <button
+                            onClick={() => handleAccomplishmentReview("revision_needed")}
+                            disabled={accomplishmentReviewing}
+                            style={{ padding: "9px 18px", background: "#d97706", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", whiteSpace: "nowrap", opacity: accomplishmentReviewing ? 0.6 : 1 }}
+                          >
+                            ✏ Request Revision
+                          </button>
+                        </div>
+                      </div>
+                      {accomplishmentReport.status === "revision_needed" && accomplishmentReport.revisionNote && (
+                        <div style={{ marginTop: 10, fontSize: "0.82rem", color: "#92400e", background: "#fef3c7", borderRadius: 8, padding: "8px 12px" }}>
+                          Last revision note: {accomplishmentReport.revisionNote}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>

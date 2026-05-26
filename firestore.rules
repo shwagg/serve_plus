@@ -22,7 +22,9 @@ service cloud.firestore {
             "proposal_status",
             "reflection_approved",
             "reflection_needs_revision",
-            "badge_earned"
+            "badge_earned",
+            "accomplishment_report_submitted",
+            "accomplishment_report_status"
           ]
         );
       }
@@ -277,6 +279,22 @@ service cloud.firestore {
       allow read: if false;
       allow update, delete: if false;
     }
+
+      // Accomplishment Report subcollection — submitted by the volunteer, reviewed by admin
+      match /accomplishmentReport/{docId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null &&
+          request.resource.data.submittedBy == request.auth.uid;
+        allow update: if request.auth != null && (
+          resource.data.submittedBy == request.auth.uid ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+        );
+        allow delete: if request.auth != null && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+        );
+      }
     }
 
     // userMissions reverse index — users manage their own enrolled missions

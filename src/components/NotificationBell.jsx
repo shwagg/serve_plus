@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { auth, db } from "../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 import { useSession } from "../context/SessionContext";
 import notificationIcon from "../assets/headassets/Notification Icon.svg";
 import {
@@ -17,6 +18,7 @@ import "./styles/NotificationBell.css";
 
 export default function NotificationBell() {
   const { userData } = useSession();
+  const navigate = useNavigate();
   const [notifEnabled, setNotifEnabled] = useState(
     () => userData?.globalNotificationsEnabled !== false
   );
@@ -112,7 +114,23 @@ export default function NotificationBell() {
     if (notification.type === "event_announcement") {
       setEventAnnouncementModal(notification);
     }
-  }, [userId]);
+    if (notification.type === "accomplishment_report_due" && notification.missionId) {
+      setIsOpen(false);
+      sessionStorage.setItem('ea_activeNav', 'requirements');
+      navigate(`/event/${notification.missionId}/activity`);
+    }
+    if ((notification.type === "accomplishment_report_approved" || notification.type === "accomplishment_report_revision") && notification.missionId) {
+      setIsOpen(false);
+      sessionStorage.setItem('ea_activeNav', 'requirements');
+      navigate(`/event/${notification.missionId}/activity`);
+    }
+    if (notification.type === "accomplishment_report_submitted" && notification.link) {
+      setIsOpen(false);
+      // Extract path from link (e.g. /admin/current-event/abc?tab=accomplishment)
+      const url = new URL(notification.link, window.location.origin);
+      navigate(url.pathname + url.search);
+    }
+  }, [userId, navigate]);
 
   const handleMarkAllAsRead = useCallback(async () => {
     if (!userId) return;
@@ -141,8 +159,12 @@ export default function NotificationBell() {
       case "attendance_flag":       return "🚩";
       case "attendance_flag_admin": return "🚩";
       case "event_full":            return "🔒";
-      case "event_announcement":    return "📢";
-      default:                   return "🔔";
+      case "event_announcement":             return "📢";
+      case "accomplishment_report_due":        return "📝";
+      case "accomplishment_report_submitted":  return "📋";
+      case "accomplishment_report_approved":   return "✅";
+      case "accomplishment_report_revision":   return "✏️";
+      default:                                return "🔔";
     }
   };
 

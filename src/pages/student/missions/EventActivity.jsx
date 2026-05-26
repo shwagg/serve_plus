@@ -25,6 +25,7 @@ import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
 import PostActivitySurvey from "../../../forms/PostActivitySurvey.jsx";
 import ParticipantModal from "./ParticipantModal.jsx";
 import GroupModal from "./GroupModal.jsx";
+import AccomplishmentReportModal from "../../../components/AccomplishmentReportModal.jsx";
 
 export default function EventActivity() {
   const isEventEditable = (eventDate) => {
@@ -368,6 +369,9 @@ export default function EventActivity() {
   });
   const [showTasksInReq, setShowTasksInReq] = useState(false);
   const [requirementBonusEarned, setRequirementBonusEarned] = useState({});
+  const [showAccomplishmentModal, setShowAccomplishmentModal] = useState(false);
+  const [accomplishmentReport, setAccomplishmentReport] = useState(null);
+  const accomplishmentNotifSentRef = useRef(false);
   const [pullY, setPullY] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const postSurveyStepRef = useRef(null);
@@ -2229,12 +2233,41 @@ export default function EventActivity() {
     const halfwayMs = (new Date().setHours(23, 59, 0, 0) - startTime.getTime()) / 2;
     return now >= new Date(startTime.getTime() + halfwayMs);
   })();
+
+  const [volunteerRole, setVolunteerRole] = useState(null);
+
+  // Is the current user the organizer / proponent of this event?
+  const isOrganizerUser = !!event && !!auth.currentUser && (
+    event.createdBy === auth.currentUser.uid ||
+    (Array.isArray(volunteerRole)
+      ? volunteerRole.some(r => ["organizer", "lead_organizer"].includes(r))
+      : ["organizer", "lead_organizer"].includes(volunteerRole))
+  );
+
+  // Notify organizer once when event has ended and no accomplishment report submitted yet
+  useEffect(() => {
+    if (!isOrganizerUser) return;
+    if (isEditable) return; // event not yet ended
+    if (accomplishmentReport) return; // already submitted (any status)
+    if (accomplishmentNotifSentRef.current) return;
+    const user = auth.currentUser;
+    if (!user || !event) return;
+    accomplishmentNotifSentRef.current = true;
+    // Fire-and-forget: send notification to organizer
+    createNotification(user.uid, {
+      type: "accomplishment_report_due",
+      title: "Accomplishment Report Due",
+      message: `The event "${event.title}" has ended. Please submit your ${event.projectType === "ce" ? "CE" : "S-L"} Accomplishment Report.`,
+      link: `/event/${id}/activity`,
+      missionId: id,
+    }).catch(() => {});
+  }, [isOrganizerUser, isEditable, accomplishmentReport, event, id]);
+
   const [preSurveyData, setPreSurveyData] = useState(null);
   const [preSurveyFullData, setPreSurveyFullData] = useState(null);
   const [consentFileUrl, setConsentFileUrl] = useState(null);
   const [consentReviewStatus, setConsentReviewStatus] = useState("");
   const [showPreSurveyPreview, setShowPreSurveyPreview] = useState(false);
-  const [volunteerRole, setVolunteerRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [totalPointsEarned, setTotalPointsEarned] = useState(0);
   const [completedMissions, setCompletedMissions] = useState(0);
@@ -2479,6 +2512,22 @@ export default function EventActivity() {
               consent: consentStatus,
             });
             setTotalPointsEarned(pointsEarned);
+
+            // Fetch accomplishment report (organizer only)
+            const isOrganizerUser =
+              eventData.createdBy === user.uid ||
+              (progress.role && ["organizer", "lead_organizer"].includes(progress.role));
+            if (isOrganizerUser || eventData.createdBy === user.uid) {
+              try {
+                const arRef = doc(db, "missions", id, "accomplishmentReport", "submission");
+                const arSnap = await getDoc(arRef);
+                if (arSnap.exists()) {
+                  setAccomplishmentReport(arSnap.data());
+                } else {
+                  setAccomplishmentReport(null);
+                }
+              } catch (_) {}
+            }
 
             const hadGroupedUpdates = await syncGroupedTaskCompletionForUser(tasksData, user.uid);
             if (hadGroupedUpdates) {
@@ -3230,6 +3279,26 @@ export default function EventActivity() {
                           points: 5,
                           bonusKey: 'postSurvey',
                         },
+                        // Step 6 — Accomplishment Report (organizer/proponent only, unlocked after event ends)
+                        ...(isOrganizerUser ? [{
+                          label: 'Accomplishment Report',
+                          desc: isEditable
+                            ? 'Unlocks after the event ends'
+                            : accomplishmentReport?.status === 'approved'
+                              ? 'Report approved by admin'
+                              : accomplishmentReport?.status === 'submitted'
+                                ? 'Submitted — awaiting admin review'
+                                : accomplishmentReport?.status === 'revision_needed'
+                                  ? 'Revision required — please resubmit'
+                                  : `Submit the ${event?.projectType === 'ce' ? 'CE' : 'S-L'} Accomplishment Report`,
+                          done: accomplishmentReport?.status === 'approved',
+                          locked: isEditable,
+                          onOpen: !isEditable ? () => setShowAccomplishmentModal(true) : null,
+                          type: 'accomplishment',
+                          previewable: false,
+                          points: 0,
+                          bonusKey: null,
+                        }] : []),
                       ];
                       const activeIndex = steps.findIndex(s => !s.done);
                       return (
@@ -3283,7 +3352,7 @@ export default function EventActivity() {
                                       disabled={step.locked}
                                       onClick={step.locked ? undefined : step.onOpen}
                                     >
-                                      {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : 'Start'}
+                                      {step.type === 'qr' ? 'Scan' : step.type === 'upload' ? 'Upload' : step.type === 'accomplishment' ? (accomplishmentReport ? 'View / Edit' : 'Submit') : 'Start'}
                                     </button>
                                   )}
                                 </div>
@@ -3636,6 +3705,23 @@ export default function EventActivity() {
         mode={groupModalMode}
         onGroupSelected={handleGroupedTaskSelection}
       />
+
+      {/* Accomplishment Report Modal */}
+      {showAccomplishmentModal && (
+        <AccomplishmentReportModal
+          missionId={id}
+          event={event}
+          existingReport={accomplishmentReport}
+          onClose={() => setShowAccomplishmentModal(false)}
+          onSubmitted={() => {
+            // Refresh report status after submission
+            getDoc(doc(db, "missions", id, "accomplishmentReport", "submission"))
+              .then(snap => snap.exists() && setAccomplishmentReport(snap.data()))
+              .catch(() => {});
+            setVolunteerProgress(prev => prev ? { ...prev, accomplishmentReport: 'submitted' } : prev);
+          }}
+        />
+      )}
 
 
       {/* Pre-Activity Survey Modal */}
