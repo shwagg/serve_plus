@@ -13,6 +13,12 @@ import { logAudit } from "../../utils/auditLogger";
 import { SessionContext } from "../../context/SessionContext";
 import "../../styles/RosterAccountManagement.css";
 
+const BLACKBOARD_RESTRICTED_ROLES = new Set(["partner", "admin", "sysadmin"]);
+
+const isBlackboardAccount = (user) =>
+  user?.authProvider === "blackboard" ||
+  Boolean(user?.blackboardId || user?.blackboardAuthUid);
+
 export default function RosterAccountManagement({ readOnly = false }) {
   const { userData: actorData } = useContext(SessionContext);
   const [users, setUsers] = useState([]);
@@ -141,6 +147,17 @@ export default function RosterAccountManagement({ readOnly = false }) {
   const handleRoleChange = async (userId) => {
     if (!selectedRole) return;
 
+    const currentUser = users.find((u) => u.id === userId) || {};
+    if (
+      isBlackboardAccount(currentUser) &&
+      BLACKBOARD_RESTRICTED_ROLES.has(selectedRole)
+    ) {
+      showToast(
+        "Blackboard accounts cannot be moved to Partner, Admin, or System Admin. Create a new account for that role.",
+      );
+      return;
+    }
+
     // Check if position is required but not selected
     if (
       (selectedRole === "faculty" || selectedRole === "admin") &&
@@ -157,8 +174,6 @@ export default function RosterAccountManagement({ readOnly = false }) {
 
     try {
       const userRef = doc(db, "users", userId);
-      // Find the current user object
-      const currentUser = users.find((u) => u.id === userId) || {};
       let updateData = { role: selectedRole };
 
       // Student role: delete position, add student fields
