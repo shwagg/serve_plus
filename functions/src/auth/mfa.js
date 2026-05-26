@@ -548,7 +548,7 @@ async function startPasswordLogin(request) {
     throw new HttpsError("permission-denied", "Your account is blocked.");
   }
 
-  if (!userRecord.emailVerified) {
+  if (!userRecord.emailVerified && !process.env.FUNCTIONS_EMULATOR) {
     return {
       status: "EMAIL_VERIFICATION_REQUIRED",
       email,

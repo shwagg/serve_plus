@@ -11,6 +11,8 @@ import loginPosterFallback from "../assets/login_poster_img.svg";
 import "../styles/ui.css";
 import { isAllowedEmailDomain, normalizeEmail } from "../utils/emailPolicy";
 
+const isEmulator = import.meta.env.VITE_USE_EMULATORS === "true";
+
 function getRegistrationErrorMessage(err) {
     if (err?.code === "auth/invalid-sender") {
         return "Registration email could not be sent because Firebase Authentication has an invalid sender email configured. Please contact the administrator.";
@@ -159,9 +161,9 @@ function Register() {
                 name: fullName,
                 username,
                 email: normalizedEmail,
-                emailVerified: false,
-                emailVerificationPending: true,
-                emailVerificationSentAt: serverTimestamp(),
+                emailVerified: isEmulator,
+                emailVerificationPending: !isEmulator,
+                ...(isEmulator ? {} : { emailVerificationSentAt: serverTimestamp() }),
                 role: "student", // Default role for new registrations
                 status: "active",
                 authProvider: "password",
@@ -179,12 +181,17 @@ function Register() {
                 agreementVersion: null,
             });
 
-            await sendEmailVerification(userCred.user);
-            verificationEmailSent = true;
+            if (!isEmulator) {
+                await sendEmailVerification(userCred.user);
+                verificationEmailSent = true;
+            }
             await signOut(auth);
 
             // 4. Redirect to login
-            alert("Account created! Check your email to verify your account before logging in.");
+            alert(isEmulator
+                ? "Account created! (Emulator: email verification skipped)"
+                : "Account created! Check your email to verify your account before logging in."
+            );
             navigate("/auth", { replace: true });
         } catch (err) {
             console.error(err);
