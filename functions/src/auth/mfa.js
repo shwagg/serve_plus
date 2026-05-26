@@ -477,7 +477,7 @@ async function getMfaFactor(uid) {
 }
 
 async function createAuthStep({uid, email, role, provider}) {
-  if (isMfaExemptRole(role) || !requiresMfaRole(role)) {
+  if (isMfaExemptRole(role) || !requiresMfaRole(role) || process.env.FUNCTIONS_EMULATOR) {
     const customToken = await createCustomToken({
       uid,
       role,
