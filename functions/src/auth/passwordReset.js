@@ -10,8 +10,6 @@ const GENERIC_OK = {ok: true};
 const BLACKBOARD_NO_PASSWORD_MESSAGE =
   "This Blackboard account does not have a SERVE+ password yet. " +
   "Sign in with Blackboard and create one from Settings first.";
-const UNVERIFIED_EMAIL_MESSAGE =
-  "Please verify your email before resetting your password.";
 
 function getDb() {
   return admin.firestore();
@@ -130,10 +128,6 @@ async function requestPasswordReset(request) {
       throw new HttpsError("failed-precondition", BLACKBOARD_NO_PASSWORD_MESSAGE);
     }
     return GENERIC_OK;
-  }
-
-  if (!userRecord.emailVerified) {
-    throw new HttpsError("failed-precondition", UNVERIFIED_EMAIL_MESSAGE);
   }
 
   if (blackboardLinked && profile.data?.hasServePassword !== true) {
