@@ -24,7 +24,6 @@
   flex: 0 1 400px;
   min-width: 340px;
   max-width: 420px;
-  min-height: 600px;
   padding: 32px;
   display: flex;
   flex-direction: column;
@@ -33,10 +32,6 @@
   border: 1.5px solid #e5e7eb;
 }
 .profile-avatar {
-  background: #e5e7eb;
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -90,7 +85,7 @@
   margin-bottom: 16px;
 }
 .profile-edit-btn {
-  margin-top: auto;
+  margin-top: 24px;
   background: #30bdb7;
   color: #fff;
   width: 100%;
@@ -360,17 +355,12 @@
     width: 100%;
     min-width: unset;
     max-width: 100%;
-    min-height: unset;   /* don't stretch – let content define height */
+    min-height: unset;
   }
   .profile-event-history-card {
     width: 100%;
     min-width: unset;
     max-width: 100%;
-  }
-  /* Key fix: margin-top:auto in a flex column with no fixed height
-     causes the button to bleed into the next stacked section */
-  .profile-edit-btn {
-    margin-top: 20px;
   }
   .profile-right-column {
     width: 100%;
@@ -391,11 +381,6 @@
     padding: 20px 16px;
     width: 100%;
     box-sizing: border-box;
-  }
-  .profile-edit-btn {
-    margin-top: 20px;   /* replace auto so it doesn't collapse into the tab row */
-    position: relative;
-    z-index: 0;
   }
   .profile-right-column {
     width: 100%;
@@ -464,9 +449,6 @@
 
 /* Level bar */
 .profile-level-section { width: 100%; margin: 16px 0; }
-.profile-level-bar-bg { background: #e6eef3; border-radius: 8px; height: 14px; position: relative; overflow: hidden; }
-.profile-level-bar-fill { background: linear-gradient(90deg,#234e7b,#30bdb7); height: 100%; transition: width .3s ease; }
-.profile-level-bar-label { position: absolute; left: 0; right: 0; text-align: center; top: 0; font-size: 12px; color: #000; font-weight: 700; }
 
 /* Lists */
 .profile-skills-list, .profile-interests-list, .profile-achievements-list { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -738,7 +720,8 @@
 .profile-avatar:hover {
   transform: scale(1.04);
 }
-.profile-avatar-img {
+.profile-avatar-img,
+.profile-avatar .avatar-frame-img {
   animation: avatarGlow 3s ease-in-out infinite;
 }
 

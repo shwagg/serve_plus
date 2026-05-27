@@ -3,7 +3,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { getLevelInfo } from "../../hooks/rewardSystem";
 // Simple modal component
-function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
+function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, activeFrame: initialFrame = 'default' }) {
   const softSkills = [
     "Teamwork", "Communication", "Problem Solving", "Leadership", "Time Management",
     "Adaptability", "Conflict Resolution", "Empathy", "Critical Thinking", "Responsibility"
@@ -42,6 +42,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
   const [interests, setInterests] = useState(profile.interests || []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [selectedFrame, setSelectedFrame] = useState(initialFrame);
 
   // Reset state when modal opens or profile changes
   useEffect(() => {
@@ -55,6 +56,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
       setProgram(profile.program || "");
       setSkills(profile.skills || []);
       setInterests(profile.interests || []);
+      setSelectedFrame(initialFrame);
     }
   }, [open, profile]);
 
@@ -143,7 +145,13 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
         <div className="profile-modal-fields">
           <div className="profile-modal-avatar-box">
             <div className="profile-modal-avatar-wrapper">
-              <img src={avatar} alt="avatar" className="profile-modal-avatar" />
+              <AvatarWithFrame
+                src={avatar}
+                displayName={username || name || 'User'}
+                alt="avatar preview"
+                frameId={selectedFrame}
+                size={100}
+              />
               <input
                 type="file"
                 accept="image/*"
@@ -277,10 +285,61 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role }) {
               ))}
             </div>
           </div>
+
+          {/* ── Profile Frame Picker (level 3+) ── */}
+          {level >= 3 && (() => {
+            const unlockedIds = new Set(getUnlockedFrames(level).map(f => f.id));
+            return (
+              <div>
+                <label className="profile-modal-label">Profile Frame</label>
+                <div className="frame-picker-subtitle" style={{ marginTop: 4, marginBottom: 10 }}>
+                  Choose a frame for your profile picture.
+                </div>
+                <div className="frame-picker-grid">
+                  {PROFILE_FRAMES.map(frame => {
+                    const isUnlocked = unlockedIds.has(frame.id);
+                    const isActive = selectedFrame === frame.id;
+                    return (
+                      <button
+                        key={frame.id}
+                        type="button"
+                        title={isUnlocked ? frame.description : `Unlocks at Level ${frame.minLevel}`}
+                        aria-label={`${isUnlocked ? 'Select' : 'Locked'} frame: ${frame.name}`}
+                        aria-pressed={isActive}
+                        disabled={!isUnlocked}
+                        onClick={() => { if (isUnlocked) setSelectedFrame(frame.id); }}
+                        className={[
+                          'frame-picker-item',
+                          isActive ? 'frame-picker-active' : '',
+                          !isUnlocked ? 'frame-picker-locked' : '',
+                        ].join(' ')}
+                      >
+                        {!isUnlocked && (
+                          <span className="frame-picker-lock-badge" aria-hidden="true">🔒</span>
+                        )}
+                        <AvatarWithFrame
+                          src={avatar}
+                          displayName={username || name || 'User'}
+                          alt={frame.name}
+                          frameId={frame.id}
+                          size={52}
+                          className="frame-picker-preview"
+                        />
+                        <span className="frame-picker-label">{frame.name}</span>
+                        {!isUnlocked && (
+                          <span className="frame-picker-level-hint">Lv. {frame.minLevel}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
-          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, department, program, skills, interests })} className="profile-modal-confirm-btn">Confirm</button>
+          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, department, program, skills, interests, activeFrame: selectedFrame })} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
@@ -290,11 +349,14 @@ import { useSession } from "../../context/SessionContext.jsx";
 import Header from "../../components/Header.jsx";
 import BadgeShelf from "../../components/badges/BadgeShelf";
 import BadgeIcon from "../../components/badges/BadgeIcon";
+import AvatarWithFrame from "../../components/AvatarWithFrame";
 import "../../styles/Profile.css";
 import "../../styles/Badge.css";
+import "../../styles/ProfileFrames.css";
 import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { BADGE_BY_ID } from "../../constants/badgeDefinitions";
+import { PROFILE_FRAMES, getUnlockedFrames } from "../../constants/profileFrames";
 const PROFILE_TABS = ["Overview", "Badges", "Portfolio"];
 
 const SDG_LABELS = {
@@ -375,6 +437,7 @@ export default function Profile() {
 
   const [scrollToCerts, setScrollToCerts] = useState(false);
   const [highlightFirstCert, setHighlightFirstCert] = useState(false);
+  const [activeFrame, setActiveFrame] = useState("default");
 
   useEffect(() => {
     if (sessionStorage.getItem("profileScrollTo") !== "certificates") return;
@@ -576,6 +639,9 @@ export default function Profile() {
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
         let profileData = docSnap.exists() ? docSnap.data() : mockProfile;
+
+        // Load active frame from Firestore
+        if (profileData.activeFrame) setActiveFrame(profileData.activeFrame);
 
         const totalPoints = profileData.totalPoints || 0;
         profileData.totalPoints = totalPoints;
@@ -844,10 +910,12 @@ export default function Profile() {
       <div className="profile-main-flex">
         <div className="profile-card">
           <div className="profile-avatar">
-            <img
-              src={profile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=30bdb7&color=fff&size=256`}
+            <AvatarWithFrame
+              src={profile.avatar}
+              displayName={profile.username || profile.name || profile.email || 'User'}
               alt={`${profile.username || profile.name || 'User'}'s avatar`}
-              className="profile-avatar-img"
+              frameId={activeFrame}
+              size={120}
             />
           </div>
           {/* Username above name */}
@@ -913,11 +981,15 @@ export default function Profile() {
               {profileMsg.text}
             </div>
           )}
+
+
           <EditProfileModal
             open={editOpen}
             onClose={() => setEditOpen(false)}
             profile={profile || {}}
             role={profile?.role}
+            level={profile?.level || 1}
+            activeFrame={activeFrame}
             onConfirm={async updated => {
               try {
                 const user = auth.currentUser;
@@ -935,6 +1007,7 @@ export default function Profile() {
                   })
                 );
                 setProfile(prev => ({ ...prev, ...updated }));
+                if (updated.activeFrame) setActiveFrame(updated.activeFrame);
                 refreshUserData();
                 setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
               } catch (err) {

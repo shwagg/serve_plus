@@ -1,0 +1,184 @@
+/* ═══════════════════════════════════════════════════════════
+   Profile Frame Styles
+   Applied to .avatar-frame-container + a frame-* class.
+   The container clips children to a circle with overflow:hidden,
+   so the ring is created by background color/gradient + padding.
+   ═══════════════════════════════════════════════════════════ */
+
+.avatar-frame-container {
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.avatar-frame-img {
+  border-radius: 50%;
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+/* ── Default ── */
+.frame-default {
+  padding: 0;
+  background: #e5e7eb;
+}
+
+/* ── Level 3: Teal Ring ── */
+.frame-teal-ring {
+  padding: 4px;
+  background: #30bdb7;
+}
+
+/* ── Level 5: Gradient Ring ── */
+.frame-gradient-ring {
+  padding: 4px;
+  background: linear-gradient(135deg, #30bdb7 0%, #68e1ab 50%, #3b82f6 100%);
+}
+
+/* ── Level 7: Golden Ring ── */
+.frame-golden-ring {
+  padding: 4px;
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.55);
+}
+
+/* ── Level 10: Champion Ring (animated conic gradient) ── */
+.frame-champion-ring {
+  padding: 4px;
+  background: transparent;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.45);
+}
+
+.frame-champion-ring::before {
+  content: "";
+  position: absolute;
+  /* Extend well beyond the clipped circle so the gradient covers
+     every point of the ring after rotation */
+  inset: -50%;
+  background: conic-gradient(
+    from 0deg,
+    #f59e0b,
+    #ef4444,
+    #8b5cf6,
+    #3b82f6,
+    #30bdb7,
+    #68e1ab,
+    #f59e0b
+  );
+  animation: champion-ring-spin 3s linear infinite;
+  z-index: 0;
+}
+
+@keyframes champion-ring-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Frame picker (shown in the Profile page) ── */
+.frame-picker-section {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.frame-picker-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.frame-picker-subtitle {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.frame-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 10px;
+}
+
+.frame-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 6px 4px;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+
+.frame-picker-item:hover:not(.frame-picker-locked) {
+  background: #f1f5f9;
+  border-color: #30bdb7;
+}
+
+.frame-picker-item.frame-picker-active {
+  border-color: #30bdb7;
+  background: #e0f7f6;
+}
+
+.frame-picker-item.frame-picker-locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.frame-picker-preview {
+  /* Preview avatars are always 52px */
+}
+
+.frame-picker-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #334155;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.frame-picker-lock-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #94a3b8;
+  color: #fff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.frame-picker-level-hint {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.frame-picker-saving {
+  font-size: 0.78rem;
+  color: #30bdb7;
+  margin-top: 6px;
+}
+
+.frame-picker-unlocked-msg {
+  font-size: 0.78rem;
+  color: #16a34a;
+  font-weight: 600;
+  margin-top: 2px;
+  margin-bottom: 6px;
+}

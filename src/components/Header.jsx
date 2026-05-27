@@ -21,6 +21,7 @@ import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 import OnboardingTutorial from './OnboardingTutorial';
 import { showToast } from '../utils/toast';
+import AvatarWithFrame from './AvatarWithFrame';
 
 
 const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
@@ -76,6 +77,7 @@ export default function Header() {
   const userEmail = userData?.email || '';
   const userUsername = userData?.username || '';
   const userAvatar = userData?.avatar || '';
+  const userActiveFrame = userData?.activeFrame || 'default';
   const [showMenu, setShowMenu] = useState(false);
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [showProposalForm, setShowProposalForm] = useState(false);
@@ -265,17 +267,14 @@ export default function Header() {
                   onClick={() => setShowMenu(!showMenu)}
                 >
                   <div className="header-profile-wrap">
-                    {userAvatar ? (
-                      <img src={userAvatar} alt="Profile" className="header-avatar" />
-                    ) : (
-                      <div className="header-avatar-initials">
-                        {(() => {
-                          const parts = (userName || '?').trim().split(/\s+/);
-                          if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-                          return (userName?.slice(0, 2) || '?').toUpperCase();
-                        })()}
-                      </div>
-                    )}
+                    <AvatarWithFrame
+                      src={userAvatar}
+                      displayName={userUsername || userName || userEmail || 'User'}
+                      alt="Profile"
+                      frameId={userActiveFrame}
+                      size={28}
+                      ringWidth={2}
+                    />
                     {userName && (
                       <span className="header-greeting">Hi, {userName.trim().split(/\s+/)[0]}!</span>
                     )}
