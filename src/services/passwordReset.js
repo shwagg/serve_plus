@@ -26,5 +26,9 @@ export function getPasswordResetErrorMessage(error) {
     return message || "Please use an accepted email address.";
   }
 
+  if (code.endsWith("resource-exhausted")) {
+    return "You can request only 2 password reset emails per day. Please try again later.";
+  }
+
   return "Unable to send reset link. Please try again.";
 }

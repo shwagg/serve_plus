@@ -6,10 +6,16 @@ const {
   isAllowedEmailDomain,
 } = require("./emailPolicy");
 
+const RESET_ATTEMPT_COLLECTION = "passwordResetAttempts";
+const MAX_RESET_ATTEMPTS = 2;
+const RESET_ATTEMPT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const GENERIC_OK = {ok: true};
 const BLACKBOARD_NO_PASSWORD_MESSAGE =
   "This Blackboard account does not have a SERVE+ password yet. " +
   "Sign in with Blackboard and create one from Settings first.";
+const RESET_LIMIT_MESSAGE =
+  "You can request only 2 password reset emails per day. " +
+  "Please try again later.";
 
 function getDb() {
   return admin.firestore();
@@ -32,6 +38,19 @@ function isBlackboardLinked(userData) {
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function getAttemptTime(attempt) {
+  if (typeof attempt?.at === "number") return attempt.at;
+  if (attempt?.at?.toMillis) return attempt.at.toMillis();
+  return 0;
+}
+
+function createReservation() {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    at: Date.now(),
+  };
 }
 
 function getApiKey() {
@@ -97,6 +116,61 @@ async function getUserProfile(uid, email) {
   };
 }
 
+async function reserveResetAttempt(email) {
+  const reservation = createReservation();
+  const cutoff = Date.now() - RESET_ATTEMPT_WINDOW_MS;
+  const attemptRef = getDb()
+    .collection(RESET_ATTEMPT_COLLECTION)
+    .doc(email);
+
+  await getDb().runTransaction(async (transaction) => {
+    const attemptSnap = await transaction.get(attemptRef);
+    const attempts = attemptSnap.exists ?
+      attemptSnap.data().attempts || [] :
+      [];
+    const recentAttempts = attempts.filter(
+      (attempt) => getAttemptTime(attempt) > cutoff,
+    );
+
+    if (recentAttempts.length >= MAX_RESET_ATTEMPTS) {
+      throw new HttpsError("resource-exhausted", RESET_LIMIT_MESSAGE);
+    }
+
+    transaction.set(attemptRef, {
+      email,
+      attempts: recentAttempts.concat(reservation),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, {merge: true});
+  });
+
+  return reservation;
+}
+
+async function rollbackResetAttempt(email, reservationId) {
+  const attemptRef = getDb()
+    .collection(RESET_ATTEMPT_COLLECTION)
+    .doc(email);
+
+  try {
+    await getDb().runTransaction(async (transaction) => {
+      const attemptSnap = await transaction.get(attemptRef);
+      if (!attemptSnap.exists) return;
+
+      const attempts = attemptSnap.data().attempts || [];
+      transaction.update(attemptRef, {
+        attempts: attempts.filter((attempt) => attempt.id !== reservationId),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+  } catch (error) {
+    console.warn("Password reset attempt rollback failed", {
+      email,
+      reservationId,
+      message: error.message,
+    });
+  }
+}
+
 async function requestPasswordReset(request) {
   const email = normalizeEmail(request.data?.email);
 
@@ -137,7 +211,14 @@ async function requestPasswordReset(request) {
     }, {merge: true});
   }
 
-  await sendPasswordResetEmail(email);
+  const reservation = await reserveResetAttempt(email);
+  try {
+    await sendPasswordResetEmail(email);
+  } catch (error) {
+    await rollbackResetAttempt(email, reservation.id);
+    throw error;
+  }
+
   return GENERIC_OK;
 }
 

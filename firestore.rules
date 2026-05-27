@@ -106,6 +106,15 @@ service cloud.firestore {
       allow write: if false; // Cloud Functions use Admin SDK, bypasses this
     }
 
+    // Password reset attempt records — written by Cloud Functions (service account bypasses rules)
+    match /passwordResetAttempts/{email} {
+      allow read: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
+      );
+      allow write: if false;
+    }
+
     // MFA records are server-only. Cloud Functions use Admin SDK and bypass rules.
     match /mfaFactors/{userId} {
       allow read, write: if false;
