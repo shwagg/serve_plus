@@ -90,6 +90,12 @@ function MfaVerify() {
     navigate("/auth", {replace: true});
   };
 
+  const handleRequestResetLink = (event) => {
+    event.preventDefault();
+    if (submitting || requestingReset) return;
+    handleRequestTotpReset();
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-split">
@@ -134,14 +140,14 @@ function MfaVerify() {
             </button>
 
             <div className="mfa-link-row">
-              <button
-                className="mfa-text-link mfa-inline-link"
-                type="button"
-                onClick={handleRequestTotpReset}
-                disabled={submitting || requestingReset}
+              <a
+                className="mfa-text-link"
+                href="#request-totp-reset"
+                aria-disabled={submitting || requestingReset}
+                onClick={handleRequestResetLink}
               >
                 {requestingReset ? "Sending request..." : "Request TOTP reset"}
-              </button>
+              </a>
               <span aria-hidden="true">|</span>
               <a
                 className="mfa-text-link"
