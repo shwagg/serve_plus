@@ -45,6 +45,7 @@ const {
   verifyTotpEnrollment,
   verifyTotpLogin,
 } = require("./src/auth/mfa");
+const { requestPasswordReset } = require("./src/auth/passwordReset");
 const { validateRegistrationEmail, cleanupUnverifiedRegistrations, } = require("./src/auth/registrationEmail");
 
 // Export as callable Cloud Functions with region
@@ -74,6 +75,10 @@ exports.startPasswordLogin = onCall(
 exports.sendEmailVerificationForLogin = onCall(
   defaultFunctionOptions,
   sendEmailVerificationForLogin
+);
+exports.requestPasswordReset = onCall(
+  defaultFunctionOptions,
+  requestPasswordReset
 );
 exports.beginTotpEnrollment = onCall(
   defaultFunctionOptions,
