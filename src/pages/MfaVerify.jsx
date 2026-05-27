@@ -84,6 +84,12 @@ function MfaVerify() {
     }
   };
 
+  const handleBackToLogin = (event) => {
+    event.preventDefault();
+    clearMfaSession();
+    navigate("/auth", {replace: true});
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-split">
@@ -127,14 +133,24 @@ function MfaVerify() {
               {submitting ? "Verifying..." : "Continue"}
             </button>
 
-            <button
-              className="mfa-secondary-btn"
-              type="button"
-              onClick={handleRequestTotpReset}
-              disabled={submitting || requestingReset}
-            >
-              {requestingReset ? "Sending request..." : "Request TOTP reset"}
-            </button>
+            <div className="mfa-link-row">
+              <button
+                className="mfa-text-link mfa-inline-link"
+                type="button"
+                onClick={handleRequestTotpReset}
+                disabled={submitting || requestingReset}
+              >
+                {requestingReset ? "Sending request..." : "Request TOTP reset"}
+              </button>
+              <span aria-hidden="true">|</span>
+              <a
+                className="mfa-text-link"
+                href="/auth"
+                onClick={handleBackToLogin}
+              >
+                Back to login
+              </a>
+            </div>
 
             {resetMessage && (
               <p className="mfa-success-text">
