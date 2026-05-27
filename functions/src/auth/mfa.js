@@ -476,6 +476,75 @@ async function getMfaFactor(uid) {
   };
 }
 
+async function assertSysadminCaller(request) {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const callerSnap = await getDb().collection("users").doc(callerUid).get();
+  const callerData = callerSnap.exists ? callerSnap.data() : null;
+
+  if (callerData?.role !== "sysadmin") {
+    throw new HttpsError(
+      "permission-denied",
+      "Only system administrators can reset TOTP setup.",
+    );
+  }
+
+  return {uid: callerUid, data: callerData};
+}
+
+function serializeTimestamp(value) {
+  if (!value) return null;
+  if (value.toDate) return value.toDate().toISOString();
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+async function writeAccountAudit({action, actor, details}) {
+  try {
+    await getDb().collection("auditLogs").add({
+      action,
+      category: "account",
+      actorUid: actor?.uid || null,
+      actorEmail: actor?.email || null,
+      actorName: actor?.name || null,
+      details,
+      timestamp: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("MFA audit log failed", {
+      action,
+      message: err?.message,
+    });
+  }
+}
+
+async function clearMfaSessionsForUser(uid) {
+  let clearedSessions = 0;
+
+  while (true) {
+    const sessionSnap = await getDb()
+      .collection(SESSION_COLLECTION)
+      .where("uid", "==", uid)
+      .limit(400)
+      .get();
+
+    if (sessionSnap.empty) return clearedSessions;
+
+    const batch = getDb().batch();
+    sessionSnap.docs.forEach((sessionDoc) => {
+      batch.delete(sessionDoc.ref);
+    });
+    await batch.commit();
+
+    clearedSessions += sessionSnap.size;
+    if (sessionSnap.size < 400) return clearedSessions;
+  }
+}
+
 async function createAuthStep({uid, email, role, provider}) {
   if (isMfaExemptRole(role) || !requiresMfaRole(role) || process.env.FUNCTIONS_EMULATOR) {
     const customToken = await createCustomToken({
@@ -510,6 +579,139 @@ async function createAuthStep({uid, email, role, provider}) {
     sessionToken,
     role,
     email: normalizeEmail(email),
+  };
+}
+
+async function requestTotpReset(request) {
+  const {sessionToken} = request.data || {};
+  const {session} = await readValidSession(sessionToken, "verify");
+  const factorRef = getDb().collection(FACTOR_COLLECTION).doc(session.uid);
+  const factorSnap = await factorRef.get();
+
+  if (!factorSnap.exists || factorSnap.data()?.enabled !== true) {
+    throw new HttpsError("failed-precondition", "TOTP is not enrolled.");
+  }
+
+  const userSnap = await getDb().collection("users").doc(session.uid).get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+  const alreadyRequested = factorSnap.data()?.resetRequested === true;
+  const serverTimestamp = FieldValue.serverTimestamp();
+
+  await factorRef.set({
+    resetRequested: true,
+    resetRequestedAt: serverTimestamp,
+    resetRequestedBy: session.uid,
+    resetRequestedSessionHash: hashSessionToken(sessionToken),
+    updatedAt: serverTimestamp,
+  }, {merge: true});
+
+  if (!alreadyRequested) {
+    await writeAccountAudit({
+      action: "TOTP_RESET_REQUESTED",
+      actor: {
+        uid: session.uid,
+        email: session.email,
+        name: userData.name || userData.displayName || null,
+      },
+      details: {
+        targetUserId: session.uid,
+        targetUserName: userData.name || userData.displayName || "",
+        targetUserEmail: session.email || userData.email || "",
+      },
+    });
+  }
+
+  return {
+    status: "TOTP_RESET_REQUESTED",
+    alreadyRequested,
+  };
+}
+
+async function listTotpResetRequests(request) {
+  await assertSysadminCaller(request);
+
+  const resetSnap = await getDb()
+    .collection(FACTOR_COLLECTION)
+    .where("resetRequested", "==", true)
+    .get();
+
+  const userSnaps = await Promise.all(
+    resetSnap.docs.map((factorDoc) =>
+      getDb().collection("users").doc(factorDoc.id).get(),
+    ),
+  );
+
+  const requests = resetSnap.docs.map((factorDoc, index) => {
+    const factorData = factorDoc.data();
+    const userSnap = userSnaps[index];
+    const userData = userSnap.exists ? userSnap.data() : {};
+
+    return {
+      uid: factorDoc.id,
+      email: userData.email || null,
+      name: userData.name || userData.displayName || null,
+      role: getRole(userData),
+      requestedAt: serializeTimestamp(factorData.resetRequestedAt),
+    };
+  });
+
+  requests.sort((a, b) =>
+    String(b.requestedAt || "").localeCompare(String(a.requestedAt || "")),
+  );
+
+  return {requests};
+}
+
+async function resetUserTotp(request) {
+  const {uid: callerUid, data: callerData} = await assertSysadminCaller(request);
+  const targetUid = String(request.data?.targetUid || "").trim();
+
+  if (!targetUid) {
+    throw new HttpsError("invalid-argument", "Target user is required.");
+  }
+
+  const userSnap = await getDb().collection("users").doc(targetUid).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "Target user was not found.");
+  }
+
+  const targetData = userSnap.data();
+  const targetRole = getRole(targetData);
+
+  if (isMfaExemptRole(targetRole) || !requiresMfaRole(targetRole)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "TOTP reset is only available for MFA-required users.",
+    );
+  }
+
+  const factorRef = getDb().collection(FACTOR_COLLECTION).doc(targetUid);
+  const factorSnap = await factorRef.get();
+  await factorRef.delete();
+  const clearedSessions = await clearMfaSessionsForUser(targetUid);
+
+  await writeAccountAudit({
+    action: "TOTP_RESET",
+    actor: {
+      uid: callerUid,
+      email: callerData.email || "",
+      name: callerData.name || callerData.displayName || null,
+    },
+    details: {
+      targetUserId: targetUid,
+      targetUserName: targetData.name || targetData.displayName || "",
+      targetUserEmail: targetData.email || "",
+      targetUserRole: targetRole,
+      previousFactorExisted: factorSnap.exists,
+      clearedSessions,
+    },
+  });
+
+  return {
+    status: "TOTP_RESET",
+    targetUid,
+    previousFactorExisted: factorSnap.exists,
+    clearedSessions,
   };
 }
 
@@ -768,4 +970,7 @@ module.exports = {
   beginTotpEnrollment,
   verifyTotpEnrollment,
   verifyTotpLogin,
+  requestTotpReset,
+  listTotpResetRequests,
+  resetUserTotp,
 };

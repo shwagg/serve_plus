@@ -5,19 +5,25 @@ import {
   getDocs,
   updateDoc,
 } from "firebase/firestore";
-import { useEffect, useState, useContext } from "react";
+import { httpsCallable } from "firebase/functions";
+import { useEffect, useState, useContext, useRef } from "react";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ChangeIcon from "../../components/icons/Change.svg";
-import { db } from "../../firebaseConfig";
-import { showToast } from "../../utils/toast";
+import { db, functions } from "../../firebaseConfig";
+import { showConfirm, showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
 import { SessionContext } from "../../context/SessionContext";
 import "../../styles/RosterAccountManagement.css";
 
 const BLACKBOARD_RESTRICTED_ROLES = new Set(["partner", "admin", "sysadmin"]);
+const TOTP_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
 
 const isBlackboardAccount = (user) =>
   user?.authProvider === "blackboard" ||
   Boolean(user?.blackboardId || user?.blackboardAuthUid);
+
+const canResetTotpForUser = (user) =>
+  TOTP_REQUIRED_ROLES.has(String(user?.role || "").toLowerCase());
 
 export default function RosterAccountManagement({ readOnly = false }) {
   const { userData: actorData } = useContext(SessionContext);
@@ -30,7 +36,12 @@ export default function RosterAccountManagement({ readOnly = false }) {
   const [selectedPosition, setSelectedPosition] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totpResetRequests, setTotpResetRequests] = useState({});
+  const [openActionUserId, setOpenActionUserId] = useState(null);
+  const [totpActionUserId, setTotpActionUserId] = useState(null);
+  const actionMenuRef = useRef(null);
   const pageSize = 10;
+  const canManageTotp = !readOnly && actorData?.role === "sysadmin";
   // Department options for faculty
   const departments = [
     "College of Arts and Science (CAS)",
@@ -45,7 +56,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
   ];
 
   // Filter states
-  const [statusFilter, setStatusFilter] = useState("overall");
+  const [statusFilter] = useState("overall");
   const [roleFilter, setRoleFilter] = useState("overall");
 
   // Position options based on role
@@ -75,6 +86,56 @@ export default function RosterAccountManagement({ readOnly = false }) {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, roleFilter]);
+
+  useEffect(() => {
+    if (!canManageTotp) {
+      setTotpResetRequests({});
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchTotpResetRequests() {
+      try {
+        const listRequests = httpsCallable(functions, "listTotpResetRequests");
+        const result = await listRequests();
+        if (cancelled) return;
+
+        const requestMap = {};
+        (result.data?.requests || []).forEach((request) => {
+          if (request.uid) requestMap[request.uid] = request;
+        });
+        setTotpResetRequests(requestMap);
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.error("Error fetching TOTP reset requests:", err);
+        }
+        if (!cancelled) setTotpResetRequests({});
+      }
+    }
+
+    fetchTotpResetRequests();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageTotp]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        actionMenuRef.current &&
+        !actionMenuRef.current.contains(event.target)
+      ) {
+        setOpenActionUserId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -122,10 +183,6 @@ export default function RosterAccountManagement({ readOnly = false }) {
     }
 
     setFilteredUsers(filtered);
-  };
-
-  const handleStatusFilterChange = (filter) => {
-    setStatusFilter(filter);
   };
 
   const handleRoleFilterChange = (filter) => {
@@ -314,6 +371,40 @@ export default function RosterAccountManagement({ readOnly = false }) {
     setSelectedDepartment("");
   };
 
+  const handleResetTotp = async (targetUser) => {
+    if (!canManageTotp || !canResetTotpForUser(targetUser)) return;
+
+    const targetLabel = targetUser.email || targetUser.name || "this user";
+    const confirmed = await showConfirm(
+      `Reset TOTP setup for ${targetLabel}? The user will need to enroll a new authenticator QR on next login.`,
+    );
+
+    if (!confirmed) return;
+
+    setOpenActionUserId(null);
+    setTotpActionUserId(targetUser.id);
+
+    try {
+      const resetTotp = httpsCallable(functions, "resetUserTotp");
+      await resetTotp({ targetUid: targetUser.id });
+
+      setTotpResetRequests((current) => {
+        const next = { ...current };
+        delete next[targetUser.id];
+        return next;
+      });
+
+      showToast(
+        "TOTP setup reset. The user can enroll a new QR on next login.",
+      );
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("Error resetting TOTP:", err);
+      showToast(err?.message || "Failed to reset TOTP setup.", "error");
+    } finally {
+      setTotpActionUserId(null);
+    }
+  };
+
   const formatCreatedAt = (createdAt) => {
     if (!createdAt) return "N/A";
     const dateValue = createdAt.toDate ? createdAt.toDate() : createdAt;
@@ -397,12 +488,18 @@ export default function RosterAccountManagement({ readOnly = false }) {
                   <th className="text-left">Email</th>
                   <th className="text-center">Role</th>
                   <th className="text-center">Account Created</th>
+                  {canManageTotp && (
+                    <th className="text-center">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="no-users-message">
+                    <td
+                      colSpan={canManageTotp ? 5 : 4}
+                      className="no-users-message"
+                    >
                       No users found
                     </td>
                   </tr>
@@ -412,7 +509,16 @@ export default function RosterAccountManagement({ readOnly = false }) {
                       <td className="row-number">
                         {(currentPage - 1) * pageSize + index + 1}
                       </td>
-                      <td className="user-name">{user.email || "N/A"}</td>
+                      <td className="user-name">
+                        <div className="user-email-stack">
+                          <span>{user.email || "N/A"}</span>
+                          {canManageTotp && totpResetRequests[user.id] && (
+                            <span className="totp-request-badge">
+                              TOTP reset requested
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="text-center role-cell">
                         {!readOnly && editingRoleUserId === user.id ? (
                           <div className="role-edit-container">
@@ -508,6 +614,62 @@ export default function RosterAccountManagement({ readOnly = false }) {
                       <td className="text-center account-created-cell">
                         {formatCreatedAt(user.createdAt)}
                       </td>
+                      {canManageTotp && (
+                        <td className="text-center roster-actions-cell">
+                          <div
+                            className="roster-row-actions"
+                            ref={
+                              openActionUserId === user.id ?
+                                actionMenuRef :
+                                null
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") {
+                                setOpenActionUserId(null);
+                              }
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="roster-action-trigger"
+                              aria-label={`Actions for ${
+                                user.email || user.name || "user"
+                              }`}
+                              aria-expanded={openActionUserId === user.id}
+                              aria-haspopup="menu"
+                              onClick={() =>
+                                setOpenActionUserId((current) =>
+                                  current === user.id ? null : user.id,
+                                )
+                              }
+                            >
+                              <MoreVertIcon fontSize="small" />
+                            </button>
+
+                            {openActionUserId === user.id && (
+                              <div className="roster-action-menu" role="menu">
+                                {canResetTotpForUser(user) ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="roster-action-menu-item"
+                                    disabled={totpActionUserId === user.id}
+                                    onClick={() => handleResetTotp(user)}
+                                  >
+                                    {totpActionUserId === user.id ?
+                                      "Resetting..." :
+                                      "Reset TOTP setup"}
+                                  </button>
+                                ) : (
+                                  <span className="roster-action-menu-empty">
+                                    No actions available
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

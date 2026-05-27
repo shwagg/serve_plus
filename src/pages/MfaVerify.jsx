@@ -14,12 +14,15 @@ import "../styles/mfa.css";
 function MfaVerify() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [requestingReset, setRequestingReset] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    setResetMessage("");
     setSubmitting(true);
 
     const session = readMfaSession();
@@ -51,6 +54,33 @@ function MfaVerify() {
       setError(err?.message || "Invalid authenticator code.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRequestTotpReset = async () => {
+    setError("");
+    setResetMessage("");
+    setRequestingReset(true);
+
+    const session = readMfaSession();
+    if (!session?.sessionToken || session.action !== "MFA_REQUIRED") {
+      navigate("/auth", {replace: true});
+      return;
+    }
+
+    try {
+      const requestReset = httpsCallable(functions, "requestTotpReset");
+      await requestReset({
+        sessionToken: session.sessionToken,
+      });
+      setResetMessage(
+        "Your request was sent. A system administrator must reset your TOTP setup before you can sign in with a new QR code.",
+      );
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("TOTP reset request error:", err);
+      setError(err?.message || "Unable to request TOTP reset.");
+    } finally {
+      setRequestingReset(false);
     }
   };
 
@@ -96,6 +126,21 @@ function MfaVerify() {
             >
               {submitting ? "Verifying..." : "Continue"}
             </button>
+
+            <button
+              className="mfa-secondary-btn"
+              type="button"
+              onClick={handleRequestTotpReset}
+              disabled={submitting || requestingReset}
+            >
+              {requestingReset ? "Sending request..." : "Request TOTP reset"}
+            </button>
+
+            {resetMessage && (
+              <p className="mfa-success-text">
+                {resetMessage}
+              </p>
+            )}
 
             {error && (
               <p className="ui-error" style={{textAlign: "center"}}>

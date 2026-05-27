@@ -44,6 +44,9 @@ const {
   beginTotpEnrollment,
   verifyTotpEnrollment,
   verifyTotpLogin,
+  requestTotpReset,
+  listTotpResetRequests,
+  resetUserTotp,
 } = require("./src/auth/mfa");
 const { requestPasswordReset } = require("./src/auth/passwordReset");
 const { validateRegistrationEmail, cleanupUnverifiedRegistrations, } = require("./src/auth/registrationEmail");
@@ -91,6 +94,18 @@ exports.verifyTotpEnrollment = onCall(
 exports.verifyTotpLogin = onCall(
   defaultFunctionOptions,
   verifyTotpLogin
+);
+exports.requestTotpReset = onCall(
+  defaultFunctionOptions,
+  requestTotpReset
+);
+exports.listTotpResetRequests = onCall(
+  defaultFunctionOptions,
+  listTotpResetRequests
+);
+exports.resetUserTotp = onCall(
+  defaultFunctionOptions,
+  resetUserTotp
 );
 exports.validateRegistrationEmail = onCall(
   defaultFunctionOptions,
