@@ -73,7 +73,6 @@ function LoginSessionsTab() {
             email: data.email || "—",
             role: data.role || "—",
             action: data.action || "—",
-            ipAddress: data.ipAddress || null,
             deviceInfo: data.deviceInfo || null,
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : null,
           };
@@ -175,7 +174,6 @@ function LoginSessionsTab() {
                   <th>User</th>
                   <th>Role</th>
                   <th>Status</th>
-                  <th>IP Address</th>
                   <th>Device / Browser</th>
                   <th>Date &amp; Time</th>
                 </tr>
@@ -183,7 +181,7 @@ function LoginSessionsTab() {
               <tbody>
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="no-logs">No records match your filters.</td>
+                    <td colSpan={6} className="no-logs">No records match your filters.</td>
                   </tr>
                 ) : (
                   paged.map((r, i) => (
@@ -195,7 +193,6 @@ function LoginSessionsTab() {
                       </td>
                       <td><RoleBadge role={r.role} /></td>
                       <td><StatusBadge action={r.action} /></td>
-                      <td className="audit-ip">{r.ipAddress || <span className="audit-meta-unknown">Unknown</span>}</td>
                       <td className="audit-device">
                         {r.deviceInfo ? (
                           <>

@@ -2,28 +2,6 @@ const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { UAParser } = require("ua-parser-js");
 
-function extractIp(rawReq) {
-  if (!rawReq) return null;
-  // x-forwarded-for is most reliable in production (behind Firebase's load balancer)
-  const forwarded = rawReq.headers?.["x-forwarded-for"];
-  if (forwarded) return forwarded.split(",")[0].trim();
-  // x-real-ip set by some reverse proxies
-  const realIp = rawReq.headers?.["x-real-ip"];
-  if (realIp) return realIp.trim();
-  // Fall back to raw socket address (emulator / direct connections)
-  const addr =
-    rawReq.socket?.remoteAddress ||
-    rawReq.connection?.remoteAddress ||
-    rawReq.ip ||
-    null;
-  if (!addr) return null;
-  // Normalize IPv6-mapped IPv4 (::ffff:1.2.3.4 → 1.2.3.4)
-  if (addr.startsWith("::ffff:")) return addr.slice(7);
-  // Normalize IPv6 loopback to familiar form
-  if (addr === "::1") return "127.0.0.1";
-  return addr;
-}
-
 function parseDeviceInfo(uaString) {
   if (!uaString) return null;
   const parser = new UAParser(uaString);
@@ -68,10 +46,8 @@ async function logLogout(request) {
       throw new Error("Account is blocked");
     }
 
-    // Capture IP and User-Agent from the raw request
-    const rawReq = request?.rawRequest;
-    const ipAddress = extractIp(rawReq);
-    const uaString = rawReq?.headers?.["user-agent"] || null;
+    // Capture User-Agent from the raw request
+    const uaString = request?.rawRequest?.headers?.["user-agent"] || null;
     const deviceInfo = parseDeviceInfo(uaString);
 
     // Store audit log
@@ -84,7 +60,6 @@ async function logLogout(request) {
         email: email || null,
         action: "LOGOUT",
         role,
-        ipAddress,
         deviceInfo,
         timestamp: FieldValue.serverTimestamp(),
       });

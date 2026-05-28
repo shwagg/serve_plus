@@ -272,13 +272,6 @@
   white-space: nowrap;
 }
 
-.audit-ip {
-  font-size: 0.82rem;
-  color: #334155;
-  font-family: monospace;
-  white-space: nowrap;
-}
-
 .audit-device-browser {
   font-size: 0.82rem;
   font-weight: 600;
