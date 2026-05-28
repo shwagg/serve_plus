@@ -73,6 +73,8 @@ function LoginSessionsTab() {
             email: data.email || "—",
             role: data.role || "—",
             action: data.action || "—",
+            ipAddress: data.ipAddress || null,
+            deviceInfo: data.deviceInfo || null,
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : null,
           };
         });
@@ -173,13 +175,15 @@ function LoginSessionsTab() {
                   <th>User</th>
                   <th>Role</th>
                   <th>Status</th>
+                  <th>IP Address</th>
+                  <th>Device / Browser</th>
                   <th>Date &amp; Time</th>
                 </tr>
               </thead>
               <tbody>
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="no-logs">No records match your filters.</td>
+                    <td colSpan={7} className="no-logs">No records match your filters.</td>
                   </tr>
                 ) : (
                   paged.map((r, i) => (
@@ -191,6 +195,17 @@ function LoginSessionsTab() {
                       </td>
                       <td><RoleBadge role={r.role} /></td>
                       <td><StatusBadge action={r.action} /></td>
+                      <td className="audit-ip">{r.ipAddress || <span className="audit-meta-unknown">Unknown</span>}</td>
+                      <td className="audit-device">
+                        {r.deviceInfo ? (
+                          <>
+                            <div className="audit-device-browser">{r.deviceInfo.browser || "Unknown Browser"}</div>
+                            <div className="audit-device-os">{[r.deviceInfo.os, r.deviceInfo.device].filter(Boolean).join(" · ")}</div>
+                          </>
+                        ) : (
+                          <span className="audit-meta-unknown">Unknown</span>
+                        )}
+                      </td>
                       <td className="audit-date">{formatDate(r.timestamp)}</td>
                     </tr>
                   ))
