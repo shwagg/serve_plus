@@ -1,23 +1,6 @@
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { UAParser } = require("ua-parser-js");
 
-function parseDeviceInfo(uaString) {
-  if (!uaString) return null;
-  const parser = new UAParser(uaString);
-  const result = parser.getResult();
-  const browser = [result.browser.name, result.browser.major]
-    .filter(Boolean)
-    .join(" ");
-  const os = [result.os.name, result.os.version].filter(Boolean).join(" ");
-  const device =
-    result.device.type === "mobile"
-      ? "Mobile"
-      : result.device.type === "tablet"
-      ? "Tablet"
-      : "Desktop";
-  return { browser: browser || null, os: os || null, device };
-}
 
 async function logLogout(request) {
   try {
@@ -46,9 +29,6 @@ async function logLogout(request) {
       throw new Error("Account is blocked");
     }
 
-    // Capture User-Agent from the raw request
-    const uaString = request?.rawRequest?.headers?.["user-agent"] || null;
-    const deviceInfo = parseDeviceInfo(uaString);
 
     // Store audit log
     console.log("Writing audit log for logout...");
@@ -60,7 +40,6 @@ async function logLogout(request) {
         email: email || null,
         action: "LOGOUT",
         role,
-        deviceInfo,
         timestamp: FieldValue.serverTimestamp(),
       });
     console.log("Logout logged for:", email);

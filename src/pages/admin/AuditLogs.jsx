@@ -73,7 +73,6 @@ function LoginSessionsTab() {
             email: data.email || "—",
             role: data.role || "—",
             action: data.action || "—",
-            deviceInfo: data.deviceInfo || null,
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : null,
           };
         });
@@ -174,14 +173,13 @@ function LoginSessionsTab() {
                   <th>User</th>
                   <th>Role</th>
                   <th>Status</th>
-                  <th>Device / Browser</th>
                   <th>Date &amp; Time</th>
                 </tr>
               </thead>
               <tbody>
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="no-logs">No records match your filters.</td>
+                    <td colSpan={5} className="no-logs">No records match your filters.</td>
                   </tr>
                 ) : (
                   paged.map((r, i) => (
@@ -193,16 +191,6 @@ function LoginSessionsTab() {
                       </td>
                       <td><RoleBadge role={r.role} /></td>
                       <td><StatusBadge action={r.action} /></td>
-                      <td className="audit-device">
-                        {r.deviceInfo ? (
-                          <>
-                            <div className="audit-device-browser">{r.deviceInfo.browser || "Unknown Browser"}</div>
-                            <div className="audit-device-os">{[r.deviceInfo.os, r.deviceInfo.device].filter(Boolean).join(" · ")}</div>
-                          </>
-                        ) : (
-                          <span className="audit-meta-unknown">Unknown</span>
-                        )}
-                      </td>
                       <td className="audit-date">{formatDate(r.timestamp)}</td>
                     </tr>
                   ))
@@ -623,7 +611,7 @@ function GenericAuditTab({ category, emptyMessage }) {
             // Handle both storage formats:
             //   new format: details stored as nested map under raw.details
             //   old format: details were spread at root level
-            const { action, category, actorName, actorEmail, actorUid, timestamp, details: nestedDetails, ...spreadFields } = raw;
+            const { action, actorName, actorEmail, actorUid, timestamp, details: nestedDetails, ...spreadFields } = raw;
             const details = (nestedDetails && typeof nestedDetails === "object") ? nestedDetails : spreadFields;
             return {
               id: d.id,
