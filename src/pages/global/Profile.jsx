@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, addDoc, deleteDoc, query, orderBy } from "firebase/firestore";
 import { getLevelInfo } from "../../hooks/rewardSystem";
 // Simple modal component
 function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, activeFrame: initialFrame = 'default' }) {
@@ -410,6 +410,129 @@ const mockProfile = {
   ]
 };
 
+// Gallery Image Modal Component
+function GalleryImageModal({ image, onClose }) {
+  const [isZoomed, setIsZoomed] = useState(false);
+  if (!image) return null;
+
+  return (
+    <div className="gallery-modal-overlay" onClick={onClose}>
+      <div className="gallery-modal-content" onClick={(e) => e.stopPropagation()}>
+        <button className="gallery-modal-close" onClick={onClose}>×</button>
+        <img 
+          src={image.url} 
+          alt={image.caption || 'Gallery image'} 
+          className={`gallery-modal-image ${isZoomed ? 'zoomed' : ''}`}
+          onClick={() => setIsZoomed(!isZoomed)}
+        />
+        {image.caption && <div className="gallery-modal-caption">{image.caption}</div>}
+        {image.eventTitle && <div className="gallery-modal-event">📅 {image.eventTitle}</div>}
+        <div className="gallery-modal-date">
+          📍 Added on {new Date(image.createdAt?.toDate?.() || image.createdAt).toLocaleDateString()}
+        </div>
+        {isZoomed && <div className="gallery-modal-zoom-hint">Click image to zoom out</div>}
+      </div>
+    </div>
+  );
+}
+
+// Gallery Upload Modal Component
+function GalleryUploadModal({ isOpen, onClose, onUpload, events }) {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [caption, setCaption] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Image size must be less than 10MB');
+        return;
+      }
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setPreviewUrl(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      alert('Please select an image');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not logged in');
+
+      const storage = getStorage();
+      const timestamp = Date.now();
+      const filename = `gallery/${user.uid}/${timestamp}_${selectedFile.name}`;
+      const storageRef = ref(storage, filename);
+      
+      await uploadBytes(storageRef, selectedFile);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      const galleryData = {
+        url: downloadURL,
+        caption: caption.trim(),
+        eventId: selectedEvent || null,
+        eventTitle: events.find(e => e.id === selectedEvent)?.title || null,
+        createdAt: new Date(),
+        userId: user.uid
+      };
+
+      await onUpload(galleryData);
+      onClose();
+      setSelectedFile(null);
+      setCaption('');
+      setSelectedEvent('');
+      setPreviewUrl(null);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="gallery-upload-modal-overlay" onClick={onClose}>
+      <div className="gallery-upload-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Add to Gallery</h3>
+        {previewUrl && (
+          <div className="gallery-upload-preview">
+            <img src={previewUrl} alt="Preview" />
+          </div>
+        )}
+        <input type="file" accept="image/*" onChange={handleFileSelect} />
+        <input type="text" placeholder="Caption (optional)" value={caption} onChange={(e) => setCaption(e.target.value)} />
+        <select value={selectedEvent} onChange={(e) => setSelectedEvent(e.target.value)}>
+          <option value="">Select related event (optional)</option>
+          {events.map(event => (
+            <option key={event.id} value={event.id}>{event.title}</option>
+          ))}
+        </select>
+        <div className="gallery-upload-buttons">
+          <button onClick={onClose}>Cancel</button>
+          <button onClick={handleUpload} disabled={uploading || !selectedFile}>
+            {uploading ? 'Uploading...' : 'Upload'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 export default function Profile() {
   const { refreshUserData } = useSession();
   const [profile, setProfile] = useState(null);
@@ -437,7 +560,6 @@ export default function Profile() {
 
   const [scrollToCerts, setScrollToCerts] = useState(false);
   const [highlightFirstCert, setHighlightFirstCert] = useState(false);
-  const [activeFrame, setActiveFrame] = useState("default");
 
   useEffect(() => {
     if (sessionStorage.getItem("profileScrollTo") !== "certificates") return;
@@ -456,6 +578,29 @@ export default function Profile() {
     }, 100);
     return () => clearTimeout(t);
   }, [scrollToCerts, activeTab, certsLoaded]);
+
+  // Load gallery images
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const galleryRef = collection(db, "users", user.uid, "gallery");
+  const q = query(galleryRef, orderBy("createdAt", "desc"));
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const images = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setGalleryImages(images);
+    setGalleryLoading(false);
+  }, (error) => {
+    console.error("Gallery load error:", error);
+    setGalleryLoading(false);
+  });
+
+  return () => unsubscribe();
+}, []);
 
 
   // Load cert PDF for the iframe viewer.
@@ -906,6 +1051,23 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+
+      {/* Gallery Image Modal */}
+      {selectedGalleryImage && (
+        <GalleryImageModal 
+          image={selectedGalleryImage} 
+          onClose={() => setSelectedGalleryImage(null)} 
+        />
+      )}
+
+      {/* Gallery Upload Modal */}
+      <GalleryUploadModal
+        isOpen={showGalleryUpload}
+        onClose={() => setShowGalleryUpload(false)}
+        onUpload={handleGalleryUpload}
+        events={profile?.registeredEvents || []}
+      />
 
       <div className="profile-main-flex">
         <div className="profile-card">
@@ -1391,6 +1553,63 @@ export default function Profile() {
               </div>
             );
           })()}
+
+                    {/* Gallery Tab */}
+          {activeTab === "Gallery" && (
+            <div role="tabpanel" id="profile-tabpanel-Gallery" aria-labelledby="profile-tab-Gallery" className="profile-tab-panel">
+              <div className="gallery-container">
+                <div className="gallery-header">
+                  <div className="gallery-title">📸 My Participation Gallery</div>
+                  <button 
+                    className="gallery-upload-btn"
+                    onClick={() => setShowGalleryUpload(true)}
+                  >
+                    + Add Photo
+                  </button>
+                </div>
+                
+                {galleryLoading ? (
+                  <div className="gallery-loading">Loading your photos...</div>
+                ) : galleryImages.length === 0 ? (
+                  <div className="gallery-empty">
+                    <div className="gallery-empty-icon">📷</div>
+                    <p>No photos yet</p>
+                    <p className="gallery-empty-subtext">Share your volunteer moments by uploading photos!</p>
+                  </div>
+                ) : (
+                  <div className="gallery-grid">
+                    {galleryImages.map((image) => (
+                      <div key={image.id} className="gallery-item">
+                        <div className="gallery-image-wrapper">
+                          <img 
+                            src={image.url} 
+                            alt={image.caption || 'Gallery image'} 
+                            className="gallery-image"
+                            onClick={() => setSelectedGalleryImage(image)}
+                          />
+                          <button 
+                            className="gallery-delete-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteGalleryImage(image.id);
+                            }}
+                            title="Delete photo"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        {image.caption && <div className="gallery-caption">{image.caption}</div>}
+                        {image.eventTitle && <div className="gallery-event-tag">📍 {image.eventTitle}</div>}
+                        <div className="gallery-date">
+                          {new Date(image.createdAt?.toDate?.() || image.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── Hidden PDF layout ── */}
           {profile && (() => {
