@@ -138,10 +138,19 @@ export default function EventActivity() {
           position.coords.latitude,
           position.coords.longitude
         );
-        const THRESHOLD_METERS = 200;
+        
+
+        const qrLocationAccuracy = parsed.location.accuracy || 20; 
+        const userLocationAccuracy = position.coords.accuracy || 20; 
+        const BASE_THRESHOLD = 200; 
+        const ACCURACY_BUFFER = 1.5;
+        
+        // Dynamic threshold: base + (combined accuracy * buffer)
+        const THRESHOLD_METERS = BASE_THRESHOLD + (qrLocationAccuracy + userLocationAccuracy) * ACCURACY_BUFFER;
+        
         if (dist > THRESHOLD_METERS) {
           setQRStatus(
-            "You are not close to the supposed event location. If you are there, kindly ask the nearby coordinator."
+            `You are ${Math.round(dist)} meters away from the event location. Please move closer. (Threshold: ${Math.round(THRESHOLD_METERS)}m)`
           );
           setScanSuccess(false);
           return;
