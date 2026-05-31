@@ -3,7 +3,6 @@ const DOCUMENT_ENTRY_FORMAT = "firestore-document-v1";
 const ROOT_COLLECTIONS_TO_BACKUP = [
   "users",
   "missions",
-  "loginAttempts",
   "auditLogs",
   "proposal",
   "settings",
