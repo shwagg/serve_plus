@@ -9,6 +9,7 @@ import {
   subscribeToNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  cleanupOldReadNotifications,
   createNotification,
 } from "../utils/notificationUtils";
 import { playNotificationSound } from "../utils/soundUtils";
@@ -62,6 +63,13 @@ export default function NotificationBell() {
     });
 
     return () => unsubscribe();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    cleanupOldReadNotifications(userId).catch((err) => {
+      console.error("Failed to cleanup old notifications:", err);
+    });
   }, [userId]);
 
   // Watch user doc for real-time updates (totalPoints + globalNotificationsEnabled)
