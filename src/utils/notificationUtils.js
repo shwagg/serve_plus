@@ -8,6 +8,7 @@ import {
   getDocs,
   getDoc,
   updateDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
   onSnapshot,
@@ -56,15 +57,34 @@ export async function notifyEventParticipants(missionId, notificationData) {
 
 export async function markNotificationAsRead(userId, notificationId) {
   const notificationRef = doc(db, "users", userId, "notifications", notificationId);
-  await updateDoc(notificationRef, { read: true });
+  await updateDoc(notificationRef, { read: true, readAt: serverTimestamp() });
 }
 
 export async function markAllNotificationsAsRead(userId) {
   const notificationsRef = collection(db, "users", userId, "notifications");
   const q = query(notificationsRef, where("read", "==", false));
   const snapshot = await getDocs(q);
-  const updates = snapshot.docs.map((docSnap) => updateDoc(docSnap.ref, { read: true }));
+  const updates = snapshot.docs.map((docSnap) => updateDoc(docSnap.ref, {
+    read: true,
+    readAt: serverTimestamp(),
+  }));
   await Promise.all(updates);
+}
+
+export async function cleanupOldReadNotifications(userId) {
+  if (!userId) return;
+  const notificationsRef = collection(db, "users", userId, "notifications");
+  const q = query(notificationsRef, where("read", "==", true));
+  const snapshot = await getDocs(q);
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+  const deletions = snapshot.docs.filter((docSnap) => {
+    const data = docSnap.data();
+    const readAt = data.readAt?.toDate?.() || data.createdAt?.toDate?.();
+    return readAt && readAt.getTime() <= cutoff;
+  });
+
+  await Promise.all(deletions.map((docSnap) => deleteDoc(docSnap.ref)));
 }
 
 export function subscribeToNotifications(userId, callback) {
@@ -75,6 +95,7 @@ export function subscribeToNotifications(userId, callback) {
       id: docSnap.id,
       ...docSnap.data(),
       createdAt: docSnap.data().createdAt?.toDate?.(),
+      readAt: docSnap.data().readAt?.toDate?.(),
     }));
     callback(notifications);
   });
