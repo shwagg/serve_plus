@@ -1,9 +1,7 @@
-const admin = require("firebase-admin");
-
-function getLoginAttemptKey(value) {
-  const trimmed = String(value || "").trim();
-  return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
-}
+const {
+  clearLoginAttemptsForEmail,
+  getLoginAttemptKey,
+} = require("./loginAttempts");
 
 async function resetLoginAttempts(request) {
   const email = getLoginAttemptKey(request.data?.email);
@@ -14,12 +12,11 @@ async function resetLoginAttempts(request) {
 
   console.log("Resetting login attempts for:", email);
 
-  // Delete the login attempts document
-  await admin.firestore().collection("loginAttempts").doc(email).delete();
+  await clearLoginAttemptsForEmail(email);
 
   console.log("Login attempts reset for:", email);
 
-  return { success: true };
+  return {success: true};
 }
 
-module.exports = { resetLoginAttempts };
+module.exports = {resetLoginAttempts};

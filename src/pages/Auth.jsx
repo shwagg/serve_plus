@@ -41,19 +41,16 @@ function checkDeactivation(data) {
   return { daysLeft };
 }
 
-function getLoginAttemptKey(loginId) {
-  const trimmed = String(loginId || "").trim();
-  return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
-}
+function getLoginLockoutMessage(err) {
+  const details = err?.details;
+  if (!details?.isLocked || !details.lockUntil) return null;
 
-function shouldRecordLoginFailure(err) {
-  const code = err?.code || "";
-  return [
-    "functions/unauthenticated",
-    "auth/invalid-credential",
-    "auth/user-not-found",
-    "auth/wrong-password",
-  ].includes(code);
+  const lockUntil = new Date(details.lockUntil);
+  const minutesLeft = Number.isNaN(lockUntil.getTime())
+    ? 10
+    : Math.max(1, Math.ceil((lockUntil - new Date()) / 60000));
+
+  return `Too many failed attempts. Account locked for ${minutesLeft} minute(s).`;
 }
 
 function Auth() {
@@ -241,7 +238,6 @@ function Auth() {
   const handleLogin = async (e) => {
     e.preventDefault();
     const submittedLoginId = loginId.trim();
-    const loginAttemptKey = getLoginAttemptKey(submittedLoginId);
     setError("");
     setVerificationMessage("");
     setVerificationRequired(null);
@@ -286,31 +282,10 @@ function Auth() {
     } catch (err) {
       if (isDev) console.error("Login error:", err);
 
-      if (shouldRecordLoginFailure(err) && loginAttemptKey) {
-        try {
-          const recordLoginFailure = httpsCallable(
-            functions,
-            "recordLoginFailure",
-          );
-          const failureResult = await recordLoginFailure({
-            email: loginAttemptKey,
-          });
-
-          if (failureResult.data?.isLocked) {
-            const lockUntil = new Date(failureResult.data.lockUntil);
-            const minutesLeft = Math.ceil((lockUntil - new Date()) / 60000);
-            setError(
-              `Too many failed attempts. Account locked for ${minutesLeft} minute(s).`,
-            );
-            return;
-          } else if (failureResult.data?.attempts) {
-            const attemptsLeft =
-              failureResult.data.maxAttempts - failureResult.data.attempts;
-            console.log(`${attemptsLeft} attempts remaining before account lock`);
-          }
-        } catch (recordErr) {
-          console.warn("Failed to record login failure:", recordErr);
-        }
+      const lockoutMessage = getLoginLockoutMessage(err);
+      if (lockoutMessage) {
+        setError(lockoutMessage);
+        return;
       }
 
       const code = err?.code || "";
@@ -324,7 +299,10 @@ function Auth() {
         userMsg = "No account found for this email.";
       } else if (code === "auth/wrong-password") {
         userMsg = "Incorrect password. Please try again.";
-      } else if (code === "auth/too-many-requests") {
+      } else if (
+        code === "auth/too-many-requests" ||
+        code === "functions/resource-exhausted"
+      ) {
         userMsg = "Too many login attempts. Please wait a bit and try again.";
       } else if (code === "auth/network-request-failed") {
         userMsg = "Network error. Please check your connection and try again.";

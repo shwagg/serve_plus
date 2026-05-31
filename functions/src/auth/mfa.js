@@ -13,6 +13,12 @@ const {
   normalizeEmail,
   isAllowedEmailDomain,
 } = require("./emailPolicy");
+const {
+  LOCK_TIME_MINUTES,
+  checkLoginAttemptLock,
+  clearLoginAttemptsForEmail,
+  recordLoginFailureForEmail,
+} = require("./loginAttempts");
 
 const REQUIRED_MFA_ROLES = new Set(["student", "faculty", "admin"]);
 const EXEMPT_MFA_ROLES = new Set(["partner", "sysadmin"]);
@@ -145,6 +151,24 @@ function mapIdentityToolkitErrorMessage(message) {
     return "Password authentication is not enabled.";
   }
   return "Authentication failed. Please try again.";
+}
+
+function createLoginLockError(lockState) {
+  const lockUntil = lockState.lockUntil;
+  const minutesLeft = lockUntil ?
+    Math.max(1, Math.ceil((new Date(lockUntil) - new Date()) / 60000)) :
+    LOCK_TIME_MINUTES;
+
+  return new HttpsError(
+    "resource-exhausted",
+    `Too many failed attempts. Account locked for ${minutesLeft} minute(s).`,
+    {
+      attempts: lockState.attempts,
+      maxAttempts: lockState.maxAttempts,
+      isLocked: lockState.isLocked,
+      lockUntil,
+    },
+  );
 }
 
 async function resolveLoginAccount(loginId) {
@@ -734,7 +758,26 @@ async function startPasswordLogin(request) {
     );
   }
 
-  const authResult = await verifyPassword(email, password);
+  const lockState = await checkLoginAttemptLock(email);
+  if (lockState.isLocked) {
+    throw createLoginLockError(lockState);
+  }
+
+  let authResult;
+  try {
+    authResult = await verifyPassword(email, password);
+  } catch (err) {
+    if (err.code === "unauthenticated") {
+      const failureState = await recordLoginFailureForEmail(email);
+      if (failureState.isLocked) {
+        throw createLoginLockError(failureState);
+      }
+    }
+    throw err;
+  }
+
+  await clearLoginAttemptsForEmail(email);
+
   const userRecord = await admin.auth().getUser(authResult.localId);
   let userData = await getOrCreateUserProfile(userRecord, resolved.userData);
   const role = getRole(userData);
