@@ -548,6 +548,11 @@ export default function Profile() {
   const [exportError, setExportError] = useState('');
   const [historyFilter, setHistoryFilter] = useState("all");
   const [historySort, setHistorySort] = useState("date_desc");
+  const [activeFrame, setActiveFrame] = useState("default");
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [galleryLoading, setGalleryLoading] = useState(true);
+  const [selectedGalleryImage, setSelectedGalleryImage] = useState(null);
+  const [showGalleryUpload, setShowGalleryUpload] = useState(false);
   const portfolioPdfRef = useRef(null);
   const serveReadyAwardedRef = useRef(false);
   const certBlobRef = useRef(null);
@@ -579,10 +584,31 @@ export default function Profile() {
     return () => clearTimeout(t);
   }, [scrollToCerts, activeTab, certsLoaded]);
 
+  const handleGalleryUpload = async (galleryData) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not logged in");
+
+    await addDoc(collection(db, "users", user.uid, "gallery"), galleryData);
+  };
+
+  const handleDeleteGalleryImage = async (imageId) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      await deleteDoc(doc(db, "users", user.uid, "gallery", imageId));
+    } catch (error) {
+      console.error("Gallery delete error:", error);
+    }
+  };
+
   // Load gallery images
 useEffect(() => {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) {
+    setGalleryLoading(false);
+    return;
+  }
 
   const galleryRef = collection(db, "users", user.uid, "gallery");
   const q = query(galleryRef, orderBy("createdAt", "desc"));
