@@ -142,7 +142,7 @@ export default function EventActivity() {
 
         const qrLocationAccuracy = parsed.location.accuracy || 20; 
         const userLocationAccuracy = position.coords.accuracy || 20; 
-        const BASE_THRESHOLD = 200; 
+        const BASE_THRESHOLD = 400; 
         const ACCURACY_BUFFER = 1.5;
         
         // Dynamic threshold: base + (combined accuracy * buffer)
