@@ -1519,9 +1519,9 @@ export default function CurrentEvent() {
                                   }}
                                 >
                                   <option value="">Pick role…</option>
-                                  <option value="volunteer">Volunteer</option>
-                                  <option value="organizer">📋 Organizer</option>
-                                  <option value="lead_organizer">🎯 Lead Organizer</option>
+                                  <option value="volunteer">Participant</option>
+                                  <option value="organizer">Organizer</option>
+                                  <option value="lead_organizer">Lead Organizer</option>
                                 </select>
                                 <button
                                   disabled={!pendingRole || !!assigningRole[v.id]}

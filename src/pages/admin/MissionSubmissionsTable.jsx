@@ -337,13 +337,17 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       const journals = v.journals || [];
       const allJournalsApproved = journals.length === 0 || journals.every(j => j.adminApprovalStatus === "approved");
       const isConsentApproved = v.consentSubmission?.reviewStatus === "approved";
-      const requiredItems = [
-        v.preSurveyAnswers,
-        v.postSurveyAnswers,
-        isConsentApproved,
-        v.progress?.attendance === "present",
-        ...(journals.length > 0 ? [allJournalsApproved] : []),
-      ];
+      const vRoles = v.preSurveyAnswers?.engagement?.participation || [];
+      const isDonorOnly = vRoles.length === 1 && vRoles[0]?.trim().toLowerCase() === "donor";
+      const requiredItems = isDonorOnly
+        ? [v.preSurveyAnswers]
+        : [
+            v.preSurveyAnswers,
+            v.postSurveyAnswers,
+            isConsentApproved,
+            v.progress?.attendance === "present",
+            ...(journals.length > 0 ? [allJournalsApproved] : []),
+          ];
       return requiredItems.every(Boolean);
     });
 
@@ -503,7 +507,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                   {filterRole && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
                   {openFilter === "role" && (
                     <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400 }}>
-                      {[["", "All Roles"], ["participant", "Participant"], ["donor", "Donor"], ["facilitator", "Facilitator"], ["organizer", "Organizer"], ["observer", "Observer"]].map(([val, label]) => (
+                      {[["", "All Roles"], ["participant", "Participant"], ["donor", "Donor"], ["organizer", "Organizer"], ["lead_organizer", "Lead Organizer"]].map(([val, label]) => (
                         <div key={val} onClick={() => { setFilterRole(val); setOpenFilter(null); }}
                           style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterRole === val ? "#1a73e8" : "#202124", background: filterRole === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
                           {label}
@@ -525,7 +529,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                   >▼</button>
                   {filterAttendance && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
                   {openFilter === "attendance" && (
-                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 150, padding: "6px 0", fontWeight: 400 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 150, padding: "6px 0", fontWeight: 400, textAlign: "left" }}>
                       {[["", "All Attendance"], ["present", "Present"], ["absent", "Not Yet"]].map(([val, label]) => (
                         <div key={val} onClick={() => { setFilterAttendance(val); setOpenFilter(null); }}
                           style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterAttendance === val ? "#1a73e8" : "#202124", background: filterAttendance === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
@@ -548,7 +552,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                   >▼</button>
                   {filterPreSurvey && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
                   {openFilter === "preSurvey" && (
-                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400, textAlign: "left" }}>
                       {[["", "All"], ["submitted", "Submitted"], ["not_submitted", "Not Submitted"]].map(([val, label]) => (
                         <div key={val} onClick={() => { setFilterPreSurvey(val); setOpenFilter(null); }}
                           style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterPreSurvey === val ? "#1a73e8" : "#202124", background: filterPreSurvey === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
@@ -571,7 +575,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                   >▼</button>
                   {filterConsent && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
                   {openFilter === "consent" && (
-                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 170, padding: "6px 0", fontWeight: 400 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 170, padding: "6px 0", fontWeight: 400, textAlign: "left" }}>
                       {[["", "All"], ["approved", "Approved"], ["pending", "Pending Review"], ["rejected", "Rejected"], ["none", "Not Submitted"]].map(([val, label]) => (
                         <div key={val} onClick={() => { setFilterConsent(val); setOpenFilter(null); }}
                           style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterConsent === val ? "#1a73e8" : "#202124", background: filterConsent === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
@@ -594,7 +598,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                   >▼</button>
                   {filterPostSurvey && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a73e8", display: "inline-block", flexShrink: 0 }} />}
                   {openFilter === "postSurvey" && (
-                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#fff", border: "1px solid #dadce0", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.14)", zIndex: 1000, minWidth: 160, padding: "6px 0", fontWeight: 400, textAlign: "left" }}>
                       {[["", "All"], ["submitted", "Submitted"], ["not_submitted", "Not Submitted"]].map(([val, label]) => (
                         <div key={val} onClick={() => { setFilterPostSurvey(val); setOpenFilter(null); }}
                           style={{ padding: "7px 14px", cursor: "pointer", fontSize: "0.8rem", color: filterPostSurvey === val ? "#1a73e8" : "#202124", background: filterPostSurvey === val ? "#e8f0fe" : "transparent", whiteSpace: "nowrap" }}>
@@ -627,13 +631,16 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               const approvedJournalCount = journals.filter(j => j.adminApprovalStatus === "approved").length;
               const allJournalsApproved = journals.length === 0 || approvedJournalCount === journals.length;
 
-              const requiredItems = [
-                v.preSurveyAnswers,
-                v.postSurveyAnswers,
-                isConsentApproved,
-                v.progress?.attendance === "present",
-                ...(journals.length > 0 ? [allJournalsApproved] : []),
-              ];
+              const isDonorOnly = rawRoles.length === 1 && rawRoles[0]?.trim().toLowerCase() === "donor";
+              const requiredItems = isDonorOnly
+                ? [v.preSurveyAnswers]
+                : [
+                    v.preSurveyAnswers,
+                    v.postSurveyAnswers,
+                    isConsentApproved,
+                    v.progress?.attendance === "present",
+                    ...(journals.length > 0 ? [allJournalsApproved] : []),
+                  ];
 
               const completedItems = requiredItems.filter(Boolean).length;
               const individualCompletion = Math.round((completedItems / requiredItems.length) * 100);
