@@ -97,7 +97,13 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const loadVolunteers = async () => {
     setLoading(true);
     try {
-      const missionSnap = await getDoc(doc(db, "missions", missionId));
+      // Round 1: fetch mission metadata, volunteer list, and task list in parallel
+      const [missionSnap, volSnap, tasksSnap] = await Promise.all([
+        getDoc(doc(db, "missions", missionId)),
+        getDocs(collection(db, "missions", missionId, "volunteer")),
+        getDocs(collection(db, "missions", missionId, "task")),
+      ]);
+
       const missionData = missionSnap.data() || {};
       setIsFeedbackActive(missionData?.feedback?.isActive !== false);
       setMissionAvgRating(missionData?.feedback?.avgRating || 0);
@@ -105,69 +111,104 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       const td = missionData.targetDate;
       setMissionDate(td?.toDate ? td.toDate() : td ? new Date(td) : null);
 
-      const snap = await getDocs(collection(db, "missions", missionId, "volunteer"));
-      const usersSnap = await getDocs(collection(db, "users"));
-      const usersMap = new Map(usersSnap.docs.map(d => [d.id, d.data()]));
-
-      const tasksSnap = await getDocs(collection(db, "missions", missionId, "task"));
       const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const volunteerDocs = volSnap.docs;
+      const volunteerIds = volunteerDocs.map(d => d.id);
 
-      const result = await Promise.all(snap.docs.map(async (d) => {
+      if (volunteerIds.length === 0) {
+        setVolunteers([]);
+        return;
+      }
+
+      // Round 2: fetch targeted user docs, all surveys, and all task participant
+      // collections in parallel — avoids fetching the entire users collection and
+      // eliminates the N×T individual participant reads from the old approach.
+      const [userDocs, preSurveyResults, postSurveyResults, taskParticipantSnaps] = await Promise.all([
+        Promise.all(volunteerIds.map(uid => getDoc(doc(db, "users", uid)))),
+        Promise.allSettled(volunteerIds.map(uid =>
+          getDoc(doc(db, "missions", missionId, "volunteer", uid, "preSurvey", "response"))
+        )),
+        Promise.allSettled(volunteerIds.map(uid =>
+          getDoc(doc(db, "missions", missionId, "volunteer", uid, "postSurvey", "response"))
+        )),
+        Promise.all(tasks.map(task =>
+          getDocs(collection(db, "missions", missionId, "task", task.id, "participants"))
+        )),
+      ]);
+
+      const userMap = new Map(userDocs.map(d => [d.id, d.exists() ? d.data() : null]));
+      const preSurveyMap = new Map(
+        preSurveyResults.map((r, i) => [volunteerIds[i], r.status === "fulfilled" && r.value.exists() ? r.value.data() : null])
+      );
+      const postSurveyMap = new Map(
+        postSurveyResults.map((r, i) => [volunteerIds[i], r.status === "fulfilled" && r.value.exists() ? r.value.data() : null])
+      );
+
+      // taskParticipantMaps: taskId → Map<userId, participantData>
+      const taskParticipantMaps = new Map(
+        tasks.map((task, i) => [
+          task.id,
+          new Map(taskParticipantSnaps[i].docs.map(d => [d.id, d.data()])),
+        ])
+      );
+
+      // Collect unique group docs needed (only for grouped tasks with reflections)
+      const groupDocRefs = [];
+      for (const task of tasks) {
+        if (task.type !== "grouped") continue;
+        const participantMap = taskParticipantMaps.get(task.id);
+        const seenGroups = new Set();
+        for (const uid of volunteerIds) {
+          const pData = participantMap?.get(uid);
+          if (pData?.reflection?.trim() && pData?.groupId && !seenGroups.has(pData.groupId)) {
+            seenGroups.add(pData.groupId);
+            groupDocRefs.push({ taskId: task.id, groupId: pData.groupId });
+          }
+        }
+      }
+
+      const groupDocSnaps = await Promise.all(
+        groupDocRefs.map(({ taskId, groupId }) =>
+          getDoc(doc(db, "missions", missionId, "task", taskId, "group", groupId))
+        )
+      );
+      const groupDocMap = new Map(
+        groupDocRefs.map(({ taskId, groupId }, i) => [
+          `${taskId}::${groupId}`,
+          groupDocSnaps[i].exists() ? groupDocSnaps[i].data() : {},
+        ])
+      );
+
+      const result = volunteerDocs.map(d => {
         const userId = d.id;
         const vData = d.data();
-        const userData = usersMap.get(userId);
+        const userData = userMap.get(userId);
         const rawName = userData?.name || userData?.username || "Unknown User";
-
-        let preSurveyAnswers = null;
-        let postSurveyAnswers = null;
-
-        try {
-          const preDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "preSurvey", "response"));
-          if (preDoc.exists()) preSurveyAnswers = preDoc.data();
-        } catch {
-          preSurveyAnswers = null;
-        }
-
-        try {
-          const postDoc = await getDoc(doc(db, "missions", missionId, "volunteer", userId, "postSurvey", "response"));
-          if (postDoc.exists()) postSurveyAnswers = postDoc.data();
-        } catch {
-          postSurveyAnswers = null;
-        }
 
         const journals = [];
         for (const task of tasks) {
-          try {
-            const pSnap = await getDoc(doc(db, "missions", missionId, "task", task.id, "participants", userId));
-            if (pSnap.exists()) {
-              const pData = pSnap.data();
-              if (pData.reflection && pData.reflection.trim()) {
-                if (task.type === "grouped" && pData.groupId) {
-                  const groupSnap = await getDoc(doc(db, "missions", missionId, "task", task.id, "group", pData.groupId));
-                  const groupData = groupSnap.exists() ? groupSnap.data() : {};
-                  journals.push({
-                    taskId: task.id,
-                    taskTitle: task.title || `Task ${task.id}`,
-                    type: "grouped",
-                    groupId: pData.groupId,
-                    reflection: groupData.reflection || pData.reflection,
-                    adminApprovalStatus: groupData.adminApprovalStatus || pData.adminApprovalStatus || "pending",
-                    pendingPoints: pData.pendingPoints || Number(task.points) || 0,
-                  });
-                } else {
-                  journals.push({
-                    taskId: task.id,
-                    taskTitle: task.title || `Task ${task.id}`,
-                    type: task.type || "individual",
-                    reflection: pData.reflection,
-                    adminApprovalStatus: pData.adminApprovalStatus || "pending",
-                    pendingPoints: pData.pendingPoints || 0,
-                  });
-                }
-              }
-            }
-          } catch {
-            // skip tasks that fail to load
+          const pData = taskParticipantMaps.get(task.id)?.get(userId);
+          if (!pData || !pData.reflection?.trim()) continue;
+          if (task.type === "grouped" && pData.groupId) {
+            const groupData = groupDocMap.get(`${task.id}::${pData.groupId}`) || {};
+            journals.push({
+              taskId: task.id,
+              taskTitle: task.title || `Task ${task.id}`,
+              type: "grouped",
+              groupId: pData.groupId,
+              reflection: groupData.reflection || pData.reflection,
+              adminApprovalStatus: groupData.adminApprovalStatus || pData.adminApprovalStatus || "pending",
+              pendingPoints: pData.pendingPoints || Number(task.points) || 0,
+            });
+          } else {
+            journals.push({
+              taskId: task.id,
+              taskTitle: task.title || `Task ${task.id}`,
+              type: task.type || "individual",
+              reflection: pData.reflection,
+              adminApprovalStatus: pData.adminApprovalStatus || "pending",
+              pendingPoints: pData.pendingPoints || 0,
+            });
           }
         }
 
@@ -180,11 +221,11 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
           level: userData?.level || "",
           photoURL: (() => { const p = userData?.avatar || userData?.photoURL || userData?.profilePhoto || ""; return p.includes("ui-avatars.com") ? "" : p; })(),
           totalPoints: userData?.totalPoints || 0,
-          preSurveyAnswers,
-          postSurveyAnswers,
+          preSurveyAnswers: preSurveyMap.get(userId),
+          postSurveyAnswers: postSurveyMap.get(userId),
           journals,
         };
-      }));
+      });
 
       setVolunteers(result);
     } finally {

@@ -87,13 +87,12 @@ export default function DocumentLibrary() {
     const loadData = async () => {
       const missions = await fetchApprovedProposals();
 
-      const statsMap = {};
-      for (const mission of missions) {
-        statsMap[mission.id] = await fetchVolunteerStats(mission.id);
-      }
+      const statsEntries = await Promise.all(
+        missions.map(async (mission) => [mission.id, await fetchVolunteerStats(mission.id)])
+      );
 
       setProposals(missions);
-      setStats(statsMap);
+      setStats(Object.fromEntries(statsEntries));
       setLoading(false);
     };
 

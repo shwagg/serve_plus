@@ -199,6 +199,12 @@ export default function CurrentEvent() {
     const tab = params.get("tab");
     return ["roster","details","docs","feedback","accomplishment"].includes(tab) ? tab : "roster";
   });
+  // Tracks whether the docs tab has ever been opened so MissionSubmissionsTable
+  // stays mounted (via display:none) after first load instead of re-fetching every tab switch.
+  const [docsTabVisited, setDocsTabVisited] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") === "docs";
+  });
   const [flagging, setFlagging] = useState(false);
   const [flagResult, setFlagResult] = useState(null);
   const [togglingAttendance, setTogglingAttendance] = useState({});
@@ -428,6 +434,10 @@ export default function CurrentEvent() {
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [volunteerCard]);
+
+  useEffect(() => {
+    if (activeTab === "docs") setDocsTabVisited(true);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!missionId || activeTab !== "feedback") return;
@@ -1731,8 +1741,10 @@ export default function CurrentEvent() {
         )}
 
         {/* ── Document Library tab ── */}
-        {activeTab === "docs" && (
-          <MissionSubmissionsTable missionId={missionId} missionTitle={missionData?.title || missionTitle || ""} refreshKey={detailRefreshKey} />
+        {docsTabVisited && (
+          <div style={{ display: activeTab === "docs" ? "block" : "none" }}>
+            <MissionSubmissionsTable missionId={missionId} missionTitle={missionData?.title || missionTitle || ""} refreshKey={detailRefreshKey} />
+          </div>
         )}
 
         {/* ── Community Feedback tab ── */}
