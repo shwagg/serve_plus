@@ -7,6 +7,7 @@ import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Fragment } from "react";
 import { collection, getDocs, doc, getDoc, query, orderBy, limit, where, getCountFromServer, onSnapshot } from "firebase/firestore";
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { getLevelInfo } from "../../hooks/rewardSystem";
 import Header from "../../components/Header";
 import "../../styles/student.css";
@@ -98,6 +99,7 @@ const StudentHome = () => {
   const [proposalCards, setProposalCards] = useState([]);
   const [volunteerInfo, setVolunteerInfo] = useState({});
   const [studentAvatar, setStudentAvatar] = useState('');
+  const [currentUserAuthProvider, setCurrentUserAuthProvider] = useState('');
   const [enrollmentDetails, setEnrollmentDetails] = useState({});
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
@@ -305,6 +307,7 @@ const StudentHome = () => {
       setCurrentUser(user);
       if (user) {
         setShowLogoutPopup(false);
+        setCurrentUserAuthProvider('');
         const resolvedName = user.displayName || user.email || "Student";
         setStudentName(resolvedName);
 
@@ -316,10 +319,13 @@ const StudentHome = () => {
             setStudentUsername(userData.username || "");
             setStudentName(userData.name || resolvedName);
             setStudentAvatar(userData.avatar || '');
+            setCurrentUserAuthProvider(userData.authProvider || '');
             const totalPoints = userData.totalPoints || 0;
             setCurrentPoints(totalPoints);
             const calculatedLevel = getLevelInfo(totalPoints).level;
             setLevel(calculatedLevel);
+          } else {
+            setCurrentUserAuthProvider('');
           }
 
         } catch (error) {
@@ -328,6 +334,7 @@ const StudentHome = () => {
           // cleanup
         }
       } else {
+        setCurrentUserAuthProvider('');
         setShowLogoutPopup(true);
       }
     });
@@ -357,10 +364,11 @@ const StudentHome = () => {
                 "User",
               points: userData.totalPoints || 0,
               avatar: userData.avatar && !userData.avatar.includes('ui-avatars.com') ? userData.avatar : "",
-              role: userData.role || ""
+              role: userData.role || "",
+              authProvider: userData.authProvider || ""
             };
           })
-          .filter(user => user.role === "student");
+          .filter(user => user.role === "student" && user.authProvider === "blackboard");
 
         leaderboardData.sort((a, b) => b.points - a.points);
         setLeaderboard(leaderboardData);
@@ -376,9 +384,10 @@ const StudentHome = () => {
   const sortedLeaderboard = leaderboard;
 
   const currentUserId = currentUser?.uid;
-  const currentUserIndex = sortedLeaderboard.findIndex(
+  const isBlackboardStudent = currentUserAuthProvider === "blackboard";
+  const currentUserIndex = isBlackboardStudent ? sortedLeaderboard.findIndex(
     (user) => user.uid === currentUserId
-  );
+  ) : -1;
   const currentUserRank = currentUserIndex !== -1 ? currentUserIndex + 1 : null;
 
   //purpose: scroll the leaderboard-list to current rank of user logged in
@@ -611,17 +620,29 @@ const StudentHome = () => {
             <div>
               <h2 className="leaderboard-compact-title">Leaderboard</h2>
               <p className="leaderboard-rank-text">
-                {currentUserRank ? `You are in ${getOrdinal(currentUserRank)} place` : "Join a mission to get ranked!"}
+                {!isBlackboardStudent ? "Leaderboard locked" : currentUserRank ? `You are in ${getOrdinal(currentUserRank)} place` : "Join a mission to get ranked!"}
               </p>
             </div>
-            <button
-              className="leaderboard-see-all-btn"
-              onClick={() => setShowLeaderboardModal(true)}
-            >
-              View more
-            </button>
+            {isBlackboardStudent && (
+              <button
+                className="leaderboard-see-all-btn"
+                onClick={() => setShowLeaderboardModal(true)}
+              >
+                View more
+              </button>
+            )}
           </div><br />
-          <div className="leaderboard-compact-body">
+          <div className={`leaderboard-compact-body${!isBlackboardStudent ? ' is-locked' : ''}`}>
+            {!isBlackboardStudent ? (
+              <div className="leaderboard-locked-state">
+                <div className="leaderboard-locked-icon" aria-hidden="true">
+                  <LockOutlinedIcon sx={{ fontSize: 26 }} />
+                </div>
+                <div className="leaderboard-locked-title">Leaderboard locked</div>
+                <p>Sign in with your Blackboard account to view rankings.</p>
+              </div>
+            ) : (
+              <>
             {/* LEFT: compact podium */}
             <div className="leaderboard-compact-podium-wrap">
               <div className="leaderboard-compact-podium">
@@ -719,6 +740,8 @@ const StudentHome = () => {
                 ));
               })()}
             </div>
+              </>
+            )}
           </div>
         </section>
 
@@ -1010,7 +1033,7 @@ const StudentHome = () => {
     )}
 
     {/* Leaderboard See-All Modal */}
-    {showLeaderboardModal && (
+    {showLeaderboardModal && isBlackboardStudent && (
       <div
         className="leaderboard-modal-overlay"
         onClick={(e) => { if (e.target === e.currentTarget) { setShowLeaderboardModal(false); setLeaderboardSearch(''); } }}
