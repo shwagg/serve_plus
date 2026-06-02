@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useContext, useMemo, useRef } from "react";
 import {
   collection,
+  collectionGroup,
   getDocs,
   query,
   where,
+  limit,
   doc,
   setDoc,
   deleteDoc,
@@ -39,43 +41,65 @@ async function uploadBadgeImage(file, badgeId) {
   return getDownloadURL(storageRef);
 }
 
+async function hasBadgeBeenAwarded(badgeId) {
+  const q = query(collectionGroup(db, "badges"), where("badgeId", "==", badgeId), limit(1));
+  const snap = await getDocs(q);
+  return !snap.empty;
+}
+
 // ─── Badge image slot with inline upload ────────────────────────────────────
 // Sits in the same left slot as the BadgeIcon — clicking it replaces the image.
 
-function BadgeImgSlotEdit({ currentImageUrl, badgeId, svgId, onFile }) {
+function BadgeImgSlotEdit({ currentImageUrl, badgeId, svgId, onFile, showRequired = false, onReject, hideHint = false }) {
   const inputRef = useRef();
   const [preview, setPreview] = useState(null);
 
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const isSvg = file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg");
+    if (!isSvg) {
+      e.target.value = "";
+      onReject?.("Badge icon must be an SVG file (.svg). Please upload an SVG.");
+      return;
+    }
     setPreview(URL.createObjectURL(file));
     onFile(file);
   };
 
+  const isEmpty = !preview && !currentImageUrl && !badgeId;
+
   return (
-    <div
-      className="bm-img-slot-edit"
-      onClick={() => inputRef.current.click()}
-      title="Use a transparent background (PNG or SVG recommended)"
-    >
-      {preview ? (
-        <img src={preview} alt="" className="bm-img-slot-img" />
-      ) : currentImageUrl ? (
-        <img src={currentImageUrl} alt="" className="bm-img-slot-img" />
-      ) : badgeId ? (
-        <BadgeIcon badgeId={svgId ?? badgeId} earned size="sm" />
-      ) : (
-        <div className="bm-img-slot-empty" />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+      {showRequired && !hideHint && (
+        <span className="bm-img-slot-bg-hint">⚠ Use transparent background</span>
       )}
-      <div className="bm-img-slot-overlay">↑</div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/svg+xml,image/webp"
-        style={{ display: "none" }}
-        onChange={handleFile}
-      />
+      <div
+        className={`bm-img-slot-edit${isEmpty && showRequired ? " bm-img-slot-required" : ""}`}
+        onClick={() => inputRef.current.click()}
+        title="SVG only — use a transparent background"
+      >
+        {preview ? (
+          <img src={preview} alt="" className="bm-img-slot-img" />
+        ) : currentImageUrl ? (
+          <img src={currentImageUrl} alt="" className="bm-img-slot-img" />
+        ) : badgeId ? (
+          <BadgeIcon badgeId={svgId ?? badgeId} earned size="sm" />
+        ) : (
+          <div className="bm-img-slot-empty" />
+        )}
+        <div className="bm-img-slot-overlay">↑</div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".svg,image/svg+xml"
+          style={{ display: "none" }}
+          onChange={handleFile}
+        />
+      </div>
+      {isEmpty && showRequired && (
+        <span className="bm-img-slot-required-label">Required</span>
+      )}
     </div>
   );
 }
@@ -83,22 +107,48 @@ function BadgeImgSlotEdit({ currentImageUrl, badgeId, svgId, onFile }) {
 // ─── Badge Catalog Tab ───────────────────────────────────────────────────────
 
 function BadgeCatalogTab({ mergedDefs, onRefresh }) {
-  const [editingId, setEditingId]   = useState(null);
-  const [editForm, setEditForm]     = useState({ name: "", criteria: "" });
-  const [editFile, setEditFile]     = useState(null);
-  const [saving, setSaving]         = useState(false);
-  const [showAdd, setShowAdd]       = useState(false);
-  const [addForm, setAddForm]       = useState({ name: "", criteria: "" });
-  const [addFile, setAddFile]       = useState(null);
-  const [addSaving, setAddSaving]   = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+  const [editingId, setEditingId]       = useState(null);
+  const [editForm, setEditForm]         = useState({ name: "", description: "", criteria: "" });
+  const [editFile, setEditFile]         = useState(null);
+  const [saving, setSaving]             = useState(false);
+  const [showAdd, setShowAdd]           = useState(false);
+  const [addForm, setAddForm]           = useState({ name: "", description: "", criteria: "" });
+  const [addFile, setAddFile]           = useState(null);
+  const [addSaving, setAddSaving]       = useState(false);
+  const [deletingId, setDeletingId]     = useState(null);
+  const [awardStatusMap, setAwardStatusMap] = useState({});
+  const [toast, setToast]               = useState("");
+  const checkingRef = useRef(new Set());
 
-  const categories = BADGE_CATEGORIES.slice(1);
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3500);
+  };
+
+  const categories = BADGE_CATEGORIES;
+
+  // Pre-load award status for all non-archived custom institutional badges
+  useEffect(() => {
+    const toCheck = mergedDefs.filter(
+      (d) => d.isCustom && d.category === "institutional" && !d.archived
+    );
+    toCheck.forEach(async (def) => {
+      if (checkingRef.current.has(def.id)) return;
+      checkingRef.current.add(def.id);
+      try {
+        const awarded = await hasBadgeBeenAwarded(def.id);
+        setAwardStatusMap((prev) => ({ ...prev, [def.id]: awarded ? "awarded" : "none" }));
+      } catch (e) {
+        console.error("hasBadgeBeenAwarded:", e);
+        setAwardStatusMap((prev) => ({ ...prev, [def.id]: "none" }));
+      }
+    });
+  }, [mergedDefs]);
 
   const startEdit = (def) => {
     setEditingId(def.id);
     setEditFile(null);
-    setEditForm({ name: def.name, criteria: def.criteria || "" });
+    setEditForm({ name: def.name, description: def.description || "", criteria: def.criteria || "" });
   };
 
   const cancelEdit = () => { setEditingId(null); setEditFile(null); };
@@ -109,7 +159,7 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
       let imageUrl = def.imageUrl || null;
       if (editFile) imageUrl = await uploadBadgeImage(editFile, def.id);
 
-      const payload = { name: editForm.name, criteria: editForm.criteria, ...(imageUrl ? { imageUrl } : {}) };
+      const payload = { name: editForm.name, description: editForm.description, criteria: editForm.criteria, ...(imageUrl ? { imageUrl } : {}) };
 
       if (def.isCustom) {
         await setDoc(doc(db, "customBadges", def._docId), {
@@ -143,6 +193,20 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
     }
   };
 
+  const archiveCustom = async (def) => {
+    if (!def.isCustom) return;
+    if (!window.confirm(`Archive "${def.name}"? It will no longer appear for new awards, but existing records are kept.`)) return;
+    setDeletingId(def.id);
+    try {
+      await setDoc(doc(db, "customBadges", def._docId), { archived: true }, { merge: true });
+      await onRefresh();
+    } catch (e) {
+      console.error("archiveCustom:", e);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const saveAdd = async () => {
     if (!addForm.name.trim()) return;
     setAddSaving(true);
@@ -153,13 +217,14 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
       await addDoc(collection(db, "customBadges"), {
         id: newId,
         name: addForm.name.trim(),
+        description: addForm.description.trim(),
         criteria: addForm.criteria.trim(),
         ...(imageUrl ? { imageUrl } : {}),
         isCustom: true, category: "institutional", colorTheme: "red", triggerType: "manual",
       });
       await onRefresh();
       setShowAdd(false);
-      setAddForm({ name: "", criteria: "" });
+      setAddForm({ name: "", description: "", criteria: "" });
       setAddFile(null);
     } catch (e) {
       console.error("saveAdd:", e);
@@ -182,8 +247,8 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
 
             <div className="bm-catalog-grid">
               {badges.map((def) => (
-                <div key={def.id} className="bm-catalog-card">
-                  {editingId === def.id ? (
+                <div key={def.id} className={`bm-catalog-card${def.archived ? " bm-catalog-card--archived" : ""}`}>
+                  {!def.archived && editingId === def.id ? (
                     // ── Edit state: same layout as display, fields in-place ──
                     <>
                       <BadgeImgSlotEdit
@@ -191,6 +256,7 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
                         badgeId={def.id}
                         svgId={def.svgId}
                         onFile={setEditFile}
+                        onReject={showToast}
                       />
                       <div className="bm-catalog-info">
                         <input
@@ -201,10 +267,17 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
                         />
                         <textarea
                           className="bm-field-criteria"
+                          value={editForm.description}
+                          onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                          placeholder="Short description (shown on hover)..."
+                          rows={2}
+                        />
+                        <textarea
+                          className="bm-field-criteria"
                           value={editForm.criteria}
                           onChange={(e) => setEditForm((f) => ({ ...f, criteria: e.target.value }))}
                           placeholder="How it is earned..."
-                          rows={3}
+                          rows={2}
                         />
                         <div className="bm-catalog-footer">
                           <button className="bm-save-btn" onClick={() => saveEdit(def)} disabled={saving}>
@@ -217,28 +290,48 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
                   ) : (
                     // ── Display state ──
                     <>
-                      <BadgeIcon badgeId={def.svgId ?? def.id} imageUrl={def.imageUrl} earned size="sm" />
+                      <BadgeIcon badgeId={def.svgId ?? def.id} imageUrl={def.imageUrl} earned={!def.archived} size="sm" />
                       <div className="bm-catalog-info">
                         <div className="bm-catalog-name">{def.name}</div>
+                        {def.description && (
+                          <div className="bm-catalog-criteria" style={{ fontStyle: "italic", color: "#80868b" }}>{def.description}</div>
+                        )}
                         <div className="bm-catalog-criteria">{def.criteria}</div>
                         <div className="bm-catalog-footer">
-                          <span className={`bm-catalog-type bm-type-${def.triggerType}`}>
-                            {def.triggerType === "manual" ? "Manual" : "Automatic"}
-                          </span>
-                          {def.triggerType === "manual" && (
+                          {def.archived ? (
+                            <span className="bm-archived-tag">Archived</span>
+                          ) : (
+                            <span className={`bm-catalog-type bm-type-${def.triggerType}`}>
+                              {def.triggerType === "manual" ? "Manual" : "Automatic"}
+                            </span>
+                          )}
+                          {!def.archived && def.triggerType === "manual" && (
                             <div className="bm-card-actions">
                               <button className="bm-edit-btn" onClick={() => { startEdit(def); setShowAdd(false); }}>
                                 Edit
                               </button>
-                              {def.isCustom && (
-                                <button
-                                  className="bm-delete-btn"
-                                  onClick={() => deleteCustom(def)}
-                                  disabled={deletingId === def.id}
-                                >
-                                  {deletingId === def.id ? "…" : "Delete"}
-                                </button>
-                              )}
+                              {def.isCustom && (() => {
+                                const status = awardStatusMap[def.id];
+                                if (!status) return <button className="bm-delete-btn" disabled>…</button>;
+                                if (status === "awarded") return (
+                                  <button
+                                    className="bm-archive-btn"
+                                    onClick={() => archiveCustom(def)}
+                                    disabled={deletingId === def.id}
+                                  >
+                                    {deletingId === def.id ? "…" : "Archive"}
+                                  </button>
+                                );
+                                return (
+                                  <button
+                                    className="bm-delete-btn"
+                                    onClick={() => deleteCustom(def)}
+                                    disabled={deletingId === def.id}
+                                  >
+                                    {deletingId === def.id ? "…" : "Delete"}
+                                  </button>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
@@ -264,31 +357,51 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
               {/* Add form — same card layout as display */}
               {cat.key === "institutional" && showAdd && (
                 <div className="bm-catalog-card bm-add-form-card">
-                  <BadgeImgSlotEdit
-                    currentImageUrl={null}
-                    badgeId={null}
-                    svgId={null}
-                    onFile={setAddFile}
-                  />
-                  <div className="bm-catalog-info">
-                    <input
-                      className="bm-field-name"
-                      value={addForm.name}
-                      onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
-                      placeholder="Badge name"
+                  <div className="bm-add-form-top">
+                    <BadgeImgSlotEdit
+                      currentImageUrl={null}
+                      badgeId={null}
+                      svgId={null}
+                      onFile={setAddFile}
+                      showRequired={true}
+                      hideHint={true}
+                      onReject={showToast}
                     />
-                    <textarea
-                      className="bm-field-criteria"
-                      value={addForm.criteria}
-                      onChange={(e) => setAddForm((f) => ({ ...f, criteria: e.target.value }))}
-                      placeholder="How it is earned..."
-                      rows={3}
-                    />
-                    <div className="bm-catalog-footer">
-                      <button className="bm-save-btn" onClick={saveAdd} disabled={addSaving || !addForm.name.trim()}>
-                        {addSaving ? "Saving…" : "Save"}
+                    <div className="bm-catalog-info">
+                      <input
+                        className="bm-field-name"
+                        value={addForm.name}
+                        onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Badge name"
+                      />
+                      <textarea
+                        className="bm-field-criteria"
+                        value={addForm.description}
+                        onChange={(e) => setAddForm((f) => ({ ...f, description: e.target.value }))}
+                        placeholder="Short description (shown on hover)..."
+                        rows={2}
+                      />
+                      <textarea
+                        className="bm-field-criteria"
+                        value={addForm.criteria}
+                        onChange={(e) => setAddForm((f) => ({ ...f, criteria: e.target.value }))}
+                        placeholder="How it is earned..."
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                  <div className="bm-add-footer">
+                    <span className="bm-img-slot-bg-hint">⚠ For icon, transparent background required</span>
+                    <div className="bm-add-btns">
+                      <button
+                        className="bm-save-btn"
+                        onClick={saveAdd}
+                        disabled={addSaving || !addForm.name.trim() || !addFile}
+                        title={!addFile ? "Upload a badge icon first" : undefined}
+                      >
+                        {addSaving ? "Adding…" : "Add"}
                       </button>
-                      <button className="bm-cancel-btn" onClick={() => { setShowAdd(false); setAddForm({ name: "", criteria: "" }); setAddFile(null); }}>
+                      <button className="bm-cancel-btn" onClick={() => { setShowAdd(false); setAddForm({ name: "", description: "", criteria: "" }); setAddFile(null); }}>
                         Cancel
                       </button>
                     </div>
@@ -299,6 +412,7 @@ function BadgeCatalogTab({ mergedDefs, onRefresh }) {
           </div>
         );
       })}
+      {toast && <div className="bm-toast">{toast}</div>}
     </div>
   );
 }
@@ -363,7 +477,7 @@ function AwardBadgesTab({ mergedDefs, mergedById }) {
   const [toast, setToast]                     = useState("");
 
   const institutionalBadges = useMemo(
-    () => mergedDefs.filter((b) => b.triggerType === "manual"),
+    () => mergedDefs.filter((b) => b.triggerType === "manual" && !b.archived),
     [mergedDefs]
   );
 
