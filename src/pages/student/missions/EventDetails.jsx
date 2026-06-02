@@ -10,6 +10,9 @@ import '../../../styles/student.css';
 import PreActivitySurvey from '../../../forms/PreActivitySurvey';
 import mission1 from '../../../assets/mission1.jpg';
 
+const normalizeValue = (value) => String(value || '').trim().toLowerCase();
+const isBlackboardProvider = (provider) => normalizeValue(provider) === 'blackboard';
+
 export default function EventDetails({ onClose = null, missionId = null }) {
   const { id: paramId } = useParams();
   const id = missionId || paramId;
@@ -28,6 +31,8 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const [surveyError, setSurveyError] = useState('');
   const [userName, setUserName] = useState('');
   const [userDepartment, setUserDepartment] = useState('');
+  const [userAuthProvider, setUserAuthProvider] = useState('');
+  const [userRole, setUserRole] = useState('');
   const [attendanceFlag, setAttendanceFlag] = useState(null); // { flagged: bool, expiry: Date, missionTitle: string }
   const [copySuccess, setCopySuccess] = useState(false);
   const defaultBanner = mission1;
@@ -117,6 +122,8 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               const uData = userSnap.data();
               setUserName(uData.name || uData.username || '');
               setUserDepartment(uData.department || '');
+              setUserAuthProvider(uData.authProvider || '');
+              setUserRole(uData.role || '');
             }
           }
         } else {
@@ -166,15 +173,32 @@ export default function EventDetails({ onClose = null, missionId = null }) {
       return;
     }
 
-    // Enforce participant limit
-    const limit = mission?.participantLimit ? Number(mission.participantLimit) : null;
-    if (limit && volunteerCount >= limit) {
-      alert(`This event is full. Maximum of ${limit} participants allowed.`);
-      return;
-    }
-
     setJoining(true);
     try {
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+      const userData = userSnap.exists() ? userSnap.data() : {};
+      const isCreator = mission?.createdBy === user.uid;
+      const hasBlackboardStudentAccess =
+        normalizeValue(userData.role) === "student" &&
+        isBlackboardProvider(userData.authProvider);
+
+      setUserAuthProvider(userData.authProvider || '');
+      setUserRole(userData.role || '');
+
+      if (!isCreator && !hasBlackboardStudentAccess) {
+        alert("Only Blackboard-integrated student accounts can join events.");
+        setJoining(false);
+        return;
+      }
+
+      // Enforce participant limit
+      const limit = mission?.participantLimit ? Number(mission.participantLimit) : null;
+      if (limit && volunteerCount >= limit) {
+        alert(`This event is full. Maximum of ${limit} participants allowed.`);
+        setJoining(false);
+        return;
+      }
+
       const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
 
       await setDoc(volunteerRef, {
@@ -265,6 +289,11 @@ export default function EventDetails({ onClose = null, missionId = null }) {
     if (onClose) return <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>Event not found.</div>;
     return <div className="full-page"><Header /><div className="content-page" style={{ padding: 32 }}>Event not found.</div></div>;
   }
+
+  const currentUserId = auth.currentUser?.uid;
+  const isMissionCreator = mission?.createdBy === currentUserId;
+  const isBlackboardStudent = normalizeValue(userRole) === "student" && isBlackboardProvider(userAuthProvider);
+  const canJoinEvent = isMissionCreator || isBlackboardStudent;
 
   return (
     <div className={onClose ? "event-details-modal-root" : "full-page"}>
@@ -455,6 +484,23 @@ export default function EventDetails({ onClose = null, missionId = null }) {
                     </button>
                     <p style={{ marginTop: 8, fontSize: 12, color: '#6b7280', fontWeight: 500, maxWidth: 260 }}>
                       This event has reached its maximum of {mission.participantLimit} participants.
+                    </p>
+                  </div>
+                ) : !canJoinEvent ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <button
+                      className="event-details-join-btn"
+                      disabled
+                      style={{
+                        background: 'linear-gradient(135deg, #64748b, #334155)',
+                        cursor: 'not-allowed',
+                        opacity: 0.9,
+                      }}
+                    >
+                      BLACKBOARD REQUIRED
+                    </button>
+                    <p style={{ marginTop: 8, fontSize: 12, color: '#475569', fontWeight: 500, maxWidth: 260 }}>
+                      Only Blackboard-integrated student accounts can join events.
                     </p>
                   </div>
                 ) : (
