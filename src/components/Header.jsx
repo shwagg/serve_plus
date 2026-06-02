@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db, functions } from '../firebaseConfig';
-import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { useSession } from '../context/SessionContext';
@@ -23,6 +23,21 @@ import OnboardingTutorial from './OnboardingTutorial';
 import { showToast } from '../utils/toast';
 import AvatarWithFrame from './AvatarWithFrame';
 
+const PROPOSAL_BLACKBOARD_LOCK_REASON =
+  'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
+
+function normalizeValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function canUserCreateProposal(role, authProvider) {
+  const normalizedRole = normalizeValue(role);
+  if (normalizedRole === 'admin') return true;
+  if (normalizedRole === 'student' || normalizedRole === 'faculty') {
+    return normalizeValue(authProvider) === 'blackboard';
+  }
+  return false;
+}
 
 const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
   if (!isOpen) return null;
@@ -73,6 +88,8 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
 export default function Header() {
   const { userData } = useSession();
   const userRole = userData?.role || null;
+  const userAuthProvider = userData?.authProvider || '';
+  const canCreateProposal = canUserCreateProposal(userRole, userAuthProvider);
   const userName = userData?.name || '';
   const userEmail = userData?.email || '';
   const userUsername = userData?.username || '';
@@ -163,6 +180,11 @@ export default function Header() {
       return;
     }
 
+    if (!canCreateProposal) {
+      showToast(PROPOSAL_BLACKBOARD_LOCK_REASON, 'error');
+      return;
+    }
+
     // Admins can always create proposals
     if (userRole === 'admin') {
       setShowProposalModal(true);
@@ -217,9 +239,23 @@ export default function Header() {
     };
     switch (userRole) {
       case 'student':
-        return <StudentMenu {...commonProps} onCreateProposal={handleOpenProposalModal} />;
+        return (
+          <StudentMenu
+            {...commonProps}
+            onCreateProposal={handleOpenProposalModal}
+            canCreateProposal={canCreateProposal}
+            proposalLockedReason={PROPOSAL_BLACKBOARD_LOCK_REASON}
+          />
+        );
       case 'faculty':
-        return <FacultyMenu {...commonProps} onCreateProposal={handleOpenProposalModal} />;
+        return (
+          <FacultyMenu
+            {...commonProps}
+            onCreateProposal={handleOpenProposalModal}
+            canCreateProposal={canCreateProposal}
+            proposalLockedReason={PROPOSAL_BLACKBOARD_LOCK_REASON}
+          />
+        );
       case 'admin':
         return <AdminMenu {...commonProps} onCreateProposal={handleOpenProposalModal} />;
       case 'partner':

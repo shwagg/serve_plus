@@ -1,12 +1,25 @@
 
 // React and library imports
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../../firebaseConfig';
-import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import '../../../styles/ProjectProposal.css';
 import SummaryPanel from '../SummaryPanel';
 import { showToast } from '../../../utils/toast';
+import { useSession } from '../../../context/SessionContext';
+
+const PROPOSAL_BLACKBOARD_LOCK_REASON =
+  'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
+
+function normalizeValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isProposalLockedForUser(userData) {
+  const role = normalizeValue(userData?.role || userData?.userRole || userData?.Role);
+  if (role !== 'student' && role !== 'faculty') return false;
+  return normalizeValue(userData?.authProvider) !== 'blackboard';
+}
 
 /**
  * Reusable custom dropdown that matches the SDG dropdown style and stays the same width as its trigger.
@@ -151,7 +164,7 @@ function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMore
  * @param {Function} props.onClose - Callback to close the proposal form
  */
 function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
-  const navigate = useNavigate();
+  const { userData, authLoading } = useSession();
   const [loading, setLoading] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [hasProponentName, setHasProponentName] = useState(false);
@@ -565,6 +578,31 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   );
 
   // Submission logic is now handled in SummaryPanel
+  if (authLoading) {
+    return (
+      <div className="proposal-content-wrapper">
+        <div className="proposal-locked-state">
+          <p>Loading proposal access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isProposalLockedForUser(userData)) {
+    return (
+      <div className="proposal-content-wrapper">
+        <div className="proposal-locked-state">
+          <h2>Create Proposal Locked</h2>
+          <p>{PROPOSAL_BLACKBOARD_LOCK_REASON}</p>
+          {onClose && (
+            <button type="button" className="btn-cancel" onClick={onClose}>
+              Close
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="proposal-content-wrapper">

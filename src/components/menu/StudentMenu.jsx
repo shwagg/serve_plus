@@ -14,6 +14,8 @@ export default function StudentMenu({
   onClose,
   onCreateProposal,
   onOpenSettings,
+  canCreateProposal = true,
+  proposalLockedReason = "",
 }) {
   const navigate = useNavigate();
   const handleMenuClick = (path) => {
@@ -22,6 +24,7 @@ export default function StudentMenu({
   };
 
   const handleCreateProposal = () => {
+    if (!canCreateProposal) return;
     onClose();
     onCreateProposal();
   };
@@ -69,7 +72,13 @@ export default function StudentMenu({
           <img src={leaderboardIcon} alt="Leaderboard" className="menu-icon" />
           Leaderboard
         </button>
-        <button className="menu-item" onClick={handleCreateProposal}>
+        <button
+          className={`menu-item${canCreateProposal ? "" : " menu-item--locked"}`}
+          onClick={handleCreateProposal}
+          disabled={!canCreateProposal}
+          title={!canCreateProposal ? proposalLockedReason : "Create Proposal"}
+          aria-label={!canCreateProposal ? proposalLockedReason : "Create Proposal"}
+        >
           <img src={createIcon} alt="Create" className="menu-icon" />
           Create Proposal
         </button>

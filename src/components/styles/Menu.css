@@ -156,12 +156,35 @@
   color: #0f766e;
 }
 
+.menu-item:disabled,
+.menu-item.menu-item--locked {
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.menu-item:disabled:hover,
+.menu-item.menu-item--locked:hover {
+  background: none;
+  color: #9ca3af;
+}
+
 .menu-item:hover::before {
   opacity: 1;
 }
 
+.menu-item:disabled::before,
+.menu-item.menu-item--locked::before {
+  opacity: 0;
+}
+
 .menu-item:hover .menu-icon {
   filter: brightness(0) saturate(100%) invert(38%) sepia(72%) saturate(576%) hue-rotate(151deg) brightness(95%) contrast(96%);
+}
+
+.menu-item:disabled .menu-icon,
+.menu-item.menu-item--locked .menu-icon {
+  filter: grayscale(1) opacity(0.45);
 }
 
 /* ── Icons ───────────────────────────────────────────── */

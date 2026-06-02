@@ -1,6 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function currentUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasBlackboardProvider() {
+      return currentUserData().authProvider is string &&
+        currentUserData().authProvider.matches("(?i)^\\s*blackboard\\s*$");
+    }
+
+    function canCreateMission() {
+      return request.auth != null && (
+        currentUserData().role == "admin" ||
+        (
+          (currentUserData().role == "student" || currentUserData().role == "faculty") &&
+          hasBlackboardProvider()
+        )
+      );
+    }
+
     // User profiles - users can read their own profile, admins/sysadmins can manage all users
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
@@ -162,8 +181,8 @@ service cloud.firestore {
     match /missions/{missionId}{
       allow read: if request.auth != null;
 
-      // Allow authenticated users to create proposals
-      allow create: if request.auth != null;
+      // Allow proposal creation only for admins/sysadmins and Blackboard-linked students/faculty
+      allow create: if canCreateMission();
 
       // ADMIN / SYSADMIN - can update and delete
       allow update, delete: if
