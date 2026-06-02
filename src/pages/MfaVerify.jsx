@@ -69,7 +69,7 @@ function MfaVerify() {
     }
 
     try {
-      const requestReset = httpsCallable(functions, "requestTotpReset");
+      const requestReset = httpsCallable(functions, "requestTotpResetHttp");
       await requestReset({
         sessionToken: session.sessionToken,
       });

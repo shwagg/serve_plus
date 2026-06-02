@@ -97,7 +97,10 @@ export default function RosterAccountManagement({ readOnly = false }) {
 
     async function fetchTotpResetRequests() {
       try {
-        const listRequests = httpsCallable(functions, "listTotpResetRequests");
+        const listRequests = httpsCallable(
+          functions,
+          "listTotpResetRequestsHttp",
+        );
         const result = await listRequests();
         if (cancelled) return;
 
@@ -385,7 +388,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
     setTotpActionUserId(targetUser.id);
 
     try {
-      const resetTotp = httpsCallable(functions, "resetUserTotp");
+      const resetTotp = httpsCallable(functions, "resetUserTotpHttp");
       await resetTotp({ targetUid: targetUser.id });
 
       setTotpResetRequests((current) => {

@@ -6,7 +6,7 @@ if (process.env.FUNCTIONS_EMULATOR) {
 }
 
 const { setGlobalOptions } = require("firebase-functions/v2");
-const { onCall } = require("firebase-functions/v2/https");
+const { HttpsError, onCall, onRequest, } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -21,13 +21,52 @@ setGlobalOptions({
   maxInstances: DEFAULT_MAX_INSTANCES,
 });
 
-const defaultFunctionOptions = { region: REGION };
+const defaultFunctionOptions = {
+  region: REGION,
+  cors: true,
+  invoker: "public",
+};
 const heavyJobOptions = {
   ...defaultFunctionOptions,
   timeoutSeconds: 540,
   memory: "1GiB",
   maxInstances: HEAVY_JOB_MAX_INSTANCES,
 };
+
+function callableHttpAdapter(handler) {
+  return async (req, res) => {
+    if (req.method !== "POST" || typeof req.body?.data === "undefined") {
+      const error = new HttpsError("invalid-argument", "Bad request.");
+      res.status(error.httpErrorCode.status).json({error: error.toJSON()});
+      return;
+    }
+
+    try {
+      const callableRequest = {
+        data: req.body.data,
+        rawRequest: req,
+      };
+      const authHeader = req.get("Authorization") || "";
+      const [, idToken] = authHeader.match(/^Bearer (.+)$/i) || [];
+
+      if (idToken) {
+        const token = await admin.auth().verifyIdToken(idToken);
+        callableRequest.auth = {
+          uid: token.uid,
+          token,
+        };
+      }
+
+      const result = await handler(callableRequest);
+      res.status(200).json({result});
+    } catch (err) {
+      const error = err instanceof HttpsError ?
+        err :
+        new HttpsError("internal", "Internal error.");
+      res.status(error.httpErrorCode.status).json({error: error.toJSON()});
+    }
+  };
+}
 
 // Import functions
 const { logLogin } = require("./src/auth/logLogin");
@@ -99,13 +138,25 @@ exports.requestTotpReset = onCall(
   defaultFunctionOptions,
   requestTotpReset
 );
+exports.requestTotpResetHttp = onRequest(
+  defaultFunctionOptions,
+  callableHttpAdapter(requestTotpReset)
+);
 exports.listTotpResetRequests = onCall(
   defaultFunctionOptions,
   listTotpResetRequests
 );
+exports.listTotpResetRequestsHttp = onRequest(
+  defaultFunctionOptions,
+  callableHttpAdapter(listTotpResetRequests)
+);
 exports.resetUserTotp = onCall(
   defaultFunctionOptions,
   resetUserTotp
+);
+exports.resetUserTotpHttp = onRequest(
+  defaultFunctionOptions,
+  callableHttpAdapter(resetUserTotp)
 );
 exports.validateRegistrationEmail = onCall(
   defaultFunctionOptions,
