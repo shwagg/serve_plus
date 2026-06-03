@@ -251,6 +251,9 @@ export default function CurrentEvent() {
   const [pickerCoords, setPickerCoords]             = useState(null); // { lat, lng }
   const [pickerAddress, setPickerAddress]           = useState("");
   const [pickerSaving, setPickerSaving]             = useState(false);
+  const [pickerSearch, setPickerSearch]             = useState("");
+  const [pickerSearching, setPickerSearching]       = useState(false);
+  const [pickerSearchError, setPickerSearchError]   = useState("");
   const mapDivRef    = useRef(null);
   const gmapRef      = useRef(null);
   const gmapMarkerRef = useRef(null);
@@ -863,6 +866,51 @@ export default function CurrentEvent() {
     }
   };
 
+  const searchPickerLocation = async () => {
+    const queryText = pickerSearch.trim();
+    if (!queryText) {
+      setPickerSearchError("Enter an area or address to search.");
+      return;
+    }
+
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setPickerSearchError("Google Maps API key not configured.");
+      return;
+    }
+    if (!gmapRef.current || !gmapMarkerRef.current) {
+      setPickerSearchError("Map is still loading. Try again in a moment.");
+      return;
+    }
+
+    setPickerSearching(true);
+    setPickerSearchError("");
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(queryText)}&region=ph&key=${apiKey}`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("lookup_failed");
+
+      const json = await resp.json();
+      const result = json.results?.[0];
+      const locationResult = result?.geometry?.location;
+      if (!locationResult || typeof locationResult.lat !== "number" || typeof locationResult.lng !== "number") {
+        setPickerSearchError("No matching location found. Try a more specific area or address.");
+        return;
+      }
+
+      const nextCoords = { lat: locationResult.lat, lng: locationResult.lng };
+      gmapRef.current.setCenter(nextCoords);
+      gmapRef.current.setZoom(17);
+      gmapMarkerRef.current.setPosition(nextCoords);
+      setPickerCoords(nextCoords);
+      setPickerAddress(result.formatted_address || queryText);
+    } catch (_) {
+      setPickerSearchError("Could not search that location. Try again.");
+    } finally {
+      setPickerSearching(false);
+    }
+  };
+
   // Initialise Google Maps inside the picker modal
   const initLocationPickerMap = () => {
     if (!mapDivRef.current) return;
@@ -903,6 +951,7 @@ export default function CurrentEvent() {
       marker.addListener("dragend", (e) => {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
+        setPickerSearchError("");
         setPickerCoords({ lat, lng });
         updateAddress(lat, lng);
       });
@@ -911,6 +960,7 @@ export default function CurrentEvent() {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
         marker.setPosition(e.latLng);
+        setPickerSearchError("");
         setPickerCoords({ lat, lng });
         updateAddress(lat, lng);
       });
@@ -960,6 +1010,9 @@ export default function CurrentEvent() {
     // reset state from last open
     setPickerCoords(null);
     setPickerAddress("");
+    setPickerSearch("");
+    setPickerSearching(false);
+    setPickerSearchError("");
     gmapRef.current = null;
     gmapMarkerRef.current = null;
     // defer so the modal div is in the DOM
@@ -2148,8 +2201,58 @@ export default function CurrentEvent() {
               </div>
               {/* hint */}
               <div style={{ padding: "8px 18px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: "0.78rem", color: "#475569" }}>
-                Click on the map or drag the marker to set the QR attendance location.
+                Search for an area or address, then click the map or drag the marker to fine-tune the QR attendance location.
               </div>
+              {/* search */}
+              <form
+                onSubmit={(e) => { e.preventDefault(); searchPickerLocation(); }}
+                style={{ padding: "12px 18px", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="Search area or address..."
+                    value={pickerSearch}
+                    onChange={e => {
+                      setPickerSearch(e.target.value);
+                      if (pickerSearchError) setPickerSearchError("");
+                    }}
+                    disabled={pickerSearching}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      padding: "10px 12px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 8,
+                      fontSize: "0.86rem",
+                      color: "#1e293b",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={pickerSearching || !pickerSearch.trim()}
+                    style={{
+                      padding: "10px 14px",
+                      background: (pickerSearching || !pickerSearch.trim()) ? "#f8f9fa" : "#1a73e8",
+                      color: (pickerSearching || !pickerSearch.trim()) ? "#9aa0a6" : "#fff",
+                      border: "none",
+                      borderRadius: 8,
+                      fontWeight: 600,
+                      fontSize: "0.85rem",
+                      cursor: (pickerSearching || !pickerSearch.trim()) ? "not-allowed" : "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {pickerSearching ? "Searching..." : "Search"}
+                  </button>
+                </div>
+                {pickerSearchError && (
+                  <div style={{ fontSize: "0.76rem", color: "#b91c1c", fontWeight: 600 }}>
+                    {pickerSearchError}
+                  </div>
+                )}
+              </form>
               {/* map */}
               <div
                 ref={mapDivRef}
