@@ -31,7 +31,6 @@ import AgreementEditor from "./pages/admin/AgreementEditor";
 import AuditLogs from "./pages/admin/AuditLogs";
 import BackupRestore from "./pages/admin/BackupRestore";
 import CurrentEvent from "./pages/admin/CurrentEvent";
-import DocumentLibrary from "./pages/admin/DocumentLibrary";
 import ProjectTasks from "./pages/admin/ProjectTasks";
 import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import FacultyHome from "./pages/faculty/FacultyHome";
@@ -114,7 +113,6 @@ function App() {
                                     <Route path="current-event" element={<CurrentEvent />} />
                                     <Route path="current-event/:missionId" element={<CurrentEvent />} />
                         <Route path="current-event/:missionId" element={<CurrentEvent />} />
-            <Route path="documents" element={<DocumentLibrary />} />
             <Route
               path="events/:eventId"
             />
