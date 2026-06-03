@@ -1,7 +1,5 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { db } from "../firebaseConfig";
-import { doc, collection, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { showToast } from "../utils/toast";
 import { generateCertificateId, buildCertificateBlob, issueCertificate } from "../utils/certificateUtils";
@@ -92,6 +90,12 @@ export default function CertificateGenerator() {
   };
 
   const handleReleaseToStudent = async () => {
+    // Verify a user is actually logged in before attempting to write to Firestore
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      showToast("You must be logged in to release a certificate.");
+      return;
+    }
     if (!userID) {
       showToast("No volunteer selected. Please select a volunteer.");
       return;
@@ -162,6 +166,7 @@ export default function CertificateGenerator() {
               <label>Mission Title</label>
               <input
                 type="text"
+                maxLength={100}
                 placeholder="Enter mission title"
                 value={course}
                 onChange={(e) => setCourse(e.target.value)}
@@ -183,6 +188,7 @@ export default function CertificateGenerator() {
               <label>Location</label>
               <input
                 type="text"
+                maxLength={100}
                 placeholder="Enter location"
                 value={loc}
                 onChange={(e) => setLoc(e.target.value)}
@@ -195,6 +201,7 @@ export default function CertificateGenerator() {
                 <label>Day</label>
                 <input
                   type="text"
+                  maxLength={2}
                   placeholder="e.g. 12"
                   value={day}
                   onChange={(e) => setDay(e.target.value)}
@@ -204,6 +211,7 @@ export default function CertificateGenerator() {
                 <label>Month</label>
                 <input
                   type="text"
+                  maxLength={15}
                   placeholder="e.g. May"
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
@@ -213,6 +221,7 @@ export default function CertificateGenerator() {
                 <label>Year</label>
                 <input
                   type="text"
+                  maxLength={4}
                   placeholder="e.g. 2026"
                   value={year}
                   onChange={(e) => setYear(e.target.value)}

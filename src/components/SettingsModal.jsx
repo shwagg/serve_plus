@@ -9,7 +9,6 @@ import {
   updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut,
 } from "firebase/auth";
 import { useSession } from "../context/SessionContext";
-import CertificateQRScannerModal from "./CertificateQRScannerModal";
 import {
   VisibilityIcon, VisibilityOffIcon, CloseIcon,
   Face6RoundedIcon, GavelRoundedIcon, NotificationsNoneRoundedIcon,
@@ -32,7 +31,6 @@ export default function SettingsModal({ isOpen, onClose }) {
   const { userData, refreshUserData } = useSession();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("profile");
-  const [showCertModal, setShowCertModal] = useState(false);
 
   // Username
   const [username, setUsername] = useState("");
@@ -676,7 +674,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                   </p>
                   <button
                     className="settings-primary-btn"
-                    onClick={() => setShowCertModal(true)}
+                    onClick={() => { onClose(); navigate("/verify-certificate"); }}
                   >
                     Open Certificate Scanner
                   </button>
@@ -808,10 +806,6 @@ export default function SettingsModal({ isOpen, onClose }) {
         </div>
       </div>
 
-      <CertificateQRScannerModal
-        isOpen={showCertModal}
-        onClose={() => setShowCertModal(false)}
-      />
     </>,
     document.body
   );

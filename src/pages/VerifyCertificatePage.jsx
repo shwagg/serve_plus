@@ -1,15 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import QRScanner from "../components/QRScanner";
 import "../components/styles/ChatModal.css";
 import { getFirestore, collectionGroup, query, where, getDocs } from "firebase/firestore";
 import { app } from "../firebaseConfig";
-
-const sampleCerts = [
-  "CERT-2024-001",
-  "CERT-2024-002",
-  "CERT-2023-045",
-  "CERT-2024-003",
-];
 
 export default function VerifyCertificatePage() {
   const [tab, setTab] = useState("id");
@@ -18,9 +11,22 @@ export default function VerifyCertificatePage() {
   const [certInfo, setCertInfo] = useState(null);
   const [searchError, setSearchError] = useState("");
   const [searching, setSearching] = useState(false);
+  const lastSearchRef = useRef(0);
+  const SEARCH_COOLDOWN_MS = 3000; // prevent rapid repeated queries
 
-  // Helper to fetch certificate info by ID (used for both search and QR)
   const fetchCertificateInfo = async (id) => {
+    // Rate limiting: enforce a cooldown between searches
+    const now = Date.now();
+    if (now - lastSearchRef.current < SEARCH_COOLDOWN_MS) {
+      setSearchError("Please wait a moment before searching again.");
+      return;
+    }
+    lastSearchRef.current = now;
+
+    // Sanitize: trim whitespace and cap length to prevent oversized queries
+    const sanitized = id.trim().slice(0, 100);
+    if (!sanitized) return;
+
     setCertInfo(null);
     setSearchError("");
     setSearching(true);
@@ -28,16 +34,14 @@ export default function VerifyCertificatePage() {
       const db = getFirestore(app);
       const certQuery = query(
         collectionGroup(db, "certificates"),
-        where("certificateId", "==", id.trim())
+        where("certificateId", "==", sanitized)
       );
       const querySnapshot = await getDocs(certQuery);
       if (!querySnapshot.empty) {
         const docSnap = querySnapshot.docs[0];
         const data = docSnap.data();
-        const pathParts = docSnap.ref.path.split("/");
-        const uid = pathParts[1];
+        // UID is intentionally omitted — it is a sensitive internal identifier
         setCertInfo({
-          uid,
           name: data.recipient || "",
           course: data.course || "",
           releasedAt: data.releasedAt?.toDate ? data.releasedAt.toDate().toLocaleString() : (data.releasedAt || ""),
@@ -155,6 +159,7 @@ export default function VerifyCertificatePage() {
                       value={certificateId}
                       onChange={e => setCertificateId(e.target.value)}
                       placeholder="Enter Certificate ID (e.g., CERT-2024-001)"
+                      maxLength={100}
                       style={{ flex: 1, padding: '12px 16px', fontSize: 17, border: '1.5px solid #3ec6e0', borderRadius: 6, marginRight: 8, color: '#1a3764' }}
                       required
                     />
@@ -165,7 +170,6 @@ export default function VerifyCertificatePage() {
                 </form>
                 {certInfo && (
                   <div style={{ marginTop: 18, color: '#1a3764', background: '#e3f6f9', borderRadius: 6, padding: 16, border: '1px solid #3ec6e0', fontSize: 16 }}>
-                    <div><strong>UID:</strong> {certInfo.uid}</div>
                     <div><strong>Name:</strong> {certInfo.name}</div>
                     <div><strong>Course:</strong> {certInfo.course}</div>
                     <div><strong>Released At:</strong> {certInfo.releasedAt}</div>
@@ -187,7 +191,6 @@ export default function VerifyCertificatePage() {
                 </div>
                 {certInfo && (
                   <div style={{ marginTop: 18, color: '#1a3764', background: '#e3f6f9', borderRadius: 6, padding: 16, border: '1px solid #3ec6e0', fontSize: 16 }}>
-                    <div><strong>UID:</strong> {certInfo.uid}</div>
                     <div><strong>Name:</strong> {certInfo.name}</div>
                     <div><strong>Course:</strong> {certInfo.course}</div>
                     <div><strong>Released At:</strong> {certInfo.releasedAt}</div>

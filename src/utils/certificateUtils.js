@@ -5,11 +5,8 @@ import { app, db } from "../firebaseConfig";
 import { doc, collection, addDoc, serverTimestamp, getDocs } from "firebase/firestore";
 
 export function generateCertificateId() {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  // crypto.randomUUID() is cryptographically secure (CSPRNG-backed), unlike Math.random()
+  return crypto.randomUUID();
 }
 
 export async function buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId }) {
@@ -50,9 +47,11 @@ export async function buildCertificateBlob({ recipient, course, date, loc, day, 
  * (with downloadURL included from the start, no second updateDoc needed).
  */
 export async function issueCertificate({ userId, recipient, course, date, loc, day, month, year }) {
-  // Idempotency guard — return existing cert if already issued for this course
+  // Idempotency guard — return existing cert if already issued for this recipient+course combo
   const existingSnap = await getDocs(collection(doc(db, "users", userId), "certificates"));
-  const duplicate = existingSnap.docs.find(d => d.data().course === course);
+  const duplicate = existingSnap.docs.find(
+    d => d.data().course === course && d.data().recipient === recipient
+  );
   if (duplicate) {
     const dData = duplicate.data();
     return { certId: dData.certificateId, downloadURL: dData.downloadURL };
@@ -61,7 +60,8 @@ export async function issueCertificate({ userId, recipient, course, date, loc, d
   const certId = generateCertificateId();
   const safeRecipient = (recipient || "recipient").replace(/[^a-zA-Z0-9_-]/g, "_");
   const safeCourse = (course || "event").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const fileName = `${safeRecipient}_${safeCourse}.pdf`;
+  // Include certId in filename to prevent collisions when same recipient retakes a course
+  const fileName = `${safeRecipient}_${safeCourse}_${certId}.pdf`;
 
   // Build and upload first so downloadURL is available before the Firestore doc is created.
   const blob = await buildCertificateBlob({ recipient, course, date, loc, day, month, year, certId });
