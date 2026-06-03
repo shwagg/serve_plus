@@ -1,5 +1,4 @@
 ﻿import { useNavigate, useLocation } from "react-router-dom";
-import { createPortal } from "react-dom";
 import EventDetails from "./missions/EventDetails";
 import ProjectProposal from "../global/proposal/ProjectProposal";
 import ReviewModal from "../global/proposal/ReviewModal";
@@ -19,7 +18,6 @@ import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
 import emptyFile from '../../assets/empty_file.svg';
 import servePlusIcon from '../../assets/serve_plus_icon.svg';
-import xpIcon from '../../assets/xp_icon.png';
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
   const radius = (size - stroke) / 2;
@@ -77,10 +75,6 @@ const StudentHome = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
 
-  const [playerStripPortal, setPlayerStripPortal] = useState(null);
-  useEffect(() => {
-    setPlayerStripPortal(document.getElementById('header-center-slot'));
-  }, []);
 
   const [level, setLevel] = useState(1);
   const [currentPoints, setCurrentPoints] = useState(0);
@@ -90,7 +84,6 @@ const StudentHome = () => {
   const leaderboardListRef = useRef(null);
   const [missionCards, setMissionCards] = useState([]);
   const [enrolledMissions, setEnrolledMissions] = useState({});
-  const [completedMissions, setCompletedMissions] = useState(0);
 
   const [selectedMissionId, setSelectedMissionId] = useState(null);
   const [enrollmentRefreshKey, setEnrollmentRefreshKey] = useState(0);
@@ -202,7 +195,6 @@ const StudentHome = () => {
 
         setEnrolledMissions(enrollmentMap);
         setEnrollmentDetails(enrollmentDetailsMap);
-        setCompletedMissions(completed);
       } catch (error) {
         console.error("Error fetching missions:", error);
       }
@@ -588,31 +580,6 @@ const StudentHome = () => {
             </button>
           </div>
         </section>*/}
-
-        {/* PROFILE LEVEL RANK — portalled into header center slot */}
-        {playerStripPortal && createPortal(
-          <div className="player-strip-inner">
-            <div className="strip-compact-row">
-              <span className="strip-level-text">Lv. {level}</span>
-              <div className="strip-pts-bar-wrap">
-                <div
-                  className="strip-pts-bar"
-                  role="progressbar"
-                  aria-valuenow={currentPoints % 100}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`${currentPoints} points`}
-                >
-                  <div className="strip-pts-fill" style={{ width: `${currentPoints % 100}%` }} />
-                  <span className="strip-pts-text">{currentPoints} XP <img src={xpIcon} alt="XP" style={{ width: 13, height: 13, verticalAlign: 'middle', marginLeft: 8, marginBottom: 2 }} /></span>
-                </div>
-              </div>
-              <span className="strip-sep" aria-hidden="true">|</span>
-              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">{completedMissions > 1 ? 'Missions' : 'Mission'}</span></span>
-            </div>
-          </div>,
-          playerStripPortal
-        )}
 
         {/* COMPACT LEADERBOARD */}
         <section className="leaderboard-compact-section" aria-label="Leaderboard">

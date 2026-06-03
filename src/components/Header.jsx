@@ -22,6 +22,7 @@ import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncem
 import OnboardingTutorial from './OnboardingTutorial';
 import { showToast } from '../utils/toast';
 import AvatarWithFrame from './AvatarWithFrame';
+import PlayerStrip from './PlayerStrip';
 
 const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
@@ -278,8 +279,10 @@ export default function Header() {
             </div>
             <span className="header-logo-text">SERVE<span className="header-logo-plus">+</span></span>
           </button>
-          {/* Center slot — student home portals the player strip here */}
-          <div className="header-center-slot" id="header-center-slot" />
+          {/* Center slot — player strip renders here for students */}
+          <div className="header-center-slot" id="header-center-slot">
+            <PlayerStrip />
+          </div>
           {/* Right Side Icons */}
           <div className="header-actions">
             {userRole === 'student' && (
