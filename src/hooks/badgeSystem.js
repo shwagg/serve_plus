@@ -13,13 +13,13 @@ import { createNotification } from "../utils/notificationUtils";
 
 /**
  * Compute a student's badge stats by scanning all missions they participated in.
- * Returns { totalCompleted, totalVerifiedActive, organizerCount, leadOrganizerCount }
+ * Returns { totalCompleted, donorCount, organizerCount, leadOrganizerCount }
  */
 async function computeBadgeStats(userId) {
   const missionsSnapshot = await getDocs(collection(db, "missions"));
 
   let totalCompleted = 0;
-  let totalVerifiedActive = 0;
+  let donorCount = 0;
   let organizerCount = 0;
   let leadOrganizerCount = 0;
 
@@ -29,34 +29,32 @@ async function computeBadgeStats(userId) {
     if (!volunteerSnap.exists()) continue;
 
     const v = volunteerSnap.data();
-    const status = v.participationStatus;
-    const role = v.role;
+    const completed = Boolean(v.releasedAt);
 
-    // Milestone: Verified Active OR Partial
-    if (status === "verified" || status === "partial") {
-      totalCompleted++;
+    if (!completed) continue;
+
+    // Milestone: any completed (graded) mission
+    totalCompleted++;
+
+    // Philanthropy: only counts when admin explicitly verified the donor role
+    if (v.adminVerifiedDonor === true) {
+      donorCount++;
     }
 
-    // Performance: Verified Active ONLY
-    if (status === "verified") {
-      totalVerifiedActive++;
-    }
+    // Leadership: admin-assigned role stored as v.role (singular string)
+    const adminRole = v.role;
+    const isLeadOrganizer = adminRole === "lead_organizer" || adminRole === "lead organizer";
+    const isOrganizer = adminRole === "organizer" || isLeadOrganizer;
 
-    // Leadership: completed missions as organizer or lead_organizer
-    const isOrganizingRole =
-      role === "organizer" ||
-      role === "lead_organizer" ||
-      role === "lead organizer";
-
-    if (isOrganizingRole && (status === "verified" || status === "partial")) {
+    if (isOrganizer) {
       organizerCount++;
-      if (role === "lead_organizer" || role === "lead organizer") {
+      if (isLeadOrganizer) {
         leadOrganizerCount++;
       }
     }
   }
 
-  return { totalCompleted, totalVerifiedActive, organizerCount, leadOrganizerCount };
+  return { totalCompleted, donorCount, organizerCount, leadOrganizerCount };
 }
 
 /**

@@ -11,29 +11,34 @@ function isNewBadge(earnedAt) {
 }
 
 /**
- * BadgeShelf — displays all 12 badge slots grouped by category.
+ * BadgeShelf — displays all badge slots grouped by category.
  *
  * Props:
- *   earnedBadges – array of { badgeId, earnedAt, ... } from Firestore
- *   onBadgeClick – optional function(badgeDef, isEarned, earnedRecord)
+ *   earnedBadges  – array of { badgeId, earnedAt, ... } from Firestore
+ *   customBadges  – array of non-archived custom badge defs from Firestore (optional)
+ *   onBadgeClick  – optional function(badgeDef, isEarned, earnedRecord)
  */
-export default function BadgeShelf({ earnedBadges = [], onBadgeClick }) {
+export default function BadgeShelf({ earnedBadges = [], customBadges = [], onBadgeClick }) {
   const earnedMap = Object.fromEntries(
     earnedBadges.map((b) => [b.badgeId ?? b.id, b])
   );
 
-  const totalEarned = BADGE_DEFINITIONS.filter((b) => earnedMap[b.id]).length;
+  const allDefs = [...BADGE_DEFINITIONS, ...customBadges];
+  const totalEarned = allDefs.filter((b) => earnedMap[b.id]).length;
 
   return (
     <div className="badge-shelf">
       <div className="badge-shelf-header">
         <span className="badge-shelf-progress">
-          {totalEarned} of {BADGE_DEFINITIONS.length} collected
+          {totalEarned} of {allDefs.length} collected
         </span>
       </div>
 
       {BADGE_CATEGORIES.map((cat) => {
-        const categoryBadges = BADGE_DEFINITIONS.filter((b) => b.category === cat.key);
+        const staticBadges = BADGE_DEFINITIONS.filter((b) => b.category === cat.key);
+        const dynamicBadges = customBadges.filter((b) => b.category === cat.key);
+        const categoryBadges = [...staticBadges, ...dynamicBadges];
+        if (categoryBadges.length === 0) return null;
         return (
           <div key={cat.key} className="badge-shelf-group">
             <div className="badge-shelf-group-label" style={{ color: cat.color }}>
@@ -46,13 +51,31 @@ export default function BadgeShelf({ earnedBadges = [], onBadgeClick }) {
                 const newBadge = earned && isNewBadge(earnedRecord?.earnedAt);
                 return (
                   <div key={def.id} className="badge-shelf-slot">
-                    <BadgeIcon
-                      badgeId={def.id}
-                      earned={earned}
-                      isNew={newBadge}
-                      size="md"
-                      onClick={onBadgeClick ? () => onBadgeClick(def, earned, earnedRecord) : undefined}
-                    />
+                    <div className="badge-tooltip-wrapper">
+                      <BadgeIcon
+                        badgeId={def.id}
+                        imageUrl={def.imageUrl || undefined}
+                        earned={earned}
+                        isNew={newBadge}
+                        size="md"
+                        onClick={onBadgeClick ? () => onBadgeClick(def, earned, earnedRecord) : undefined}
+                      />
+                      <div className="badge-tooltip" role="tooltip">
+                        <div className="badge-tooltip-name">{def.name}</div>
+                        {def.description && (
+                          <div className="badge-tooltip-desc">{def.description}</div>
+                        )}
+                        {def.criteria && (
+                          <div className="badge-tooltip-criteria">
+                            <span className="badge-tooltip-how">How to earn: </span>
+                            {def.criteria}
+                          </div>
+                        )}
+                        {earned && (
+                          <div className="badge-tooltip-earned">✓ Earned</div>
+                        )}
+                      </div>
+                    </div>
                     <span className={`badge-shelf-name${earned ? " earned" : " locked"}`}>
                       {def.name}
                     </span>

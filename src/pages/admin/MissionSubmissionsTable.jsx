@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc, deleteField, increment } from "firebase/firestore";
+import { checkAndAssignBadges } from "../../hooks/badgeSystem";
 import { computeFinalPoints, getProgramMultiplier, ROLE_POINTS } from "../../hooks/rewardSystem";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
 import { showToast } from "../../utils/toast";
@@ -73,6 +74,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const [filterPostSurvey, setFilterPostSurvey] = useState("");
   // Which column-header filter dropdown is open
   const [openFilter, setOpenFilter] = useState(null);
+  const [verifyingDonor, setVerifyingDonor] = useState(null);
 
   useEffect(() => {
     if (!volunteerCard) return;
@@ -297,6 +299,22 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       }
     } catch {
       showToast("Failed to update consent review status.");
+    }
+  };
+
+  const handleVerifyDonor = async (volunteerId, verified) => {
+    setVerifyingDonor(volunteerId);
+    try {
+      await updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId), { adminVerifiedDonor: verified });
+      setVolunteers(prev => prev.map(v => v.id === volunteerId ? { ...v, adminVerifiedDonor: verified } : v));
+      const alreadyReleased = volunteers.find(v => v.id === volunteerId)?.releasedAt;
+      if (verified && alreadyReleased) {
+        await checkAndAssignBadges(volunteerId);
+      }
+    } catch {
+      showToast("Failed to update donor verification.");
+    } finally {
+      setVerifyingDonor(null);
     }
   };
 
@@ -721,7 +739,28 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                     </div>
                   </td>
                   <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>
-                    {rawRoles.map(r => r.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())).join(", ") || "—"}
+                    <div>{rawRoles.map(r => r.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())).join(", ") || "—"}</div>
+                    {rawRoles.map(r => r.trim().toLowerCase()).includes("donor") && (
+                      v.adminVerifiedDonor ? (
+                        <button
+                          onClick={() => handleVerifyDonor(v.id, false)}
+                          disabled={verifyingDonor === v.id}
+                          style={{ marginTop: 4, fontSize: "0.68rem", padding: "1px 7px", borderRadius: 5, border: "none", background: "#dcfce7", color: "#15803d", fontWeight: 700, cursor: "pointer" }}
+                          title="Click to revoke donor verification"
+                        >
+                          ✓ Donor Verified
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleVerifyDonor(v.id, true)}
+                          disabled={verifyingDonor === v.id}
+                          style={{ marginTop: 4, fontSize: "0.68rem", padding: "1px 7px", borderRadius: 5, border: "1px solid #d97706", background: "#fff", color: "#d97706", fontWeight: 600, cursor: "pointer" }}
+                          title="Verify this volunteer actually donated"
+                        >
+                          {verifyingDonor === v.id ? "…" : "Verify Donor"}
+                        </button>
+                      )
+                    )}
                   </td>
                   <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
                     {v.progress?.attendance === "present"

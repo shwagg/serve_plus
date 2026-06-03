@@ -106,6 +106,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         completionStatus: "graded",
         releasedAt: serverTimestamp(),
         releasedBy: adminName,
+        roles: Array.isArray(rawRole) ? rawRole : [rawRole],
     });
 
     logAudit({

@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { db } from "../../firebaseConfig";
 import {
   collection, getDocs, addDoc, deleteDoc,
-  doc, serverTimestamp, orderBy, query, where,
+  doc, serverTimestamp, orderBy, query, where, limit,
 } from "firebase/firestore";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
@@ -26,7 +26,14 @@ export default function AnnouncementsManager() {
     try {
       const q = query(collection(db, "missions"), where("status", "==", "published"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
-      setMissions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const published = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const withVolunteers = await Promise.all(
+        published.map(async (m) => {
+          const volSnap = await getDocs(query(collection(db, "missions", m.id, "volunteer"), limit(1)));
+          return volSnap.empty ? null : m;
+        })
+      );
+      setMissions(withVolunteers.filter(Boolean));
     } catch (error) {
       console.error("Error loading missions:", error);
     }
@@ -136,7 +143,7 @@ export default function AnnouncementsManager() {
     ));
 
   return (
-    <div className="admin-outlet content">
+    <div>
       <h1 className="page-title">Announcements</h1>
 
       {/* Post new announcement */}
@@ -175,16 +182,9 @@ export default function AnnouncementsManager() {
                   Select Mission/Event *
                 </label>
                 <select
+                  className="ann-input"
                   value={form.eventId || ""}
                   onChange={(e) => setForm(f => ({ ...f, eventId: e.target.value }))}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    fontFamily: "inherit",
-                  }}
                 >
                   <option value="">-- Select an event --</option>
                   {missions.map((mission) => (
@@ -232,45 +232,122 @@ export default function AnnouncementsManager() {
       <div className="card">
         <div className="card-header">Live Preview</div>
         <div className="card-body" style={{ padding: 0 }}>
-          <p className="card-note" style={{ padding: '12px 16px 10px' }}>
-            This is how the announcement strip appears to students — fixed above the header at the very top of the screen.
-          </p>
-          {/* Mock student screen */}
-          <div style={{ margin: '0 16px 16px', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-            {/* Ticker */}
-            <div className="ticker-preview-wrap">
-              <span className="ticker-label">📢 News</span>
-              <div className="ticker-track">
-                {previewItems.length === 0 ? (
-                  <span style={{ fontSize: 12, color: '#475569', paddingLeft: 16 }}>
-                    No announcements posted yet — your text will scroll here
-                  </span>
-                ) : (
-                  <div className="ticker-content">
-                    <span className="ticker-text">{renderPreviewItems(previewItems)}</span>
-                    <span className="ticker-text" aria-hidden="true">{renderPreviewItems(previewItems, 'd-')}</span>
+          {form.type === "global" ? (
+            <>
+              <p className="card-note" style={{ padding: '12px 16px 10px' }}>
+                This is how the announcement strip appears to students — fixed above the header at the very top of the screen.
+              </p>
+              {/* Mock student screen */}
+              <div style={{ margin: '0 16px 16px', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                {/* Ticker */}
+                <div className="ticker-preview-wrap">
+                  <span className="ticker-label">📢 News</span>
+                  <div className="ticker-track">
+                    {previewItems.length === 0 ? (
+                      <span style={{ fontSize: 12, color: '#475569', paddingLeft: 16 }}>
+                        No announcements posted yet — your text will scroll here
+                      </span>
+                    ) : (
+                      <div className="ticker-content">
+                        <span className="ticker-text">{renderPreviewItems(previewItems)}</span>
+                        <span className="ticker-text" aria-hidden="true">{renderPreviewItems(previewItems, 'd-')}</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+                {/* Mock header */}
+                <div style={{ background: '#d0edfc', height: 56, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, borderBottom: '1px solid #b8ddf0' }}>
+                  <div style={{ width: 22, height: 22, background: '#30bdb7', borderRadius: 4, flexShrink: 0 }} />
+                  <span style={{ fontWeight: 800, fontSize: 16, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                    SERVE<span style={{ color: '#30bdb7' }}>+</span>
+                  </span>
+                </div>
+                {/* Mock leaderboard */}
+                <div style={{ background: '#f0f9ff', padding: '14px 16px 18px' }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 3 }}>Leaderboard</div>
+                  <div style={{ height: 9, background: '#cce6f8', borderRadius: 4, width: '52%', marginBottom: 14 }} />
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    {[{ h: 72, w: '30%' }, { h: 96, w: '38%' }, { h: 60, w: '30%' }].map((s, i) => (
+                      <div key={i} style={{ width: s.w, height: s.h, background: '#fff', borderRadius: 8, border: '1px solid #dbeafe' }} />
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-            {/* Mock header */}
-            <div style={{ background: '#d0edfc', height: 56, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, borderBottom: '1px solid #b8ddf0' }}>
-              <div style={{ width: 22, height: 22, background: '#30bdb7', borderRadius: 4, flexShrink: 0 }} />
-              <span style={{ fontWeight: 800, fontSize: 16, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                SERVE<span style={{ color: '#30bdb7' }}>+</span>
-              </span>
-            </div>
-            {/* Mock leaderboard */}
-            <div style={{ background: '#f0f9ff', padding: '14px 16px 18px' }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 3 }}>Leaderboard</div>
-              <div style={{ height: 9, background: '#cce6f8', borderRadius: 4, width: '52%', marginBottom: 14 }} />
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                {[{ h: 72, w: '30%' }, { h: 96, w: '38%' }, { h: 60, w: '30%' }].map((s, i) => (
-                  <div key={i} style={{ width: s.w, height: s.h, background: '#fff', borderRadius: 8, border: '1px solid #dbeafe' }} />
-                ))}
+            </>
+          ) : (
+            <>
+              <p className="card-note" style={{ padding: '12px 16px 10px' }}>
+                Event-specific announcements are delivered as notifications — students see them in their notification bell and a popup when clicked.
+              </p>
+              <div style={{ display: 'flex', gap: 16, margin: '0 16px 16px', flexWrap: 'wrap' }}>
+
+                {/* Mock notification bell item */}
+                <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    In notification bell
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+                    {/* Dropdown header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px 8px', borderBottom: '1px solid #f0f0f0' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: '#000' }}>Notifications</span>
+                      <span style={{ fontSize: 16, color: '#9ca3af', lineHeight: 1 }}>×</span>
+                    </div>
+                    {/* Notification item */}
+                    <div style={{ display: 'flex', gap: 10, padding: '12px 14px', background: '#f0f8ff', position: 'relative' }}>
+                      <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📢</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {form.eventId && (
+                          <div style={{ color: '#0369a1', fontSize: 11, fontWeight: 700, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {missions.find(m => m.id === form.eventId)?.title || 'Selected Event'}
+                          </div>
+                        )}
+                        <div style={{ fontWeight: 600, color: '#1a3a5c', fontSize: 13, marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {draftPreview.title || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Your title here</span>}
+                        </div>
+                        {draftPreview.body && (
+                          <div style={{ color: '#555', fontSize: 12, marginBottom: 3, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                            {draftPreview.body}
+                          </div>
+                        )}
+                        <div style={{ color: '#aaa', fontSize: 11 }}>just now</div>
+                      </div>
+                      <div style={{ position: 'absolute', top: '50%', right: 12, transform: 'translateY(-50%)', width: 8, height: 8, background: '#30bdb7', borderRadius: '50%' }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mock popup modal */}
+                <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    When clicked (popup)
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '24px 20px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', position: 'relative' }}>
+                    <span style={{ position: 'absolute', top: 10, right: 12, color: '#9ca3af', fontSize: 18, lineHeight: 1 }}>×</span>
+                    <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 12 }}>📢</div>
+                    {form.eventId && (
+                      <div style={{ color: '#0369a1', fontSize: 11, fontWeight: 700, textAlign: 'center', marginBottom: 6 }}>
+                        {missions.find(m => m.id === form.eventId)?.title || 'Selected Event'}
+                      </div>
+                    )}
+                    <div style={{ fontWeight: 700, fontSize: 15, color: '#1a3a5c', textAlign: 'center', marginBottom: draftPreview.body ? 10 : 16, lineHeight: 1.3 }}>
+                      {draftPreview.title || <span style={{ color: '#94a3b8', fontStyle: 'italic', fontWeight: 400 }}>Your title here</span>}
+                    </div>
+                    {draftPreview.body && (
+                      <div style={{ fontSize: 12, color: '#555', textAlign: 'center', lineHeight: 1.5, marginBottom: 16 }}>
+                        {draftPreview.body}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <span style={{ background: 'linear-gradient(135deg,#30bdb7 0%,#1a9e99 100%)', color: '#fff', padding: '7px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
+                        Go to Event
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
 
