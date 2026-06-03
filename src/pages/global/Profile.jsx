@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs, onSnapshot, addDoc, deleteDoc, query, orderBy } from "firebase/firestore";
-import { getLevelInfo } from "../../hooks/rewardSystem";
+import { getLevelInfo, getNextUnlock, LEVEL_UNLOCKS } from "../../hooks/rewardSystem";
 // Simple modal component
-function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, activeFrame: initialFrame = 'default' }) {
+function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, activeFrame: initialFrame = 'default', bio: initialBio = '', profileBgColor: initialBgColor = '', profileTitle: initialTitle = '', profileGlow: initialGlow = '', pinnedBadges: initialPinned = [], earnedBadges = [] }) {
   const softSkills = [
     "Teamwork", "Communication", "Problem Solving", "Leadership", "Time Management",
     "Adaptability", "Conflict Resolution", "Empathy", "Critical Thinking", "Responsibility"
@@ -43,6 +43,11 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame);
+  const [bio, setBio] = useState(initialBio);
+  const [profileBgColor, setProfileBgColor] = useState(initialBgColor);
+  const [profileTitle, setProfileTitle] = useState(initialTitle);
+  const [profileGlow, setProfileGlow] = useState(initialGlow);
+  const [pinnedBadges, setPinnedBadges] = useState(initialPinned);
 
   // Reset state when modal opens or profile changes
   useEffect(() => {
@@ -57,6 +62,11 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
       setSkills(profile.skills || []);
       setInterests(profile.interests || []);
       setSelectedFrame(initialFrame);
+      setBio(initialBio);
+      setProfileBgColor(initialBgColor);
+      setProfileTitle(initialTitle);
+      setProfileGlow(initialGlow);
+      setPinnedBadges(initialPinned);
     }
   }, [open, profile]);
 
@@ -286,6 +296,161 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
             </div>
           </div>
 
+          {/* ── About Me bio (level 2+) ── */}
+          {level >= 2 && (
+            <div>
+              <label className="profile-modal-label">About Me</label>
+              <textarea
+                value={bio}
+                onChange={e => setBio(e.target.value.slice(0, 200))}
+                className="profile-modal-input"
+                rows={3}
+                placeholder="Tell others a bit about yourself… (max 200 chars)"
+                style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{bio.length}/200</span>
+            </div>
+          )}
+
+          {/* ── Profile card background color (level 4+) ── */}
+          {level >= 4 && (() => {
+            const BG_OPTIONS = [
+              { value: '',        label: 'Default',      swatch: '#ffffff', border: '#e2e8f0' },
+              { value: '#f0fdf4', label: 'Mint',         swatch: '#f0fdf4', border: '#86efac' },
+              { value: '#eff6ff', label: 'Sky',          swatch: '#eff6ff', border: '#93c5fd' },
+              { value: '#fdf4ff', label: 'Lavender',     swatch: '#fdf4ff', border: '#d8b4fe' },
+              { value: '#fff7ed', label: 'Peach',        swatch: '#fff7ed', border: '#fed7aa' },
+              { value: '#f0f9ff', label: 'Ice',          swatch: '#f0f9ff', border: '#7dd3fc' },
+              { value: '#1e293b', label: 'Dark Slate',   swatch: '#1e293b', border: '#475569' },
+            ];
+            return (
+              <div>
+                <label className="profile-modal-label">Card Background</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                  {BG_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      title={opt.label}
+                      onClick={() => setProfileBgColor(opt.value)}
+                      style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: opt.swatch,
+                        border: `3px solid ${profileBgColor === opt.value ? '#30bdb7' : opt.border}`,
+                        cursor: 'pointer', outline: 'none',
+                        boxShadow: profileBgColor === opt.value ? '0 0 0 2px #30bdb7' : 'none',
+                      }}
+                      aria-label={opt.label}
+                      aria-pressed={profileBgColor === opt.value}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Custom title / flair (level 6+) ── */}
+          {level >= 6 && (() => {
+            const TITLES = [
+              '', 'Community Hero', 'Service Champion', 'Dedicated Volunteer',
+              'Event Leader', 'SDG Champion', 'Philanthropy Star', 'Mission Expert',
+              'Campus Changemaker', 'Passionate Advocate',
+            ];
+            return (
+              <div>
+                <label className="profile-modal-label">Profile Title</label>
+                <select
+                  value={profileTitle}
+                  onChange={e => setProfileTitle(e.target.value)}
+                  className="profile-modal-input"
+                >
+                  {TITLES.map(t => (
+                    <option key={t} value={t}>{t || '— None —'}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+
+          {/* ── Profile card glow (level 8+) ── */}
+          {level >= 8 && (() => {
+            const GLOWS = [
+              { value: '',                                    label: 'None',    color: '#e2e8f0' },
+              { value: '0 0 18px 4px rgba(13,148,136,0.55)', label: 'Teal',   color: '#0d9488' },
+              { value: '0 0 18px 4px rgba(168,85,247,0.55)', label: 'Purple', color: '#a855f7' },
+              { value: '0 0 18px 4px rgba(234,179,8,0.55)',  label: 'Gold',   color: '#eab308' },
+              { value: '0 0 18px 4px rgba(239,68,68,0.55)',  label: 'Red',    color: '#ef4444' },
+              { value: '0 0 18px 4px rgba(59,130,246,0.55)', label: 'Blue',   color: '#3b82f6' },
+            ];
+            return (
+              <div>
+                <label className="profile-modal-label">Profile Glow</label>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+                  {GLOWS.map(g => (
+                    <button
+                      key={g.value}
+                      type="button"
+                      title={g.label}
+                      onClick={() => setProfileGlow(g.value)}
+                      style={{
+                        width: 34, height: 34, borderRadius: '50%',
+                        background: g.color,
+                        border: `3px solid ${profileGlow === g.value ? '#30bdb7' : 'transparent'}`,
+                        boxShadow: profileGlow === g.value ? `0 0 0 2px #30bdb7, ${g.value || 'none'}` : (g.value || 'none'),
+                        cursor: 'pointer', outline: 'none',
+                      }}
+                      aria-label={g.label}
+                      aria-pressed={profileGlow === g.value}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Pin up to 3 badges (level 9+) ── */}
+          {level >= 9 && earnedBadges.length > 0 && (() => {
+            const togglePin = (badgeId) => {
+              setPinnedBadges(prev =>
+                prev.includes(badgeId)
+                  ? prev.filter(id => id !== badgeId)
+                  : prev.length < 3 ? [...prev, badgeId] : prev
+              );
+            };
+            return (
+              <div>
+                <label className="profile-modal-label">Pinned Badges <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 400 }}>({pinnedBadges.length}/3 selected)</span></label>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 8 }}>Pin your favorite badges to show on your profile card.</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {earnedBadges.map(b => {
+                    const bid = b.badgeId ?? b.id;
+                    const isPinned = pinnedBadges.includes(bid);
+                    const canPin = isPinned || pinnedBadges.length < 3;
+                    return (
+                      <button
+                        key={bid}
+                        type="button"
+                        onClick={() => canPin && togglePin(bid)}
+                        title={isPinned ? 'Unpin' : (canPin ? 'Pin this badge' : 'Max 3 badges')}
+                        style={{
+                          padding: '4px 10px', borderRadius: 20, fontSize: '0.8rem',
+                          border: `2px solid ${isPinned ? '#30bdb7' : '#e2e8f0'}`,
+                          background: isPinned ? '#f0fdfa' : '#f8fafc',
+                          color: isPinned ? '#0f766e' : '#475569',
+                          cursor: canPin ? 'pointer' : 'not-allowed',
+                          opacity: canPin ? 1 : 0.5,
+                          fontWeight: isPinned ? 700 : 400,
+                        }}
+                      >
+                        {isPinned ? '📌 ' : ''}{b.name || bid}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── Profile Frame Picker (level 3+) ── */}
           {level >= 3 && (() => {
             const unlockedIds = new Set(getUnlockedFrames(level).map(f => f.id));
@@ -339,7 +504,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
-          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, department, program, skills, interests, activeFrame: selectedFrame })} className="profile-modal-confirm-btn">Confirm</button>
+          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, department, program, skills, interests, activeFrame: selectedFrame, bio, profileBgColor, profileTitle, profileGlow, pinnedBadges })} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
@@ -549,10 +714,16 @@ export default function Profile() {
   const [historyFilter, setHistoryFilter] = useState("all");
   const [historySort, setHistorySort] = useState("date_desc");
   const [activeFrame, setActiveFrame] = useState("default");
+  const [bio, setBio] = useState('');
+  const [profileBgColor, setProfileBgColor] = useState('');
+  const [profileTitle, setProfileTitle] = useState('');
+  const [profileGlow, setProfileGlow] = useState('');
+  const [pinnedBadges, setPinnedBadges] = useState([]);
   const [galleryImages, setGalleryImages] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(true);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState(null);
   const [showGalleryUpload, setShowGalleryUpload] = useState(false);
+  const [customBadges, setCustomBadges] = useState([]);
   const portfolioPdfRef = useRef(null);
   const serveReadyAwardedRef = useRef(false);
   const certBlobRef = useRef(null);
@@ -811,8 +982,13 @@ useEffect(() => {
         const docSnap = await getDoc(docRef);
         let profileData = docSnap.exists() ? docSnap.data() : mockProfile;
 
-        // Load active frame from Firestore
+        // Load active frame + level unlock customizations from Firestore
         if (profileData.activeFrame) setActiveFrame(profileData.activeFrame);
+        if (profileData.bio) setBio(profileData.bio);
+        if (profileData.profileBgColor) setProfileBgColor(profileData.profileBgColor);
+        if (profileData.profileTitle) setProfileTitle(profileData.profileTitle);
+        if (profileData.profileGlow) setProfileGlow(profileData.profileGlow);
+        if (Array.isArray(profileData.pinnedBadges)) setPinnedBadges(profileData.pinnedBadges);
 
         const totalPoints = profileData.totalPoints || 0;
         profileData.totalPoints = totalPoints;
@@ -826,8 +1002,16 @@ useEffect(() => {
         setProfile(profileData);
         setLoading(false); // Show the page now — events load in background
 
-        // Phase 2: Fetch missions
-        const missionsSnap = await getDocs(collection(db, "missions"));
+        // Phase 2: Fetch missions + custom badges in parallel
+        const [missionsSnap, customBadgesSnap] = await Promise.all([
+          getDocs(collection(db, "missions")),
+          getDocs(collection(db, "customBadges")),
+        ]);
+        setCustomBadges(
+          customBadgesSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(b => !b.archived)
+        );
 
         // Real-time badge listener — updates whenever a badge is awarded
         const badgesRef = collection(db, "users", user.uid, "badges");
@@ -907,11 +1091,15 @@ useEffect(() => {
               targetDate = new Date(eventData.targetDate);
             }
 
+            const reqBonus = vData.requirementBonus || {};
+            const requirementPoints = Object.values(reqBonus).reduce((s, val) => s + (Number(val) || 0), 0);
+
             return {
               id: eventId,
               title: eventData.title || eventId,
               role: vData.role || "participant",
               pointsEarned: vData.pointsEarned || 0,
+              requirementPoints,
               sdgs: eventData.sdgs || [],
               tasksDone,
               status: eventData.status || "unknown",
@@ -1096,7 +1284,13 @@ useEffect(() => {
       />
 
       <div className="profile-main-flex">
-        <div className="profile-card">
+        <div
+          className="profile-card"
+          style={{
+            ...(profileBgColor ? { background: profileBgColor } : {}),
+            ...(profileGlow    ? { boxShadow: profileGlow }       : {}),
+          }}
+        >
           <div className="profile-avatar">
             <AvatarWithFrame
               src={profile.avatar}
@@ -1113,6 +1307,10 @@ useEffect(() => {
           {!profile.username && profile.email && (
             <h2 className="profile-username">{profile.email.split('@')[0]}</h2>
           )}
+          {/* Custom title (level 6+) */}
+          {profileTitle && (
+            <div className="profile-custom-title">{profileTitle}</div>
+          )}
           <div className="profile-name">{profile.name}</div>
           <div className="profile-email">{profile.email}</div>
           <div className="profile-level-label">Level {profile.level}</div>
@@ -1124,6 +1322,22 @@ useEffect(() => {
               </div>
             </div>
           </div>
+          {/* Next unlock hint */}
+          {profile.level < 10 && (() => {
+            const next = getNextUnlock(profile.level, profile.totalPoints);
+            if (!next) return null;
+            return (
+              <div className="profile-next-unlock">
+                <span className="profile-next-unlock-icon">{next.unlock.icon}</span>
+                <span className="profile-next-unlock-text">
+                  {next.ptsToUnlock === 0
+                    ? `${next.unlock.name} ready to unlock!`
+                    : `${next.ptsToUnlock} pts → unlock ${next.unlock.name}`
+                  } <span className="profile-next-unlock-level">(Lv. {next.level})</span>
+                </span>
+              </div>
+            );
+          })()}
           {(profile.department || profile.program) && (
             <div style={{ width: "100%", marginTop: 18 }}>
               <div className="profile-skills-label">Department & Program</div>
@@ -1157,6 +1371,38 @@ useEffect(() => {
               ))}
             </div>
           </div>
+          {/* Bio (level 2+) */}
+          {bio && (
+            <div style={{ width: '100%', marginTop: 14 }}>
+              <div className="profile-skills-label">About Me</div>
+              <div className="profile-bio-text">{bio}</div>
+            </div>
+          )}
+
+          {/* Pinned badges (level 9+) */}
+          {pinnedBadges.length > 0 && (() => {
+            const pinnedDefs = pinnedBadges
+              .map(id => earnedBadges.find(b => (b.badgeId ?? b.id) === id))
+              .filter(Boolean);
+            if (pinnedDefs.length === 0) return null;
+            return (
+              <div style={{ width: '100%', marginTop: 14 }}>
+                <div className="profile-skills-label">📌 Pinned Badges</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+                  {pinnedDefs.map(b => {
+                    const bid = b.badgeId ?? b.id;
+                    return (
+                      <div key={bid} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                        <BadgeIcon badgeId={bid} earned size="sm" />
+                        <span style={{ fontSize: '0.7rem', color: '#475569', textAlign: 'center', maxWidth: 56 }}>{b.name || bid}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <button
             className="profile-edit-btn"
             onClick={() => { setEditOpen(true); setProfileMsg({ type: '', text: '' }); }}
@@ -1178,6 +1424,12 @@ useEffect(() => {
             role={profile?.role}
             level={profile?.level || 1}
             activeFrame={activeFrame}
+            bio={bio}
+            profileBgColor={profileBgColor}
+            profileTitle={profileTitle}
+            profileGlow={profileGlow}
+            pinnedBadges={pinnedBadges}
+            earnedBadges={earnedBadges}
             onConfirm={async updated => {
               try {
                 const user = auth.currentUser;
@@ -1196,6 +1448,11 @@ useEffect(() => {
                 );
                 setProfile(prev => ({ ...prev, ...updated }));
                 if (updated.activeFrame) setActiveFrame(updated.activeFrame);
+                if ('bio'            in updated) setBio(updated.bio ?? '');
+                if ('profileBgColor' in updated) setProfileBgColor(updated.profileBgColor ?? '');
+                if ('profileTitle'   in updated) setProfileTitle(updated.profileTitle ?? '');
+                if ('profileGlow'    in updated) setProfileGlow(updated.profileGlow ?? '');
+                if (Array.isArray(updated.pinnedBadges)) setPinnedBadges(updated.pinnedBadges);
                 refreshUserData();
                 setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
               } catch (err) {
@@ -1257,7 +1514,7 @@ useEffect(() => {
 
                 // Sort
                 const sorted = [...filtered].sort((a, b) => {
-                  if (historySort === "points") return (b.pointsEarned || 0) - (a.pointsEarned || 0);
+                  if (historySort === "points") return ((b.pointsEarned || 0) + (b.requirementPoints || 0)) - ((a.pointsEarned || 0) + (a.requirementPoints || 0));
                   const da = a.targetDate ? new Date(a.targetDate) : new Date(0);
                   const db2 = b.targetDate ? new Date(b.targetDate) : new Date(0);
                   return historySort === "date_asc" ? da - db2 : db2 - da;
@@ -1329,7 +1586,7 @@ useEffect(() => {
                                 {hasCert && <span className="peh-badge" style={{ background: "#fef9c3", color: "#854d0e" }}>🎓 Certificate</span>}
                               </div>
                               <div className="peh-card-stats">
-                                <span className="peh-stat">⭐ {ev.pointsEarned || 0} pts</span>
+                                <span className="peh-stat">⭐ {(ev.pointsEarned || 0) + (ev.requirementPoints || 0)} pts</span>
                                 {tasksTotal > 0 && <span className="peh-stat">✅ {tasksDone}/{tasksTotal} tasks</span>}
                                 {ev.targetDate && <span className="peh-stat">📅 {ev.targetDate instanceof Date ? ev.targetDate.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : ev.targetDate}</span>}
                               </div>
@@ -1431,7 +1688,7 @@ useEffect(() => {
 
           {activeTab === "Badges" && (
             <div role="tabpanel" id="profile-tabpanel-Badges" aria-labelledby="profile-tab-Badges" className="profile-tab-panel">
-              <BadgeShelf earnedBadges={earnedBadges} />
+              <BadgeShelf earnedBadges={earnedBadges} customBadges={customBadges} />
             </div>
           )}
 
@@ -1508,7 +1765,7 @@ useEffect(() => {
                               <span className="event-title">{event.title}</span>
                               <div className="event-meta">
                                 <span className="event-role">{event.role}</span>
-                                <span className="event-points">+{event.pointsEarned} pts</span>
+                                <span className="event-points">+{(event.pointsEarned || 0) + (event.requirementPoints || 0)} pts</span>
                               </div>
                             </div>
                             {event.tasksDone && event.tasksDone.length > 0 && (
@@ -1780,7 +2037,7 @@ useEffect(() => {
                                 <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #f0f4f8' }}>
                                   <span style={{ background: '#30bdb7', color: '#fff', borderRadius: 4, padding: '2px 9px', fontWeight: 600 }}>{event.role}</span>
                                 </td>
-                                <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#000', borderBottom: '1px solid #f0f4f8' }}>+{event.pointsEarned}</td>
+                                <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#000', borderBottom: '1px solid #f0f4f8' }}>+{(event.pointsEarned || 0) + (event.requirementPoints || 0)}</td>
                               </tr>
 
                               {event.tasksDone && event.tasksDone.length > 0 && (

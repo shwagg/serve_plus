@@ -219,22 +219,24 @@
   border: 1.5px solid #e5e7eb;
   background: #ffffff;
   border-radius: 999px;
-  padding: 7px 22px;
+  padding: 8px 22px;
+  max-width: 90%;
+  overflow: hidden;
 }
 .strip-compact-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 /* Separator dot */
 .strip-sep {
   color: #9ca3af;
-  font-size: 12px;
+  font-size: 13px;
   user-select: none;
 }
 /* Level text */
 .strip-level-text {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: #111827;
   white-space: nowrap;
@@ -246,8 +248,8 @@
 }
 .strip-pts-bar {
   position: relative;
-  width: 110px;
-  height: 20px;
+  width: 130px;
+  height: 22px;
   background: #e5e7eb;
   border-radius: 999px;
   overflow: hidden;
@@ -268,7 +270,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #1f2937;
   z-index: 1;
@@ -276,7 +278,7 @@
 }
 /* Mission count */
 .strip-missions-text {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: #111827;
   white-space: nowrap;
@@ -285,6 +287,174 @@
   font-weight: 400;
   color: #6b7280;
 }
+/* ===== PLAYER STRIP — clickable button variant ===== */
+.player-strip-btn {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+.player-strip-btn:hover {
+  border-color: #30bdb7;
+  background: #f0fffe;
+}
+.player-strip-btn.strip-open {
+  border-color: #30bdb7;
+  background: #e6fafa;
+  box-shadow: 0 0 0 3px rgba(48, 189, 183, 0.15);
+}
+.player-strip-btn:focus-visible {
+  outline: 2px solid #30bdb7;
+  outline-offset: 2px;
+}
+.strip-caret {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid #1f2937;
+  border-bottom: 2px solid #1f2937;
+  transform: rotate(45deg);
+  position: relative;
+  top: -2px;
+  flex-shrink: 0;
+  margin-left: 10px;
+  transition: transform 0.2s, border-color 0.18s;
+}
+.strip-caret--up {
+  transform: rotate(-135deg);
+  top: 2px;
+}
+.player-strip-btn:hover .strip-caret,
+.player-strip-btn.strip-open .strip-caret {
+  border-color: #30bdb7;
+}
+
+/* ===== POINTS HISTORY PANEL ===== */
+.pts-history-panel {
+  width: 340px;
+  max-height: 420px;
+  background: #ffffff;
+  border: 1px solid rgba(48, 189, 183, 0.25);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: phpSlideIn 0.18s ease;
+}
+@keyframes phpSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.php-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(48, 189, 183, 0.15);
+  flex-shrink: 0;
+}
+.php-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.03em;
+}
+.php-total-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.08);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.php-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0;
+}
+.php-list::-webkit-scrollbar { width: 4px; }
+.php-list::-webkit-scrollbar-track { background: transparent; }
+.php-list::-webkit-scrollbar-thumb {
+  background: rgba(48, 189, 183, 0.3);
+  border-radius: 2px;
+}
+.php-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 18px;
+  color: #9ca3af;
+  font-size: 13px;
+  text-align: center;
+}
+.php-empty-icon { font-size: 30px; }
+
+/* History entry */
+.phe {
+  padding: 11px 18px;
+  border-bottom: 1px solid rgba(48, 189, 183, 0.1);
+  transition: background 0.12s;
+}
+.phe:last-child { border-bottom: none; }
+.phe:hover { background: rgba(48, 189, 183, 0.04); }
+.phe-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.phe-mission {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phe-pts {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d9488;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.phe-row-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.phe-date {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.phe-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.phe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  background: rgba(13, 148, 136, 0.06);
+  border: 1px solid rgba(13, 148, 136, 0.15);
+  border-radius: 999px;
+  padding: 1px 7px;
+  color: #374151;
+}
+.phe-chip-amt {
+  font-weight: 700;
+  color: #0d9488;
+}
+
 /* keep .level-bar for backward compat on other pages */
 .level-bar {
   width: 60px;
@@ -2227,7 +2397,8 @@
     padding-left: 8px;
     padding-right: 8px;
   }
-}/* ========== PHONE (≤ 600px) ========== */
+}
+/* ========== PHONE (≤ 600px) ========== */
 @media (max-width: 600px) {
   .header-spacer {
     height: 56px;
@@ -2276,35 +2447,41 @@
     min-height: 7px;
   }
 
-  /* Player strip — compact pill in the header center slot */
+  /* Player strip — compact pill on mobile */
   .player-strip-inner {
-    padding: 5px 8px;
-    max-width: calc(100vw - 116px);
-    overflow: hidden;
+    padding: 5px 10px;
   }
   .strip-compact-row {
-    gap: 6px;
+    gap: 8px;
   }
   .strip-sep {
     display: none;
   }
   .strip-pts-bar {
-    width: 64px;
-  }
-  .strip-xp-chip {
-    padding: 3px 10px;
-    font-size: 12px;
+    width: 80px;
+    height: 18px;
   }
   .strip-level-text,
   .strip-missions-text {
-    font-size: 11px;
+    font-size: 12px;
   }
   .strip-missions-label {
     display: inline;
-    font-size: 10px;
+    font-size: 11px;
   }
   .strip-pts-text {
     font-size: 10px;
+  }
+  .strip-pts-text img {
+    display: none;
+  }
+  .strip-caret {
+    width: 5px;
+    height: 5px;
+    margin-left: 6px;
+  }
+  .pts-history-panel {
+    width: calc(100vw - 32px);
   }
   /* Current section */
   .current-section {
@@ -2775,4 +2952,9 @@
     padding-left: 0;
     padding-right: 0;
   }
+}
+/* ========== NARROW PHONE (≤ 420px) — strip overflow guard ========== */
+@media (max-width: 420px) {
+  .strip-missions-text { display: none; }
+  .strip-sep { display: none; }
 }

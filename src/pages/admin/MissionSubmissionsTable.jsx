@@ -75,6 +75,10 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   // Which column-header filter dropdown is open
   const [openFilter, setOpenFilter] = useState(null);
   const [verifyingDonor, setVerifyingDonor] = useState(null);
+  const [pointsPopover, setPointsPopover] = useState(null);
+  const [missionCreatedBy, setMissionCreatedBy] = useState(null);
+  const [accomplishmentReport, setAccomplishmentReport] = useState(null);
+  const [arActionLoading, setArActionLoading] = useState(false);
 
   useEffect(() => {
     if (!volunteerCard) return;
@@ -82,6 +86,13 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [volunteerCard]);
+
+  useEffect(() => {
+    if (!pointsPopover) return;
+    const close = () => setPointsPopover(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [pointsPopover]);
 
   useEffect(() => {
     if (!openFilter) return;
@@ -99,11 +110,12 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const loadVolunteers = async () => {
     setLoading(true);
     try {
-      // Round 1: fetch mission metadata, volunteer list, and task list in parallel
-      const [missionSnap, volSnap, tasksSnap] = await Promise.all([
+      // Round 1: fetch mission metadata, volunteer list, task list, and accomplishment report in parallel
+      const [missionSnap, volSnap, tasksSnap, arSnap] = await Promise.all([
         getDoc(doc(db, "missions", missionId)),
         getDocs(collection(db, "missions", missionId, "volunteer")),
         getDocs(collection(db, "missions", missionId, "task")),
+        getDoc(doc(db, "missions", missionId, "accomplishmentReport", "submission")).catch(() => null),
       ]);
 
       const missionData = missionSnap.data() || {};
@@ -112,6 +124,8 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       setMissionLocation(missionData.location || "");
       const td = missionData.targetDate;
       setMissionDate(td?.toDate ? td.toDate() : td ? new Date(td) : null);
+      setMissionCreatedBy(missionData.createdBy || null);
+      setAccomplishmentReport(arSnap?.exists?.() ? arSnap.data() : null);
 
       const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const volunteerDocs = volSnap.docs;
@@ -318,6 +332,64 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
     }
   };
 
+  const handleArReview = async (status) => {
+    setArActionLoading(true);
+    try {
+      const arRef = doc(db, "missions", missionId, "accomplishmentReport", "submission");
+      await updateDoc(arRef, { status, reviewedAt: new Date().toISOString() });
+
+      const submitterId = accomplishmentReport?.submittedBy;
+      if (status === "approved" && submitterId) {
+        const submitterVolunteer = volunteers.find(v => v.id === submitterId);
+        const submitterName = submitterVolunteer?.name || "Organizer";
+        const certDate = missionDate || new Date();
+        const certDay = String(certDate.getDate());
+        const certMonth = certDate.toLocaleString("en-US", { month: "long" });
+        const certYear = String(certDate.getFullYear());
+
+        try {
+          await issueCertificate({
+            userId: submitterId,
+            recipient: submitterName,
+            course: missionTitle || "",
+            date: `${certMonth} ${certDay}, ${certYear}`,
+            loc: missionLocation,
+            day: certDay,
+            month: certMonth,
+            year: certYear,
+          });
+          await updateDoc(doc(db, "missions", missionId, "volunteer", submitterId), { certIssuedAt: new Date().toISOString() }).catch(() => {});
+          setVolunteers(prev => prev.map(v => v.id === submitterId ? { ...v, certIssuedAt: new Date().toISOString() } : v));
+        } catch {}
+
+        await createNotification(submitterId, {
+          type: "accomplishment_report_approved",
+          title: "Accomplishment Report Approved",
+          message: `Your accomplishment report for "${missionTitle || "this mission"}" has been approved! Your certificate has been issued.`,
+          link: `/profile`,
+        }).catch(() => {});
+
+        showToast("Report approved and certificate issued.");
+      } else if (status === "revision_needed") {
+        if (submitterId) {
+          await createNotification(submitterId, {
+            type: "accomplishment_report_revision",
+            title: "Accomplishment Report Needs Revision",
+            message: `Your accomplishment report for "${missionTitle || "this mission"}" needs revision. Please review and resubmit.`,
+            link: `/event/${missionId}/activity`,
+          }).catch(() => {});
+        }
+        showToast("Revision requested.");
+      }
+
+      setAccomplishmentReport(prev => prev ? { ...prev, status } : prev);
+    } catch {
+      showToast("Failed to update accomplishment report status.");
+    } finally {
+      setArActionLoading(false);
+    }
+  };
+
   const handleViewAnswers = (volunteer, type) => {
     const data = type === "pre" ? volunteer.preSurveyAnswers : volunteer.postSurveyAnswers;
     const prefix = type === "pre" ? "Pre-Activity" : "Post-Activity";
@@ -431,6 +503,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               userId: v.id,
               recipient: v.name,
               course: missionTitle || "",
+              missionPoints: typeof finalPoints === "number" ? finalPoints : undefined,
               date: `${certMonth} ${certDay}, ${certYear}`,
               loc: missionLocation,
               day: certDay,
@@ -479,6 +552,26 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   });
 
   const activeFilterCount = [searchQuery, filterRole, filterAttendance, filterPreSurvey, filterConsent, filterPostSurvey].filter(Boolean).length;
+
+  // Pin lead_organizer / organizer / mission proponent to the top
+  const getOrgRank = (v) => {
+    const surveyRoles = (v.preSurveyAnswers?.engagement?.participation || [])
+      .map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
+    if (v.id === missionCreatedBy || v.role === "lead_organizer" || surveyRoles.includes("lead_organizer")) return 0;
+    if (v.role === "organizer" || surveyRoles.includes("organizer")) return 1;
+    return 2;
+  };
+  const sortedVolunteers = [...filteredVolunteers].sort((a, b) => {
+    const rankDiff = getOrgRank(a) - getOrgRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    return a.name.localeCompare(b.name);
+  });
+
+  const AR_LABELS = {
+    submitted:       { label: "Submitted",       bg: "#dbeafe", color: "#1e40af" },
+    approved:        { label: "Approved",         bg: "#dcfce7", color: "#166534" },
+    revision_needed: { label: "Revision Needed",  bg: "#fef3c7", color: "#92400e" },
+  };
 
   return (
     <>
@@ -543,7 +636,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
           </span>
         </div>
         <div style={{ width: "100%", overflowX: "auto" }}>
-        <table style={{ width: "100%", minWidth: 980, borderCollapse: "collapse", fontSize: "0.84rem" }}>
+        <table style={{ width: "100%", minWidth: 1120, borderCollapse: "collapse", fontSize: "0.84rem" }}>
           <thead>
             <tr style={{ borderBottom: "1.5px solid #e8eaed" }}>
               {/* Volunteer column — no filter dropdown */}
@@ -673,18 +766,23 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Done %</th>
               <th style={{ position: "sticky", top: 0, background: "#f8f9fa", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Points</th>
               <th style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed" }}>Status</th>
+              <th style={{ position: "sticky", top: 0, background: "#f3f0ff", zIndex: 2, padding: "12px 16px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", textAlign: "center", whiteSpace: "nowrap", boxShadow: "inset 0 -1.5px 0 #e8eaed", minWidth: 140 }}>Accomplishment Report</th>
             </tr>
           </thead>
           <tbody>
             {filteredVolunteers.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>{volunteers.length === 0 ? "No submissions found." : "No volunteers match the current filters."}</td>
+                <td colSpan={11} style={{ textAlign: "center", padding: 32, color: "#9aa0a6", fontSize: "0.85rem" }}>{volunteers.length === 0 ? "No submissions found." : "No volunteers match the current filters."}</td>
               </tr>
-            ) : filteredVolunteers.map((v, idx) => {
+            ) : sortedVolunteers.map((v, idx) => {
               const rawRoles = v.preSurveyAnswers?.engagement?.participation || [];
               const hasConsentSubmission = Boolean(v.consentSubmission?.fileUrl);
               const consentReviewStatus = v.consentSubmission?.reviewStatus || "";
               const isConsentApproved = consentReviewStatus === "approved";
+              const preSurveyOrgRoles = rawRoles.map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
+              const isOrgRole = v.id === missionCreatedBy
+                || v.role === "lead_organizer" || v.role === "organizer"
+                || preSurveyOrgRoles.includes("lead_organizer") || preSurveyOrgRoles.includes("organizer");
 
               const journals = v.journals || [];
               const approvedJournalCount = journals.filter(j => j.adminApprovalStatus === "approved").length;
@@ -712,7 +810,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               }
 
               return (
-                <tr key={v.id} style={{ borderBottom: idx < filteredVolunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
+                <tr key={v.id} style={{ borderBottom: idx < sortedVolunteers.length - 1 ? "1px dashed #e8eaed" : "none", background: isOrgRole ? "#f8f6ff" : "transparent" }}>
                   <td style={{ padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {v.photoURL ? (
@@ -806,11 +904,10 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                           {approvedJournalCount}/{journals.length}
                         </span>
                         <button
-                          disabled={!!v.releasedAt}
-                          style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #30bdb7", background: "#fff", color: "#30bdb7", cursor: !!v.releasedAt ? "not-allowed" : "pointer", fontWeight: 600, fontSize: "0.75rem", whiteSpace: "nowrap" }}
+                          style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #30bdb7", background: "#fff", color: "#30bdb7", cursor: "pointer", fontWeight: 600, fontSize: "0.75rem", whiteSpace: "nowrap" }}
                           onClick={() => { setJournalModalVolunteer(v); setShowJournalModal(true); }}
                         >
-                          Review
+                          {v.releasedAt ? "View" : "Review"}
                         </button>
                       </div>
                     )}
@@ -822,45 +919,40 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                     {(() => {
                       if (!breakdown) return <span style={{ color: "#9aa0a6" }}>—</span>;
 
-                      const roleLines = rawRoles
-                        .map(r => {
-                          const key = r.trim().toLowerCase().replace(/\s+/g, "_");
-                          const pts = ROLE_POINTS[key] || 0;
-                          const label = r.trim().replace(/\b\w/g, c => c.toUpperCase());
-                          return pts > 0 ? `  ${label}: ${pts} pts` : null;
-                        })
-                        .filter(Boolean)
-                        .join("\n");
-
                       if (v.releasedAt) {
-                        const journalBonus = (v.pointsEarned || 0) - breakdown.finalPoints;
-                        const lines = [
-                          "── Role Breakdown ──",
-                          roleLines,
-                          `  Base Total: ${breakdown.base} pts`,
-                          `  × ${breakdown.multiplier} (avg rating: ${missionAvgRating})`,
-                          `  = ${breakdown.finalPoints} pts`,
-                          ...(journalBonus > 0 ? [`  + Journal/Task: ${journalBonus} pts`] : []),
-                          "────────────────────",
-                          `  Points Earned: ${v.pointsEarned} pts`,
-                        ].join("\n");
+                        const reqBonus = v.requirementBonus || {};
+                        const requirementPoints = Object.values(reqBonus).reduce((s, val) => s + (Number(val) || 0), 0);
+                        const bonusPoints = v.bonusPoints || 0;
+                        const releasedPoints = v.pointsEarned || 0;
+                        const basePoints = releasedPoints - bonusPoints;
+                        const roleRatingPoints = breakdown.finalPoints;
+                        const taskJournalPoints = Math.max(0, basePoints - roleRatingPoints);
+                        const displayTotal = releasedPoints + requirementPoints;
                         return (
-                          <span title={lines} style={{ fontWeight: 700, color: "#202124", cursor: "help" }}>
-                            {v.pointsEarned}
-                          </span>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              const r = e.currentTarget.getBoundingClientRect();
+                              setPointsPopover(prev => prev?.volunteerId === v.id ? null : {
+                                volunteerId: v.id,
+                                x: r.left,
+                                y: r.bottom + 6,
+                                roleRatingPoints,
+                                taskJournalPoints,
+                                requirementPoints,
+                                bonusPoints,
+                                displayTotal,
+                              });
+                            }}
+                            style={{ fontWeight: 700, color: "#202124", cursor: "pointer", background: "none", border: "none", padding: 0, fontSize: "inherit", textDecoration: "underline dotted #9aa0a6" }}
+                          >
+                            {displayTotal}
+                          </button>
                         );
                       }
 
-                      const lines = [
-                        "── Role Breakdown ──",
-                        roleLines,
-                        `  Base Total: ${breakdown.base} pts`,
-                        `  × ${breakdown.multiplier} (avg rating: ${missionAvgRating})`,
-                        "────────────────────",
-                        `  Expected: ${breakdown.finalPoints} pts`,
-                      ].join("\n");
                       return (
-                        <span title={lines} style={{ cursor: "help", fontWeight: 600, color: "#5f6368" }}>
+                        <span title={`Expected: ${breakdown.finalPoints} pts (role/rating only, before task & bonuses)`} style={{ cursor: "help", fontWeight: 600, color: "#5f6368" }}>
                           {previewPoints}
                         </span>
                       );
@@ -881,6 +973,50 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                     ) : (
                       <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>Incomplete</span>
                     )}
+                  </td>
+
+                  {/* ── Accomplishment Report column ── */}
+                  <td style={{ padding: "12px 16px", textAlign: "center", background: isOrgRole ? "#f3f0ff" : "transparent" }}>
+                    {!isOrgRole ? (
+                      <span style={{ color: "#9aa0a6", fontSize: "0.8rem" }}>—</span>
+                    ) : (() => {
+                      const arStatus = accomplishmentReport?.status;
+                      const isSubmitter = v.id === accomplishmentReport?.submittedBy;
+                      const arLabel = arStatus ? AR_LABELS[arStatus] : null;
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                          {arLabel ? (
+                            <span style={{
+                              display: "inline-block", padding: "3px 10px",
+                              background: arLabel.bg, color: arLabel.color,
+                              borderRadius: 99, fontSize: "0.75rem", fontWeight: 700,
+                            }}>
+                              {arLabel.label}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: "0.76rem", color: "#94a3b8" }}>Not yet submitted</span>
+                          )}
+                          {isSubmitter && arStatus === "submitted" && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center", marginTop: 2 }}>
+                              <button
+                                disabled={arActionLoading}
+                                onClick={() => handleArReview("approved")}
+                                style={{ padding: "3px 9px", borderRadius: 6, border: "none", background: "#137333", color: "#fff", fontWeight: 600, fontSize: "0.7rem", cursor: arActionLoading ? "not-allowed" : "pointer" }}
+                              >
+                                {arActionLoading ? "…" : "Approve"}
+                              </button>
+                              <button
+                                disabled={arActionLoading}
+                                onClick={() => handleArReview("revision_needed")}
+                                style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #d97706", background: "#fff", color: "#d97706", fontWeight: 600, fontSize: "0.7rem", cursor: arActionLoading ? "not-allowed" : "pointer" }}
+                              >
+                                Revise
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                 </tr>
               );
@@ -909,15 +1045,10 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               const isApproving = approvingJournal?.volunteerId === journalModalVolunteer.id && approvingJournal?.taskId === journal.taskId;
               return (
                 <div key={journal.taskId} style={{ marginBottom: 20, border: "1px solid #e8eaed", borderRadius: 10, padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div>
-                      <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#202124" }}>{journal.taskTitle}</span>
-                      <span style={{ marginLeft: 8, fontSize: "0.72rem", color: "#80868b", background: "#f1f3f4", borderRadius: 99, padding: "1px 7px" }}>
-                        {journal.type === "grouped" ? "Group" : "Individual"}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "0.78rem", fontWeight: 600, color: journal.adminApprovalStatus === "approved" ? "#137333" : journal.adminApprovalStatus === "rejected" ? "#d93025" : "#f9ab00" }}>
-                      {journal.adminApprovalStatus === "approved" ? "Approved" : journal.adminApprovalStatus === "rejected" ? "Rejected" : "Pending"}
+                  <div style={{ marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#202124" }}>{journal.taskTitle}</span>
+                    <span style={{ marginLeft: 8, fontSize: "0.72rem", color: "#80868b", background: "#f1f3f4", borderRadius: 99, padding: "1px 7px" }}>
+                      {journal.type === "grouped" ? "Group" : "Individual"}
                     </span>
                   </div>
                   <p style={{ fontSize: "0.85rem", color: "#3c4043", lineHeight: 1.6, margin: "0 0 12px 0", background: "#f8f9fa", borderRadius: 6, padding: "10px 12px" }}>
@@ -941,13 +1072,29 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                       </button>
                     </div>
                   )}
-                  {journal.adminApprovalStatus !== "pending" && !journalModalVolunteer.releasedAt && (
+                  {journal.adminApprovalStatus !== "pending" && (
                     <button
                       disabled={isApproving}
-                      onClick={() => handleJournalApproval(journalModalVolunteer, journal, "pending")}
-                      style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #dadce0", background: "#fff", color: "#5f6368", fontWeight: 600, fontSize: "0.72rem", cursor: isApproving ? "not-allowed" : "pointer" }}
+                      onClick={() => {
+                        if (!journalModalVolunteer.releasedAt && !isApproving) {
+                          handleJournalApproval(journalModalVolunteer, journal, "pending");
+                        }
+                      }}
+                      title={journalModalVolunteer.releasedAt ? undefined : "Click to undo and reset to pending"}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "4px 12px", borderRadius: 99, border: "none",
+                        background: journal.adminApprovalStatus === "approved" ? "#dcfce7" : "#fee2e2",
+                        color: journal.adminApprovalStatus === "approved" ? "#137333" : "#d93025",
+                        fontWeight: 700, fontSize: "0.78rem",
+                        cursor: journalModalVolunteer.releasedAt || isApproving ? "default" : "pointer",
+                        opacity: isApproving ? 0.6 : 1,
+                      }}
                     >
-                      Reset to Pending
+                      {journal.adminApprovalStatus === "approved" ? "✓ Approved" : "✗ Rejected"}
+                      {!journalModalVolunteer.releasedAt && (
+                        <span style={{ fontSize: "0.65rem", opacity: 0.65 }}>↩ undo</span>
+                      )}
                     </button>
                   )}
                 </div>
@@ -1086,6 +1233,41 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                 <span style={{ color: "#202124", fontWeight: 600 }}>{value || "—"}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {pointsPopover && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: Math.min(pointsPopover.y, window.innerHeight - 240),
+            left: Math.min(pointsPopover.x, window.innerWidth - 230),
+            zIndex: 12000,
+            background: "#fff",
+            borderRadius: 10,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+            border: "1px solid #e8eaed",
+            width: 220,
+            padding: "14px 16px",
+          }}
+        >
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#9aa0a6", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Points Breakdown</div>
+          {[
+            { label: "✅ Requirements", value: pointsPopover.requirementPoints },
+            { label: "Role / Rating", value: pointsPopover.roleRatingPoints },
+            ...(pointsPopover.taskJournalPoints > 0 ? [{ label: "Task Journal", value: pointsPopover.taskJournalPoints }] : []),
+            ...(pointsPopover.bonusPoints > 0 ? [{ label: "⭐ Bonuses", value: pointsPopover.bonusPoints }] : []),
+          ].map(({ label, value }) => (
+            <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>
+              <span style={{ color: "#5f6368" }}>{label}</span>
+              <span style={{ fontWeight: 600, color: "#202124" }}>+{value}</span>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", fontWeight: 700, paddingTop: 8, marginTop: 2 }}>
+            <span style={{ color: "#202124" }}>Total</span>
+            <span style={{ color: "#f59e0b" }}>{pointsPopover.displayTotal} pts</span>
           </div>
         </div>
       )}

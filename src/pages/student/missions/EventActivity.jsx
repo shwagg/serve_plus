@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction, increment, deleteField } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction, increment, deleteField, addDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -185,6 +185,12 @@ export default function EventActivity() {
         await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
         setTotalPointsEarned(prev => prev + 5);
         window.showToast?.("+5 XP", "success", "You earned XP for your attendance.");
+        createNotification(user.uid, {
+          type: "points_awarded",
+          title: "Points Awarded",
+          message: "You received 5 points from completing a mission requirement.",
+          link: `/event/${projectId}/activity`,
+        }).catch(() => {});
       }
 
       setQRStatus("Attendance Recorded");
@@ -370,7 +376,6 @@ export default function EventActivity() {
   const [selectedTaskForGroups, setSelectedTaskForGroups] = useState(null);
   const [groupModalMode, setGroupModalMode] = useState("view");
   const [timerNow, setTimerNow] = useState(Date.now());
-  const [playerStripPortal, setPlayerStripPortal] = useState(null);
   const [activeNav, setActiveNav] = useState(() => {
     const saved = sessionStorage.getItem('ea_activeNav');
     if (saved) { sessionStorage.removeItem('ea_activeNav'); return saved; }
@@ -422,12 +427,6 @@ export default function EventActivity() {
 
     return () => window.clearInterval(intervalId);
   }, []);
-
-  useEffect(() => {
-    const el = document.getElementById('header-center-slot');
-    if (el) setPlayerStripPortal(el);
-  }, []);
-
 
   // Auto-expand Task Assignment when attendance is first marked present
   useEffect(() => {
@@ -716,8 +715,15 @@ export default function EventActivity() {
         link: `/event/${id}/activity`
       });
 
-      // Refresh journals to show the updated reflection
-      await fetchUserJournals();
+      // Refresh journals and check if all requirements are now complete
+      const updatedJournals = await fetchUserJournals();
+      await checkAndWriteRequirementsCompleted({
+        preSurveyDone: volunteerProgress?.preSurvey === 'submitted',
+        consentDone: ['submitted', 'verified'].includes(volunteerProgress?.consent),
+        attendanceDone: volunteerProgress?.attendance === 'present',
+        journalDone: updatedJournals.length > 0,
+        postSurveyDone: volunteerProgress?.postSurvey === 'submitted',
+      });
     } catch (err) {
       console.error("Error submitting reflection:", err);
       const isGroupReflectionConflict = err?.message === "GROUP_REFLECTION_ALREADY_SUBMITTED";
@@ -803,8 +809,57 @@ export default function EventActivity() {
       if (backfilledPoints > 0) {
         setTotalPointsEarned(prev => prev + backfilledPoints);
       }
+      return journals;
     } catch (err) {
       console.error("Error fetching journals:", err);
+      return [];
+    }
+  };
+
+  const checkAndWriteRequirementsCompleted = async ({ preSurveyDone, consentDone, attendanceDone, journalDone, postSurveyDone }) => {
+    if (!preSurveyDone || !consentDone || !attendanceDone || !journalDone || !postSurveyDone) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const existingSnap = await getDocs(query(
+        collection(db, "users", user.uid, "notifications"),
+        where("type", "==", "requirements_completed"),
+        where("missionId", "==", id)
+      ));
+      if (!existingSnap.empty) return;
+
+      await addDoc(collection(db, "users", user.uid, "notifications"), {
+        type: "requirements_completed",
+        missionId: id,
+        isOrganizer: !!isOrganizerUser,
+        popupShown: false,
+        read: false,
+        createdAt: serverTimestamp(),
+        title: "Requirements Completed!",
+        message: "You've submitted all your requirements for this mission.",
+      });
+
+      if (isOrganizerUser) {
+        const arSnap = await getDocs(query(
+          collection(db, "users", user.uid, "notifications"),
+          where("type", "==", "accomplishment_report_reminder"),
+          where("missionId", "==", id)
+        ));
+        if (arSnap.empty) {
+          await addDoc(collection(db, "users", user.uid, "notifications"), {
+            type: "accomplishment_report_reminder",
+            missionId: id,
+            popupShown: false,
+            read: false,
+            createdAt: serverTimestamp(),
+            title: "Submit Your Accomplishment Report",
+            message: "Don't forget! Submit your Accomplishment Report to receive your certificate for this mission.",
+            link: `/event/${id}/activity`,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("checkAndWriteRequirementsCompleted error:", err);
     }
   };
 
@@ -815,7 +870,12 @@ export default function EventActivity() {
         const eventRef = doc(db, "missions", id);
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
-          setEvent(eventSnap.data());
+          const eventData = eventSnap.data();
+          if (eventData.status === 'completed' || eventData.status === 'cancelled') {
+            navigate(`/event/${id}`, { replace: true });
+            return;
+          }
+          setEvent(eventData);
         } else {
           console.error("Event not found for id:", id);
         }
@@ -2473,6 +2533,18 @@ export default function EventActivity() {
                 }
               }
 
+              // Consent backfill: points were already awarded when progress.consent was first set
+              // to 'verified', but requirementBonus.consent was never written (historical gap).
+              // Only write the volunteer doc field — do not re-award user XP.
+              if (progress.consent === 'verified' && !requirementBonus.consent) {
+                try {
+                  await updateDoc(volunteerRef, { "requirementBonus.consent": 5 });
+                  setRequirementBonusEarned(prev => ({ ...prev, consent: 5 }));
+                } catch (e) {
+                  console.warn('Failed to backfill consent bonus field:', e);
+                }
+              }
+
               const reviewStatus = data.consentSubmission?.reviewStatus || "";
               const hasConsentFile = Boolean(data.consentSubmission?.fileUrl);
               setConsentReviewStatus(reviewStatus);
@@ -2487,13 +2559,17 @@ export default function EventActivity() {
                 consentStatus = "verified";
 
                 // Write progress.consent = 'verified' to Firestore so the leaderboard can read it.
-                // Only award the bonus if it was never awarded before (guard via progress.consent).
+                // Only award the bonus if it was never awarded before (guard via requirementBonus.consent).
                 if (data.progress?.consent !== 'verified') {
                   try {
                     const bonusAlreadyAwarded = Boolean(data.requirementBonus?.consent);
-                    await updateDoc(volunteerRef, { "progress.consent": "verified" });
+                    await updateDoc(volunteerRef, {
+                      "progress.consent": "verified",
+                      ...(!bonusAlreadyAwarded ? { "requirementBonus.consent": 5 } : {}),
+                    });
                     if (!bonusAlreadyAwarded) {
                       await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
+                      setRequirementBonusEarned(prev => ({ ...prev, consent: 5 }));
                     }
                   } catch (e) {
                     console.warn("Failed to update consent verified status:", e);
@@ -2593,11 +2669,20 @@ export default function EventActivity() {
         if (data.progress?.consent !== 'verified') {
           try {
             const bonusAlreadyAwarded = Boolean(data.requirementBonus?.consent);
-            await updateDoc(volunteerRef, { "progress.consent": "verified" });
+            await updateDoc(volunteerRef, {
+              "progress.consent": "verified",
+              ...(!bonusAlreadyAwarded ? { "requirementBonus.consent": 5 } : {}),
+            });
             if (!bonusAlreadyAwarded) {
               await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
               setRequirementBonusEarned(prev => ({ ...prev, consent: 5 }));
               setTotalPointsEarned(prev => prev + 5);
+              createNotification(user.uid, {
+                type: "points_awarded",
+                title: "Points Awarded",
+                message: "You received 5 points from completing a mission requirement.",
+                link: `/event/${id}/activity`,
+              }).catch(() => {});
               window.showToast?.("+5 XP", "success", "You earned XP for your approved consent form.");
             } else {
               window.showToast?.("Your consent form has been approved!", "success");
@@ -2949,31 +3034,6 @@ export default function EventActivity() {
       <Header />
       <div className="header-spacer"></div>
       <div className="content-page" style={{ overflow: 'hidden' }}>
-
-        {/* Portal: level/pts strip into header center slot */}
-        {playerStripPortal && createPortal(
-          <div className="player-strip-inner">
-            <div className="strip-compact-row">
-              <span className="strip-level-text">Lv. {getLevelInfo(userData?.totalPoints).level}</span>
-              <div className="strip-pts-bar-wrap">
-                <div
-                  className="strip-pts-bar"
-                  role="progressbar"
-                  aria-valuenow={(userData?.totalPoints || 0) % 100}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`${userData?.totalPoints || 0} points`}
-                >
-                  <div className="strip-pts-fill" style={{ width: `${(userData?.totalPoints || 0) % 100}%` }} />
-                  <span className="strip-pts-text">{userData?.totalPoints || 0} XP <img src={xpIcon} alt="XP" style={{ width: 13, height: 13, verticalAlign: 'middle', marginLeft: 8, marginBottom: 2 }} /></span>
-                </div>
-              </div>
-              <span className="strip-sep" aria-hidden="true">|</span>
-              <span className="strip-missions-text">{completedMissions} <span className="strip-missions-label">{completedMissions > 1 ? 'Missions' : 'Mission'}</span></span>
-            </div>
-          </div>,
-          playerStripPortal
-        )}
 
         {/* PROGRESS STRIP — back | event title | compact progress bar */}
         {(() => {
@@ -3825,6 +3885,12 @@ export default function EventActivity() {
                   if (preSurveyIsFirst) {
                     await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
                     setTotalPointsEarned(prev => prev + 5);
+                    createNotification(user.uid, {
+                      type: "points_awarded",
+                      title: "Points Awarded",
+                      message: "You received 5 points from completing a mission requirement.",
+                      link: `/event/${id}/activity`,
+                    }).catch(() => {});
                   }
 
                   setVolunteerProgress((prev) => ({
@@ -3922,6 +3988,12 @@ export default function EventActivity() {
                 if (postSurveyIsFirst) {
                   await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
                   setTotalPointsEarned(prev => prev + 5);
+                  createNotification(user.uid, {
+                    type: "points_awarded",
+                    title: "Points Awarded",
+                    message: "You received 5 points from completing a mission requirement.",
+                    link: `/event/${id}/activity`,
+                  }).catch(() => {});
                 }
                 setVolunteerProgress(prev => ({
                   ...prev,
@@ -3935,6 +4007,13 @@ export default function EventActivity() {
                 } else {
                   window.showToast?.("Post-Activity Survey submitted!", "success");
                 }
+                await checkAndWriteRequirementsCompleted({
+                  preSurveyDone: volunteerProgress?.preSurvey === 'submitted',
+                  consentDone: ['submitted', 'verified'].includes(volunteerProgress?.consent),
+                  attendanceDone: volunteerProgress?.attendance === 'present',
+                  journalDone: userJournals.length > 0,
+                  postSurveyDone: true,
+                });
                 sessionStorage.setItem('ea_activeNav', activeNavRef.current);
                 window.location.reload();
               }}

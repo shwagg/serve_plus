@@ -1,11 +1,12 @@
 // Saving computation to firestore such as updating
 // user account 'totalPoints' and in mission 'pointsEarned'
-import { doc, getDoc, getDocs, collection, updateDoc, increment, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, updateDoc, increment, arrayUnion, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { getAuth } from "firebase/auth";
-import { computeFinalPoints } from "../../hooks/rewardSystem";
+import { computeFinalPoints, getLevelInfo } from "../../hooks/rewardSystem";
 import { checkAndAssignBadges } from "../../hooks/badgeSystem";
 import { logAudit } from "../../utils/auditLogger";
+import { createNotification } from "../../utils/notificationUtils";
 
 export const releaseMissionPoints = async (missionId) => {
     const volunteerSnap = await getDocs(
@@ -73,14 +74,96 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
             approvedTaskPoints += Number(pSnap.data().pendingPoints) || 0;
         }
     }
-    const totalPoints = finalPoints + approvedTaskPoints;
+    approvedTaskPoints = Math.min(30, approvedTaskPoints);
+    const basePoints = finalPoints + approvedTaskPoints;
 
-    // Increment user totalPoints
+    // ── Bonus point computation ────────────────────────────────────────────
+    let totalBonusPoints = 0;
+    let userUpdateExtras = {};
+    let levelBefore = 1;
+    let levelAfter = 1;
+    let bonusBreakdown = {};
+
+    if (volunteerData.userId) {
+        const userDocRef = doc(db, "users", volunteerData.userId);
+        const userSnapBefore = await getDoc(userDocRef);
+        const uData = userSnapBefore.exists() ? userSnapBefore.data() : {};
+        const ptsBefore = uData.totalPoints || 0;
+        levelBefore = getLevelInfo(ptsBefore).level;
+
+        // Returning participant bonus: rewards students who keep coming back across missions.
+        // 2nd mission = +5%, 3rd+ = +10% of base role points. No time window — fits
+        // the school-year schedule where only 2 projects are offered per year.
+        const missionsCompletedSoFar = uData.missionsCompleted || 0;
+        const returningPct = missionsCompletedSoFar >= 2 ? 0.10 : missionsCompletedSoFar === 1 ? 0.05 : 0;
+        const returningBonus = returningPct > 0 ? Math.round(finalPoints * returningPct * 10) / 10 : 0;
+
+        // Term streak bonus: +5 pts flat if the student has already completed ≥1 mission
+        // in the past 3 months (i.e., this is their 2nd+ mission this term).
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        const recentMissions = (uData.missionReleaseDates || []).filter(
+            d => new Date(d) >= threeMonthsAgo
+        );
+        const termStreakBonus = recentMissions.length >= 1 ? 5 : 0;
+
+        // Role diversity bonus: +5 pts first time completing each non-participant role
+        const doneRoles = new Set(uData.rolesCompleted || []);
+        const roleArray = Array.isArray(rawRole) ? rawRole : [rawRole];
+        const newRoles = [];
+        let roleDiversityBonus = 0;
+        for (const r of roleArray) {
+            const norm = r.trim().toLowerCase().replace(/\s+/g, "_");
+            if (norm !== "participant" && !doneRoles.has(norm)) {
+                roleDiversityBonus += 5;
+                newRoles.push(norm);
+            }
+        }
+
+        // SDG breadth bonus: +3 pts per unique SDG contributed to for the first time
+        const doneSdgs = new Set(uData.sdgsContributed || []);
+        const missionSdgs = missionData.sdgs || [];
+        const newSdgs = [];
+        let sdgBonus = 0;
+        for (const sdg of missionSdgs) {
+            if (!doneSdgs.has(sdg)) {
+                sdgBonus += 3;
+                newSdgs.push(sdg);
+            }
+        }
+
+        totalBonusPoints = returningBonus + termStreakBonus + roleDiversityBonus + sdgBonus;
+        levelAfter = getLevelInfo(ptsBefore + basePoints + totalBonusPoints).level;
+
+        userUpdateExtras = {
+            missionsCompleted: increment(1),
+            missionReleaseDates: arrayUnion(new Date().toISOString()),
+            ...(newRoles.length > 0 ? { rolesCompleted: arrayUnion(...newRoles) } : {}),
+            ...(newSdgs.length > 0 ? { sdgsContributed: arrayUnion(...newSdgs) } : {}),
+        };
+
+        if (returningBonus > 0) bonusBreakdown.returning = { amount: returningBonus, pct: Math.round(returningPct * 100) };
+        if (termStreakBonus > 0) bonusBreakdown.termStreak = { amount: termStreakBonus };
+        if (roleDiversityBonus > 0) bonusBreakdown.roleDiversity = { amount: roleDiversityBonus };
+        if (sdgBonus > 0) bonusBreakdown.sdg = { amount: sdgBonus, count: newSdgs.length };
+    }
+
+    const releasedPoints = basePoints + totalBonusPoints;
+
+    // Requirement bonuses are already in the user's totalPoints (awarded at completion time).
+    // We read them here only to include in the history panel display total.
+    const requirementBonus = volunteerData.requirementBonus || {};
+    const requirementPoints = Object.values(requirementBonus).reduce((sum, v) => sum + (Number(v) || 0), 0);
+
+    const totalPoints = releasedPoints;
+
+    // Increment user totalPoints + persist bonus-tracking fields
     if (volunteerData.userId) {
         await updateDoc(
             doc(db, "users", volunteerData.userId),
             {
-                totalPoints: increment(totalPoints)
+                totalPoints: increment(totalPoints),
+                ...userUpdateExtras,
             }
         );
     }
@@ -107,6 +190,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         releasedAt: serverTimestamp(),
         releasedBy: adminName,
         roles: Array.isArray(rawRole) ? rawRole : [rawRole],
+        ...(totalBonusPoints > 0 ? { bonusPoints: totalBonusPoints } : {}),
     });
 
     logAudit({
@@ -118,8 +202,38 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         targetUserId: volunteerId,
         targetUserName: volunteerData.displayName || volunteerData.name || "",
         pointsEarned: totalPoints,
+        bonusPoints: totalBonusPoints,
       },
     });
+
+    // Level-up notification if the student crossed a level threshold
+    if (volunteerData.userId && levelAfter > levelBefore) {
+        await createNotification(volunteerData.userId, {
+            type: "level_up",
+            title: "Level Up!",
+            message: `You reached Level ${levelAfter}!`,
+            newLevel: levelAfter,
+            popupShown: false,
+        });
+    }
+
+    // Points released notification — always shown when points > 0 so the student
+    // sees their full breakdown (base + any bonuses earned this mission).
+    const displayTotal = totalPoints + requirementPoints;
+    if (volunteerData.userId && displayTotal > 0) {
+        await createNotification(volunteerData.userId, {
+            type: "bonus_earned",
+            title: "Points Released!",
+            message: `You earned ${displayTotal} points from this mission!`,
+            popupShown: false,
+            missionId,
+            missionTitle: missionData.title || "Mission",
+            totalPoints: displayTotal,
+            basePoints,
+            requirementPoints,
+            bonuses: bonusBreakdown,
+        });
+    }
 
     // Check and assign any newly earned badges after grading
     await checkAndAssignBadges(volunteerId);

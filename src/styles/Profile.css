@@ -908,3 +908,55 @@
   font-weight: 700;
   color: #fff;
 }
+
+/* ── Level unlock: next-unlock hint ─────────────────── */
+.profile-next-unlock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  color: #0f766e;
+  font-weight: 500;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-next-unlock-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.profile-next-unlock-text {
+  line-height: 1.35;
+}
+
+.profile-next-unlock-level {
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+/* ── Level unlock: custom title ─────────────────────── */
+.profile-custom-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #30bdb7;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+/* ── Level unlock: bio text ─────────────────────────── */
+.profile-bio-text {
+  font-size: 0.85rem;
+  color: #475569;
+  line-height: 1.6;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

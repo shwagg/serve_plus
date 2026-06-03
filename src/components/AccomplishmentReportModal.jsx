@@ -37,8 +37,8 @@ export default function AccomplishmentReportModal({ missionId, event, existingRe
   const [summaryDetails,    setSummaryDetails]    = useState(preload.summaryDetails    || event?.description || "");
   const [sdgs,              setSdgs]              = useState(preload.sdgs              || (Array.isArray(event?.sdg || event?.sdgGoals) ? (event.sdg || event.sdgGoals).join(", ") : (event?.sdg || event?.sdgGoals || "")));
   const [volunteerHours,    setVolunteerHours]    = useState(preload.volunteerHours    || event?.volunteerHours || "");
-  const [plannedStart,      setPlannedStart]      = useState(preload.plannedStart      || event?.targetDate || "");
-  const [plannedEnd,        setPlannedEnd]        = useState(preload.plannedEnd        || event?.targetDate || "");
+  const [plannedStart,      setPlannedStart]      = useState(preload.plannedStart      || event?.plannedTargetDate || event?.targetDate || "");
+  const [plannedEnd,        setPlannedEnd]        = useState(preload.plannedEnd        || event?.plannedTargetDate || event?.targetDate || "");
   const [actualStart,       setActualStart]       = useState(preload.actualStart       || event?.targetDate || "");
   const [actualEnd,         setActualEnd]         = useState(preload.actualEnd         || event?.targetDate || "");
   const [proposedBudget,    setProposedBudget]    = useState(preload.proposedBudget    || event?.budget || "");

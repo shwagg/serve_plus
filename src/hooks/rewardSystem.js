@@ -62,22 +62,50 @@ export function computeFinalPoints(roles, avgRating, participationStatus) {
     return { base: totalBase, multiplier, factor, finalPoints };
 }
 
-// Progressive level thresholds — cumulative points required to reach each level.
-// Index 0 = Level 1 (0 pts), Index 9 = Level 10 (715 pts). Level 10 is the max.
+// Cumulative points required to reach each level. 1000 pts = Level 10 (max).
 const LEVEL_THRESHOLDS = [
     0,    // Level 1
-    20,   // Level 2  (+20)
-    50,   // Level 3  (+30)
-    90,   // Level 4  (+40)
-    145,  // Level 5  (+55)
-    215,  // Level 6  (+70)
-    305,  // Level 7  (+90)
-    415,  // Level 8  (+110)
-    550,  // Level 9  (+135)
-    715,  // Level 10 (+165)
+    100,  // Level 2  (+100)
+    200,  // Level 3  (+100)
+    300,  // Level 4  (+100)
+    400,  // Level 5  (+100)
+    500,  // Level 6  (+100)
+    600,  // Level 7  (+100)
+    700,  // Level 8  (+100)
+    800,  // Level 9  (+100)
+    1000, // Level 10 (+200)
 ];
 
 const MAX_LEVEL = 10;
+
+// Cosmetic unlocks earned at each level
+export const LEVEL_UNLOCKS = {
+  2:  { name: 'About Me bio',        icon: '📝', description: 'Add a personal bio to your profile' },
+  3:  { name: 'Teal Ring frame',     icon: '🔵', description: 'Unlock the Teal Ring profile frame' },
+  4:  { name: 'Background color',    icon: '🎨', description: 'Customize your profile card background' },
+  5:  { name: 'Gradient Ring frame', icon: '🌈', description: 'Unlock the Gradient Ring frame' },
+  6:  { name: 'Custom title',        icon: '✨', description: 'Add a custom flair title to your profile' },
+  7:  { name: 'Golden Ring frame',   icon: '🥇', description: 'Unlock the Golden Ring frame' },
+  8:  { name: 'Profile glow',        icon: '💫', description: 'Unlock a colored glow for your profile card' },
+  9:  { name: 'Badge pinning',       icon: '📌', description: 'Pin up to 3 favorite badges on your profile' },
+  10: { name: 'Champion Ring frame', icon: '🏆', description: 'Unlock the animated Champion Ring frame' },
+};
+
+/**
+ * Returns the next cosmetic unlock above the current level, plus how many
+ * points the user still needs to reach it. Returns null at max level.
+ */
+export function getNextUnlock(level, totalPoints) {
+  if (level >= MAX_LEVEL) return null;
+  const pts = totalPoints || 0;
+  for (let l = level + 1; l <= MAX_LEVEL; l++) {
+    if (LEVEL_UNLOCKS[l]) {
+      const ptsNeeded = LEVEL_THRESHOLDS[l - 1];
+      return { level: l, ptsToUnlock: Math.max(0, ptsNeeded - pts), unlock: LEVEL_UNLOCKS[l] };
+    }
+  }
+  return null;
+}
 
 export function getLevelInfo(totalPoints) {
     const pts = Math.max(0, totalPoints || 0);
