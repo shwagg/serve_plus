@@ -494,7 +494,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
   const feedbackUrl = `${window.location.origin}/global/feedback/${project.id}`;
   const attendanceQRValue = qrLocation
-    ? JSON.stringify({ eventId: project.id, location: qrLocation })
+    ? JSON.stringify({ eventId: project.id, location: qrLocation, timestamp: validQRTimestamp })
     : null;
 
   const typeLabel = project.projectType === "sl" ? "Service Learning"

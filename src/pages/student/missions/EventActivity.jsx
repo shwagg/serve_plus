@@ -153,6 +153,21 @@ export default function EventActivity() {
         setQRStatus("This QR code is not valid for this event.");
         return;
       }
+
+      // Check if QR code has expired (30 minutes)
+      if (parsed.timestamp) {
+        const now = Date.now();
+        const qrAge = now - parsed.timestamp;
+        const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+        
+        if (qrAge > THIRTY_MINUTES_MS) {
+          const minutesAgo = Math.floor(qrAge / 60000);
+          setQRStatus(`This QR code expired ${minutesAgo} minutes ago. Please ask the administrator to generate a new one.`);
+          setScanSuccess(false);
+          return;
+        }
+      }
+
       // Location proximity check — only if QR has embedded location
       if (parsed.location && position?.coords) {
         const dist = getDistanceMeters(
@@ -3176,14 +3191,45 @@ export default function EventActivity() {
             className="ea-nav-unenroll"
             title="Un-enroll from this event"
             onClick={async () => {
-              if (!await showConfirm('Are you sure you want to un-enroll from this event?')) return;
+              if (!await showConfirm('Are you sure you want to un-enroll from this event? All earned points from this event will be voided.')) return;
               const user = auth.currentUser;
               if (!user) return;
               try {
-                await deleteDoc(doc(db, 'missions', id, 'volunteer', user.uid));
+                // Get volunteer data to calculate total points to void
+                const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
+                const volunteerSnap = await getDoc(volunteerRef);
+                
+                let totalPointsToVoid = 0;
+                if (volunteerSnap.exists()) {
+                  const volunteerData = volunteerSnap.data();
+                  totalPointsToVoid = Number(volunteerData.pointsEarned) || 0;
+                  
+                  // Deduct points from user's total
+                  if (totalPointsToVoid > 0) {
+                    await updateDoc(doc(db, 'users', user.uid), { 
+                      totalPoints: increment(-totalPointsToVoid) 
+                    });
+                  }
+                }
+                
+                // Delete volunteer enrollment
+                await deleteDoc(volunteerRef);
                 deleteDoc(doc(db, 'userMissions', user.uid, 'missions', id)).catch(() => {});
+                
+                // Send notification about voided points
+                if (totalPointsToVoid > 0) {
+                  createNotification(user.uid, {
+                    type: 'points_voided',
+                    title: 'Points Voided',
+                    message: `You unenrolled from "${event.title}". ${totalPointsToVoid} point${totalPointsToVoid !== 1 ? 's were' : ' was'} removed from your total.`,
+                    link: '/student/home',
+                    icon: '⚠️',
+                  });
+                }
+                
                 navigate('/student', { state: { scrollTo: 'missions' } });
               } catch (err) {
+                console.error('Failed to un-enroll:', err);
                 alert('Failed to un-enroll. Please try again.');
               }
             }}

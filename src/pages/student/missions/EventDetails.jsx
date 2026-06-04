@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
-import { doc, getDoc, setDoc, deleteDoc, updateDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, collection, getDocs, query, where, serverTimestamp, increment } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
 import { showToast } from '../../../utils/toast';
 
@@ -175,9 +175,38 @@ export default function EventDetails({ onClose = null, missionId = null }) {
     const user = auth.currentUser;
     if (!user) return;
     try {
-      await deleteDoc(doc(db, "missions", id, "volunteer", user.uid));
+      // Get volunteer data to calculate total points to void
+      const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
+      const volunteerSnap = await getDoc(volunteerRef);
+      
+      let totalPointsToVoid = 0;
+      if (volunteerSnap.exists()) {
+        const volunteerData = volunteerSnap.data();
+        totalPointsToVoid = Number(volunteerData.pointsEarned) || 0;
+        
+        // Deduct points from user's total
+        if (totalPointsToVoid > 0) {
+          await updateDoc(doc(db, 'users', user.uid), { 
+            totalPoints: increment(-totalPointsToVoid) 
+          });
+        }
+      }
+      
+      // Delete volunteer enrollment
+      await deleteDoc(volunteerRef);
       await deleteDoc(doc(db, "userMissions", user.uid, "missions", id));
       setVolunteer(null);
+      
+      // Send notification about voided points
+      if (totalPointsToVoid > 0) {
+        createNotification(user.uid, {
+          type: 'points_voided',
+          title: 'Points Voided',
+          message: `You unenrolled from "${mission?.title || 'the event'}". ${totalPointsToVoid} point${totalPointsToVoid !== 1 ? 's were' : ' was'} removed from your total.`,
+          link: '/student/home',
+          icon: '⚠️',
+        });
+      }
     } catch (err) {
       console.error("Failed to cancel request:", err);
       alert("Failed to cancel request. Please try again.");

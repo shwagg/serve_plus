@@ -1165,6 +1165,7 @@ export default function CurrentEvent() {
     JSON.stringify({
       eventId: missionId,
       location: missionData?.qrLocation ?? null,
+      timestamp: missionData?.validQRTimestamp ?? null,
     });
 
   // Init map when picker modal opens
