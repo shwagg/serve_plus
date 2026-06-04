@@ -18,6 +18,14 @@ import "../../styles/RosterAccountManagement.css";
 const BLACKBOARD_RESTRICTED_ROLES = new Set(["partner", "admin", "sysadmin"]);
 const TOTP_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
 
+const ROLE_FILTER_OPTIONS = [
+  { value: "overall", label: "All" },
+  { value: "student", label: "Volunteer" },
+  { value: "faculty", label: "Faculty" },
+  { value: "partner", label: "Partner" },
+  { value: "admin", label: "Admin" },
+];
+
 const isBlackboardAccount = (user) =>
   user?.authProvider === "blackboard" ||
   Boolean(user?.blackboardId || user?.blackboardAuthUid);
@@ -39,7 +47,9 @@ export default function RosterAccountManagement({ readOnly = false }) {
   const [totpResetRequests, setTotpResetRequests] = useState({});
   const [openActionUserId, setOpenActionUserId] = useState(null);
   const [totpActionUserId, setTotpActionUserId] = useState(null);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const actionMenuRef = useRef(null);
+  const filterDropdownRef = useRef(null);
   const pageSize = 10;
   const canManageTotp = !readOnly && actorData?.role === "sysadmin";
   // Department options for faculty
@@ -131,6 +141,12 @@ export default function RosterAccountManagement({ readOnly = false }) {
         !actionMenuRef.current.contains(event.target)
       ) {
         setOpenActionUserId(null);
+      }
+      if (
+        filterDropdownRef.current &&
+        !filterDropdownRef.current.contains(event.target)
+      ) {
+        setFilterDropdownOpen(false);
       }
     };
 
@@ -458,13 +474,50 @@ export default function RosterAccountManagement({ readOnly = false }) {
 
           {/* Role Filters */}
           <div className="role-filters">
-            {[
-              { value: "overall", label: "All" },
-              { value: "student", label: "Volunteer" },
-              { value: "faculty", label: "Faculty" },
-              { value: "partner", label: "Partner" },
-              { value: "admin", label: "Admin" },
-            ].map(({ value, label }) => (
+            {/* Mobile custom dropdown */}
+            <div className="role-filter-dropdown" ref={filterDropdownRef}>
+              <button
+                type="button"
+                className="role-filter-dropdown-trigger"
+                aria-expanded={filterDropdownOpen}
+                aria-haspopup="listbox"
+                onClick={() => setFilterDropdownOpen((o) => !o)}
+              >
+                {ROLE_FILTER_OPTIONS.find((o) => o.value === roleFilter)?.label ?? "All"}
+                <svg
+                  className={`role-filter-chevron${filterDropdownOpen ? " open" : ""}`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {filterDropdownOpen && (
+                <div className="role-filter-dropdown-menu" role="listbox">
+                  {ROLE_FILTER_OPTIONS.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="option"
+                      aria-selected={roleFilter === value}
+                      className={`role-filter-dropdown-item${roleFilter === value ? " active" : ""}`}
+                      onClick={() => {
+                        handleRoleFilterChange(value);
+                        setFilterDropdownOpen(false);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Desktop pills */}
+            {ROLE_FILTER_OPTIONS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
