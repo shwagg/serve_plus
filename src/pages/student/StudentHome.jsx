@@ -339,11 +339,8 @@ const StudentHome = () => {
 
   // Fetch leaderboard data
   useEffect(() => {
-    const fetchLeaderboard = async () => {
+    const unsubscribe = onSnapshot(collection(db, "users"), (usersSnap) => {
       try {
-        // Fetch all users without orderBy so documents missing `totalPoints` are not excluded
-        const usersSnap = await getDocs(collection(db, "users"));
-
         const leaderboardData = usersSnap.docs
           .map(userDoc => {
             const userData = userDoc.data();
@@ -367,9 +364,11 @@ const StudentHome = () => {
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
       }
-    };
+    }, (error) => {
+      console.error("Error fetching leaderboard:", error);
+    });
 
-    fetchLeaderboard();
+    return () => unsubscribe();
   }, []);
 
   // leaderboard is already sorted by fetchLeaderboard

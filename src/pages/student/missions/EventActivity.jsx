@@ -19,6 +19,7 @@ import { logAudit } from "../../../utils/auditLogger";
 import { useSession } from '../../../context/SessionContext';
 import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
 import { computeFinalPoints, getLevelInfo } from "../../../hooks/rewardSystem";
+import { getMissionPointsBreakdown, getRequirementPoints } from "../../../hooks/missionPoints";
 import "../../../styles/student.css";
 import "../../../styles/EventActivity.css";
 import PreActivitySurvey from "../../../forms/PreActivitySurvey.jsx";
@@ -26,6 +27,28 @@ import PostActivitySurvey from "../../../forms/PostActivitySurvey.jsx";
 import ParticipantModal from "./ParticipantModal.jsx";
 import GroupModal from "./GroupModal.jsx";
 import AccomplishmentReportModal from "../../../components/AccomplishmentReportModal.jsx";
+
+const requirementPointUpdate = (key, points = 5) => ({
+  [`requirementBonus.${key}`]: points,
+  requirementPoints: increment(points),
+  missionPoints: increment(points),
+  [`pointsBreakdown.requirements.${key}`]: points,
+  "pointsBreakdown.requirementPoints": increment(points),
+  "pointsBreakdown.missionPoints": increment(points),
+});
+
+const taskPointIncrementUpdate = (points) => ({
+  pointsEarned: increment(points),
+  taskPoints: increment(points),
+  missionPoints: increment(points),
+  "pointsBreakdown.taskPoints": increment(points),
+  "pointsBreakdown.missionPoints": increment(points),
+});
+
+function normalizeMissionRoles(rawRoles) {
+  const roles = Array.isArray(rawRoles) ? rawRoles : (rawRoles ? [rawRoles] : []);
+  return roles.map(r => String(r || "").trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean);
+}
 
 export default function EventActivity() {
   const isEventEditable = (eventDate) => {
@@ -179,7 +202,7 @@ export default function EventActivity() {
         "scanAttendance.location": locData,
         "scanAttendance.scannedAt": serverTimestamp(),
         "progress.attendance": "present",
-        ...(attendanceIsFirst ? { "requirementBonus.attendance": 5 } : {}),
+        ...(attendanceIsFirst ? requirementPointUpdate("attendance") : {}),
       });
       if (attendanceIsFirst) {
         await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
@@ -786,7 +809,7 @@ export default function EventActivity() {
                 if (pts > 0) {
                   await updateDoc(participantRef, { pointsEarned: pts, estimatedPoints: deleteField() });
                   await updateDoc(doc(db, 'users', user.uid), { totalPoints: increment(pts) });
-                  await updateDoc(volunteerRef, { pointsEarned: increment(pts) });
+                  await updateDoc(volunteerRef, taskPointIncrementUpdate(pts));
                   resolvedData = { ...resolvedData, pointsEarned: pts };
                   backfilledPoints += pts;
                 }
@@ -817,7 +840,7 @@ export default function EventActivity() {
   };
 
   const checkAndWriteRequirementsCompleted = async ({ preSurveyDone, consentDone, attendanceDone, journalDone, postSurveyDone }) => {
-    if (!preSurveyDone || !consentDone || !attendanceDone || !journalDone || !postSurveyDone) return;
+    if (isDonorUser ? !preSurveyDone : (!preSurveyDone || !consentDone || !attendanceDone || !journalDone || !postSurveyDone)) return;
     const user = auth.currentUser;
     if (!user) return;
     try {
@@ -944,7 +967,7 @@ export default function EventActivity() {
               const volunteerRef = doc(db, 'missions', id, 'volunteer', user.uid);
               await updateDoc(participantRef, { pointsEarned: pts, estimatedPoints: deleteField() });
               await updateDoc(doc(db, 'users', user.uid), { totalPoints: increment(pts) });
-              await updateDoc(volunteerRef, { pointsEarned: increment(pts) });
+              await updateDoc(volunteerRef, taskPointIncrementUpdate(pts));
               setTaskPointsEarned(prev => ({ ...prev, [task.id]: pts }));
               setTotalPointsEarned(prev => prev + pts);
               setUserJournals(prev => prev.map(j => j.taskId === task.id ? { ...j, pointsEarned: pts, estimatedPoints: undefined } : j));
@@ -1182,7 +1205,13 @@ export default function EventActivity() {
           if (volunteerSnap.exists()) {
             const currentTotal = volunteerSnap.data().pointsEarned || 0;
             const newTotal = Math.max(0, currentTotal - pointsToRemove);
-            await updateDoc(volunteerRef, { pointsEarned: newTotal });
+            await updateDoc(volunteerRef, {
+              pointsEarned: newTotal,
+              taskPoints: newTotal,
+              missionPoints: increment(-pointsToRemove),
+              "pointsBreakdown.taskPoints": newTotal,
+              "pointsBreakdown.missionPoints": increment(-pointsToRemove),
+            });
             setTotalPointsEarned(newTotal);
           }
         }
@@ -1212,7 +1241,13 @@ export default function EventActivity() {
         if (volunteerSnap.exists()) {
           const currentTotal = volunteerSnap.data().pointsEarned || 0;
           const newTotal = Math.max(0, currentTotal - pointsToRemove);
-          await updateDoc(volunteerRef, { pointsEarned: newTotal });
+          await updateDoc(volunteerRef, {
+            pointsEarned: newTotal,
+            taskPoints: newTotal,
+            missionPoints: increment(-pointsToRemove),
+            "pointsBreakdown.taskPoints": newTotal,
+            "pointsBreakdown.missionPoints": increment(-pointsToRemove),
+          });
           setTotalPointsEarned(newTotal);
         }
       }
@@ -1288,7 +1323,13 @@ export default function EventActivity() {
           if (volunteerSnap.exists()) {
             const currentTotal = volunteerSnap.data().pointsEarned || 0;
             const newTotal = Math.max(0, currentTotal - participantPoints);
-            await updateDoc(volunteerRef, { pointsEarned: newTotal });
+            await updateDoc(volunteerRef, {
+              pointsEarned: newTotal,
+              taskPoints: newTotal,
+              missionPoints: increment(-participantPoints),
+              "pointsBreakdown.taskPoints": newTotal,
+              "pointsBreakdown.missionPoints": increment(-participantPoints),
+            });
             totalPointsDelta -= participantPoints;
           }
         }
@@ -1324,7 +1365,7 @@ export default function EventActivity() {
           await setDoc(
             doc(db, "missions", id, "volunteer", userId),
             {
-              pointsEarned: increment(pointsToAdd),
+              ...taskPointIncrementUpdate(pointsToAdd),
             },
             { merge: true },
           );
@@ -2304,13 +2345,19 @@ export default function EventActivity() {
   })();
 
   const [volunteerRole, setVolunteerRole] = useState(null);
+  const [volunteerMissionRoles, setVolunteerMissionRoles] = useState([]);
+  const effectiveVolunteerRoles = volunteerMissionRoles.length > 0
+    ? volunteerMissionRoles
+    : normalizeMissionRoles(volunteerRole);
 
   // Is the current user the organizer / proponent of this event?
   const isOrganizerUser = !!event && !!auth.currentUser && (
     event.createdBy === auth.currentUser.uid ||
-    (Array.isArray(volunteerRole)
-      ? volunteerRole.some(r => ["organizer", "lead_organizer"].includes(r))
-      : ["organizer", "lead_organizer"].includes(volunteerRole))
+    effectiveVolunteerRoles.some(r => ["organizer", "lead_organizer"].includes(r))
+  );
+
+  const isDonorUser = !!event && !!auth.currentUser && (
+    effectiveVolunteerRoles.length === 1 && effectiveVolunteerRoles.includes("donor")
   );
 
   // Notify organizer once when event has ended and no accomplishment report submitted yet
@@ -2331,6 +2378,17 @@ export default function EventActivity() {
       missionId: id,
     }).catch(() => {});
   }, [isOrganizerUser, isEditable, accomplishmentReport, event, id]);
+
+  // For donors: once pre-survey is submitted, they're fully complete
+  const donorCompletionFiredRef = useRef(false);
+  useEffect(() => {
+    if (donorCompletionFiredRef.current) return;
+    if (!isDonorUser || volunteerProgress?.preSurvey !== 'submitted') return;
+    donorCompletionFiredRef.current = true;
+    checkAndWriteRequirementsCompleted({
+      preSurveyDone: true, consentDone: true, attendanceDone: true, journalDone: true, postSurveyDone: true,
+    });
+  }, [isDonorUser, volunteerProgress?.preSurvey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [preSurveyData, setPreSurveyData] = useState(null);
   const [preSurveyFullData, setPreSurveyFullData] = useState(null);
@@ -2445,7 +2503,7 @@ export default function EventActivity() {
                   joinedAt: new Date().toISOString(),
                   registrationStatus: "approved",
                   completionStatus: "in_progress",
-                  role: "organizer",
+                  roles: ["organizer"],
                   pointsEarned: 0,
                   progress: {
                     preSurvey: "not_required",
@@ -2457,7 +2515,7 @@ export default function EventActivity() {
                 // Keep the reverse-index so chat / profile history loads correctly
                 setDoc(doc(db, "userMissions", user.uid, "missions", id), {
                   title: eventData.title || "Untitled Mission",
-                  role: "organizer",
+                  roles: ["organizer"],
                   date: eventData.targetDate || "",
                   joinedAt: serverTimestamp(),
                 }).catch(() => {});
@@ -2495,10 +2553,13 @@ export default function EventActivity() {
             let consentStatus = "";
             let progress = {};
             let pointsEarned = 0;
+            let loadedVolunteerRoles = [];
             if (volunteerSnap.exists()) {
               const data = volunteerSnap.data();
               progress = data.progress || {};
-              pointsEarned = data.pointsEarned || 0;
+              pointsEarned = getMissionPointsBreakdown(data).missionPoints;
+              loadedVolunteerRoles = normalizeMissionRoles(data.roles?.length > 0 ? data.roles : data.role);
+              setVolunteerMissionRoles(loadedVolunteerRoles);
               const requirementBonus = data.requirementBonus || {};
               setRequirementBonusEarned(requirementBonus);
 
@@ -2520,12 +2581,20 @@ export default function EventActivity() {
               }
               if (Object.keys(bonusBackfill).length > 0) {
                 try {
-                  await updateDoc(volunteerRef, bonusBackfill);
+                  await updateDoc(volunteerRef, {
+                    ...bonusBackfill,
+                    requirementPoints: increment(bonusBackfillPoints),
+                    missionPoints: increment(bonusBackfillPoints),
+                    "pointsBreakdown.requirementPoints": increment(bonusBackfillPoints),
+                    "pointsBreakdown.missionPoints": increment(bonusBackfillPoints),
+                  });
                   await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(bonusBackfillPoints) });
                   setRequirementBonusEarned(prev => ({
                     ...prev,
                     ...Object.fromEntries(
-                      Object.entries(bonusBackfill).map(([k, v]) => [k.replace('requirementBonus.', ''), v])
+                      Object.entries(bonusBackfill)
+                        .filter(([k]) => k.startsWith('requirementBonus.'))
+                        .map(([k, v]) => [k.replace('requirementBonus.', ''), v])
                     ),
                   }));
                 } catch (e) {
@@ -2538,7 +2607,7 @@ export default function EventActivity() {
               // Only write the volunteer doc field — do not re-award user XP.
               if (progress.consent === 'verified' && !requirementBonus.consent) {
                 try {
-                  await updateDoc(volunteerRef, { "requirementBonus.consent": 5 });
+                  await updateDoc(volunteerRef, requirementPointUpdate("consent"));
                   setRequirementBonusEarned(prev => ({ ...prev, consent: 5 }));
                 } catch (e) {
                   console.warn('Failed to backfill consent bonus field:', e);
@@ -2565,7 +2634,7 @@ export default function EventActivity() {
                     const bonusAlreadyAwarded = Boolean(data.requirementBonus?.consent);
                     await updateDoc(volunteerRef, {
                       "progress.consent": "verified",
-                      ...(!bonusAlreadyAwarded ? { "requirementBonus.consent": 5 } : {}),
+                      ...(!bonusAlreadyAwarded ? requirementPointUpdate("consent") : {}),
                     });
                     if (!bonusAlreadyAwarded) {
                       await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
@@ -2587,6 +2656,7 @@ export default function EventActivity() {
             } else {
               setConsentFileUrl(null);
               setConsentReviewStatus("");
+              setVolunteerMissionRoles([]);
             }
             setConsentSubmitted(consentSubmitted);
 
@@ -2601,7 +2671,7 @@ export default function EventActivity() {
             // Fetch accomplishment report (organizer only)
             const isOrganizerUser =
               eventData.createdBy === user.uid ||
-              (progress.role && ["organizer", "lead_organizer"].includes(progress.role));
+              loadedVolunteerRoles.some(r => ["organizer", "lead_organizer"].includes(r));
             if (isOrganizerUser || eventData.createdBy === user.uid) {
               try {
                 const arRef = doc(db, "missions", id, "accomplishmentReport", "submission");
@@ -2671,7 +2741,7 @@ export default function EventActivity() {
             const bonusAlreadyAwarded = Boolean(data.requirementBonus?.consent);
             await updateDoc(volunteerRef, {
               "progress.consent": "verified",
-              ...(!bonusAlreadyAwarded ? { "requirementBonus.consent": 5 } : {}),
+              ...(!bonusAlreadyAwarded ? requirementPointUpdate("consent") : {}),
             });
             if (!bonusAlreadyAwarded) {
               await updateDoc(doc(db, "users", user.uid), { totalPoints: increment(5) });
@@ -2731,11 +2801,14 @@ export default function EventActivity() {
   useEffect(() => {
     async function fetchEventLeaderboard() {
       try {
-        const [usersSnap, volunteersSnap, tasksSnap] = await Promise.all([
+        const [usersSnap, volunteersSnap, tasksSnap, missionSnap] = await Promise.all([
           getDocs(collection(db, "users")),
           getDocs(collection(db, "missions", id, "volunteer")),
           getDocs(collection(db, "missions", id, "task")),
+          getDoc(doc(db, "missions", id)),
         ]);
+        const missionData = missionSnap.data() || {};
+        const avgRating = missionData.feedback?.avgRating ?? 0;
 
         const usersMap = new Map();
         usersSnap.docs.forEach((userDoc) => {
@@ -2795,16 +2868,26 @@ export default function EventActivity() {
             userData.email?.split("@")[0] ||
             "Volunteer";
           const progress = volData.progress || {};
-          const reqBonusTotal =
+          const progressRequirementPoints =
             (progress.preSurvey === 'submitted' ? 5 : 0) +
             (progress.attendance === 'present' ? 5 : 0) +
             (progress.consent === 'verified' ? 5 : 0) +
             (progress.postSurvey === 'submitted' ? 5 : 0);
-          const taskPoints = taskPointsMap.get(userId) || 0;
+          const storedRequirementPoints = getRequirementPoints(volData);
+          const requirementPoints = storedRequirementPoints || progressRequirementPoints;
+          const taskPoints = Number(volData.taskPoints) || taskPointsMap.get(userId) || 0;
+          const roles = volData.roles || (volData.role ? [volData.role] : []);
+          const roleRatingPoints = Number(volData.roleRatingPoints) ||
+            (volData.releasedAt && roles.length > 0
+              ? computeFinalPoints(roles, avgRating, "verified").finalPoints
+              : 0);
+          const bonusPoints = Number(volData.bonusPoints) || 0;
+          const missionPoints = Number(volData.missionPoints) ||
+            requirementPoints + taskPoints + roleRatingPoints + bonusPoints;
           return {
             uid: userId,
             name,
-            points: taskPoints + reqBonusTotal,
+            points: missionPoints,
             avatar:
               userData.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -2828,7 +2911,7 @@ export default function EventActivity() {
             );
             volunteersSnap.docs.forEach((volunteerDoc) => {
               const currentPoints = pointsByUser.get(volunteerDoc.id) || 0;
-              const pointsToAdd = volunteerDoc.data().pointsEarned || 0;
+              const pointsToAdd = getMissionPointsBreakdown(volunteerDoc.data()).missionPoints;
               pointsByUser.set(volunteerDoc.id, currentPoints + pointsToAdd);
             });
           }
@@ -2962,7 +3045,7 @@ export default function EventActivity() {
                 <div className="level-bar" role="progressbar" aria-valuenow={li.progress} aria-valuemin={0} aria-valuemax={100}>
                   <div className="level-bar-fill" style={{ width: `${li.progress}%` }}></div>
                 </div>
-                <span className="level-points">{userData?.totalPoints || 0} pts ({li.pointsInLevel}/{li.pointsForLevel} to next level)</span>
+                <span className="level-points">{li.currentPoints}/{li.nextLevelPoints} pts</span>
                 </>); })()}
               </div>
             </div>
@@ -3038,16 +3121,18 @@ export default function EventActivity() {
         {/* PROGRESS STRIP — back | event title | compact progress bar */}
         {(() => {
           const enrolledTaskIds = Object.keys(enrolledTasks).filter(tid => enrolledTasks[tid]);
-          const totalItems = 4 + enrolledTaskIds.length;
+          const totalItems = isDonorUser ? 1 : (4 + enrolledTaskIds.length);
           let done = 0;
           if (volunteerProgress?.preSurvey === 'submitted') done++;
-          if (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') done++;
-          if (volunteerProgress?.attendance === 'present') done++;
-          if (volunteerProgress?.postSurvey === 'submitted') done++;
-          enrolledTaskIds.forEach(tid => {
-            const task = tasks.find(t => t.id === tid);
-            if (task && userJournals.some(j => j.activityId === task.title)) done++;
-          });
+          if (!isDonorUser) {
+            if (volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified') done++;
+            if (volunteerProgress?.attendance === 'present') done++;
+            if (volunteerProgress?.postSurvey === 'submitted') done++;
+            enrolledTaskIds.forEach(tid => {
+              const task = tasks.find(t => t.id === tid);
+              if (task && userJournals.some(j => j.activityId === task.title)) done++;
+            });
+          }
           const pct = totalItems > 0 ? Math.round((done / totalItems) * 100) : 0;
           return (
             <div className="ea-progress-strip">
@@ -3280,19 +3365,20 @@ export default function EventActivity() {
                       const attendanceDone = volunteerProgress?.attendance === 'present';
                       const postSurveyDone = volunteerProgress?.postSurvey === 'submitted';
                       const postLocked = !attendanceDone;
-                      const steps = [
-                        {
-                          label: 'Pre-Activity Survey',
-                          desc: !isEditable ? 'Closed after the event date' : 'Fill out before the event',
-                          done: preSurveyDone,
-                          locked: !isEditable,
-                          onOpen: isEditable ? () => setShowPreSurveyModal(true) : null,
-                          type: 'survey',
-                          previewable: preSurveyDone && !!preSurveyFullData,
-                          onPreview: () => setShowPreSurveyPreview(true),
-                          points: 5,
-                          bonusKey: 'preSurvey',
-                        },
+                      const preSurveyStep = {
+                        label: 'Pre-Activity Survey',
+                        desc: !isEditable ? 'Closed after the event date' : 'Fill out before the event',
+                        done: preSurveyDone,
+                        locked: !isEditable,
+                        onOpen: isEditable ? () => setShowPreSurveyModal(true) : null,
+                        type: 'survey',
+                        previewable: preSurveyDone && !!preSurveyFullData,
+                        onPreview: () => setShowPreSurveyPreview(true),
+                        points: 5,
+                        bonusKey: 'preSurvey',
+                      };
+                      const steps = isDonorUser ? [preSurveyStep] : [
+                        preSurveyStep,
                         {
                           label: 'Parent Consent Form',
                           desc: !isEditable
@@ -3646,6 +3732,12 @@ export default function EventActivity() {
                             );
                           })}
                         </div>
+                        {isDonorUser && (
+                          <div style={{ marginTop: 14, padding: '10px 14px', background: '#fef9c3', border: '1px solid #fde68a', borderRadius: 10, fontSize: '0.8rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span>💛</span>
+                            <span>As a donor, only the Pre-Activity Survey is required. Other requirements are waived.</span>
+                          </div>
+                        )}
                         </>
                       );
                     })()}
@@ -3874,12 +3966,19 @@ export default function EventActivity() {
                     }
                   );
                   const preSurveyIsFirst = volunteerProgress?.preSurvey !== "submitted";
+                  const participationArr = Array.isArray(form.participation) ? form.participation : (form.participation ? [form.participation] : []);
+                  const normParticipation = participationArr.map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
+                  const primaryParticipationRole =
+                    normParticipation.includes("lead_organizer") ? "lead_organizer" :
+                    normParticipation.includes("organizer") ? "organizer" :
+                    (normParticipation.includes("donor") && !normParticipation.includes("participant")) ? "donor" : null;
                   await updateDoc(
                     doc(db, "missions", id, "volunteer", user.uid),
                     {
                       "progress.preSurvey": "submitted",
                       "progress.consent": "open",
-                      ...(preSurveyIsFirst ? { "requirementBonus.preSurvey": 5 } : {}),
+                      ...(preSurveyIsFirst ? requirementPointUpdate("preSurvey") : {}),
+                      ...(normParticipation.length > 0 ? { roles: normParticipation, role: deleteField() } : {}),
                     }
                   );
                   if (preSurveyIsFirst) {
@@ -3891,6 +3990,11 @@ export default function EventActivity() {
                       message: "You received 5 points from completing a mission requirement.",
                       link: `/event/${id}/activity`,
                     }).catch(() => {});
+                  }
+                  if (primaryParticipationRole === "donor") {
+                    await checkAndWriteRequirementsCompleted({
+                      preSurveyDone: true, consentDone: true, attendanceDone: true, journalDone: true, postSurveyDone: true,
+                    });
                   }
 
                   setVolunteerProgress((prev) => ({
@@ -3982,7 +4086,7 @@ export default function EventActivity() {
                   doc(db, "missions", id, "volunteer", user.uid),
                   {
                     "progress.postSurvey": "submitted",
-                    ...(postSurveyIsFirst ? { "requirementBonus.postSurvey": 5 } : {}),
+                    ...(postSurveyIsFirst ? requirementPointUpdate("postSurvey") : {}),
                   }
                 );
                 if (postSurveyIsFirst) {

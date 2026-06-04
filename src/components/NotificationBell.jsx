@@ -16,6 +16,7 @@ import { playNotificationSound } from "../utils/soundUtils";
 import BadgeEarnedModal from "./badges/BadgeEarnedModal";
 import CertEarnedModal from "./CertEarnedModal";
 import "./styles/NotificationBell.css";
+import { announceHeaderModalOpen, useCloseOnHeaderModalOpen } from "../utils/modalCoordinator";
 
 export default function NotificationBell() {
   const { userData } = useSession();
@@ -34,6 +35,13 @@ export default function NotificationBell() {
   const bellButtonRef = useRef(null);
   const prevPointsRef = useRef(null);
   const prevNotifCountRef = useRef(0);
+
+  const closeForOtherHeaderModal = useCallback(() => {
+    setIsOpen(false);
+    setEventAnnouncementModal(null);
+  }, []);
+
+  useCloseOnHeaderModalOpen("notifications", closeForOtherHeaderModal);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
@@ -120,6 +128,8 @@ export default function NotificationBell() {
       setReplayCert({ notifId: notification.id, course: notification.event || notification.course });
     }
     if (notification.type === "event_announcement") {
+      announceHeaderModalOpen("notifications");
+      setIsOpen(false);
       setEventAnnouncementModal(notification);
     }
     if (notification.type === "accomplishment_report_due" && notification.missionId) {
@@ -191,7 +201,11 @@ export default function NotificationBell() {
       <button
         ref={bellButtonRef}
         className="notification-bell-button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => setIsOpen((prev) => {
+          if (prev) return false;
+          announceHeaderModalOpen("notifications");
+          return true;
+        })}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"

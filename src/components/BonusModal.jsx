@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 
+function formatWholePoints(value) {
+  return Math.round(Number(value) || 0);
+}
+
 export default function BonusModal({ bonusQueue = [], onDismiss }) {
   const [visible, setVisible] = useState(false);
   const current = bonusQueue[0] ?? null;
@@ -8,20 +12,34 @@ export default function BonusModal({ bonusQueue = [], onDismiss }) {
     if (current) {
       const t = setTimeout(() => setVisible(true), 80);
       return () => clearTimeout(t);
-    } else {
-      setVisible(false);
     }
+    setVisible(false);
   }, [current?.id]);
 
   if (!current) return null;
 
   const { missionTitle, totalPoints, basePoints, requirementPoints = 0, bonuses = {} } = current;
+  const displayTotalPoints = formatWholePoints(totalPoints);
+  const displayBasePoints = formatWholePoints(basePoints);
+  const displayRequirementPoints = formatWholePoints(requirementPoints);
 
   const bonusLines = [
-    bonuses.returning     && { icon: "↩️", label: "Returning participant",                    amount: bonuses.returning.amount },
-    bonuses.termStreak    && { icon: "🔥", label: "Term streak",                              amount: bonuses.termStreak.amount },
-    bonuses.roleDiversity && { icon: "🎭", label: "Role diversity",                           amount: bonuses.roleDiversity.amount },
-    bonuses.sdg           && { icon: "🌍", label: `New SDGs (${bonuses.sdg.count})`,          amount: bonuses.sdg.amount },
+    bonuses.returning && {
+      label: "Returning participant",
+      amount: formatWholePoints(bonuses.returning.amount),
+    },
+    bonuses.termStreak && {
+      label: "Term streak",
+      amount: formatWholePoints(bonuses.termStreak.amount),
+    },
+    bonuses.roleDiversity && {
+      label: "Role diversity",
+      amount: formatWholePoints(bonuses.roleDiversity.amount),
+    },
+    bonuses.sdg && {
+      label: `New SDGs (${bonuses.sdg.count})`,
+      amount: formatWholePoints(bonuses.sdg.amount),
+    },
   ].filter(Boolean);
 
   const handleClose = () => {
@@ -47,25 +65,25 @@ export default function BonusModal({ bonusQueue = [], onDismiss }) {
         </h2>
 
         <div style={{ width: "100%", margin: "16px 0", textAlign: "left" }}>
-          {requirementPoints > 0 && (
+          {displayRequirementPoints > 0 && (
             <div style={rowStyle}>
-              <span style={labelStyle}>✅ Requirements</span>
-              <span style={valueStyle}>+{requirementPoints} pts</span>
+              <span style={labelStyle}>Requirements</span>
+              <span style={valueStyle}>+{displayRequirementPoints} pts</span>
             </div>
           )}
-          {basePoints > 0 && (
+          {displayBasePoints > 0 && (
             <div style={rowStyle}>
               <span style={labelStyle}>Mission points</span>
-              <span style={valueStyle}>+{basePoints} pts</span>
+              <span style={valueStyle}>+{displayBasePoints} pts</span>
             </div>
           )}
 
           {bonusLines.length > 0 && (
             <>
               <p style={bonusHeadingStyle}>Bonuses</p>
-              {bonusLines.map((b, i) => (
-                <div key={i} style={rowStyle}>
-                  <span style={{ ...labelStyle, color: "#374151" }}>{b.icon} {b.label}</span>
+              {bonusLines.map((b) => (
+                <div key={b.label} style={rowStyle}>
+                  <span style={{ ...labelStyle, color: "#374151" }}>{b.label}</span>
                   <span style={{ ...valueStyle, color: "#16a34a" }}>+{b.amount} pts</span>
                 </div>
               ))}
@@ -74,7 +92,7 @@ export default function BonusModal({ bonusQueue = [], onDismiss }) {
 
           <div style={{ ...rowStyle, borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 8 }}>
             <span style={{ fontWeight: 700, color: "#111", fontSize: 15 }}>Total</span>
-            <span style={{ fontWeight: 700, color: "#f59e0b", fontSize: 15 }}>{totalPoints} pts</span>
+            <span style={{ fontWeight: 700, color: "#f59e0b", fontSize: 15 }}>{displayTotalPoints} pts</span>
           </div>
         </div>
 

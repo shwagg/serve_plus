@@ -11,6 +11,16 @@ import { AUTO_BADGE_RULES, BADGE_BY_ID } from "../constants/badgeDefinitions";
 import { logAudit } from "../utils/auditLogger";
 import { createNotification } from "../utils/notificationUtils";
 
+function normalizeMissionRoles(volunteerData = {}) {
+  const rawRoles = Array.isArray(volunteerData.roles) && volunteerData.roles.length > 0
+    ? volunteerData.roles
+    : (volunteerData.role ? [volunteerData.role] : []);
+
+  return rawRoles
+    .map(role => String(role || "").trim().toLowerCase().replace(/\s+/g, "_"))
+    .filter(Boolean);
+}
+
 /**
  * Compute a student's badge stats by scanning all missions they participated in.
  * Returns { totalCompleted, donorCount, organizerCount, leadOrganizerCount }
@@ -36,15 +46,16 @@ async function computeBadgeStats(userId) {
     // Milestone: any completed (graded) mission
     totalCompleted++;
 
-    // Philanthropy: only counts when admin explicitly verified the donor role
-    if (v.adminVerifiedDonor === true) {
+    const roles = normalizeMissionRoles(v);
+
+    // Philanthropy: counts completed missions where donor is one of the roles.
+    if (roles.includes("donor")) {
       donorCount++;
     }
 
-    // Leadership: admin-assigned role stored as v.role (singular string)
-    const adminRole = v.role;
-    const isLeadOrganizer = adminRole === "lead_organizer" || adminRole === "lead organizer";
-    const isOrganizer = adminRole === "organizer" || isLeadOrganizer;
+    // Leadership: count organizer roles from the roles array.
+    const isLeadOrganizer = roles.includes("lead_organizer");
+    const isOrganizer = roles.includes("organizer") || isLeadOrganizer;
 
     if (isOrganizer) {
       organizerCount++;

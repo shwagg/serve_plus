@@ -4,6 +4,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { getLevelInfo } from "../hooks/rewardSystem";
+import { getMissionPointsBreakdown } from "../hooks/missionPoints";
 import xpIcon from "../assets/xp_icon.png";
 
 function formatDate(ts) {
@@ -22,8 +23,19 @@ function BonusChip({ icon, amount }) {
 }
 
 function HistoryEntry({ entry }) {
-  const { missionTitle, totalPoints, missionBase = 0, bonusPoints = 0, createdAt } = entry;
-  const hasChips = missionBase > 0 || bonusPoints > 0;
+  const {
+    missionTitle,
+    totalPoints,
+    missionBase: rawMissionBase = 0,
+    requirementPoints = 0,
+    taskPoints = 0,
+    roleRatingPoints = 0,
+    bonusPoints = 0,
+    createdAt,
+  } = entry;
+  const hasDetailedChips = requirementPoints > 0 || taskPoints > 0 || roleRatingPoints > 0;
+  const missionBase = hasDetailedChips ? 0 : rawMissionBase;
+  const hasChips = hasDetailedChips || missionBase > 0 || bonusPoints > 0;
 
   return (
     <div className="phe">
@@ -35,6 +47,9 @@ function HistoryEntry({ entry }) {
         <span className="phe-date">{formatDate(createdAt)}</span>
         {hasChips && (
           <div className="phe-chips">
+            {requirementPoints > 0 && <BonusChip icon="Req" amount={requirementPoints} />}
+            {taskPoints > 0 && <BonusChip icon="Task" amount={taskPoints} />}
+            {roleRatingPoints > 0 && <BonusChip icon="Role" amount={roleRatingPoints} />}
             {missionBase > 0 && <BonusChip icon="✅" amount={missionBase} />}
             {bonusPoints > 0 && <BonusChip icon="⭐" amount={bonusPoints} />}
           </div>
@@ -82,17 +97,16 @@ export default function PlayerStrip() {
               if (!volSnap.exists()) return null;
               const vData = volSnap.data();
               if (!vData.releasedAt) return null;
-              const reqBonus = vData.requirementBonus || {};
-              const requirementPoints = Object.values(reqBonus).reduce((s, v) => s + (Number(v) || 0), 0);
-              const releasedPoints = vData.pointsEarned || 0;
-              const bonusPoints = vData.bonusPoints || 0;
-              const missionBase = (releasedPoints - bonusPoints) + requirementPoints;
+              const breakdown = getMissionPointsBreakdown(vData);
               return {
                 id: missionDoc.id,
                 missionTitle: missionDoc.data().title || missionDoc.id,
-                totalPoints: releasedPoints + requirementPoints,
-                missionBase,
-                bonusPoints,
+                totalPoints: breakdown.missionPoints,
+                missionBase: breakdown.requirementPoints + breakdown.taskPoints + breakdown.roleRatingPoints,
+                requirementPoints: breakdown.requirementPoints,
+                taskPoints: breakdown.taskPoints,
+                roleRatingPoints: breakdown.roleRatingPoints,
+                bonusPoints: breakdown.bonusPoints,
                 createdAt: vData.releasedAt,
               };
             } catch {
@@ -139,7 +153,7 @@ export default function PlayerStrip() {
 
   if (!uid || role !== "student") return null;
 
-  const { level, progress } = getLevelInfo(totalPoints);
+  const { level, progress, currentPoints, nextLevelPoints } = getLevelInfo(totalPoints);
 
   return (
     <>
@@ -160,11 +174,11 @@ export default function PlayerStrip() {
               aria-valuenow={progress}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={`${totalPoints} points`}
+              aria-label={`${currentPoints} of ${nextLevelPoints} points`}
             >
               <div className="strip-pts-fill" style={{ width: `${progress}%` }} />
               <span className="strip-pts-text">
-                {totalPoints} XP
+                {currentPoints}/{nextLevelPoints} XP
                 <img src={xpIcon} alt="XP" style={{ width: 13, height: 13, verticalAlign: "middle", marginLeft: 8, marginBottom: 2 }} />
               </span>
             </div>

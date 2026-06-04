@@ -100,7 +100,7 @@ export default function ProjectTasks() {
         title: formData.title,
         description: formData.description,
         enrollmentDeadline: formData.enrollmentDeadline,
-        points: parseInt(formData.points) || 0,
+        points: Math.min(30, parseInt(formData.points) || 0),
         type: formData.type || "individual",
         createdAt: new Date().toISOString(),
       };
@@ -370,7 +370,7 @@ export default function ProjectTasks() {
                     color: "#111",
                   }}
                 >
-                  Points (0-1000)
+                  Points (0-30)
                 </label>
                 <input
                   type="number"
@@ -378,7 +378,7 @@ export default function ProjectTasks() {
                   value={formData.points}
                   onChange={handleInputChange}
                   min="0"
-                  max="1000"
+                  max="30"
                   style={{ width: "100%", padding: 8, fontSize: 14 }}
                 />
               </div>

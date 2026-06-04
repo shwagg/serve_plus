@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import ReactDOM from "react-dom";
 import {
   collection,
@@ -17,6 +17,7 @@ import { auth, db } from "../firebaseConfig";
 import "../styles/GlobalAnnouncements.css";
 import UserProfileModal from './UserProfileModal';
 import '../styles/UserProfileModal.css';
+import { announceHeaderModalOpen, useCloseOnHeaderModalOpen } from "../utils/modalCoordinator";
 
 const GlobalAnnouncements = () => {
   const sdgLabelMap = {
@@ -58,6 +59,14 @@ const GlobalAnnouncements = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [modalType, setModalType] = useState('event'); // 'event', 'closing', 'milestone', 'info', or 'full'
   const [profileUser, setProfileUser] = useState(null);
+
+  const closeForOtherHeaderModal = useCallback(() => {
+    setModalOpen(false);
+    setSelectedEvent(null);
+    setProfileUser(null);
+  }, []);
+
+  useCloseOnHeaderModalOpen('global-announcements', closeForOtherHeaderModal);
 
   const toKey = (type, id) => `${type}:${id}`;
 
@@ -332,6 +341,7 @@ const GlobalAnnouncements = () => {
   useEffect(() => {
     window.showUserProfile = async (userId) => {
       if (!userId) return;
+      announceHeaderModalOpen('header');
       try {
         const userRef = doc(db, 'users', userId);
         const userSnap = await getDoc(userRef);
@@ -429,6 +439,7 @@ const GlobalAnnouncements = () => {
   };
 
   const openModal = (event, type = 'event') => {
+    announceHeaderModalOpen('header');
     setSelectedEvent(event);
     setModalType(type);
     setModalOpen(true);

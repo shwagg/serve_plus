@@ -15,6 +15,8 @@ import ImpactMetrics from "./ImpactMetrics";
 import { computeAverageRating } from "../../hooks/rewardSystem";
 import "../../styles/ProjectDetailSidebar.css";
 
+const TASK_POINTS_BUDGET = 30;
+
 function isForApproval(status = "") {
   const s = String(status).toLowerCase();
   return s === "for_approval" || s === "for-approval" || s === "pending";
@@ -391,10 +393,12 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     try {
       const snap = await getDocs(collection(db, "missions", project.id, "task"));
       const nextId = snap.size.toString();
+      const currentTotal = tasks.reduce((s, t) => s + (Number(t.points) || 0), 0);
+      const budgetLeft = Math.max(0, TASK_POINTS_BUDGET - currentTotal);
       const taskData = {
         title: taskFormData.title, description: taskFormData.description,
         enrollmentDeadline: taskFormData.enrollmentDeadline,
-        points: parseInt(taskFormData.points) || 0,
+        points: Math.min(budgetLeft, parseInt(taskFormData.points) || 0),
         type: taskFormData.type || "individual", createdAt: new Date().toISOString(),
       };
       if (taskFormData.type === "grouped") taskData.maxParticipants = parseInt(taskFormData.maxParticipants) || 5;
@@ -411,10 +415,13 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     if (!taskFormData.title.trim()) { showToast("Task title is required."); return; }
     setSavingTask(true);
     try {
+      const currentTotal = tasks.reduce((s, t) => s + (Number(t.points) || 0), 0);
+      const existingPts = tasks.find(t => t.id === editingTaskId)?.points || 0;
+      const maxAllowed = Math.min(TASK_POINTS_BUDGET, Math.max(0, TASK_POINTS_BUDGET - currentTotal + existingPts));
       const updateData = {
         title: taskFormData.title, description: taskFormData.description,
         enrollmentDeadline: taskFormData.enrollmentDeadline,
-        points: parseInt(taskFormData.points) || 0, type: taskFormData.type || "individual",
+        points: Math.min(maxAllowed, parseInt(taskFormData.points) || 0), type: taskFormData.type || "individual",
       };
       if (taskFormData.type === "grouped") updateData.maxParticipants = parseInt(taskFormData.maxParticipants) || 5;
       await updateDoc(doc(db, "missions", project.id, "task", editingTaskId), updateData);
@@ -451,7 +458,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const saveTaskPoints = async (taskId) => {
     setSavingPoints(true);
     try {
-      await updateDoc(doc(db, "missions", project.id, "task", taskId), { points: parseInt(editingPoints) || 0 });
+      await updateDoc(doc(db, "missions", project.id, "task", taskId), { points: Math.min(30, parseInt(editingPoints) || 0) });
       await loadTasks();
       setEditingTaskId(null);
     } catch {
@@ -476,6 +483,9 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   };
 
   if (!project) return null;
+
+  const totalAssignedPoints = tasks.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
+  const remainingBudget = Math.max(0, TASK_POINTS_BUDGET - totalAssignedPoints);
 
   const registered = volunteers.length;
   const attended = volunteers.filter(v => v.progress?.attendance === "present").length;
@@ -512,7 +522,18 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   // ── Reusable inline task points display ──────────────────────────
   const renderTaskPoints = () => (
     <div className="pds-section">
-      <div className="pds-section-label">Tasks &amp; Points</div>
+      <div className="pds-section-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+        <span>Tasks &amp; Points</span>
+        {tasks.length > 0 && (
+          <span style={{
+            background: remainingBudget === 0 ? "#fee2e2" : remainingBudget <= 8 ? "#fef3c7" : "#dcfce7",
+            color: remainingBudget === 0 ? "#dc2626" : remainingBudget <= 8 ? "#b45309" : "#15803d",
+            borderRadius: 12, padding: "2px 10px", fontSize: 12, fontWeight: 700,
+          }}>
+            {totalAssignedPoints}/{TASK_POINTS_BUDGET} pts · {remainingBudget} remaining
+          </span>
+        )}
+      </div>
       {loadingTasks ? (
         <p className="pds-loading">Loading…</p>
       ) : tasks.length === 0 ? (
@@ -528,7 +549,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                     onChange={e => setEditingPoints(e.target.value)}
                     onBlur={() => saveTaskPoints(task.id)}
                     onKeyDown={e => { if (e.key === "Enter") saveTaskPoints(task.id); if (e.key === "Escape") setEditingTaskId(null); }}
-                    min="0" disabled={savingPoints} autoFocus
+                    min="0" max={String(Math.min(TASK_POINTS_BUDGET, remainingBudget + (Number(task.points) || 0)))}
+                    disabled={savingPoints} autoFocus
                   />
                   <span className="pds-pts-unit">pts</span>
                 </div>
@@ -732,10 +754,22 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   );
 
   // ── Tasks CRUD section (published left col) ───────────────────────
-  const renderTasksCRUD = () => (
+  const renderTasksCRUD = () => {
+    const editingTaskCurrentPts = editingTaskId ? (tasks.find(t => t.id === editingTaskId)?.points || 0) : 0;
+    const maxForForm = editingTaskId
+      ? Math.min(TASK_POINTS_BUDGET, remainingBudget + editingTaskCurrentPts)
+      : remainingBudget;
+    return (
     <div className="pds-section">
-      <div className="pds-section-label" style={{ marginBottom: 10 }}>
-        Tasks ({tasks.length})
+      <div className="pds-section-label" style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+        <span>Tasks ({tasks.length})</span>
+        <span style={{
+          background: remainingBudget === 0 ? "#fee2e2" : remainingBudget <= 8 ? "#fef3c7" : "#dcfce7",
+          color: remainingBudget === 0 ? "#dc2626" : remainingBudget <= 8 ? "#b45309" : "#15803d",
+          borderRadius: 12, padding: "2px 10px", fontSize: 12, fontWeight: 700,
+        }}>
+          {totalAssignedPoints}/{TASK_POINTS_BUDGET} pts · {remainingBudget} remaining
+        </span>
       </div>
 
       {!showTaskForm ? (
@@ -762,8 +796,16 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
               <input type="time" value={taskFormData.enrollmentDeadline} onChange={e => setTaskFormData(p => ({ ...p, enrollmentDeadline: e.target.value }))} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Points (0–1000)</label>
-              <input type="number" value={taskFormData.points} onChange={e => setTaskFormData(p => ({ ...p, points: e.target.value }))} min="0" max="1000" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+              <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>
+                Points
+                <span style={{ fontWeight: 400, color: remainingBudget === 0 && !editingTaskId ? "#dc2626" : "#888", fontSize: 12, marginLeft: 6 }}>
+                  ({maxForForm} pts available)
+                </span>
+              </label>
+              <input type="number" value={taskFormData.points} onChange={e => setTaskFormData(p => ({ ...p, points: e.target.value }))} min="0" max={String(maxForForm)} disabled={maxForForm === 0} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: `1px solid ${maxForForm === 0 ? "#fca5a5" : "#ccc"}`, boxSizing: "border-box" }} />
+              {maxForForm === 0 && !editingTaskId && (
+                <p style={{ color: "#dc2626", fontSize: 12, margin: "4px 0 0" }}>Task points budget of 30 is fully used.</p>
+              )}
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Task Type</label>
@@ -826,7 +868,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <>

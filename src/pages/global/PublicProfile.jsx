@@ -13,6 +13,21 @@ const DEFAULT_AVATAR = "/assets/headassets/default-avatar.png";
 
 const TABS = ["Overview", "Events Joined", "Rewards & Badges"];
 
+function normalizeMissionRoles(data = {}) {
+  const rawRoles = Array.isArray(data.roles) && data.roles.length > 0
+    ? data.roles
+    : (data.role ? [data.role] : []);
+  return rawRoles.map(r => String(r || "").trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean);
+}
+
+function getPrimaryDisplayRole(roles = []) {
+  return roles.find(r => r === "lead_organizer") ||
+    roles.find(r => r === "organizer") ||
+    roles.find(r => r === "donor") ||
+    roles[0] ||
+    "participant";
+}
+
 export default function PublicProfile() {
   const { uid } = useParams();
   const navigate = useNavigate();
@@ -58,12 +73,14 @@ export default function PublicProfile() {
           const volunteerSnap = await getDoc(doc(db, "missions", eventId, "volunteer", uid));
           if (volunteerSnap.exists()) {
             const vData = volunteerSnap.data();
+            const roles = normalizeMissionRoles(vData);
             registeredEvents.push({
               id: eventId,
               title: eventData.title || eventId,
               date: eventData.targetDate || eventData.startDate || null,
               status: eventData.status || "unknown",
-              role: vData.role || "participant",
+              roles,
+              role: getPrimaryDisplayRole(roles),
               pointsEarned: vData.pointsEarned || 0,
             });
           }

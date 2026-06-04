@@ -173,6 +173,10 @@
 .icon-button.profile-btn {
   width: auto;
   min-width: 36px;
+  min-height: 45px;
+  border-radius: 16px;
+  padding: 4px 2px 4px 8px;
+  cursor: default;
 }
 /* Responsive Design */
 @media (max-width: 768px) {

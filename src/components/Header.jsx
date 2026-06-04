@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db, functions } from '../firebaseConfig';
 import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
@@ -16,13 +16,14 @@ import SysAdminMenu from './menu/SysAdminMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
 import SettingsModal from './SettingsModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
-import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon, HelpOutlineRoundedIcon } from './icons';
+import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon, HelpOutlineRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon} from './icons';
 import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 import OnboardingTutorial from './OnboardingTutorial';
 import { showToast } from '../utils/toast';
 import AvatarWithFrame from './AvatarWithFrame';
 import PlayerStrip from './PlayerStrip';
+import { announceHeaderModalOpen, useCloseOnHeaderModalOpen } from '../utils/modalCoordinator';
 
 const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
@@ -110,6 +111,19 @@ export default function Header() {
   const menuRef = useRef(null);
   const navigate = useNavigate();
 
+  const closeHeaderOwnedModals = useCallback(() => {
+    setShowMenu(false);
+    setShowProposalModal(false);
+    setShowProposalForm(false);
+    setSelectedProjectType('');
+    setShowCertificateQRModal(false);
+    setShowSettings(false);
+    setShowTutorial(false);
+    setAnnouncementsOpen(false);
+  }, []);
+
+  useCloseOnHeaderModalOpen('header', closeHeaderOwnedModals);
+
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -188,6 +202,8 @@ export default function Header() {
 
     // Admins can always create proposals
     if (userRole === 'admin') {
+      announceHeaderModalOpen('header');
+      closeHeaderOwnedModals();
       setShowProposalModal(true);
       return;
     }
@@ -207,6 +223,8 @@ export default function Header() {
         return;
       }
 
+      announceHeaderModalOpen('header');
+      closeHeaderOwnedModals();
       setShowProposalModal(true);
     } catch (error) {
       console.error('Error checking pending proposals before opening modal:', error);
@@ -217,6 +235,8 @@ export default function Header() {
   };
 
   const handleSelectProjectType = (type) => {
+    announceHeaderModalOpen('header');
+    closeHeaderOwnedModals();
     setSelectedProjectType(type);
     setShowProposalForm(true);
   };
@@ -227,8 +247,36 @@ export default function Header() {
   };
 
   const handleOpenSettings = () => {
+    announceHeaderModalOpen('header');
+    closeHeaderOwnedModals();
     setShowMenu(false);
     setShowSettings(true);
+  };
+
+  const handleOpenTutorial = () => {
+    announceHeaderModalOpen('header');
+    closeHeaderOwnedModals();
+    setShowTutorial(true);
+  };
+
+  const handleToggleMenu = () => {
+    if (showMenu) {
+      setShowMenu(false);
+      return;
+    }
+    announceHeaderModalOpen('header');
+    closeHeaderOwnedModals();
+    setShowMenu(true);
+  };
+
+  const handleToggleAnnouncements = () => {
+    if (announcementsOpen) {
+      setAnnouncementsOpen(false);
+      return;
+    }
+    announceHeaderModalOpen('header');
+    closeHeaderOwnedModals();
+    setAnnouncementsOpen(true);
   };
 
   const renderMenu = () => {
@@ -290,7 +338,7 @@ export default function Header() {
                 className="notification-bell-button tutorial-header-btn"
                 aria-label="Help / Tutorial"
                 title="Help"
-                onClick={() => setShowTutorial(true)}
+                onClick={handleOpenTutorial}
               >
                 <HelpOutlineRoundedIcon style={{ fontSize: 24, color: '#000' }} />
               </button>
@@ -303,7 +351,7 @@ export default function Header() {
                   className="icon-button profile-btn"
                   aria-label="Menu"
                   title={userName || 'Profile'}
-                  onClick={() => setShowMenu(!showMenu)}
+                  onClick={handleToggleMenu}
                 >
                   <div className="header-profile-wrap">
                     <AvatarWithFrame
@@ -316,6 +364,11 @@ export default function Header() {
                     />
                     {userName && (
                       <span className="header-greeting">Hi, {userName.trim().split(/\s+/)[0]}!</span>
+                    )}
+                    {showMenu ? (
+                      <ExpandLessRoundedIcon style={{ fontSize: 26, color: '#000' }} />
+                    ) : (
+                      <ExpandMoreRoundedIcon style={{ fontSize: 26, color: '#000' }} />
                     )}
                   </div>
                 </button>
@@ -331,7 +384,7 @@ export default function Header() {
           className="tutorial-fab"
           aria-label="Help / Tutorial"
           title="Help"
-          onClick={() => setShowTutorial(true)}
+          onClick={handleOpenTutorial}
         >
           <HelpOutlineRoundedIcon style={{ fontSize: 22, color: '#6b7280' }} />
         </button>
@@ -340,7 +393,7 @@ export default function Header() {
         <>
           <GlobalNotificationButton
             unreadCount={announcementUnreadCount}
-            onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+            onClick={handleToggleAnnouncements}
             isOpen={announcementsOpen}
           />
           <aside className={`global-feed ${announcementsOpen ? 'open' : ''}`}>

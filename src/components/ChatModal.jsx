@@ -7,6 +7,7 @@ import { auth, db } from '../firebaseConfig';
 import { Link } from 'react-router-dom';
 import './styles/ChatModal.css';
 import chatIcon from '../assets/headassets/Chat Icon.svg';
+import { announceHeaderModalOpen, useCloseOnHeaderModalOpen } from '../utils/modalCoordinator';
 
 export default function ChatModal() {
   // ── Dropdown state ───────────────────────────────────
@@ -30,14 +31,24 @@ export default function ChatModal() {
   const listenerRef   = useRef(null);
 
   // ── Close & reset on dropdown close ─────────────────
-  const closeAll = useCallback(() => {
+  const resetDropdown = useCallback((restoreFocus = false) => {
     setIsOpen(false);
     setActiveConvo(null);
     setMessages([]);
     setMessageInput('');
     setSearchQuery('');
-    buttonRef.current?.focus();
+    if (restoreFocus) buttonRef.current?.focus();
   }, []);
+
+  const closeAll = useCallback(() => {
+    resetDropdown(true);
+  }, [resetDropdown]);
+
+  const closeForOtherHeaderModal = useCallback(() => {
+    resetDropdown(false);
+  }, [resetDropdown]);
+
+  useCloseOnHeaderModalOpen('chat', closeForOtherHeaderModal);
 
   // ── Fetch missions when dropdown opens ───────────────
   useEffect(() => {
@@ -264,7 +275,11 @@ export default function ChatModal() {
         aria-label="Chat"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        onClick={() => setIsOpen(prev => !prev)}
+        onClick={() => setIsOpen(prev => {
+          if (prev) return false;
+          announceHeaderModalOpen('chat');
+          return true;
+        })}
       >
         <img src={chatIcon} alt="" width="24" height="24" aria-hidden="true" />
       </button>

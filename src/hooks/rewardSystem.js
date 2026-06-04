@@ -56,7 +56,7 @@ export function computeFinalPoints(roles, avgRating, participationStatus) {
         return { base: 0, multiplier, factor, finalPoints: 0 };
     }
 
-    const finalPoints = Number((totalBase * multiplier * factor).toFixed(2));
+    const finalPoints = Math.round(totalBase * multiplier * factor);
 
     //Return all variables for computation details information
     return { base: totalBase, multiplier, factor, finalPoints };
@@ -97,7 +97,7 @@ export const LEVEL_UNLOCKS = {
  */
 export function getNextUnlock(level, totalPoints) {
   if (level >= MAX_LEVEL) return null;
-  const pts = totalPoints || 0;
+  const pts = Math.max(0, Math.round(Number(totalPoints) || 0));
   for (let l = level + 1; l <= MAX_LEVEL; l++) {
     if (LEVEL_UNLOCKS[l]) {
       const ptsNeeded = LEVEL_THRESHOLDS[l - 1];
@@ -108,7 +108,7 @@ export function getNextUnlock(level, totalPoints) {
 }
 
 export function getLevelInfo(totalPoints) {
-    const pts = Math.max(0, totalPoints || 0);
+    const pts = Math.max(0, Math.round(Number(totalPoints) || 0));
 
     // Find the highest threshold the user has reached
     let levelIndex = 0;
@@ -126,6 +126,8 @@ export function getLevelInfo(totalPoints) {
         return {
             level: MAX_LEVEL,
             progress: 100,
+            currentPoints: pts,
+            nextLevelPoints: LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1],
             pointsInLevel: pts - LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1],
             pointsForLevel: null,
             pointsToNextLevel: 0,
@@ -139,5 +141,13 @@ export function getLevelInfo(totalPoints) {
     const progress = Math.min(100, Math.round((pointsInLevel / pointsForLevel) * 100));
     const pointsToNextLevel = nextThreshold - pts;
 
-    return { level, progress, pointsInLevel, pointsForLevel, pointsToNextLevel };
+    return {
+        level,
+        progress,
+        currentPoints: pts,
+        nextLevelPoints: nextThreshold,
+        pointsInLevel,
+        pointsForLevel,
+        pointsToNextLevel,
+    };
 }

@@ -541,8 +541,35 @@ const SDG_COLORS = [
   "#00689d", "#19486a",
 ];
 
+function normalizeMissionRoles(data = {}) {
+  const rawRoles = Array.isArray(data.roles) && data.roles.length > 0
+    ? data.roles
+    : (data.role ? [data.role] : []);
+  return rawRoles.map(r => String(r || "").trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean);
+}
+
+function getPrimaryDisplayRole(roles = []) {
+  return roles.find(r => r === "lead_organizer") ||
+    roles.find(r => r === "organizer") ||
+    roles.find(r => r === "donor") ||
+    roles[0] ||
+    "participant";
+}
+
+const normalizeText = (value = "") => String(value).trim().toLowerCase();
+const getVolunteerAttendanceStatus = (volunteerData = {}) =>
+  volunteerData.progress?.attendance || volunteerData.attendanceStatus || null;
+const hasEventCertificate = (event, certs = []) => {
+  if (event.certIssuedAt) return true;
+  const eventTitle = normalizeText(event.title);
+  return certs.some(cert => {
+    if (cert.missionId === event.id || cert.eventId === event.id) return true;
+    return eventTitle && normalizeText(cert.course) === eventTitle;
+  });
+};
+
 function computeAchievements(events, totalPoints, level) {
-  const roles = [...new Set(events.map(e => e.role).filter(Boolean))];
+  const roles = [...new Set(events.flatMap(e => e.roles?.length > 0 ? e.roles : [e.role]).filter(Boolean))];
   return [
     { id: "first_step", icon: "🌱", name: "First Step", desc: "Joined your first event", unlocked: events.length >= 1 },
     { id: "active", icon: "⭐", name: "Active Volunteer", desc: "Joined 3+ events", unlocked: events.length >= 3 },
@@ -551,9 +578,9 @@ function computeAchievements(events, totalPoints, level) {
     { id: "pts50", icon: "💫", name: "Point Starter", desc: "Earned 50+ points", unlocked: totalPoints >= 50 },
     { id: "pts100", icon: "💎", name: "Point Collector", desc: "Earned 100+ points", unlocked: totalPoints >= 100 },
     { id: "pts500", icon: "👑", name: "Point Master", desc: "Earned 500+ points", unlocked: totalPoints >= 500 },
-    { id: "organizer", icon: "📋", name: "Event Organizer", desc: "Served as an organizer", unlocked: events.some(e => e.role === "organizer") },
-    { id: "lead_org", icon: "🎯", name: "Lead Organizer", desc: "Served as lead organizer", unlocked: events.some(e => e.role === "lead_organizer") },
-    { id: "donor", icon: "💝", name: "Generous Donor", desc: "Donated to a cause", unlocked: events.some(e => e.role === "donor") },
+    { id: "organizer", icon: "📋", name: "Event Organizer", desc: "Served as an organizer", unlocked: events.some(e => (e.roles || []).includes("organizer")) },
+    { id: "lead_org", icon: "🎯", name: "Lead Organizer", desc: "Served as lead organizer", unlocked: events.some(e => (e.roles || []).includes("lead_organizer")) },
+    { id: "donor", icon: "💝", name: "Generous Donor", desc: "Donated to a cause", unlocked: events.some(e => (e.roles || []).includes("donor")) },
     { id: "all_rounder", icon: "🎨", name: "All-Rounder", desc: "Held 3+ different roles", unlocked: roles.length >= 3 },
     { id: "lv5", icon: "🚀", name: "Rising Star", desc: "Reached Level 5", unlocked: (level || 1) >= 5 },
     { id: "lv10", icon: "🦅", name: "Veteran", desc: "Reached Level 10", unlocked: (level || 1) >= 10 },
@@ -964,6 +991,9 @@ useEffect(() => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    const unsubscribeFns = [];
+
     const fetchProfileAndEvents = async () => {
       setLoading(true);
       setError("");
@@ -999,6 +1029,7 @@ useEffect(() => {
         profileData.levelPointsForLevel = _li.pointsForLevel;
         profileData.registeredEvents = [];
 
+        if (!isMounted) return;
         setProfile(profileData);
         setLoading(false); // Show the page now — events load in background
 
@@ -1015,7 +1046,8 @@ useEffect(() => {
 
         // Real-time badge listener — updates whenever a badge is awarded
         const badgesRef = collection(db, "users", user.uid, "badges");
-        onSnapshot(badgesRef, async (snapshot) => {
+        unsubscribeFns.push(onSnapshot(badgesRef, async (snapshot) => {
+          if (!isMounted) return;
           const badgeList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           const hasServeReady = badgeList.some(b => (b.badgeId ?? b.id) === "serve-ready");
           if (profileData.role === "student" && !hasServeReady && !serveReadyAwardedRef.current) {
@@ -1030,14 +1062,15 @@ useEffect(() => {
           } else {
             setEarnedBadges(badgeList);
           }
-        });
+        }));
 
         // Certificates — real-time listener
         const certsRef = collection(db, "users", user.uid, "certificates");
-        onSnapshot(certsRef, (snapshot) => {
+        unsubscribeFns.push(onSnapshot(certsRef, (snapshot) => {
+          if (!isMounted) return;
           setCertificates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
           setCertsLoaded(true);
-        });
+        }));
 
         // Check all volunteer docs in parallel (instead of sequential for-loop)
         const volunteerSnaps = await Promise.all(
@@ -1093,23 +1126,49 @@ useEffect(() => {
 
             const reqBonus = vData.requirementBonus || {};
             const requirementPoints = Object.values(reqBonus).reduce((s, val) => s + (Number(val) || 0), 0);
+            const roles = normalizeMissionRoles(vData);
 
             return {
               id: eventId,
               title: eventData.title || eventId,
-              role: vData.role || "participant",
+              roles,
+              role: getPrimaryDisplayRole(roles),
               pointsEarned: vData.pointsEarned || 0,
               requirementPoints,
               sdgs: eventData.sdgs || [],
               tasksDone,
               status: eventData.status || "unknown",
               targetDate,
-              attendanceStatus: vData.attendanceStatus || null,
+              attendanceStatus: getVolunteerAttendanceStatus(vData),
+              certIssuedAt: vData.certIssuedAt || null,
             };
           })
         );
 
+        if (!isMounted) return;
         setProfile(prev => ({ ...prev, registeredEvents }));
+
+        enrolledEntries.forEach(({ eventDoc }) => {
+          const volunteerRef = doc(db, "missions", eventDoc.id, "volunteer", user.uid);
+          unsubscribeFns.push(onSnapshot(volunteerRef, (snapshot) => {
+            if (!isMounted || !snapshot.exists()) return;
+            const vData = snapshot.data();
+            setProfile(prev => ({
+              ...prev,
+              registeredEvents: (prev?.registeredEvents || []).map(event =>
+                event.id === eventDoc.id
+                  ? {
+                      ...event,
+                      role: vData.role || event.role || "participant",
+                      pointsEarned: vData.pointsEarned || 0,
+                      attendanceStatus: getVolunteerAttendanceStatus(vData),
+                      certIssuedAt: vData.certIssuedAt || null,
+                    }
+                  : event
+              ),
+            }));
+          }));
+        });
 
         const proposedEvents = missionsSnap.docs
           .filter(d => d.data().createdBy === user.uid)
@@ -1128,9 +1187,11 @@ useEffect(() => {
             projectType: d.data().projectType || "",
             sdgs: d.data().sdgs || [],
           }));
+        if (!isMounted) return;
         setProfile(prev => ({ ...prev, proposedEvents }));
 
       } catch (err) {
+        if (!isMounted) return;
         setError("Failed to load profile.");
         setProfile(mockProfile);
         setLoading(false);
@@ -1138,6 +1199,10 @@ useEffect(() => {
     };
 
     fetchProfileAndEvents();
+    return () => {
+      isMounted = false;
+      unsubscribeFns.forEach(unsubscribe => unsubscribe());
+    };
   }, []);
 
   if (loading) return (
@@ -1508,7 +1573,7 @@ useEffect(() => {
                   ? allEvents
                   : allEvents.filter(e => {
                       if (historyFilter === "attended") return e.attendanceStatus === "present";
-                      if (historyFilter === "absent") return e.attendanceStatus !== "present";
+                      if (historyFilter === "absent") return e.attendanceStatus === "absent" || e.attendanceStatus === null || e.attendanceStatus === "not_checked_in";
                       return e.status === historyFilter;
                     });
 
@@ -1545,7 +1610,7 @@ useEffect(() => {
                           <option value="published">Published</option>
                           <option value="completed">Completed</option>
                           <option value="cancelled">Cancelled</option>
-                          <option value="attended">Attended ✓</option>
+                          <option value="attended">Present</option>
                           <option value="absent">Absent</option>
                         </select>
                         <select className="peh-select" value={historySort} onChange={e => setHistorySort(e.target.value)}>
@@ -1567,7 +1632,7 @@ useEffect(() => {
                         {sorted.map(ev => {
                           const sm = statusMeta[ev.status] || statusMeta.unknown;
                           const rm = roleMeta[ev.role] || { label: ev.role, bg: "#f3f4f6", color: "#374151" };
-                          const hasCert = certificates.some(c => c.eventId === ev.id || c.missionId === ev.id);
+                          const hasCert = hasEventCertificate(ev, certificates);
                           const tasksTotal = ev.tasksDone?.length || 0;
                           const tasksDone = ev.tasksDone?.filter(t => t.status === "done" || t.status === "completed").length || 0;
                           return (
@@ -1579,11 +1644,16 @@ useEffect(() => {
                               <div className="peh-card-row">
                                 <span className="peh-badge" style={{ background: rm.bg, color: rm.color }}>{rm.label}</span>
                                 {ev.attendanceStatus === "present"
-                                  ? <span className="peh-badge" style={{ background: "#d1fae5", color: "#065f46" }}>✓ Attended</span>
+                                  ? <span className="peh-badge" style={{ background: "#d1fae5", color: "#065f46" }}>Present</span>
                                   : ev.attendanceStatus === "absent"
-                                    ? <span className="peh-badge" style={{ background: "#fee2e2", color: "#991b1b" }}>✗ Absent</span>
-                                    : <span className="peh-badge" style={{ background: "#f3f4f6", color: "#9ca3af" }}>— Attendance pending</span>}
-                                {hasCert && <span className="peh-badge" style={{ background: "#fef9c3", color: "#854d0e" }}>🎓 Certificate</span>}
+                                    ? <span className="peh-badge" style={{ background: "#fee2e2", color: "#991b1b" }}>Absent</span>
+                                    : <span className="peh-badge" style={{ background: "#f3f4f6", color: "#6b7280" }}>Not checked in</span>}
+                                {hasCert && <span className="peh-badge" style={{ background: "#fef9c3", color: "#854d0e" }}>Certificate issued</span>}
+                                {!hasCert && (
+                                  <span className="peh-badge" style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                                    No certificate yet
+                                  </span>
+                                )}
                               </div>
                               <div className="peh-card-stats">
                                 <span className="peh-stat">⭐ {(ev.pointsEarned || 0) + (ev.requirementPoints || 0)} pts</span>
@@ -2076,3 +2146,4 @@ useEffect(() => {
     </div>
   );
 }
+
