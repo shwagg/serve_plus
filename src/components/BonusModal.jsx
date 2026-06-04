@@ -24,10 +24,6 @@ export default function BonusModal({ bonusQueue = [], onDismiss }) {
   const displayRequirementPoints = formatWholePoints(requirementPoints);
 
   const bonusLines = [
-    bonuses.returning && {
-      label: "Returning participant",
-      amount: formatWholePoints(bonuses.returning.amount),
-    },
     bonuses.termStreak && {
       label: "Term streak",
       amount: formatWholePoints(bonuses.termStreak.amount),

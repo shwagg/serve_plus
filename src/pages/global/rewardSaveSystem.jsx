@@ -101,12 +101,6 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         const ptsBefore = uData.totalPoints || 0;
         levelBefore = getLevelInfo(ptsBefore).level;
 
-        // Returning participant bonus: rewards students who keep coming back across missions.
-        // 2nd mission = +5%, 3rd+ = +10% of base role points. No time window — fits
-        // the school-year schedule where only 2 projects are offered per year.
-        const missionsCompletedSoFar = uData.missionsCompleted || 0;
-        const returningBonus = missionsCompletedSoFar >= 2 ? 10 : missionsCompletedSoFar === 1 ? 5 : 0;
-
         // Term streak bonus: +5 pts flat if the student has already completed ≥1 mission
         // in the past 3 months (i.e., this is their 2nd+ mission this term).
         const threeMonthsAgo = new Date();
@@ -141,7 +135,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
             }
         }
 
-        totalBonusPoints = returningBonus + termStreakBonus + roleDiversityBonus + sdgBonus;
+        totalBonusPoints = termStreakBonus + roleDiversityBonus + sdgBonus;
         levelAfter = getLevelInfo(ptsBefore + roleRatingPoints + totalBonusPoints).level;
 
         userUpdateExtras = {
@@ -151,7 +145,6 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
             ...(newSdgs.length > 0 ? { sdgsContributed: arrayUnion(...newSdgs) } : {}),
         };
 
-        if (returningBonus > 0) bonusBreakdown.returning = { amount: returningBonus };
         if (termStreakBonus > 0) bonusBreakdown.termStreak = { amount: termStreakBonus };
         if (roleDiversityBonus > 0) bonusBreakdown.roleDiversity = { amount: roleDiversityBonus };
         if (sdgBonus > 0) bonusBreakdown.sdg = { amount: sdgBonus, count: newSdgs.length };
