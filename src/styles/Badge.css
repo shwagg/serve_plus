@@ -819,9 +819,9 @@
   border-radius: 99px;
 }
 
-.bm-type-auto_mission  { background: #dcfce7; color: #166534; }
-.bm-type-auto_signup   { background: #e0f2fe; color: #0369a1; }
-.bm-type-manual        { background: #fee2e2; color: #991b1b; }
+.bm-type-auto_mission, .bm-type-auto_signup { background: #dcfce7; color: #166534; }
+
+.bm-type-manual{ background: #fee2e2; color: #991b1b; }
 
 /* Award badges layout */
 .bm-award-layout {

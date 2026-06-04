@@ -1,5 +1,5 @@
 //first page for admin after login
-import { addDoc, collection, doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import ProjectDetailSidebar from "./ProjectDetailSidebar";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +23,7 @@ const G = {
   bg:       "#f8f9fa",
   white:    "#ffffff",
   // brand accents
-  teal:     "#B1E1E6",
+  teal:     "#5a8488ff",
   pink:     "#E4AABB",
   orange:   "#ED4F13",
   yellow:   "#FBC805",
@@ -131,9 +131,11 @@ export default function AdminDashboard() {
   const [participationBreakdown, setParticipationBreakdown] = useState({ verified: 0, partial: 0, minimal: 0, no_show: 0 });
   const [stepFunnel,             setStepFunnel]             = useState({ preSurvey: 0, consent: 0, attendance: 0, postSurvey: 0, total: 0 });
   const [pendingConsent,         setPendingConsent]         = useState(null);
+  const [overdueCount,           setOverdueCount]           = useState(0);
+  const [pendingReportsCount,    setPendingReportsCount]    = useState(0);
 
   // UI state
-  const [activeModal,     setActiveModal]     = useState(null); // 'sdg'|'engagement'|'funnel'|'participation'|'flaggedStudents'
+  const [activeModal,     setActiveModal]     = useState(null); // 'sdg'|'engagement'|'funnel'|'flaggedStudents'
   const [showSidebar,     setShowSidebar]     = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
 
@@ -186,6 +188,7 @@ export default function AdminDashboard() {
       upcoming.sort((a, b) => (parseDate(a.targetDate) || 0) - (parseDate(b.targetDate) || 0));
       setEventsToday(todayEvts);
       setUpcomingEvents(upcoming);
+      setOverdueCount(published.filter(m => { const d = parseDate(m.targetDate); return d && new Date(d.getFullYear(), d.getMonth(), d.getDate()) < today; }).length);
     }).catch(console.error);
   }, []);
 
@@ -233,6 +236,20 @@ export default function AdminDashboard() {
         setStepFunnel(fn);
         setPendingConsent(pending);
       } catch { setEngagement([]); }
+    };
+    run();
+  }, []);
+
+  // ── Pending accomplishment reports ───────────────────────
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, "missions"), where("status", "==", "published")));
+        const results = await Promise.all(
+          snap.docs.map(d => getDoc(doc(db, "missions", d.id, "accomplishmentReport", "submission")))
+        );
+        setPendingReportsCount(results.filter(d => d.exists() && d.data().status === "submitted").length);
+      } catch { /* non-critical */ }
     };
     run();
   }, []);
@@ -488,7 +505,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Compliance Alerts — only shown when actionable */}
-          {(pendingConsent > 0 || flaggedCount > 0) && (
+          {(pendingConsent > 0 || flaggedCount > 0 || overdueCount > 0 || pendingReportsCount > 0) && (
             <Card style={{ border: `1px solid #fad2cf` }}>
               <CardHead title="Compliance Alerts" sub="Items that require your attention" />
               <Divider />
@@ -497,6 +514,18 @@ export default function AdminDashboard() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: G.redL, borderRadius: 8, padding: "10px 14px" }}>
                     <span style={{ fontSize: 13, color: G.text }}>Consent forms awaiting review</span>
                     <span style={{ fontWeight: 700, color: G.red, fontSize: 16 }}>{pendingConsent}</span>
+                  </div>
+                )}
+                {pendingReportsCount > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: G.redL, borderRadius: 8, padding: "10px 14px" }}>
+                    <span style={{ fontSize: 13, color: G.text }}>Accomplishment reports awaiting review</span>
+                    <span style={{ fontWeight: 700, color: G.red, fontSize: 16 }}>{pendingReportsCount}</span>
+                  </div>
+                )}
+                {overdueCount > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: G.amberL, borderRadius: 8, padding: "10px 14px", border: "1px solid #f9d97b" }}>
+                    <span style={{ fontSize: 13, color: G.text }}>Published events past their target date</span>
+                    <span style={{ fontWeight: 700, color: G.amber, fontSize: 16 }}>{overdueCount}</span>
                   </div>
                 )}
                 {flaggedCount > 0 && (
@@ -516,36 +545,6 @@ export default function AdminDashboard() {
             </Card>
           )}
 
-          {/* Participation Status */}
-          <Card>
-            <CardHead
-              title="Participation Status"
-              sub="How volunteers were rated after each completed event"
-              onMore={() => setActiveModal("participation")}
-            />
-            <Divider />
-            <div style={{ padding: "12px 20px 20px" }}>
-              {bdTotal === 0
-                ? <Empty text="No participation data yet. Status is set after events are completed." />
-                : PART_STATUSES.map(({ key, label, color }) => {
-                  const count = participationBreakdown[key];
-                  const p     = bdTotal > 0 ? Math.round((count / bdTotal) * 100) : 0;
-                  return (
-                    <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, color: G.text, width: 68, flexShrink: 0 }}>{label}</span>
-                      <div style={{ flex: 1 }}>
-                        <ProgressBar value={p} color={color} height={6} />
-                      </div>
-                      <span style={{ fontSize: 12, color: G.sub, width: 56, textAlign: "right", flexShrink: 0 }}>
-                        {count} ({p}%)
-                      </span>
-                    </div>
-                  );
-                })
-              }
-            </div>
-          </Card>
 
           {/* Events Today */}
           <Card>
@@ -715,36 +714,6 @@ export default function AdminDashboard() {
                 {i < arr.length - 1 && (
                   <div style={{ width: 2, height: 16, background: G.border, margin: "8px 0 0 13px" }} />
                 )}
-              </div>
-            );
-          })}
-        </Modal>
-      )}
-
-      {/* Participation Status Modal */}
-      {activeModal === "participation" && (
-        <Modal
-          title="Participation Status"
-          subtitle={`Admins rate volunteers after each completed event. ${bdTotal} total ratings recorded.`}
-          onClose={() => setActiveModal(null)}
-        >
-          {PART_STATUSES.map(({ key, label, color, desc }) => {
-            const count = participationBreakdown[key];
-            const p     = bdTotal > 0 ? Math.round((count / bdTotal) * 100) : 0;
-            return (
-              <div key={key} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: `1px solid ${G.border}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
-                    <span style={{ fontSize: 14, fontWeight: 600, color: G.text }}>{label}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 20, fontWeight: 700, color: G.text }}>{count}</span>
-                    <Pill label={`${p}%`} color={color} bg={`${color}22`} />
-                  </div>
-                </div>
-                <ProgressBar value={p} color={color} height={8} />
-                <p style={{ fontSize: 12, color: G.sub, margin: "8px 0 0" }}>{desc}</p>
               </div>
             );
           })}
