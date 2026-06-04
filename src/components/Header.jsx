@@ -109,6 +109,7 @@ export default function Header() {
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [announcementsEnabled, setAnnouncementsEnabled] = useState(true);
   const menuRef = useRef(null);
+  const announcementsRef = useRef(null);
   const navigate = useNavigate();
 
   const closeHeaderOwnedModals = useCallback(() => {
@@ -143,6 +144,24 @@ export default function Header() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Don't close if clicking the toggle button itself
+      if (event.target.closest('.global-feed-toggle')) {
+        return;
+      }
+      // Close if clicking outside the announcements panel
+      if (announcementsRef.current && !announcementsRef.current.contains(event.target)) {
+        setAnnouncementsOpen(false);
+      }
+    };
+    
+    if (announcementsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [announcementsOpen]);
   useEffect(() => {
     const checkCount = () => {
       if (window.announcementActions?.getUnreadCount) {
@@ -396,7 +415,7 @@ export default function Header() {
             onClick={handleToggleAnnouncements}
             isOpen={announcementsOpen}
           />
-          <aside className={`global-feed ${announcementsOpen ? 'open' : ''}`}>
+          <aside ref={announcementsRef} className={`global-feed ${announcementsOpen ? 'open' : ''}`}>
             <GlobalAnnouncements />
           </aside>
         </>

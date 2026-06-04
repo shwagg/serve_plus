@@ -1509,30 +1509,32 @@
   right: 0;
   z-index: 1600;
 
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   margin: 0;
   padding: 0;
 
-  border-radius: 10px 0 0 10px;
+  border-radius: 12px 0 0 12px;
   outline: none;
-  background: #111;
+  background: linear-gradient(135deg, #30bdb7 0%, #68e1ab 100%);
   color: #ffffff;
   border: none;
+  border-left: 2px solid rgba(255, 255, 255, 0.3);
   cursor: pointer;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  box-shadow: -2px 2px 8px rgba(0,0,0,0.25);
-  transition: background 0.2s ease;
+  box-shadow: -3px 3px 12px rgba(48, 189, 183, 0.35), 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s ease;
   font-family: inherit;
 }
 
 .global-feed-toggle:hover {
-  background: #333;
-  box-shadow: -4px 4px 16px rgba(0,0,0,0.35);
+  background: linear-gradient(135deg, #68e1ab 0%, #30bdb7 100%);
+  box-shadow: -4px 4px 20px rgba(48, 189, 183, 0.5), 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateX(-2px);
 }
 
 .global-feed-toggle-inner {
@@ -1543,18 +1545,20 @@
 }
 
 .global-feed-toggle-emoji {
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 .global-feed-badge {
   position: absolute;
-  top: 6px;
-  left: -8px;
+  top: 4px;
+  left: -10px;
 
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 11px;
 
   background: #ef4444;
   color: #ffffff;
@@ -1564,6 +1568,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4), 0 0 0 2px #ffffff;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 .global-feed {
   position: fixed;
@@ -2737,12 +2753,19 @@
 
   /* Global feed toggle */
   .global-feed-toggle {
-    width: 36px;
-    height: 36px;
+    width: 42px;
+    height: 42px;
     right: 0;
+    border-radius: 10px 0 0 10px;
   }
   .global-feed-toggle-emoji {
-    font-size: 18px;
+    font-size: 20px;
+  }
+  .global-feed-badge {
+    min-width: 20px;
+    height: 20px;
+    font-size: 10px;
+    left: -8px;
   }
 
   /* Global feed panel keeps a narrow rail for the floating icon on phones */
