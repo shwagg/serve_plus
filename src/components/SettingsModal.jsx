@@ -621,7 +621,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                     <div>
                       <p className="settings-toggle-label">Notification Bell</p>
                       <p className="settings-toggle-sublabel">
-                        When off, the unread count badge is hidden from the bell
+                        Toggle off to hide the bell's count badge.
                       </p>
                     </div>
                     <div
@@ -645,7 +645,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                       <p className="settings-toggle-sublabel">
                         {communityUpdatesDisabled
                           ? "Not available for this account type"
-                          : "When off, the 📢 announcements button is hidden from the page"
+                          : "Toggle off to hide 📢 announcement button."
                         }
                       </p>
                     </div>
