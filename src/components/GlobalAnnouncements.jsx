@@ -222,7 +222,7 @@ const GlobalAnnouncements = () => {
             const count = volunteerSnap.size;
             event.volunteerCount = count;
             let milestoneTime = null;
-            if (count >= 3) { // Change to desired milestone number
+            if (count >= 50) { // Change to desired milestone number
               const joinDates = [];
               volunteerSnap.forEach(doc => {
                 const data = doc.data();
@@ -232,7 +232,7 @@ const GlobalAnnouncements = () => {
                 }
               });
               joinDates.sort((a, b) => a - b);
-              milestoneTime = joinDates[2] || null; // change index based on milestone number
+              milestoneTime = joinDates[49] || null; // change index based on milestone number (50th volunteer = index 49)
               milestoneArr.push({ eventId: event.id, title: event.title || 'Untitled Event', count, milestoneTime });
             }
             event.fullBookedTime = milestoneTime;
@@ -612,7 +612,7 @@ const GlobalAnnouncements = () => {
                   <div className="feed-content">
                     {isUnseen && <span className="unread-dot"></span>}
                     <p className="feed-title">Milestone Reached!</p>
-                    <p className="feed-desc">3+ volunteers have joined <b>{milestone.title}</b>!</p>
+                    <p className="feed-desc"><b>{milestone.count}</b> volunteers have joined <b>{milestone.title}</b>!</p>
                     <span className="feed-time">
                       {formatTimeAgo(milestone.milestoneTime)}
                     </span>
