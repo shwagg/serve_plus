@@ -3,6 +3,7 @@ import { db } from "../../firebaseConfig";
 import { collection, getDocs, doc, getDoc, updateDoc, deleteField, increment } from "firebase/firestore";
 import { checkAndAssignBadges } from "../../hooks/badgeSystem";
 import { computeFinalPoints, getProgramMultiplier, ROLE_POINTS } from "../../hooks/rewardSystem";
+import { getMissionPointsBreakdown } from "../../hooks/missionPoints";
 import { releaseVolunteerPoints } from "../global/rewardSaveSystem";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
@@ -18,6 +19,38 @@ function getInitials(name) {
   const parts = (name || "?").trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return (name || "?").slice(0, 2).toUpperCase();
+}
+
+const ROLE_LABELS = {
+  lead_organizer: "Lead Organizer",
+  organizer: "Organizer",
+  donor: "Donor",
+};
+const ROLE_PRIORITY = ["lead_organizer", "organizer", "donor"];
+
+function normalizeRole(role) {
+  return String(role || "").trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function getVolunteerRoles(v = {}) {
+  const sourceRoles = Array.isArray(v.roles) && v.roles.length > 0
+    ? v.roles
+    : (v.role ? [v.role] : []);
+  return sourceRoles.map(normalizeRole).filter(Boolean);
+}
+
+function getSurveyRoles(v = {}) {
+  return (v.preSurveyAnswers?.engagement?.participation || []).map(normalizeRole).filter(Boolean);
+}
+
+function getDisplayRoles(v = {}) {
+  const roles = getVolunteerRoles(v).length > 0 ? getVolunteerRoles(v) : getSurveyRoles(v);
+  return roles.filter(r => r !== "participant");
+}
+
+function isDonorOnly(v = {}) {
+  const roles = getVolunteerRoles(v).length > 0 ? getVolunteerRoles(v) : getSurveyRoles(v);
+  return roles.length === 1 && roles.includes("donor");
 }
 
 const PRE_LIKERT = [
@@ -74,7 +107,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const [filterPostSurvey, setFilterPostSurvey] = useState("");
   // Which column-header filter dropdown is open
   const [openFilter, setOpenFilter] = useState(null);
-  const [verifyingDonor, setVerifyingDonor] = useState(null);
+  const [removingRole, setRemovingRole] = useState(null);
   const [pointsPopover, setPointsPopover] = useState(null);
   const [missionCreatedBy, setMissionCreatedBy] = useState(null);
   const [accomplishmentReport, setAccomplishmentReport] = useState(null);
@@ -202,9 +235,16 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
         const rawName = userData?.name || userData?.username || "Unknown User";
 
         const journals = [];
+        let taskEnrollmentPoints = 0;
         for (const task of tasks) {
           const pData = taskParticipantMaps.get(task.id)?.get(userId);
-          if (!pData || !pData.reflection?.trim()) continue;
+          if (!pData) continue;
+          taskEnrollmentPoints +=
+            Number(pData.pointsEarned) ||
+            Number(pData.pendingPoints) ||
+            Number(pData.estimatedPoints) ||
+            0;
+          if (!pData.reflection?.trim()) continue;
           if (task.type === "grouped" && pData.groupId) {
             const groupData = groupDocMap.get(`${task.id}::${pData.groupId}`) || {};
             journals.push({
@@ -237,11 +277,29 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
           level: userData?.level || "",
           photoURL: (() => { const p = userData?.avatar || userData?.photoURL || userData?.profilePhoto || ""; return p.includes("ui-avatars.com") ? "" : p; })(),
           totalPoints: userData?.totalPoints || 0,
+          taskPoints: Number(vData.taskPoints) || taskEnrollmentPoints,
           preSurveyAnswers: preSurveyMap.get(userId),
           postSurveyAnswers: postSurveyMap.get(userId),
           journals,
         };
       });
+
+      // Auto-sync: keep volunteer.roles aligned with pre-survey participation.
+      const toSync = result.filter(v => {
+        const allRoles = getSurveyRoles(v);
+        return allRoles.length > 0 && JSON.stringify(getVolunteerRoles(v)) !== JSON.stringify(allRoles);
+      });
+      if (toSync.length > 0) {
+        await Promise.all(toSync.map(v => {
+          const allRoles = getSurveyRoles(v);
+          return updateDoc(doc(db, "missions", missionId, "volunteer", v.id), { roles: allRoles, role: deleteField() });
+        }));
+        toSync.forEach(v => {
+          const allRoles = getSurveyRoles(v);
+          const idx = result.findIndex(r => r.id === v.id);
+          if (idx !== -1) result[idx] = { ...result[idx], role: undefined, roles: allRoles };
+        });
+      }
 
       setVolunteers(result);
     } finally {
@@ -316,19 +374,52 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
     }
   };
 
-  const handleVerifyDonor = async (volunteerId, verified) => {
-    setVerifyingDonor(volunteerId);
+  const handleRemoveRole = async (volunteerId, roleToRemove) => {
+    const key = `${volunteerId}:${roleToRemove}`;
+    setRemovingRole(key);
     try {
-      await updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId), { adminVerifiedDonor: verified });
-      setVolunteers(prev => prev.map(v => v.id === volunteerId ? { ...v, adminVerifiedDonor: verified } : v));
-      const alreadyReleased = volunteers.find(v => v.id === volunteerId)?.releasedAt;
-      if (verified && alreadyReleased) {
-        await checkAndAssignBadges(volunteerId);
-      }
+      const vol = volunteers.find(v => v.id === volunteerId);
+      const currentRoles = getVolunteerRoles(vol);
+      const newRoles = currentRoles.filter(r => r !== roleToRemove);
+      const syncedRoles = newRoles.length > 0 ? newRoles : ["participant"];
+
+      // Remove the matching entry from the pre-survey participation array
+      const currentParticipation = vol?.preSurveyAnswers?.engagement?.participation || [];
+      const filteredParticipation = currentParticipation.filter(
+        r => r.trim().toLowerCase().replace(/\s+/g, "_") !== roleToRemove
+      );
+      const newParticipation = filteredParticipation.length > 0 ? filteredParticipation : ["participant"];
+
+      await Promise.all([
+        updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId), {
+          roles: syncedRoles,
+          role: deleteField(),
+        }),
+        ...(JSON.stringify(newParticipation.map(normalizeRole)) !== JSON.stringify(currentParticipation.map(normalizeRole))
+          ? [updateDoc(doc(db, "missions", missionId, "volunteer", volunteerId, "preSurvey", "response"), {
+              "engagement.participation": newParticipation,
+            })]
+          : []),
+      ]);
+
+      setVolunteers(prev => prev.map(v =>
+        v.id === volunteerId ? {
+          ...v,
+          role: undefined,
+          roles: syncedRoles,
+          preSurveyAnswers: v.preSurveyAnswers ? {
+            ...v.preSurveyAnswers,
+            engagement: {
+              ...v.preSurveyAnswers.engagement,
+              participation: newParticipation,
+            },
+          } : v.preSurveyAnswers,
+        } : v
+      ));
     } catch {
-      showToast("Failed to update donor verification.");
+      showToast("Failed to remove role.");
     } finally {
-      setVerifyingDonor(null);
+      setRemovingRole(null);
     }
   };
 
@@ -468,9 +559,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       const journals = v.journals || [];
       const allJournalsApproved = journals.length === 0 || journals.every(j => j.adminApprovalStatus === "approved");
       const isConsentApproved = v.consentSubmission?.reviewStatus === "approved";
-      const vRoles = v.preSurveyAnswers?.engagement?.participation || [];
-      const isDonorOnly = vRoles.length === 1 && vRoles[0]?.trim().toLowerCase() === "donor";
-      const requiredItems = isDonorOnly
+      const requiredItems = isDonorOnly(v)
         ? [v.preSurveyAnswers]
         : [
             v.preSurveyAnswers,
@@ -514,11 +603,13 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
             certIssued = true;
           } catch { /* cert failure is non-fatal */ }
 
+          const updatedVolunteerSnap = await getDoc(doc(db, "missions", missionId, "volunteer", v.id));
+          const updatedVolunteerData = updatedVolunteerSnap.exists() ? updatedVolunteerSnap.data() : {};
           setVolunteers(prev => prev.map(vol => vol.id === v.id ? {
             ...vol,
-            pointsEarned: finalPoints,
-            releasedAt: new Date().toISOString(),
-            ...(certIssued ? { certIssuedAt: new Date().toISOString() } : {}),
+            ...updatedVolunteerData,
+            releasedAt: updatedVolunteerData.releasedAt || new Date().toISOString(),
+            ...(certIssued && !updatedVolunteerData.certIssuedAt ? { certIssuedAt: new Date().toISOString() } : {}),
           } : vol));
         } catch {
           autoReleasedIdsRef.current.delete(v.id);
@@ -533,8 +624,8 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
   const filteredVolunteers = volunteers.filter(v => {
     if (searchQuery && !v.name.toLowerCase().includes(searchQuery.toLowerCase()) && !v.email.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (filterRole) {
-      const rawRoles = (v.preSurveyAnswers?.engagement?.participation || []).map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
-      if (!rawRoles.includes(filterRole)) return false;
+      const roles = getVolunteerRoles(v).length > 0 ? getVolunteerRoles(v) : getSurveyRoles(v);
+      if (!roles.includes(filterRole)) return false;
     }
     if (filterAttendance === "present" && v.progress?.attendance !== "present") return false;
     if (filterAttendance === "absent" && v.progress?.attendance === "present") return false;
@@ -555,10 +646,9 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
 
   // Pin lead_organizer / organizer / mission proponent to the top
   const getOrgRank = (v) => {
-    const surveyRoles = (v.preSurveyAnswers?.engagement?.participation || [])
-      .map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
-    if (v.id === missionCreatedBy || v.role === "lead_organizer" || surveyRoles.includes("lead_organizer")) return 0;
-    if (v.role === "organizer" || surveyRoles.includes("organizer")) return 1;
+    const roles = getVolunteerRoles(v).length > 0 ? getVolunteerRoles(v) : getSurveyRoles(v);
+    if (roles.includes("lead_organizer")) return 0;
+    if (roles.includes("organizer")) return 1;
     return 2;
   };
   const sortedVolunteers = [...filteredVolunteers].sort((a, b) => {
@@ -779,17 +869,14 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
               const hasConsentSubmission = Boolean(v.consentSubmission?.fileUrl);
               const consentReviewStatus = v.consentSubmission?.reviewStatus || "";
               const isConsentApproved = consentReviewStatus === "approved";
-              const preSurveyOrgRoles = rawRoles.map(r => r.trim().toLowerCase().replace(/\s+/g, "_"));
-              const isOrgRole = v.id === missionCreatedBy
-                || v.role === "lead_organizer" || v.role === "organizer"
-                || preSurveyOrgRoles.includes("lead_organizer") || preSurveyOrgRoles.includes("organizer");
+              const volunteerRoles = getVolunteerRoles(v).length > 0 ? getVolunteerRoles(v) : getSurveyRoles(v);
+              const isOrgRole = volunteerRoles.includes("lead_organizer") || volunteerRoles.includes("organizer");
 
               const journals = v.journals || [];
               const approvedJournalCount = journals.filter(j => j.adminApprovalStatus === "approved").length;
               const allJournalsApproved = journals.length === 0 || approvedJournalCount === journals.length;
 
-              const isDonorOnly = rawRoles.length === 1 && rawRoles[0]?.trim().toLowerCase() === "donor";
-              const requiredItems = isDonorOnly
+              const requiredItems = isDonorOnly(v)
                 ? [v.preSurveyAnswers]
                 : [
                     v.preSurveyAnswers,
@@ -836,33 +923,34 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                       >{v.name}</span>
                     </div>
                   </td>
-                  <td style={{ padding: "12px 16px", color: "#5f6368", fontSize: "0.82rem" }}>
-                    <div>{rawRoles.map(r => r.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())).join(", ") || "—"}</div>
-                    {rawRoles.map(r => r.trim().toLowerCase()).includes("donor") && (
-                      v.adminVerifiedDonor ? (
-                        <button
-                          onClick={() => handleVerifyDonor(v.id, false)}
-                          disabled={verifyingDonor === v.id}
-                          style={{ marginTop: 4, fontSize: "0.68rem", padding: "1px 7px", borderRadius: 5, border: "none", background: "#dcfce7", color: "#15803d", fontWeight: 700, cursor: "pointer" }}
-                          title="Click to revoke donor verification"
-                        >
-                          ✓ Donor Verified
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleVerifyDonor(v.id, true)}
-                          disabled={verifyingDonor === v.id}
-                          style={{ marginTop: 4, fontSize: "0.68rem", padding: "1px 7px", borderRadius: 5, border: "1px solid #d97706", background: "#fff", color: "#d97706", fontWeight: 600, cursor: "pointer" }}
-                          title="Verify this volunteer actually donated"
-                        >
-                          {verifyingDonor === v.id ? "…" : "Verify Donor"}
-                        </button>
-                      )
-                    )}
+                  <td style={{ padding: "12px 16px" }}>
+                    {(() => {
+                      const specialRoles = getDisplayRoles(v);
+                      if (specialRoles.length === 0) {
+                        return <span style={{ color: "#5f6368", fontSize: "0.82rem" }}>Participant</span>;
+                      }
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                          {specialRoles.map(role => (
+                            <div key={role} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <span style={{ fontSize: "0.82rem", color: "#202124" }}>
+                                {ROLE_LABELS[role] || role}
+                              </span>
+                              <button
+                                onClick={() => handleRemoveRole(v.id, role)}
+                                disabled={removingRole === `${v.id}:${role}`}
+                                title={`Remove ${ROLE_LABELS[role] || role}`}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#9aa0a6", fontSize: 11, padding: "0 1px", lineHeight: 1, opacity: removingRole === `${v.id}:${role}` ? 0.4 : 1 }}
+                              >✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td style={{ padding: "12px 16px", textAlign: "center", background: "#f8f9fa" }}>
                     {v.progress?.attendance === "present"
-                      ? <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>✓ Present</span>
+                      ? <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>Present</span>
                       : <span style={{ color: "#80868b", fontSize: "0.82rem" }}>—</span>}
                   </td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
@@ -920,14 +1008,7 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                       if (!breakdown) return <span style={{ color: "#9aa0a6" }}>—</span>;
 
                       if (v.releasedAt) {
-                        const reqBonus = v.requirementBonus || {};
-                        const requirementPoints = Object.values(reqBonus).reduce((s, val) => s + (Number(val) || 0), 0);
-                        const bonusPoints = v.bonusPoints || 0;
-                        const releasedPoints = v.pointsEarned || 0;
-                        const basePoints = releasedPoints - bonusPoints;
-                        const roleRatingPoints = breakdown.finalPoints;
-                        const taskJournalPoints = Math.max(0, basePoints - roleRatingPoints);
-                        const displayTotal = releasedPoints + requirementPoints;
+                        const points = getMissionPointsBreakdown(v, breakdown.finalPoints);
                         return (
                           <button
                             onClick={e => {
@@ -937,16 +1018,18 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                                 volunteerId: v.id,
                                 x: r.left,
                                 y: r.bottom + 6,
-                                roleRatingPoints,
-                                taskJournalPoints,
-                                requirementPoints,
-                                bonusPoints,
-                                displayTotal,
+                                roleRatingPoints: points.roleRatingPoints,
+                                taskJournalPoints: points.taskPoints,
+                                requirementPoints: points.requirementPoints,
+                                bonusPoints: points.bonusPoints,
+                                displayTotal: points.missionPoints,
+                                multiplier: breakdown.multiplier,
+                                roleBasePoints: breakdown.base,
                               });
                             }}
                             style={{ fontWeight: 700, color: "#202124", cursor: "pointer", background: "none", border: "none", padding: 0, fontSize: "inherit", textDecoration: "underline dotted #9aa0a6" }}
                           >
-                            {displayTotal}
+                            {points.missionPoints}
                           </button>
                         );
                       }
@@ -961,9 +1044,9 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     {v.releasedAt ? (
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                        <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>✓ Completed</span>
+                        <span style={{ color: "#137333", fontWeight: 700, fontSize: "0.82rem" }}>Completed</span>
                         {v.certIssuedAt
-                          ? <span style={{ color: "#1a73e8", fontSize: "0.72rem", fontWeight: 600 }}>🎓 Cert Issued</span>
+                          ? <span style={{ color: "#1a73e8", fontSize: "0.72rem", fontWeight: 600 }}>Cert Issued</span>
                           : <span style={{ color: "#f9ab00", fontSize: "0.72rem", fontWeight: 600 }}>Cert pending…</span>}
                       </div>
                     ) : individualCompletion === 100 && !isFeedbackActive ? (
@@ -1254,10 +1337,15 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
           }}
         >
           <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#9aa0a6", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Points Breakdown</div>
+          {pointsPopover.roleBasePoints != null && (
+            <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 6 }}>
+              Role base {pointsPopover.roleBasePoints} x rating {pointsPopover.multiplier}
+            </div>
+          )}
           {[
             { label: "✅ Requirements", value: pointsPopover.requirementPoints },
             { label: "Role / Rating", value: pointsPopover.roleRatingPoints },
-            ...(pointsPopover.taskJournalPoints > 0 ? [{ label: "Task Journal", value: pointsPopover.taskJournalPoints }] : []),
+            ...(pointsPopover.taskJournalPoints > 0 ? [{ label: "Task enrolled", value: pointsPopover.taskJournalPoints }] : []),
             ...(pointsPopover.bonusPoints > 0 ? [{ label: "⭐ Bonuses", value: pointsPopover.bonusPoints }] : []),
           ].map(({ label, value }) => (
             <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>

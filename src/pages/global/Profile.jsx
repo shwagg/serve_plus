@@ -541,8 +541,23 @@ const SDG_COLORS = [
   "#00689d", "#19486a",
 ];
 
+function normalizeMissionRoles(data = {}) {
+  const rawRoles = Array.isArray(data.roles) && data.roles.length > 0
+    ? data.roles
+    : (data.role ? [data.role] : []);
+  return rawRoles.map(r => String(r || "").trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean);
+}
+
+function getPrimaryDisplayRole(roles = []) {
+  return roles.find(r => r === "lead_organizer") ||
+    roles.find(r => r === "organizer") ||
+    roles.find(r => r === "donor") ||
+    roles[0] ||
+    "participant";
+}
+
 function computeAchievements(events, totalPoints, level) {
-  const roles = [...new Set(events.map(e => e.role).filter(Boolean))];
+  const roles = [...new Set(events.flatMap(e => e.roles?.length > 0 ? e.roles : [e.role]).filter(Boolean))];
   return [
     { id: "first_step", icon: "🌱", name: "First Step", desc: "Joined your first event", unlocked: events.length >= 1 },
     { id: "active", icon: "⭐", name: "Active Volunteer", desc: "Joined 3+ events", unlocked: events.length >= 3 },
@@ -551,9 +566,9 @@ function computeAchievements(events, totalPoints, level) {
     { id: "pts50", icon: "💫", name: "Point Starter", desc: "Earned 50+ points", unlocked: totalPoints >= 50 },
     { id: "pts100", icon: "💎", name: "Point Collector", desc: "Earned 100+ points", unlocked: totalPoints >= 100 },
     { id: "pts500", icon: "👑", name: "Point Master", desc: "Earned 500+ points", unlocked: totalPoints >= 500 },
-    { id: "organizer", icon: "📋", name: "Event Organizer", desc: "Served as an organizer", unlocked: events.some(e => e.role === "organizer") },
-    { id: "lead_org", icon: "🎯", name: "Lead Organizer", desc: "Served as lead organizer", unlocked: events.some(e => e.role === "lead_organizer") },
-    { id: "donor", icon: "💝", name: "Generous Donor", desc: "Donated to a cause", unlocked: events.some(e => e.role === "donor") },
+    { id: "organizer", icon: "📋", name: "Event Organizer", desc: "Served as an organizer", unlocked: events.some(e => (e.roles || []).includes("organizer")) },
+    { id: "lead_org", icon: "🎯", name: "Lead Organizer", desc: "Served as lead organizer", unlocked: events.some(e => (e.roles || []).includes("lead_organizer")) },
+    { id: "donor", icon: "💝", name: "Generous Donor", desc: "Donated to a cause", unlocked: events.some(e => (e.roles || []).includes("donor")) },
     { id: "all_rounder", icon: "🎨", name: "All-Rounder", desc: "Held 3+ different roles", unlocked: roles.length >= 3 },
     { id: "lv5", icon: "🚀", name: "Rising Star", desc: "Reached Level 5", unlocked: (level || 1) >= 5 },
     { id: "lv10", icon: "🦅", name: "Veteran", desc: "Reached Level 10", unlocked: (level || 1) >= 10 },
@@ -1093,11 +1108,13 @@ useEffect(() => {
 
             const reqBonus = vData.requirementBonus || {};
             const requirementPoints = Object.values(reqBonus).reduce((s, val) => s + (Number(val) || 0), 0);
+            const roles = normalizeMissionRoles(vData);
 
             return {
               id: eventId,
               title: eventData.title || eventId,
-              role: vData.role || "participant",
+              roles,
+              role: getPrimaryDisplayRole(roles),
               pointsEarned: vData.pointsEarned || 0,
               requirementPoints,
               sdgs: eventData.sdgs || [],

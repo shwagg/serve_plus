@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { createNotification } from "../../utils/notificationUtils";
+import { logAudit } from "../../utils/auditLogger";
 import ImpactMetrics from "./ImpactMetrics";
 
 export default function CurrentEventMonitoring() {
@@ -31,6 +32,9 @@ export default function CurrentEventMonitoring() {
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showPreSurveyAnalytics, setShowPreSurveyAnalytics] = useState(false);
   const [preSurveyAnalytics, setPreSurveyAnalytics] = useState(null);
+  const [showDateEditModal, setShowDateEditModal] = useState(false);
+  const [editingDate, setEditingDate] = useState("");
+  const [savingDate, setSavingDate] = useState(false);
 
   useEffect(() => {
     const fetchEventData = async () => {
@@ -261,6 +265,71 @@ export default function CurrentEventMonitoring() {
     );
   };
 
+  const handleOpenDateEdit = () => {
+    let dateStr = "";
+    if (mission.targetDate?.toDate) {
+      dateStr = mission.targetDate.toDate().toLocaleDateString("en-CA");
+    } else if (typeof mission.targetDate === "string") {
+      dateStr = mission.targetDate;
+    }
+    setEditingDate(dateStr);
+    setShowDateEditModal(true);
+  };
+
+  const handleDateSave = async () => {
+    if (!editingDate) return;
+    setSavingDate(true);
+    try {
+      let oldDateStr = "";
+      if (mission.targetDate?.toDate) {
+        oldDateStr = mission.targetDate.toDate().toLocaleDateString("en-CA");
+      } else if (typeof mission.targetDate === "string") {
+        oldDateStr = mission.targetDate;
+      }
+
+      const updatePayload = { targetDate: editingDate, updatedAt: serverTimestamp() };
+      if (!mission.plannedTargetDate) {
+        updatePayload.plannedTargetDate = oldDateStr;
+      }
+      await updateDoc(doc(db, "missions", missionId), updatePayload);
+
+      // Best-effort: auto-populate actualStart in the accomplishment report
+      try {
+        const reportRef = doc(db, "missions", missionId, "accomplishmentReport", "submission");
+        const reportSnap = await getDoc(reportRef);
+        if (reportSnap.exists()) {
+          const fd = reportSnap.data().formData || {};
+          const reportUpdate = {
+            "formData.actualStart": editingDate,
+            updatedAt: serverTimestamp(),
+          };
+          if (!fd.plannedStart) {
+            reportUpdate["formData.plannedStart"] = oldDateStr || editingDate;
+          }
+          await updateDoc(reportRef, reportUpdate);
+        }
+      } catch (_) { /* non-critical */ }
+
+      logAudit({
+        action: "EVENT_DATE_CHANGED",
+        category: "event",
+        details: {
+          missionId,
+          missionTitle: mission.title || "",
+          oldDate: oldDateStr,
+          newDate: editingDate,
+        },
+      });
+
+      setMission(prev => ({ ...prev, targetDate: editingDate }));
+      setShowDateEditModal(false);
+    } catch (_) {
+      // surface silently — user can retry
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
   return (
     <div className="current-event-monitoring">
       {/* Header */}
@@ -366,7 +435,7 @@ export default function CurrentEventMonitoring() {
               </ul>
             </div>
 
-            <button className="cem-btn-primary">Edit Details</button>
+            <button className="cem-btn-primary" onClick={handleOpenDateEdit}>Edit Date</button>
           </div>
         </div>
 
@@ -717,6 +786,66 @@ export default function CurrentEventMonitoring() {
           </div>
         </div>
       </div>
+
+      {/* ── Date Edit Modal ── */}
+      {showDateEditModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(44,62,80,0.22)",
+            zIndex: 13000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={() => setShowDateEditModal(false)}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: 16, padding: 32,
+              minWidth: 340, maxWidth: "90vw",
+              boxShadow: "0 2px 24px #0003",
+              position: "relative",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              className="admin-modal-close admin-modal-close--absolute"
+              onClick={() => setShowDateEditModal(false)}
+            >
+              ×
+            </button>
+            <h2 style={{ margin: "0 0 6px", fontSize: "1.05rem", color: "#1e293b" }}>Edit Event Date</h2>
+            <p style={{ margin: "0 0 20px", fontSize: "0.82rem", color: "#64748b" }}>
+              Only the target date can be modified for a published event.
+              The original approved date will be saved as <strong>Planned Start</strong> and
+              the new date as <strong>Actual Start</strong> in the accomplishment report.
+            </p>
+            <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+              Target Date
+            </label>
+            <input
+              type="date"
+              value={editingDate}
+              onChange={e => setEditingDate(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: "0.95rem", color: "#1e293b", boxSizing: "border-box", marginBottom: 24 }}
+            />
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowDateEditModal(false)}
+                style={{ padding: "8px 18px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDateSave}
+                disabled={savingDate || !editingDate}
+                style={{ padding: "8px 20px", background: savingDate || !editingDate ? "#cbd5e1" : "#1a73e8", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: "0.85rem", cursor: savingDate || !editingDate ? "not-allowed" : "pointer" }}
+              >
+                {savingDate ? "Saving…" : "Save Date"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

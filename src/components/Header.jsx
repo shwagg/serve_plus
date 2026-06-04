@@ -16,7 +16,7 @@ import SysAdminMenu from './menu/SysAdminMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
 import SettingsModal from './SettingsModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
-import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon, HelpOutlineRoundedIcon } from './icons';
+import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon, HelpOutlineRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon} from './icons';
 import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 import OnboardingTutorial from './OnboardingTutorial';
@@ -316,6 +316,11 @@ export default function Header() {
                     />
                     {userName && (
                       <span className="header-greeting">Hi, {userName.trim().split(/\s+/)[0]}!</span>
+                    )}
+                    {showMenu ? (
+                      <ExpandLessRoundedIcon style={{ fontSize: 26, color: '#000' }} />
+                    ) : (
+                      <ExpandMoreRoundedIcon style={{ fontSize: 26, color: '#000' }} />
                     )}
                   </div>
                 </button>

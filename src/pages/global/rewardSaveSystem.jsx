@@ -1,12 +1,18 @@
 // Saving computation to firestore such as updating
 // user account 'totalPoints' and in mission 'pointsEarned'
-import { doc, getDoc, getDocs, collection, updateDoc, increment, arrayUnion, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, updateDoc, increment, arrayUnion, serverTimestamp, deleteField } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { getAuth } from "firebase/auth";
 import { computeFinalPoints, getLevelInfo } from "../../hooks/rewardSystem";
+import { getMissionPointsBreakdown, getRequirementPoints } from "../../hooks/missionPoints";
 import { checkAndAssignBadges } from "../../hooks/badgeSystem";
 import { logAudit } from "../../utils/auditLogger";
 import { createNotification } from "../../utils/notificationUtils";
+
+function normalizeMissionRoles(rawRoles) {
+    const roles = Array.isArray(rawRoles) ? rawRoles : (rawRoles ? [rawRoles] : []);
+    return roles.map(role => String(role || "").trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean);
+}
 
 export const releaseMissionPoints = async (missionId) => {
     const volunteerSnap = await getDocs(
@@ -59,10 +65,11 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     }
 
     const role = rawRole;
+    const normalizedRoles = normalizeMissionRoles(rawRole);
 
     const breakdown = computeFinalPoints(role, avgRating, "verified");
 
-    const finalPoints = breakdown.finalPoints;
+    const roleRatingPoints = breakdown.finalPoints;
 
     // Sum approved task-journal points for this volunteer
     const tasksSnap = await getDocs(collection(db, "missions", missionId, "task"));
@@ -71,11 +78,14 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         const pRef = doc(db, "missions", missionId, "task", taskDoc.id, "participants", volunteerId);
         const pSnap = await getDoc(pRef);
         if (pSnap.exists() && pSnap.data().adminApprovalStatus === "approved") {
-            approvedTaskPoints += Number(pSnap.data().pendingPoints) || 0;
+            const participantData = pSnap.data();
+            approvedTaskPoints += Number(participantData.pointsEarned) || Number(participantData.pendingPoints) || 0;
         }
     }
     approvedTaskPoints = Math.min(30, approvedTaskPoints);
-    const basePoints = finalPoints + approvedTaskPoints;
+    const storedTaskPoints = Number(volunteerData.taskPoints) || 0;
+    const legacyTaskPoints = Number(volunteerData.pointsEarned) || 0;
+    const taskPoints = Math.max(storedTaskPoints, legacyTaskPoints, approvedTaskPoints);
 
     // ── Bonus point computation ────────────────────────────────────────────
     let totalBonusPoints = 0;
@@ -95,8 +105,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         // 2nd mission = +5%, 3rd+ = +10% of base role points. No time window — fits
         // the school-year schedule where only 2 projects are offered per year.
         const missionsCompletedSoFar = uData.missionsCompleted || 0;
-        const returningPct = missionsCompletedSoFar >= 2 ? 0.10 : missionsCompletedSoFar === 1 ? 0.05 : 0;
-        const returningBonus = returningPct > 0 ? Math.round(finalPoints * returningPct * 10) / 10 : 0;
+        const returningBonus = missionsCompletedSoFar >= 2 ? 10 : missionsCompletedSoFar === 1 ? 5 : 0;
 
         // Term streak bonus: +5 pts flat if the student has already completed ≥1 mission
         // in the past 3 months (i.e., this is their 2nd+ mission this term).
@@ -133,7 +142,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         }
 
         totalBonusPoints = returningBonus + termStreakBonus + roleDiversityBonus + sdgBonus;
-        levelAfter = getLevelInfo(ptsBefore + basePoints + totalBonusPoints).level;
+        levelAfter = getLevelInfo(ptsBefore + roleRatingPoints + totalBonusPoints).level;
 
         userUpdateExtras = {
             missionsCompleted: increment(1),
@@ -142,27 +151,22 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
             ...(newSdgs.length > 0 ? { sdgsContributed: arrayUnion(...newSdgs) } : {}),
         };
 
-        if (returningBonus > 0) bonusBreakdown.returning = { amount: returningBonus, pct: Math.round(returningPct * 100) };
+        if (returningBonus > 0) bonusBreakdown.returning = { amount: returningBonus };
         if (termStreakBonus > 0) bonusBreakdown.termStreak = { amount: termStreakBonus };
         if (roleDiversityBonus > 0) bonusBreakdown.roleDiversity = { amount: roleDiversityBonus };
         if (sdgBonus > 0) bonusBreakdown.sdg = { amount: sdgBonus, count: newSdgs.length };
     }
 
-    const releasedPoints = basePoints + totalBonusPoints;
-
-    // Requirement bonuses are already in the user's totalPoints (awarded at completion time).
-    // We read them here only to include in the history panel display total.
-    const requirementBonus = volunteerData.requirementBonus || {};
-    const requirementPoints = Object.values(requirementBonus).reduce((sum, v) => sum + (Number(v) || 0), 0);
-
-    const totalPoints = releasedPoints;
+    const releaseDelta = roleRatingPoints + totalBonusPoints;
+    const requirementPoints = getRequirementPoints(volunteerData);
+    const missionPoints = requirementPoints + taskPoints + roleRatingPoints + totalBonusPoints;
 
     // Increment user totalPoints + persist bonus-tracking fields
     if (volunteerData.userId) {
         await updateDoc(
             doc(db, "users", volunteerData.userId),
             {
-                totalPoints: increment(totalPoints),
+                totalPoints: increment(releaseDelta),
                 ...userUpdateExtras,
             }
         );
@@ -185,11 +189,26 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     }
 
     await updateDoc(volunteerRef, {
-        pointsEarned: totalPoints,
+        pointsEarned: taskPoints + roleRatingPoints + totalBonusPoints,
+        requirementPoints,
+        taskPoints,
+        roleRatingPoints,
+        missionPoints,
+        pointsBreakdown: {
+            requirementPoints,
+            taskPoints,
+            roleRatingPoints,
+            bonusPoints: totalBonusPoints,
+            missionPoints,
+            roleBasePoints: breakdown.base,
+            feedbackMultiplier: breakdown.multiplier,
+            participationFactor: breakdown.factor,
+        },
         completionStatus: "graded",
         releasedAt: serverTimestamp(),
         releasedBy: adminName,
-        roles: Array.isArray(rawRole) ? rawRole : [rawRole],
+        roles: normalizedRoles,
+        role: deleteField(),
         ...(totalBonusPoints > 0 ? { bonusPoints: totalBonusPoints } : {}),
     });
 
@@ -201,7 +220,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
         missionId,
         targetUserId: volunteerId,
         targetUserName: volunteerData.displayName || volunteerData.name || "",
-        pointsEarned: totalPoints,
+        pointsEarned: missionPoints,
         bonusPoints: totalBonusPoints,
       },
     });
@@ -219,18 +238,24 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
 
     // Points released notification — always shown when points > 0 so the student
     // sees their full breakdown (base + any bonuses earned this mission).
-    const displayTotal = totalPoints + requirementPoints;
-    if (volunteerData.userId && displayTotal > 0) {
+    if (volunteerData.userId && missionPoints > 0) {
         await createNotification(volunteerData.userId, {
             type: "bonus_earned",
             title: "Points Released!",
-            message: `You earned ${displayTotal} points from this mission!`,
+            message: `You earned ${missionPoints} points from this mission!`,
             popupShown: false,
             missionId,
             missionTitle: missionData.title || "Mission",
-            totalPoints: displayTotal,
-            basePoints,
+            totalPoints: missionPoints,
+            basePoints: taskPoints + roleRatingPoints,
             requirementPoints,
+            pointsBreakdown: getMissionPointsBreakdown({
+                requirementPoints,
+                taskPoints,
+                roleRatingPoints,
+                bonusPoints: totalBonusPoints,
+                missionPoints,
+            }),
             bonuses: bonusBreakdown,
         });
     }
@@ -238,5 +263,5 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
     // Check and assign any newly earned badges after grading
     await checkAndAssignBadges(volunteerId);
 
-    return totalPoints;
+    return missionPoints;
 };

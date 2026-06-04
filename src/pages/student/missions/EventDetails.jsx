@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, setDoc, deleteDoc, updateDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { createNotification } from '../../../utils/notificationUtils';
+import { showToast } from '../../../utils/toast';
 
 import IosShareRoundedIcon from '@mui/icons-material/IosShareRounded';
 import Header from '../../../components/Header';
@@ -34,15 +35,16 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const [userAuthProvider, setUserAuthProvider] = useState('');
   const [userRole, setUserRole] = useState('');
   const [attendanceFlag, setAttendanceFlag] = useState(null); // { flagged: bool, expiry: Date, missionTitle: string }
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [userJoinedTasks, setUserJoinedTasks] = useState([]);
   const defaultBanner = mission1;
 
   const handleShare = () => {
     const url = `${window.location.origin}/preview/event/${id}`;
     navigator.clipboard.writeText(url).then(() => {
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    }).catch(() => {});
+      showToast('Mission link copied to clipboard!');
+    }).catch(() => {
+      showToast('Failed to copy link. Please try again.');
+    });
   };
 
 
@@ -125,6 +127,19 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               setUserAuthProvider(uData.authProvider || '');
               setUserRole(uData.role || '');
             }
+
+            const missionStatus = missionSnap.data().status;
+            if (missionStatus === 'completed' || missionStatus === 'cancelled') {
+              const joinedList = [];
+              for (const tDoc of tasksSnap.docs) {
+                const pRef = doc(db, 'missions', id, 'task', tDoc.id, 'participants', user.uid);
+                const pSnap = await getDoc(pRef);
+                if (pSnap.exists()) {
+                  joinedList.push({ id: tDoc.id, ...tDoc.data() });
+                }
+              }
+              setUserJoinedTasks(joinedList);
+            }
           }
         } else {
           setMission(null);
@@ -139,16 +154,19 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   }, [id, navigate]);
 
   useEffect(() => {
-    if (volunteer?.registrationStatus === "approved") {
+    if (!mission) return;
+    const missionClosed = mission.status === 'completed' || mission.status === 'cancelled';
+    if (!missionClosed && volunteer?.registrationStatus === "approved") {
       navigate(`/event/${id}/activity?mode=active`);
     }
-  }, [volunteer, id, navigate]);
+  }, [volunteer, id, navigate, mission]);
 
   // Proponents/organizers go straight into the event — no join step needed
   useEffect(() => {
     const user = auth.currentUser;
     if (!user || !mission) return;
-    if (mission.createdBy === user.uid) {
+    const missionClosed = mission.status === 'completed' || mission.status === 'cancelled';
+    if (!missionClosed && mission.createdBy === user.uid) {
       navigate(`/event/${id}/activity?mode=active`);
     }
   }, [mission, id, navigate]);
@@ -294,6 +312,20 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const isMissionCreator = mission?.createdBy === currentUserId;
   const isBlackboardStudent = normalizeValue(userRole) === "student" && isBlackboardProvider(userAuthProvider);
   const canJoinEvent = isMissionCreator || isBlackboardStudent;
+  const isClosed = mission.status === 'completed' || mission.status === 'cancelled';
+  const closedDate = (() => {
+    const ts = mission.completedAt;
+    if (!ts) return null;
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    return isNaN(d?.getTime()) ? null : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  })();
+  const pointsEarned = Number(volunteer?.pointsEarned) || 0;
+  const userRoleLabel = (() => {
+    const r = volunteer?.role;
+    if (!r || r === 'volunteer') return 'Participant';
+    if (r === 'lead_organizer') return 'Lead Organizer';
+    return r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, ' ');
+  })();
 
   return (
     <div className={onClose ? "event-details-modal-root" : "full-page"}>
@@ -309,34 +341,13 @@ export default function EventDetails({ onClose = null, missionId = null }) {
             />
             <div className="event-details-toolbar">
               <div style={{ position: 'relative', display: 'inline-flex' }}>
-                {copySuccess && (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 'calc(100% + 6px)',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: '#1f2937',
-                    color: '#fff',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    whiteSpace: 'nowrap',
-                    pointerEvents: 'none',
-                    zIndex: 10,
-                  }}>
-                    Link copied!
-                  </div>
-                )}
                 <button
                   onClick={handleShare}
                   className="event-details-icon-btn"
-                  aria-label={copySuccess ? 'Copied!' : 'Copy event link'}
-                  title={copySuccess ? 'Copied!' : 'Copy event link'}
+                  aria-label="Copy event link"
+                  title="Copy event link"
                 >
-                  {copySuccess
-                    ? <span style={{ fontSize: 15, fontWeight: 700}}>✓</span>
-                    : <IosShareRoundedIcon sx={{ fontSize: 17 }} />}
+                  <IosShareRoundedIcon sx={{ fontSize: 17 }} />
                 </button>
               </div>
               {onClose && (
@@ -348,7 +359,7 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               )}
             </div>
           </div>
-          <div className={`event-details-card${onClose ? " event-details-card--modal" : ""}`}>
+          <div className={`event-details-card${onClose ? " event-details-card--modal" : ""}`} style={isClosed ? { paddingBottom: 0 } : undefined}>
             <div className={`event-details-grid${onClose ? " event-details-grid--modal" : ""}`}>
 
               {/* LEFT COLUMN */}
@@ -357,7 +368,10 @@ export default function EventDetails({ onClose = null, missionId = null }) {
                 <p className="event-details-desc">{mission.description}</p>
                 <div className="event-details-meta">
                   <div className="event-meta-item">
-                    📅 <span>{mission.targetDate || "Date TBA"}</span>
+                    📅 <span>
+                      {mission.targetDate || "Date TBA"}
+                      {isClosed && closedDate && <> &nbsp;·&nbsp; Ended {closedDate}</>}
+                    </span>
                   </div>
 
                   <div className="event-meta-item">
@@ -371,6 +385,17 @@ export default function EventDetails({ onClose = null, missionId = null }) {
                         : "TBA"}
                     </span>
                   </div>
+
+                  {isClosed && volunteer && (
+                    <>
+                      <div className="event-meta-item">
+                        🏆 <span><strong>{pointsEarned} pts</strong> earned</span>
+                      </div>
+                      <div className="event-meta-item">
+                        🎖️ <span>Role: <strong>{userRoleLabel}</strong></span>
+                      </div>
+                    </>
+                  )}
 
                   {(mission.preparedBy || (Array.isArray(mission.proponents) && mission.proponents.length > 0)) && (
                     <div className="event-meta-item">
@@ -401,10 +426,24 @@ export default function EventDetails({ onClose = null, missionId = null }) {
 
                 <div className="event-details-section">
                   <span className="event-details-activity-label">
-                    Included Tasks
+                    {isClosed ? 'Tasks Joined' : 'Included Tasks'}
                   </span>
 
-                  {tasks.length === 0 ? (
+                  {isClosed ? (
+                    userJoinedTasks.length === 0 ? (
+                      <p className="event-details-empty">No tasks joined.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: 6 }}>
+                        {userJoinedTasks.map(task => (
+                          <div key={task.id} className="event-task-item">
+                            <span>☑️</span>
+                            <span>{task.title}</span>
+                            <span className="task-points">{task.points} pts</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : tasks.length === 0 ? (
                     <p className="event-details-empty">
                       No tasks added yet.
                     </p>
@@ -423,97 +462,112 @@ export default function EventDetails({ onClose = null, missionId = null }) {
 
               </div>
             </div>
-            <div className="event-details-cta">
-              {/* Left: volunteer avatars + joined count */}
-              <div className="volunteer-avatars">
-                {volunteerCount > 0 && (
-                  <>
-                    <div className="volunteer-avatar-stack">
-                      {volunteerAvatars.map((src, i) => (
-                        <img key={i} src={src} alt="volunteer" />
-                      ))}
-                      {volunteerCount > 3 && (
-                        <div className="volunteer-avatar-overflow">+{volunteerCount - 3}</div>
-                      )}
-                    </div>
-                    <span className="volunteer-joined-text">{volunteerCount} joined</span>
-                  </>
-                )}
-              </div>
+            {!isClosed && (
+              <div className="event-details-cta">
+                {/* Left: volunteer avatars + joined count */}
+                <div className="volunteer-avatars">
+                  {volunteerCount > 0 && (
+                    <>
+                      <div className="volunteer-avatar-stack">
+                        {volunteerAvatars.map((src, i) => (
+                          <img key={i} src={src} alt="volunteer" />
+                        ))}
+                        {volunteerCount > 3 && (
+                          <div className="volunteer-avatar-overflow">+{volunteerCount - 3}</div>
+                        )}
+                      </div>
+                      <span className="volunteer-joined-text">{volunteerCount} joined</span>
+                    </>
+                  )}
+                </div>
 
-              {/* Right: join / flagged / already enrolled button */}
-              <div className="event-details-action">
-                {/* Attendance flag check — active flag blocks joining.
-                    Exception: the event's own proponent/creator is never blocked. */}
-                {attendanceFlag?.flagged && !attendanceFlag?.expired && mission?.createdBy !== auth.currentUser?.uid ? (
-                  <div style={{ textAlign: 'center' }}>
+                {/* Right: join / flagged / already enrolled button */}
+                <div className="event-details-action">
+                  {attendanceFlag?.flagged && !attendanceFlag?.expired && mission?.createdBy !== auth.currentUser?.uid ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <button
+                        className="event-details-join-btn"
+                        disabled
+                        style={{
+                          background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+                          cursor: 'not-allowed',
+                          opacity: 0.9,
+                        }}
+                      >
+                        🚩 FLAGGED – CANNOT JOIN
+                      </button>
+                      <p style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        color: '#b91c1c',
+                        fontWeight: 500,
+                        maxWidth: 260,
+                      }}>
+                        You missed attendance for &ldquo;{attendanceFlag.missionTitle}&rdquo;.
+                        Restriction lifts on {attendanceFlag.expiry?.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.
+                      </p>
+                    </div>
+                  ) : volunteer?.registrationStatus === "approved" ? null : mission?.participantLimit && volunteerCount >= Number(mission.participantLimit) ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <button
+                        className="event-details-join-btn"
+                        disabled
+                        style={{
+                          background: 'linear-gradient(135deg, #9ca3af, #6b7280)',
+                          cursor: 'not-allowed',
+                          opacity: 0.9,
+                        }}
+                      >
+                        🔒 EVENT FULL
+                      </button>
+                      <p style={{ marginTop: 8, fontSize: 12, color: '#6b7280', fontWeight: 500, maxWidth: 260 }}>
+                        This event has reached its maximum of {mission.participantLimit} participants.
+                      </p>
+                    </div>
+                  ) : !canJoinEvent ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <button
+                        className="event-details-join-btn"
+                        disabled
+                        style={{
+                          background: 'linear-gradient(135deg, #64748b, #334155)',
+                          cursor: 'not-allowed',
+                          opacity: 0.9,
+                        }}
+                      >
+                        BLACKBOARD REQUIRED
+                      </button>
+                      <p style={{ marginTop: 8, fontSize: 12, color: '#475569', fontWeight: 500, maxWidth: 260 }}>
+                        Only Blackboard-integrated student accounts can join events.
+                      </p>
+                    </div>
+                  ) : (
                     <button
                       className="event-details-join-btn"
-                      disabled
-                      style={{
-                        background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-                        cursor: 'not-allowed',
-                        opacity: 0.9,
-                      }}
+                      disabled={joining}
+                      onClick={handleJoinEvent}
                     >
-                      🚩 FLAGGED – CANNOT JOIN
+                      {joining ? "JOINING..." : "JOIN EVENT"}
                     </button>
-                    <p style={{
-                      marginTop: 8,
-                      fontSize: 12,
-                      color: '#b91c1c',
-                      fontWeight: 500,
-                      maxWidth: 260,
-                    }}>
-                      You missed attendance for &ldquo;{attendanceFlag.missionTitle}&rdquo;.
-                      Restriction lifts on {attendanceFlag.expiry?.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.
-                    </p>
-                  </div>
-                ) : volunteer?.registrationStatus === "approved" ? null : mission?.participantLimit && volunteerCount >= Number(mission.participantLimit) ? (
-                  <div style={{ textAlign: 'center' }}>
-                    <button
-                      className="event-details-join-btn"
-                      disabled
-                      style={{
-                        background: 'linear-gradient(135deg, #9ca3af, #6b7280)',
-                        cursor: 'not-allowed',
-                        opacity: 0.9,
-                      }}
-                    >
-                      🔒 EVENT FULL
-                    </button>
-                    <p style={{ marginTop: 8, fontSize: 12, color: '#6b7280', fontWeight: 500, maxWidth: 260 }}>
-                      This event has reached its maximum of {mission.participantLimit} participants.
-                    </p>
-                  </div>
-                ) : !canJoinEvent ? (
-                  <div style={{ textAlign: 'center' }}>
-                    <button
-                      className="event-details-join-btn"
-                      disabled
-                      style={{
-                        background: 'linear-gradient(135deg, #64748b, #334155)',
-                        cursor: 'not-allowed',
-                        opacity: 0.9,
-                      }}
-                    >
-                      BLACKBOARD REQUIRED
-                    </button>
-                    <p style={{ marginTop: 8, fontSize: 12, color: '#475569', fontWeight: 500, maxWidth: 260 }}>
-                      Only Blackboard-integrated student accounts can join events.
-                    </p>
-                  </div>
-                ) : (
-                  <button
-                    className="event-details-join-btn"
-                    disabled={joining}
-                    onClick={handleJoinEvent}
-                  >
-                    {joining ? "JOINING..." : "JOIN EVENT"}
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+            {isClosed && (
+              <div style={{
+                width: '100%',
+                padding: '14px 24px',
+                background: '#9ca3af',
+                color: '#fff',
+                textAlign: 'center',
+                fontWeight: 800,
+                fontSize: 13,
+                letterSpacing: '0.18em',
+                borderRadius: '0 0 20px 20px',
+              }}>
+                EVENT CLOSED
+              </div>
+            )}
           </div>
         </div>
   {/* Modal for Pre-Activity Survey and Consent Upload */ }

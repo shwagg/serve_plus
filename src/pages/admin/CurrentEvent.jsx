@@ -1,6 +1,7 @@
 import {
   collection, getDocs, getDoc, doc, updateDoc, addDoc,
   query, where, serverTimestamp, Timestamp, onSnapshot,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import { useState, useEffect, useRef, useContext } from "react";
@@ -18,12 +19,30 @@ import { logAudit } from "../../utils/auditLogger";
 import MissionSubmissionsTable from "./MissionSubmissionsTable";
 import { computeAverageRating, getProgramMultiplier } from "../../hooks/rewardSystem";
 import { exportAccomplishmentPDF } from "../global/exportAccomplishmentPDF";
+import { issueCertificate } from "../../utils/certificateUtils";
 
 // ── helpers ───────────────────────────────────────────────────────────
+const ROSTER_ROLE_TAG = {
+  lead_organizer: { label: "🎯 Lead", bg: "#f3e8ff", color: "#7c3aed", border: "#d8b4fe" },
+  organizer:      { label: "📋 Organizer", bg: "#e8f0fe", color: "#1a73e8", border: "#c5d9fd" },
+  donor:          { label: "💛 Donor", bg: "#fef9c3", color: "#a16207", border: "#fde68a" },
+};
+
 function getInitials(name) {
   const parts = (name || "?").trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return (name || "?").slice(0, 2).toUpperCase();
+}
+
+function normalizeRole(role) {
+  return String(role || "").trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function normalizeMissionRoles(data = {}) {
+  const source = Array.isArray(data.roles) && data.roles.length > 0
+    ? data.roles
+    : (data.role && data.role !== "volunteer" ? [data.role] : []);
+  return source.map(normalizeRole).filter(Boolean);
 }
 
 function getDateUrgency(targetDate) {
@@ -210,7 +229,7 @@ export default function CurrentEvent() {
   const [togglingAttendance, setTogglingAttendance] = useState({});
   const [assigningRole, setAssigningRole] = useState({});   // userId → true while saving
   const [editingRoleFor, setEditingRoleFor] = useState(null); // userId whose role is being edited
-  const [pendingRole, setPendingRole] = useState("");         // selected value in the dropdown
+  const [pendingRoles, setPendingRoles] = useState([]);       // selected roles in the checkbox UI
   const [volunteerCard, setVolunteerCard] = useState(null);   // { volunteer, x, y }
 
 
@@ -218,6 +237,9 @@ export default function CurrentEvent() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [editDetailsData, setEditDetailsData] = useState({});
   const [savingDetails, setSavingDetails] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
+  const [calViewYear, setCalViewYear] = useState(new Date().getFullYear());
+  const [calViewMonth, setCalViewMonth] = useState(new Date().getMonth());
 
   // ── community feedback tab state ─────────────────────────────────
   const [feedbackResponses, setFeedbackResponses] = useState([]);
@@ -330,6 +352,72 @@ export default function CurrentEvent() {
   }, [missionId]);
 
   const handleSaveDetails = async () => {
+    // Published missions: only the target date may be changed
+    if (missionData?.status === "published") {
+      if (!editDetailsData.targetDate) { showToast("Target date is required."); return; }
+      setSavingDetails(true);
+      try {
+        // Normalise the existing date to a YYYY-MM-DD string for comparison
+        let oldDateStr = "";
+        if (missionData.targetDate?.toDate) {
+          oldDateStr = missionData.targetDate.toDate().toLocaleDateString("en-CA");
+        } else if (typeof missionData.targetDate === "string") {
+          oldDateStr = missionData.targetDate;
+        }
+        const newDateStr = editDetailsData.targetDate;
+
+        const updatePayload = { targetDate: newDateStr, updatedAt: serverTimestamp() };
+        // On first date change, freeze the approved date as plannedTargetDate
+        if (!missionData.plannedTargetDate) {
+          updatePayload.plannedTargetDate = oldDateStr;
+        }
+        await updateDoc(doc(db, "missions", missionId), updatePayload);
+
+        // Best-effort: auto-populate actualStart in the accomplishment report
+        try {
+          const reportRef = doc(db, "missions", missionId, "accomplishmentReport", "submission");
+          const reportSnap = await getDoc(reportRef);
+          if (reportSnap.exists()) {
+            const fd = reportSnap.data().formData || {};
+            const reportUpdate = {
+              "formData.actualStart": newDateStr,
+              updatedAt: serverTimestamp(),
+            };
+            // Also back-fill plannedStart if it was never saved
+            if (!fd.plannedStart) {
+              reportUpdate["formData.plannedStart"] = oldDateStr || newDateStr;
+            }
+            await updateDoc(reportRef, reportUpdate);
+          }
+        } catch (_) { /* non-critical */ }
+
+        logAudit({
+          action: "EVENT_DATE_CHANGED",
+          category: "event",
+          details: {
+            missionId,
+            missionTitle: missionData.title || "",
+            oldDate: oldDateStr,
+            newDate: newDateStr,
+          },
+        });
+
+        const refreshed = await getDoc(doc(db, "missions", missionId));
+        if (refreshed.exists()) {
+          setMissionData({ id: refreshed.id, ...refreshed.data() });
+          setMissionTitle(refreshed.data().title || "Event");
+        }
+        showToast("Event date updated.");
+        setEditingDetails(false);
+      } catch {
+        showToast("Failed to save. Try again.");
+      } finally {
+        setSavingDetails(false);
+      }
+      return;
+    }
+
+    // Non-published missions: full edit
     if (!editDetailsData.title.trim()) { showToast("Title is required."); return; }
     setSavingDetails(true);
     try {
@@ -413,7 +501,8 @@ export default function CurrentEvent() {
         department: uData.department || "",
         photoURL: (() => { const p = uData.avatar || uData.photoURL || uData.profilePhoto || ""; return p.includes("ui-avatars.com") ? "" : p; })(),
         totalPoints: uData.totalPoints || 0,
-        role: vData.role || "volunteer",
+        role: normalizeMissionRoles(vData)[0] || "volunteer",
+        roles: normalizeMissionRoles(vData),
         joinedAt: vData.joinedAt,
         registrationStatus: vData.registrationStatus || "pending",
         attendanceStatus: vData.progress?.attendance || null,
@@ -424,6 +513,33 @@ export default function CurrentEvent() {
     }));
 
     setRosterVolunteers(results);
+
+    // Auto-sync: keep volunteer.roles aligned with pre-survey participation.
+    const docsNeedingRoles = snap.docs.filter(d => normalizeMissionRoles(d.data()).length === 0);
+    if (docsNeedingRoles.length > 0) {
+      const preSurveySnaps = await Promise.all(
+        docsNeedingRoles.map(d =>
+          getDoc(doc(db, "missions", missionId, "volunteer", d.id, "preSurvey", "response")).catch(() => null)
+        )
+      );
+      const syncUpdates = [];
+      docsNeedingRoles.forEach((d, i) => {
+        const pSnap = preSurveySnaps[i];
+        if (!pSnap?.exists()) return;
+        const participation = pSnap.data()?.engagement?.participation || [];
+        const allRoles = participation.map(normalizeRole).filter(Boolean);
+        if (allRoles.length > 0) syncUpdates.push({ id: d.id, roles: allRoles });
+      });
+      if (syncUpdates.length > 0) {
+        await Promise.all(syncUpdates.map(u =>
+          updateDoc(doc(db, "missions", missionId, "volunteer", u.id), { roles: u.roles, role: deleteField() })
+        ));
+        setRosterVolunteers(prev => prev.map(v => {
+          const upd = syncUpdates.find(u => u.id === v.id);
+          return upd ? { ...v, role: upd.roles[0] || "volunteer", roles: upd.roles } : v;
+        }));
+      }
+    }
   }
 
   useEffect(() => {
@@ -441,6 +557,17 @@ export default function CurrentEvent() {
   useEffect(() => {
     if (activeTab === "docs") setDocsTabVisited(true);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (editingDetails && missionData?.status === "published") {
+      const d = editDetailsData.targetDate ? new Date(editDetailsData.targetDate + "T00:00:00") : new Date();
+      setCalViewYear(d.getFullYear());
+      setCalViewMonth(d.getMonth());
+      setTimeout(() => setCalOpen(true), 60);
+    } else {
+      setCalOpen(false);
+    }
+  }, [editingDetails]);
 
   useEffect(() => {
     if (!missionId || activeTab !== "feedback") return;
@@ -526,19 +653,54 @@ export default function CurrentEvent() {
         ...(status === "revision_needed" ? { revisionNote } : { revisionNote: "" }),
       });
       setAccomplishmentReport(prev => prev ? { ...prev, status, ...(status === "revision_needed" ? { revisionNote } : { revisionNote: "" }) } : prev);
+
+      if (status === "approved" && accomplishmentReport?.submittedBy) {
+        // Auto-issue certificate for the organizer/lead organizer
+        try {
+          const submitterId = accomplishmentReport.submittedBy;
+          const userSnap = await getDoc(doc(db, "users", submitterId));
+          const userData = userSnap.exists() ? userSnap.data() : {};
+          const recipientName = userData.name || "Organizer";
+
+          const rawDate = missionData?.targetDate;
+          let certDate = rawDate?.toDate ? rawDate.toDate() : rawDate ? new Date(rawDate) : new Date();
+          if (isNaN(certDate)) certDate = new Date();
+          const certDay   = String(certDate.getDate());
+          const certMonth = certDate.toLocaleString("en-US", { month: "long" });
+          const certYear  = String(certDate.getFullYear());
+
+          await issueCertificate({
+            userId: submitterId,
+            recipient: recipientName,
+            course: missionData?.title || missionTitle || "",
+            date: `${certMonth} ${certDay}, ${certYear}`,
+            loc: missionData?.location || "",
+            day: certDay,
+            month: certMonth,
+            year: certYear,
+          });
+
+          await updateDoc(doc(db, "missions", missionId, "volunteer", submitterId), {
+            certIssuedAt: new Date().toISOString(),
+          }).catch(() => {});
+        } catch (certErr) {
+          console.error("Auto-cert issuance failed:", certErr);
+        }
+      }
+
       // Notify the submitter
       if (accomplishmentReport?.submittedBy) {
         await createNotification(accomplishmentReport.submittedBy, {
           type: status === "approved" ? "accomplishment_report_approved" : "accomplishment_report_revision",
           title: status === "approved" ? "Accomplishment Report Approved" : "Accomplishment Report: Revision Needed",
           message: status === "approved"
-            ? "Your accomplishment report has been approved by the admin."
+            ? "Your accomplishment report has been approved! Your certificate has been issued."
             : `Your accomplishment report requires revision: ${revisionNote || "Please review and resubmit."}`,
           link: `/event/${missionId}/activity`,
           missionId,
         });
       }
-      showToast(status === "approved" ? "Report approved." : "Revision request sent.", "success");
+      showToast(status === "approved" ? "Report approved and certificate issued." : "Revision request sent.", "success");
       setRevisionNote("");
     } catch (e) {
       showToast("Failed to update report status.", "error");
@@ -689,10 +851,10 @@ export default function CurrentEvent() {
       } else {
         // Protect the event organizer/proponent from manual flagging
         const targetVolunteer = rosterVolunteers.find(v => v.id === userId);
+        const targetRoles = normalizeMissionRoles(targetVolunteer);
         const isOrganizer =
-          targetVolunteer?.role === "organizer" ||
-          targetVolunteer?.role === "lead_organizer" ||
-          targetVolunteer?.role === "lead organizer" ||
+          targetRoles.includes("organizer") ||
+          targetRoles.includes("lead_organizer") ||
           userId === missionData?.createdBy;
         if (isOrganizer) {
           showToast("The event organizer/proponent cannot be flagged.");
@@ -768,14 +930,16 @@ export default function CurrentEvent() {
     }
   };
 
-  // ── assign volunteer role (admin only) ───────────────────────────
-  const handleAssignVolunteerRole = async (userId, newRole) => {
-    if (!newRole) return;
+  // ── assign volunteer roles (admin only, supports multiple) ──────────
+  const handleAssignVolunteerRole = async (userId, newRoles) => {
+    if (!newRoles || newRoles.length === 0) return;
+    const priorityMap = { lead_organizer: 0, organizer: 1, donor: 2, participant: 3, volunteer: 3 };
+    const sorted = [...newRoles].sort((a, b) => (priorityMap[a] ?? 99) - (priorityMap[b] ?? 99));
+    const primaryRole = sorted[0] || "volunteer";
     setAssigningRole(prev => ({ ...prev, [userId]: true }));
     try {
-      await updateDoc(doc(db, "missions", missionId, "volunteer", userId), { role: newRole });
-      // Best-effort update of the reverse index so the volunteer's profile reflects the change
-      updateDoc(doc(db, "userMissions", userId, "missions", missionId), { role: newRole }).catch(() => {});
+      await updateDoc(doc(db, "missions", missionId, "volunteer", userId), { roles: newRoles, role: deleteField() });
+      updateDoc(doc(db, "userMissions", userId, "missions", missionId), { roles: newRoles, role: deleteField() }).catch(() => {});
       const volunteer = rosterVolunteers.find(v => v.id === userId);
       logAudit({
         action: "VOLUNTEER_ROLE_ASSIGNED",
@@ -786,16 +950,15 @@ export default function CurrentEvent() {
           targetUserId: userId,
           targetUserName: volunteer?.name || "",
           previousRole: volunteer?.role || "",
-          newRole,
+          newRole: newRoles.join(", "),
         },
       });
       setRosterVolunteers(prev => prev.map(v =>
-        v.id === userId ? { ...v, role: newRole } : v
+        v.id === userId ? { ...v, role: undefined, roles: newRoles } : v
       ));
       setEditingRoleFor(null);
-      setPendingRole("");
-      const volunteer2 = rosterVolunteers.find(v => v.id === userId);
-      showToast(`Role updated to "${newRole}" for ${volunteer2?.name || "volunteer"}.`);
+      setPendingRoles([]);
+      showToast(`Role updated for ${volunteer?.name || "volunteer"}.`);
     } catch {
       showToast("Failed to update role. Please try again.");
     } finally {
@@ -1376,7 +1539,7 @@ export default function CurrentEvent() {
                     cursor: closingEvent ? "not-allowed" : "pointer", whiteSpace: "nowrap",
                   }}
                 >
-                  {closingEvent ? "Closing…" : "✓ Close Event"}
+                  {closingEvent ? "Closing…" : "Close Event"}
                 </button>
               )}
               {(missionData?.status === "completed" || missionData?.status === "cancelled") && (
@@ -1471,8 +1634,19 @@ export default function CurrentEvent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rosterVolunteers.map((v, idx) => (
-                    <tr key={v.id} style={{ borderBottom: idx < rosterVolunteers.length - 1 ? "1px dashed #e8eaed" : "none" }}>
+                  {[...rosterVolunteers].sort((a, b) => {
+                    const rank = r => r === "lead_organizer" ? 0 : r === "organizer" ? 1 : 2;
+                    const aRoles = normalizeMissionRoles(a);
+                    const bRoles = normalizeMissionRoles(b);
+                    const aIsProponent = a.id === missionData?.createdBy ? 0 : Math.min(...aRoles.map(rank));
+                    const bIsProponent = b.id === missionData?.createdBy ? 0 : Math.min(...bRoles.map(rank));
+                    return aIsProponent - bIsProponent;
+                  }).map((v, idx) => {
+                    const vAllRoles = normalizeMissionRoles(v);
+                    const isOrgHighlight = v.id === missionData?.createdBy || vAllRoles.includes("organizer") || vAllRoles.includes("lead_organizer");
+                    return (
+                    <tr key={v.id} style={{ borderBottom: idx < rosterVolunteers.length - 1 ? "1px dashed #e8eaed" : "none",
+                      ...(isOrgHighlight ? { background: "#f8f6ff" } : {}) }}>
                       <td style={{ padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           {v.photoURL ? (
@@ -1504,17 +1678,15 @@ export default function CurrentEvent() {
                                   style={{ fontSize: 13, lineHeight: 1 }}
                                 >🚩</span>
                               )}
-                              {(v.role === "organizer" || v.role === "lead_organizer") && (
-                                <span style={{
-                                  padding: "1px 7px",
-                                  background: v.role === "lead_organizer" ? "#f3e8ff" : "#e8f0fe",
-                                  color: v.role === "lead_organizer" ? "#7c3aed" : "#1a73e8",
-                                  borderRadius: 99, fontSize: 10.5, fontWeight: 700,
-                                  border: `1px solid ${v.role === "lead_organizer" ? "#d8b4fe" : "#c5d9fd"}`,
-                                }}>
-                                  {v.role === "lead_organizer" ? "🎯 Lead" : "📋 Organizer"}
-                                </span>
-                              )}
+                              {normalizeMissionRoles(v).filter(role => role !== "participant" && role !== "volunteer").map(role => {
+                                const tag = ROSTER_ROLE_TAG[role];
+                                if (!tag) return null;
+                                return (
+                                  <span key={role} style={{ padding: "1px 7px", background: tag.bg, color: tag.color, borderRadius: 99, fontSize: 10.5, fontWeight: 700, border: `1px solid ${tag.border}` }}>
+                                    {tag.label}
+                                  </span>
+                                );
+                              })}
                             </div>
                             {v.email && <div style={{ fontSize: "0.72rem", color: "#80868b", marginTop: 1 }}>{v.email}</div>}
                           </div>
@@ -1567,50 +1739,69 @@ export default function CurrentEvent() {
                             {togglingAttendance[v.id] ? "Saving…" : v.attendanceStatus === "present" ? "Mark Absent" : "Mark Present"}
                           </button>
 
-                          {/* ── Assign organizer role (admin only) ── */}
+                          {/* ── Assign roles (admin only, multi-select) ── */}
                           {!isFaculty && (
                             editingRoleFor === v.id ? (
-                              <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
-                                <select
-                                  value={pendingRole}
-                                  onChange={e => setPendingRole(e.target.value)}
-                                  disabled={!!assigningRole[v.id]}
-                                  style={{
-                                    padding: "3px 6px", border: "1px solid #dadce0",
-                                    borderRadius: 6, fontSize: 11, fontFamily: "inherit",
-                                    color: "#202124", background: "#fff", cursor: "pointer",
-                                  }}
-                                >
-                                  <option value="">Pick role…</option>
-                                  <option value="volunteer">Participant</option>
-                                  <option value="organizer">Organizer</option>
-                                  <option value="lead_organizer">Lead Organizer</option>
-                                </select>
-                                <button
-                                  disabled={!pendingRole || !!assigningRole[v.id]}
-                                  onClick={() => handleAssignVolunteerRole(v.id, pendingRole)}
-                                  style={{
-                                    padding: "3px 8px", background: "#1a73e8", color: "#fff",
-                                    border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                                    cursor: (!pendingRole || assigningRole[v.id]) ? "not-allowed" : "pointer",
-                                    opacity: (!pendingRole || assigningRole[v.id]) ? 0.6 : 1,
-                                  }}
-                                >
-                                  {assigningRole[v.id] ? "…" : "Save"}
-                                </button>
-                                <button
-                                  onClick={() => { setEditingRoleFor(null); setPendingRole(""); }}
-                                  style={{
-                                    padding: "3px 7px", background: "#f1f3f4", color: "#5f6368",
-                                    border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                                  }}
-                                >
-                                  ✕
-                                </button>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4, background: "#f8f9fa", border: "1px solid #e8eaed", borderRadius: 8, padding: "8px 10px", minWidth: 160 }}>
+                                <div>
+                                  <span style={{ fontSize: 9.5, color: "#9aa0a6", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>Verified</span>
+                                  <div style={{ fontSize: 11, color: "#202124", marginTop: 1 }}>
+                                    {(v.roles?.filter(r => r !== "participant" && r !== "volunteer") ?? []).length > 0
+                                      ? v.roles.filter(r => r !== "participant" && r !== "volunteer")
+                                          .map(r => ({ lead_organizer: "Lead Organizer", organizer: "Organizer", donor: "Donor" })[r] || r)
+                                          .join(", ")
+                                      : "Participant"}
+                                  </div>
+                                </div>
+                                <div style={{ height: 1, background: "#e8eaed" }} />
+                                {[
+                                  { value: "lead_organizer", label: "Lead Organizer" },
+                                  { value: "organizer", label: "Organizer" },
+                                  { value: "donor", label: "Donor" },
+                                  { value: "participant", label: "Participant" },
+                                ].map(opt => (
+                                  <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, cursor: "pointer", userSelect: "none" }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={pendingRoles.includes(opt.value) || (opt.value === "participant" && pendingRoles.includes("volunteer"))}
+                                      disabled={!!assigningRole[v.id]}
+                                      onChange={e => setPendingRoles(prev =>
+                                        e.target.checked
+                                          ? [...prev.filter(r => r !== "volunteer"), opt.value]
+                                          : prev.filter(r => r !== opt.value && r !== "volunteer")
+                                      )}
+                                      style={{ cursor: "pointer" }}
+                                    />
+                                    {opt.label}
+                                  </label>
+                                ))}
+                                <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                                  <button
+                                    disabled={pendingRoles.length === 0 || !!assigningRole[v.id]}
+                                    onClick={() => handleAssignVolunteerRole(v.id, pendingRoles)}
+                                    style={{
+                                      flex: 1, padding: "3px 0", background: "#1a73e8", color: "#fff",
+                                      border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                      cursor: (pendingRoles.length === 0 || assigningRole[v.id]) ? "not-allowed" : "pointer",
+                                      opacity: (pendingRoles.length === 0 || assigningRole[v.id]) ? 0.6 : 1,
+                                    }}
+                                  >
+                                    {assigningRole[v.id] ? "…" : "Save"}
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingRoleFor(null); setPendingRoles([]); }}
+                                    style={{ padding: "3px 7px", background: "#fff", color: "#5f6368", border: "1px solid #dadce0", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <button
-                                onClick={() => { setEditingRoleFor(v.id); setPendingRole(v.role || "volunteer"); }}
+                                onClick={() => {
+                                  setEditingRoleFor(v.id);
+                                  setPendingRoles(normalizeMissionRoles(v).length > 0 ? normalizeMissionRoles(v) : ["participant"]);
+                                }}
                                 style={{
                                   padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8",
                                   border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
@@ -1624,7 +1815,8 @@ export default function CurrentEvent() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
               </div>
@@ -1637,7 +1829,7 @@ export default function CurrentEvent() {
           missionData ? (
             <div>
               {/* Edit / Save controls */}
-              {!isFaculty && (
+              {!isFaculty && (missionData?.status !== "published" || editingDetails) && (
                 <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
                   {!editingDetails ? (
                     <button onClick={() => setEditingDetails(true)}
@@ -1663,8 +1855,9 @@ export default function CurrentEvent() {
                 </div>
               )}
 
-              {editingDetails ? (
-                /* ── Edit form ── */
+              {editingDetails && missionData?.status !== "published" ? (
+                (
+                /* ── Full edit form (non-published) ── */
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "0 32px" }}>
                   {[
                     { label: "Title *", key: "title", type: "text" },
@@ -1702,91 +1895,291 @@ export default function CurrentEvent() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                /* ── Display view ── */
-                <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "0 28px" }}>
-                  <DetailField label="Type"           value={typeLabel} />
-                  <DetailField label="Target Date"    value={missionData.targetDate} />
-                  <DetailField label="Start Time"     value={missionData.startTime} />
-                  <DetailField label="Location"       value={missionData.location} />
-                  <DetailField label="Department"     value={missionData.affiliatedDepartment || missionData.department} />
-                  <DetailField label="Partner"        value={missionData.partnerSchool} />
-                  <DetailField label="Prepared By"    value={missionData.preparedBy} />
-                  <DetailField label="Max Volunteers" value={missionData.maxStudents} />
-                  <DetailField label="Volunteer Hours" value={missionData.volunteerHours} />
-                  <DetailField label="Participant Limit" value={missionData.participantLimit ? `${missionData.participantLimit} students` : null} />
-                  <DetailField label="Points"         value={missionData.points} />
-                  <DetailField label="Budget"         value={missionData.budget} />
-                </div>
+                )
+              ) : (() => {
+                /* ── Display view (+ dimmed published date-edit) — CE Proposal Form table layout ── */
+                const de = editingDetails && missionData?.status === "published";
+                const dLbl    = de ? "#c4cdd6" : "#475569";
+                const dVal    = de ? "#b0bec5" : "#1e293b";
+                const dGrayBg = de ? "#f4f6f8" : "#f1f5f9";
+                const dCellBg = de ? "#fafbfc" : "transparent";
 
-              {missionData.description && (
-                <div style={{ marginTop: 16, marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Description</div>
-                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.65 }}>{missionData.description}</div>
-                </div>
-              )}
-              {missionData.objectives && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Objectives</div>
-                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.65 }}>{missionData.objectives}</div>
-                </div>
-              )}
-              {missionData.studentOutcomes && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Student Outcomes</div>
-                  <div style={{ fontSize: "0.93rem", color: "#1e293b", lineHeight: 1.65 }}>{missionData.studentOutcomes}</div>
-                </div>
-              )}
-              {Array.isArray(missionData.successIndicators) && missionData.successIndicators.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Success Indicators</div>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {missionData.successIndicators.map((s, i) => <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b" }}>{s}</li>)}
-                  </ul>
-                </div>
-              )}
-              {Array.isArray(missionData.stakeholders) && missionData.stakeholders.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Stakeholders</div>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {missionData.stakeholders.map((s, i) => <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b" }}>{s}</li>)}
-                  </ul>
-                </div>
-              )}
-              {Array.isArray(missionData.sdgs) && missionData.sdgs.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>SDGs</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-                    {missionData.sdgs.map((sdg, i) => (
-                      <span key={i} style={{ background: "#e8edf7", color: "#000", padding: "3px 10px", borderRadius: 99, fontSize: "0.8rem", fontWeight: 600 }}>{sdg}</span>
-                    ))}
+                const CAL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+                const CAL_DAYS   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+                const selDate    = editDetailsData.targetDate ? new Date(editDetailsData.targetDate + "T00:00:00") : null;
+                const totalCells = new Date(calViewYear, calViewMonth, 1).getDay();
+                const daysInMo   = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+                const prevMo = () => { if (calViewMonth === 0) { setCalViewMonth(11); setCalViewYear(y => y - 1); } else setCalViewMonth(m => m - 1); };
+                const nextMo = () => { if (calViewMonth === 11) { setCalViewMonth(0); setCalViewYear(y => y + 1); } else setCalViewMonth(m => m + 1); };
+                const pickDay = d => {
+                  const val = `${calViewYear}-${String(calViewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  setEditDetailsData(p => ({ ...p, targetDate: val }));
+                  setCalOpen(false);
+                };
+                const isSelected = d => selDate && d === selDate.getDate() && calViewMonth === selDate.getMonth() && calViewYear === selDate.getFullYear();
+                const today = new Date();
+                const isToday = d => d === today.getDate() && calViewMonth === today.getMonth() && calViewYear === today.getFullYear();
+
+                return (
+                <>
+                  <div style={{ border: "1.5px solid #94a3b8", borderRadius: 8, overflow: "hidden" }}>
+
+                    {/* Row: Title | Date Proposed */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", borderRight: "1.5px solid #94a3b8", background: dCellBg }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: dLbl, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Title of Community Engagement Initiative</div>
+                        <div style={{ fontSize: "0.93rem", color: dVal }}>{missionData.title || "—"}</div>
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Date Proposed</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          {de ? (
+                            <div style={{ position: "relative", flex: 1 }}>
+                              <div onClick={() => setCalOpen(o => !o)}
+                                style={{ padding: "5px 10px", border: "1.5px solid #1a73e8", borderRadius: 7, fontSize: "0.88rem", cursor: "pointer", color: "#1e293b", background: "#fff", userSelect: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                                <span>{editDetailsData.targetDate || "Select date…"}</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                              </div>
+                              {calOpen && (
+                                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 1200, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "12px", boxShadow: "0 6px 24px rgba(0,0,0,0.14)", minWidth: 248 }}>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                                    <button onClick={prevMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>‹</button>
+                                    <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "#1e293b" }}>{CAL_MONTHS[calViewMonth]} {calViewYear}</span>
+                                    <button onClick={nextMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>›</button>
+                                  </div>
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center" }}>
+                                    {CAL_DAYS.map(d => <div key={d} style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", padding: "2px 0", marginBottom: 2 }}>{d}</div>)}
+                                    {Array.from({ length: totalCells }).map((_, i) => <div key={"e" + i} />)}
+                                    {Array.from({ length: daysInMo }, (_, i) => i + 1).map(d => (
+                                      <div key={d} onClick={() => pickDay(d)}
+                                        style={{ padding: "5px 2px", fontSize: "0.82rem", borderRadius: 6, cursor: "pointer",
+                                          background: isSelected(d) ? "#1a73e8" : isToday(d) ? "#e8f0fe" : "transparent",
+                                          color: isSelected(d) ? "#fff" : isToday(d) ? "#1a73e8" : "#1e293b" }}>
+                                        {d}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.targetDate || "—"}</div>
+                          )}
+                          {!isFaculty && missionData?.status === "published" && !de && (
+                            <button onClick={() => { setEditDetailsData({ targetDate: missionData.targetDate || "" }); setEditingDetails(true); }}
+                              style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              Edit Date
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row: Proponent(s) + Dept + Partner | Student Outcomes */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", borderRight: "1.5px solid #94a3b8" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Name of Proponent(s) / College / Program / Department</div>
+                        <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>
+                          {Array.isArray(missionData.proponents) && missionData.proponents.length > 0
+                            ? missionData.proponents.join(", ")
+                            : missionData.preparedBy || "—"}
+                        </div>
+                        {(missionData.affiliatedDepartment || missionData.department) && (
+                          <div style={{ fontSize: "0.82rem", color: "#475569", marginTop: 3 }}>{missionData.affiliatedDepartment || missionData.department}</div>
+                        )}
+                        {missionData.partnerSchool && (
+                          <div style={{ fontSize: "0.82rem", color: "#475569", marginTop: 2 }}>Partner: {missionData.partnerSchool}</div>
+                        )}
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Student Outcomes</div>
+                        <div style={{ fontSize: "0.93rem", color: missionData.studentOutcomes ? "#1e293b" : "#94a3b8", lineHeight: 1.6 }}>{missionData.studentOutcomes || "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: SDG(s) — gray label column + list */}
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", background: "#f1f5f9", borderRight: "1.5px solid #94a3b8", display: "flex", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>SDG(s)</div>
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        {Array.isArray(missionData.sdgs) && missionData.sdgs.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {missionData.sdgs.map((sdg, i) => (
+                              <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b", marginBottom: 2 }}>{sdg}</li>
+                            ))}
+                          </ul>
+                        ) : <span style={{ fontSize: "0.93rem", color: "#94a3b8" }}>—</span>}
+                      </div>
+                    </div>
+
+                    {/* Row: Nature of Engagement — gray label column */}
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", background: "#f1f5f9", borderRight: "1.5px solid #94a3b8", display: "flex", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Nature of Engagement</div>
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.ceFields?.nature || typeLabel || "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: Target Date | Location */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", borderRight: "1.5px solid #94a3b8" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Target Date</div>
+                        <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.targetDate || "—"}</div>
+                        {missionData.startTime && (
+                          <div style={{ fontSize: "0.82rem", color: "#475569", marginTop: 2 }}>{missionData.startTime}</div>
+                        )}
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Location</div>
+                        <div style={{ fontSize: "0.93rem", color: missionData.location ? "#1e293b" : "#94a3b8" }}>{missionData.location || "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: Stakeholders | Number of Volunteer Hours */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", borderRight: "1.5px solid #94a3b8" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Stakeholders</div>
+                        {Array.isArray(missionData.stakeholders) && missionData.stakeholders.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {missionData.stakeholders.map((s, i) => (
+                              <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b" }}>{s}</li>
+                            ))}
+                          </ul>
+                        ) : <span style={{ fontSize: "0.93rem", color: "#94a3b8" }}>—</span>}
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Number of Volunteer Hours</div>
+                        <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.volunteerHours ?? "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: Description — gray label column */}
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", background: "#f1f5f9", borderRight: "1.5px solid #94a3b8", display: "flex", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Description</div>
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.93rem", color: missionData.description ? "#1e293b" : "#94a3b8", lineHeight: 1.65 }}>{missionData.description || "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: Objectives — gray label column */}
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", background: "#f1f5f9", borderRight: "1.5px solid #94a3b8", display: "flex", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Objectives</div>
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.93rem", color: missionData.objectives ? "#1e293b" : "#94a3b8", lineHeight: 1.65 }}>{missionData.objectives || "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: Specific Activities | Success Indicators */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", borderRight: "1.5px solid #94a3b8" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Specific Activities</div>
+                        {Array.isArray(missionData.specificActivities) && missionData.specificActivities.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {missionData.specificActivities.map((a, i) => (
+                              <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b", marginBottom: 2 }}>{a}</li>
+                            ))}
+                          </ul>
+                        ) : typeof missionData.specificActivities === "string" && missionData.specificActivities ? (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {missionData.specificActivities.split("\n").filter(a => a.trim()).map((a, i) => (
+                              <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b", marginBottom: 2 }}>{a}</li>
+                            ))}
+                          </ul>
+                        ) : <span style={{ fontSize: "0.93rem", color: "#94a3b8" }}>—</span>}
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Success Indicators</div>
+                        {Array.isArray(missionData.successIndicators) && missionData.successIndicators.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {missionData.successIndicators.map((s, i) => (
+                              <li key={i} style={{ fontSize: "0.93rem", color: "#1e293b" }}>{s}</li>
+                            ))}
+                          </ul>
+                        ) : <span style={{ fontSize: "0.93rem", color: "#94a3b8" }}>—</span>}
+                      </div>
+                    </div>
+
+                    {/* Row: Budget — gray label column */}
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", background: "#f1f5f9", borderRight: "1.5px solid #94a3b8", display: "flex", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Budget</div>
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ fontSize: "0.93rem", color: missionData.budget ? "#1e293b" : "#94a3b8", lineHeight: 1.65 }}>{missionData.budget || "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: Supplemental (Max Volunteers, Limit, Points) */}
+                    <div style={{ display: "flex" }}>
+                      {[
+                        { label: "Max Volunteers",    value: missionData.maxStudents },
+                        { label: "Participant Limit",  value: missionData.participantLimit ? `${missionData.participantLimit} students` : null },
+                        { label: "Points",             value: missionData.points },
+                      ].map(({ label, value }, i, arr) => (
+                        <div key={label} style={{ flex: 1, padding: "10px 14px", borderRight: i < arr.length - 1 ? "1.5px solid #94a3b8" : "none" }}>
+                          <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{label}</div>
+                          <div style={{ fontSize: "0.93rem", color: value != null ? "#1e293b" : "#94a3b8" }}>{value ?? "—"}</div>
+                        </div>
+                      ))}
+                    </div>
+
                   </div>
-                </div>
-              )}
-              {/* type-specific fields */}
-              {missionData.slFields && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Service Learning Fields</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "0 28px" }}>
-                    <DetailField label="Section"          value={missionData.slFields.section} />
-                    <DetailField label="Course"           value={missionData.slFields.course} />
-                    <DetailField label="Course Code"      value={missionData.slFields.courseCode} />
-                    <DetailField label="Assigned Faculty" value={missionData.slFields.assignedFaculty} />
-                  </div>
-                </div>
-              )}
-              {missionData.ceFields && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Community Engagement Fields</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "0 28px" }}>
-                    <DetailField label="Nature"           value={missionData.ceFields.nature} />
-                    <DetailField label="Assigned Faculty" value={missionData.ceFields.assignedFaculty} />
-                  </div>
-                </div>
-              )}
-              </>
-              )}
+
+                  {/* SL / CE type-specific fields */}
+                  {missionData.slFields && (
+                    <div style={{ marginTop: 12, border: "1.5px solid #94a3b8", borderRadius: 8, overflow: "hidden" }}>
+                      <div style={{ padding: "8px 14px", background: "#f1f5f9", borderBottom: "1.5px solid #94a3b8" }}>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Service Learning Fields</div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+                        {[
+                          { label: "Section",          value: missionData.slFields.section },
+                          { label: "Course",           value: missionData.slFields.course },
+                          { label: "Course Code",      value: missionData.slFields.courseCode },
+                          { label: "Assigned Faculty", value: missionData.slFields.assignedFaculty },
+                        ].map(({ label, value }, i, arr) => (
+                          <div key={label} style={{ padding: "10px 14px", borderRight: i < arr.length - 1 ? "1.5px solid #94a3b8" : "none" }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{label}</div>
+                            <div style={{ fontSize: "0.93rem", color: value ? "#1e293b" : "#94a3b8" }}>{value || "—"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {missionData.ceFields && (
+                    <div style={{ marginTop: 12, border: "1.5px solid #94a3b8", borderRadius: 8, overflow: "hidden" }}>
+                      <div style={{ padding: "8px 14px", background: "#f1f5f9", borderBottom: "1.5px solid #94a3b8" }}>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Community Engagement Fields</div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+                        {[
+                          { label: "Nature",           value: missionData.ceFields.nature },
+                          { label: "Assigned Faculty", value: missionData.ceFields.assignedFaculty },
+                        ].map(({ label, value }, i, arr) => (
+                          <div key={label} style={{ padding: "10px 14px", borderRight: i < arr.length - 1 ? "1.5px solid #94a3b8" : "none" }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{label}</div>
+                            <div style={{ fontSize: "0.93rem", color: value ? "#1e293b" : "#94a3b8" }}>{value || "—"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+                );
+              })()}
             </div>
           ) : (
             <div className="loading-message">Loading details…</div>
