@@ -15,6 +15,7 @@ export default function ProposalTimeline({ proposal, compact = false }) {
     reviewedBy, recommendedBy, endorsedBy, approvedBy,
     preparedBy, status, rejectedBy, rejectedByUser, rejectionReason,
     approvals = {},
+    selectedReviewedBy, selectedRecommendedBy,
   } = proposal;
 
   const fmt = (ts) => {
@@ -48,6 +49,7 @@ export default function ProposalTimeline({ proposal, compact = false }) {
       key: "reviewedBy",
       label: "Reviewed By",
       sublabel: "Program Chair",
+      designated: selectedReviewedBy || null,
       done: !!reviewedBy,
       name: reviewedBy,
       decidedAt: fmt(approvals?.reviewedBy?.decidedAt),
@@ -58,6 +60,7 @@ export default function ProposalTimeline({ proposal, compact = false }) {
       key: "recommendedBy",
       label: "Recommended By",
       sublabel: "College Dean / Cluster Head",
+      designated: selectedRecommendedBy || null,
       done: !!recommendedBy,
       name: recommendedBy,
       decidedAt: fmt(approvals?.recommendedBy?.decidedAt),
@@ -67,7 +70,8 @@ export default function ProposalTimeline({ proposal, compact = false }) {
     {
       key: "endorsedBy",
       label: "Endorsed By",
-      sublabel: "Admin — Regular",
+      sublabel: "CSCE Admin",
+      designated: null,
       done: !!endorsedBy,
       name: endorsedBy,
       decidedAt: fmt(approvals?.endorsedBy?.decidedAt),
@@ -77,7 +81,8 @@ export default function ProposalTimeline({ proposal, compact = false }) {
     {
       key: "approvedBy",
       label: "Approved By",
-      sublabel: "Director",
+      sublabel: "CSCE Director",
+      designated: null,
       done: !!approvedBy,
       name: approvedBy,
       decidedAt: fmt(approvals?.approvedBy?.decidedAt),
@@ -176,6 +181,11 @@ export default function ProposalTimeline({ proposal, compact = false }) {
               <div style={{ fontSize: compact ? "0.72rem" : "0.76rem", color: "#94a3b8", lineHeight: 1.4 }}>
                 {step.sublabel}
               </div>
+              {step.designated && (
+                <div style={{ fontSize: compact ? "0.74rem" : "0.78rem", fontWeight: 600, color: "#475569", marginTop: 2 }}>
+                  {step.designated}
+                </div>
+              )}
               {step.name && (
                 <div style={{ fontSize: compact ? "0.76rem" : "0.8rem", fontWeight: 600, color: "#0D9488", marginTop: 3 }}>
                   {step.name}
