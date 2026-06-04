@@ -286,7 +286,7 @@ const GlobalAnnouncements = () => {
                   existing.events++;
                 } else {
                   userPointsMap.set(userId, {
-                    name: data.name || 'Anonymous',
+                    name: null, // Will be fetched from users collection
                     totalPoints: points,
                     events: 1
                   });
@@ -298,8 +298,32 @@ const GlobalAnnouncements = () => {
           }
         }
 
-        // Get top 3 volunteers and include their ids for clickable profiles
+        // Fetch actual user names from the users collection
         if (userPointsMap.size > 0) {
+          const userIds = Array.from(userPointsMap.keys());
+          const userNamePromises = userIds.map(async (uid) => {
+            try {
+              const userDoc = await getDoc(doc(db, 'users', uid));
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                return { uid, name: userData.name || userData.username || 'Anonymous' };
+              }
+              return { uid, name: 'Anonymous' };
+            } catch (err) {
+              console.warn(`Error fetching user ${uid}:`, err);
+              return { uid, name: 'Anonymous' };
+            }
+          });
+
+          const userNames = await Promise.all(userNamePromises);
+          userNames.forEach(({ uid, name }) => {
+            const userData = userPointsMap.get(uid);
+            if (userData) {
+              userData.name = name;
+            }
+          });
+
+          // Get top 3 volunteers and include their ids for clickable profiles
           const topVolunteers = Array.from(userPointsMap.entries())
             .sort((a, b) => b[1].totalPoints - a[1].totalPoints)
             .slice(0, 3)
