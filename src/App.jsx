@@ -211,11 +211,26 @@ function App() {
             path="/current-event/:missionId"
             element={
               <ProtectedRoute allowedRoles={["partner", "admin"]}>
+                <CurrentEvent />
               </ProtectedRoute>
             }
           />
-          <Route path="/event/:id" element={<EventDetails />} />
-          <Route path="/event/:id/activity" element={<EventActivity />} />
+          <Route
+            path="/event/:id"
+            element={
+              <ProtectedRoute>
+                <EventDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/event/:id/activity"
+            element={
+              <ProtectedRoute>
+                <EventActivity />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/profile"
             element={
@@ -251,7 +266,14 @@ function App() {
           <Route path="/global/menu/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
           <Route path="/global/terms-condition" element={<TermsCondition />} />
           <Route path="/global/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/certificate-generator" element={<CertificateGenerator />} />
+          <Route
+            path="/certificate-generator"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "sysadmin"]}>
+                <CertificateGenerator />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
       </Router>
