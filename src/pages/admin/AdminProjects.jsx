@@ -9,7 +9,7 @@ import ProjectDetailSidebar from "./ProjectDetailSidebar";
 import ProjectProposal from "../global/proposal/ProjectProposal";
 import "../../styles/ReviewProposal.css";
 import "../../styles/AdminProjects.css";
-import { SessionContext } from "../../context/SessionContext";
+import { SessionContext } from "../../context/sessionContextCore";
 
 const FILTER_OPTIONS = [
   { key: "all",         label: "All Projects" },

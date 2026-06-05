@@ -4,7 +4,7 @@ import { auth, db, functions } from '../firebaseConfig';
 import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
-import { useSession } from '../context/SessionContext';
+import { useSession } from '../context/useSession';
 import './Header.css';
 import NotificationBell from './NotificationBell';
 import servePlusIcon from '../assets/serve_plus_icon.svg';

@@ -510,7 +510,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
     </div>
   );
 }
-import { useSession } from "../../context/SessionContext.jsx";
+import { useSession } from "../../context/useSession";
 import Header from "../../components/Header.jsx";
 import BadgeShelf from "../../components/badges/BadgeShelf";
 import BadgeIcon from "../../components/badges/BadgeIcon";

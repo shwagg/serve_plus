@@ -16,7 +16,7 @@ import GlobalAnnouncements from "../../../components/GlobalAnnouncements";
 import QRScanner from "../../../components/QRScanner";
 import { createNotification } from "../../../utils/notificationUtils";
 import { logAudit } from "../../../utils/auditLogger";
-import { useSession } from '../../../context/SessionContext';
+import { useSession } from '../../../context/useSession';
 import { calculateWeightedTaskPoints } from "../../../hooks/taskPointingSystem";
 import { computeFinalPoints, getLevelInfo } from "../../../hooks/rewardSystem";
 import { getMissionPointsBreakdown, getRequirementPoints } from "../../../hooks/missionPoints";

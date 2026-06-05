@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useSession } from "../context/SessionContext";
+import { useSession } from "../context/useSession";
 import LoadingOverlay from "../components/LoadingOverlay";
 
 export function ProtectedRoute({ children, allowedRoles }) {

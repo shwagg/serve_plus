@@ -12,7 +12,7 @@ import ChangeIcon from "../../components/icons/Change.svg";
 import { db, functions } from "../../firebaseConfig";
 import { showConfirm, showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
-import { SessionContext } from "../../context/SessionContext";
+import { SessionContext } from "../../context/sessionContextCore";
 import "../../styles/RosterAccountManagement.css";
 
 const ROLE_OPTIONS = [

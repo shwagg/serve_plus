@@ -3,7 +3,7 @@ import ProposalTimeline from "../../../components/ProposalTimeline";
 import { db, auth } from "../../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { createNotification, notifyUsersByRoles } from "../../../utils/notificationUtils";
-import { SessionContext } from "../../../context/SessionContext";
+import { SessionContext } from "../../../context/sessionContextCore";
 import { exportProposalPDF } from "../exportProposalPDF";
 import "./ReviewModal.css";
 

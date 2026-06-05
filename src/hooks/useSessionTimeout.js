@@ -1,9 +1,8 @@
-import { useEffect, useRef } from "react";
-import { useSession } from "../context/SessionContext";
+import { useEffect } from "react";
+import { useSession } from "../context/useSession";
 
 export function useSessionTimeout() {
   const { resetInactivityTimer } = useSession();
-  const timerRef = useRef(null);
 
   useEffect(() => {
     // Show warning 10 seconds before timeout (optional)

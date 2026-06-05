@@ -6,7 +6,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import '../../../styles/ProjectProposal.css';
 import SummaryPanel from '../SummaryPanel';
 import { showToast } from '../../../utils/toast';
-import { useSession } from '../../../context/SessionContext';
+import { useSession } from '../../../context/useSession';
 
 const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';

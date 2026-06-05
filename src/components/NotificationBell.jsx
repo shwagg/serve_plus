@@ -3,7 +3,7 @@ import ReactDOM from "react-dom";
 import { auth, db } from "../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { useSession } from "../context/SessionContext";
+import { useSession } from "../context/useSession";
 import notificationIcon from "../assets/headassets/Notification Icon.svg";
 import {
   subscribeToNotifications,

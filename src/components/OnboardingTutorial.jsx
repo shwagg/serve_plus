@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { auth } from '../firebaseConfig';
-import { SessionContext } from '../context/SessionContext';
+import { SessionContext } from '../context/sessionContextCore';
 import './OnboardingTutorial.css';
 
 const STEPS = [

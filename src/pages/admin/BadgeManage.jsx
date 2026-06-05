@@ -19,7 +19,7 @@ import {
 } from "../../constants/badgeDefinitions";
 import { awardBadge, getStudentBadges } from "../../hooks/badgeSystem";
 import BadgeIcon from "../../components/badges/BadgeIcon";
-import { SessionContext } from "../../context/SessionContext";
+import { SessionContext } from "../../context/sessionContextCore";
 import { logAudit } from "../../utils/auditLogger";
 import "../../styles/Badge.css";
 

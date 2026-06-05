@@ -8,7 +8,7 @@ import {
 import {
   updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut,
 } from "firebase/auth";
-import { useSession } from "../context/SessionContext";
+import { useSession } from "../context/useSession";
 import {
   VisibilityIcon, VisibilityOffIcon, CloseIcon,
   Face6RoundedIcon, GavelRoundedIcon, NotificationsNoneRoundedIcon,

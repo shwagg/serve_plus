@@ -6,7 +6,7 @@ import {
 import { db } from "../../firebaseConfig";
 import { useState, useEffect, useRef, useContext } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { SessionContext } from "../../context/SessionContext";
+import { SessionContext } from "../../context/sessionContextCore";
 import { QRCodeCanvas } from "qrcode.react";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import "../../styles/CurrentEvent.css";

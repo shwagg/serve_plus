@@ -6,7 +6,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import ProposalTimeline from "../../components/ProposalTimeline";
-import { SessionContext } from "../../context/SessionContext";
+import { SessionContext } from "../../context/sessionContextCore";
 import { createNotification, notifyUsersByRoles } from "../../utils/notificationUtils";
 import { logAudit } from "../../utils/auditLogger";
 import { showToast, showConfirm } from "../../utils/toast";

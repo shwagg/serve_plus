@@ -4,8 +4,8 @@ import {
   BrowserRouter as Router,
   Routes,
 } from "react-router-dom";
-import { SessionProvider, SessionContext } from "./context/SessionContext";
-import { useContext, useEffect, useState } from "react";
+import { SessionProvider } from "./context/SessionContext";
+import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useOverdueReflectionNotifications } from "./hooks/useOverdueReflectionNotifications";
 import { useUpcomingEventNotifications } from "./hooks/useUpcomingEventNotifications";

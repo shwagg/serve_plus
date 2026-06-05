@@ -5,7 +5,7 @@ import { collection, getDocs } from "firebase/firestore";
 import Header from "../../../components/Header";
 import ReviewModal from "./ReviewModal";
 import "../../../styles/ReviewProposal.css";
-import { SessionContext } from "../../../context/SessionContext";
+import { SessionContext } from "../../../context/sessionContextCore";
 
 export default function ReviewProposal() {
   const location = useLocation();
