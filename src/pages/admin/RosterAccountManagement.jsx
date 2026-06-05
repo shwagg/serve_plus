@@ -15,7 +15,16 @@ import { logAudit } from "../../utils/auditLogger";
 import { SessionContext } from "../../context/SessionContext";
 import "../../styles/RosterAccountManagement.css";
 
-const BLACKBOARD_RESTRICTED_ROLES = new Set(["partner", "admin", "sysadmin"]);
+const ROLE_OPTIONS = [
+  { value: "student", label: "Volunteer" },
+  { value: "faculty", label: "Faculty" },
+  { value: "partner", label: "Partner" },
+  { value: "admin", label: "Admin" },
+  { value: "sysadmin", label: "System Admin" },
+];
+
+const BLACKBOARD_ALLOWED_ROLES = new Set(["student", "faculty"]);
+const NON_BLACKBOARD_ALLOWED_ROLES = new Set(["partner", "admin", "sysadmin"]);
 const TOTP_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
 
 const ROLE_FILTER_OPTIONS = [
@@ -29,6 +38,17 @@ const ROLE_FILTER_OPTIONS = [
 const isBlackboardAccount = (user) =>
   user?.authProvider === "blackboard" ||
   Boolean(user?.blackboardId || user?.blackboardAuthUid);
+
+const getAllowedRoleSet = (user) =>
+  isBlackboardAccount(user) ? BLACKBOARD_ALLOWED_ROLES : NON_BLACKBOARD_ALLOWED_ROLES;
+
+const getAssignableRoleOptions = (user) => {
+  const allowedRoles = getAllowedRoleSet(user);
+  return ROLE_OPTIONS.filter(({ value }) => allowedRoles.has(value));
+};
+
+const isRoleAllowedForAccount = (user, role) =>
+  getAllowedRoleSet(user).has(String(role || "").toLowerCase());
 
 const canResetTotpForUser = (user) =>
   TOTP_REQUIRED_ROLES.has(String(user?.role || "").toLowerCase());
@@ -214,8 +234,12 @@ export default function RosterAccountManagement({ readOnly = false }) {
     currentPosition,
     currentDepartment,
   ) => {
+    const currentUser = users.find((u) => u.id === userId) || {};
+    const normalizedRole = String(currentRole || "").toLowerCase();
     setEditingRoleUserId(userId);
-    setSelectedRole(currentRole || "");
+    setSelectedRole(
+      isRoleAllowedForAccount(currentUser, normalizedRole) ? normalizedRole : "",
+    );
     setSelectedPosition(currentPosition || "");
     setSelectedDepartment(currentDepartment || "");
   };
@@ -224,13 +248,14 @@ export default function RosterAccountManagement({ readOnly = false }) {
     if (!selectedRole) return;
 
     const currentUser = users.find((u) => u.id === userId) || {};
-    if (
-      isBlackboardAccount(currentUser) &&
-      BLACKBOARD_RESTRICTED_ROLES.has(selectedRole)
-    ) {
-      showToast(
-        "Blackboard accounts cannot be moved to Partner, Admin, or System Admin. Create a new account for that role.",
-      );
+    if (!isRoleAllowedForAccount(currentUser, selectedRole)) {
+      const accountType = isBlackboardAccount(currentUser)
+        ? "Blackboard"
+        : "Non-Blackboard";
+      const allowedRoles = getAssignableRoleOptions(currentUser)
+        .map(({ label }) => label)
+        .join(" or ");
+      showToast(`${accountType} accounts can only be assigned to ${allowedRoles}.`);
       return;
     }
 
@@ -587,11 +612,14 @@ export default function RosterAccountManagement({ readOnly = false }) {
                               }}
                               className="role-select"
                             >
-                              <option value="student">Volunteer</option>
-                              <option value="faculty">Faculty</option>
-                              <option value="partner">Partner</option>
-                              <option value="admin">Admin</option>
-                              <option value="sysadmin">System Admin</option>
+                              {!isRoleAllowedForAccount(user, selectedRole) && (
+                                <option value="">Select Role</option>
+                              )}
+                              {getAssignableRoleOptions(user).map(({ value, label }) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
                             </select>
 
                             {(selectedRole === "faculty" ||

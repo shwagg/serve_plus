@@ -10,6 +10,39 @@ service cloud.firestore {
         currentUserData().authProvider.matches("(?i)^\\s*blackboard\\s*$");
     }
 
+    function isAccountManager() {
+      return request.auth != null && (
+        request.auth.token.role == "admin" ||
+        currentUserData().role == "admin" ||
+        currentUserData().role == "sysadmin"
+      );
+    }
+
+    function hasBlackboardIdentity(userData) {
+      return (
+        userData.authProvider is string &&
+        userData.authProvider.matches("(?i)^\\s*blackboard\\s*$")
+      ) ||
+      ("blackboardId" in userData && userData.blackboardId != null) ||
+      ("blackboardAuthUid" in userData && userData.blackboardAuthUid != null);
+    }
+
+    function hasValidRosterRolePlacement(userData) {
+      return userData.role is string && (
+        (hasBlackboardIdentity(userData) && userData.role in ["student", "faculty"]) ||
+        (!hasBlackboardIdentity(userData) && userData.role in ["partner", "admin", "sysadmin"])
+      );
+    }
+
+    function protectedAccountFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        "role",
+        "authProvider",
+        "blackboardId",
+        "blackboardAuthUid"
+      ]);
+    }
+
     function hasStudentBlackboardAccess() {
       return currentUserData().role == "student" && hasBlackboardProvider();
     }
@@ -45,11 +78,17 @@ service cloud.firestore {
     // User profiles - users can read their own profile, admins/sysadmins can manage all users
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null &&
-        (request.auth.uid == userId ||
-         request.auth.token.role == "admin" ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin");
+      allow create: if request.auth != null &&
+        (request.auth.uid == userId || isAccountManager());
+      allow update: if request.auth != null && (
+        (request.auth.uid == userId && !protectedAccountFieldsChanged()) ||
+        (
+          isAccountManager() &&
+          (!protectedAccountFieldsChanged() || hasValidRosterRolePlacement(request.resource.data))
+        )
+      );
+      allow delete: if request.auth != null &&
+        (request.auth.uid == userId || isAccountManager());
 
       // Notifications subcollection
       match /notifications/{notificationId} {
