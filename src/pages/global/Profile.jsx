@@ -203,7 +203,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
           )}
           <div>
             <label className="profile-modal-label">Email</label><br />
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="profile-modal-input" />
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="profile-modal-input" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} />
           </div>
           <div>
             <label className="profile-modal-label">Department</label><br />
