@@ -198,3 +198,7 @@ exports.manualFlagAbsentVolunteers = onCall(
   defaultFunctionOptions,
   manualFlagAbsentVolunteers
 );
+
+// Mission reminder emails
+const { scheduledMissionReminderEmails } = require("./src/missions/missionReminderEmails");
+exports.scheduledMissionReminderEmails = scheduledMissionReminderEmails;

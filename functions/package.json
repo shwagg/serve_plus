@@ -17,6 +17,7 @@
     "axios": "^1.13.5",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^4.9.0",
+    "nodemailer": "^8.0.10",
     "otplib": "^13.4.0",
     "serve_plus": "file:..",
     "ua-parser-js": "^2.0.3"
