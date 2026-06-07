@@ -9,7 +9,7 @@ import { SessionContext } from "./sessionContextCore";
 const SESSION_TIMEOUTS = {
   admin:    10 * 60 * 1000,  // 10 minutes
   sysadmin: 10 * 60 * 1000,  // 10 minutes
-  faculty:  10 * 60 * 1000,  // 10 minutes
+  faculty:  30 * 60 * 1000,  // 30 minutes
   student:  30 * 60 * 1000,  // 30 minutes
   partner:  30 * 60 * 1000,  // 30 minutes
 };
