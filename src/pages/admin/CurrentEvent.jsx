@@ -144,7 +144,7 @@ function EventCard({ mission, onClick, onToggleStatus }) {
         onClick={e => { e.stopPropagation(); onClick(); }}
         style={{ marginTop: 12, width: "100%", padding: "8px 0", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.83rem", cursor: "pointer" }}
       >
-        View Roster →
+        View Roster
       </button>
     </div>
   );
@@ -230,6 +230,7 @@ export default function CurrentEvent() {
   const [assigningRole, setAssigningRole] = useState({});   // userId → true while saving
   const [editingRoleFor, setEditingRoleFor] = useState(null); // userId whose role is being edited
   const [pendingRoles, setPendingRoles] = useState([]);       // selected roles in the checkbox UI
+  const [roleEditPos, setRoleEditPos] = useState({ top: 0, left: 0 });
   const [volunteerCard, setVolunteerCard] = useState(null);   // { volunteer, x, y }
 
 
@@ -1484,7 +1485,7 @@ export default function CurrentEvent() {
           </div>
 
           {missionData && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "10px 20px", paddingTop: 14, borderTop: "1px solid #f1f3f4" }}>
+            <div className="ce-meta-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "10px 20px", paddingTop: 14, borderTop: "1px solid #f1f3f4" }}>
               <MetaItem icon="📅" label="Date"       value={missionData.targetDate} />
               <MetaItem icon="⏰" label="Time"       value={missionData.startTime} />
               <MetaItem icon="📍" label="Location"   value={missionData.location} />
@@ -1505,7 +1506,7 @@ export default function CurrentEvent() {
         </div>
 
         {/* ── action strip ── */}
-        <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <div className="ce-action-strip" style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {/* QR buttons — visible to all roles */}
           <button className="ce-action-btn" onClick={() => setShowAttQR(true)}>
             Attendance QR
@@ -1742,76 +1743,31 @@ export default function CurrentEvent() {
 
                           {/* ── Assign roles (admin only, multi-select) ── */}
                           {!isFaculty && (
-                            editingRoleFor === v.id ? (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4, background: "#f8f9fa", border: "1px solid #e8eaed", borderRadius: 8, padding: "8px 10px", minWidth: 160 }}>
-                                <div>
-                                  <span style={{ fontSize: 9.5, color: "#9aa0a6", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>Verified</span>
-                                  <div style={{ fontSize: 11, color: "#202124", marginTop: 1 }}>
-                                    {(v.roles?.filter(r => r !== "participant" && r !== "volunteer") ?? []).length > 0
-                                      ? v.roles.filter(r => r !== "participant" && r !== "volunteer")
-                                          .map(r => ({ lead_organizer: "Lead Organizer", organizer: "Organizer", donor: "Donor" })[r] || r)
-                                          .join(", ")
-                                      : "Participant"}
-                                  </div>
-                                </div>
-                                <div style={{ height: 1, background: "#e8eaed" }} />
-                                {[
-                                  { value: "lead_organizer", label: "Lead Organizer" },
-                                  { value: "organizer", label: "Organizer" },
-                                  { value: "donor", label: "Donor" },
-                                  { value: "participant", label: "Participant" },
-                                ].map(opt => (
-                                  <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, cursor: "pointer", userSelect: "none" }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={pendingRoles.includes(opt.value) || (opt.value === "participant" && pendingRoles.includes("volunteer"))}
-                                      disabled={!!assigningRole[v.id]}
-                                      onChange={e => setPendingRoles(prev =>
-                                        e.target.checked
-                                          ? [...prev.filter(r => r !== "volunteer"), opt.value]
-                                          : prev.filter(r => r !== opt.value && r !== "volunteer")
-                                      )}
-                                      style={{ cursor: "pointer" }}
-                                    />
-                                    {opt.label}
-                                  </label>
-                                ))}
-                                <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                                  <button
-                                    disabled={pendingRoles.length === 0 || !!assigningRole[v.id]}
-                                    onClick={() => handleAssignVolunteerRole(v.id, pendingRoles)}
-                                    style={{
-                                      flex: 1, padding: "3px 0", background: "#1a73e8", color: "#fff",
-                                      border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                                      cursor: (pendingRoles.length === 0 || assigningRole[v.id]) ? "not-allowed" : "pointer",
-                                      opacity: (pendingRoles.length === 0 || assigningRole[v.id]) ? 0.6 : 1,
-                                    }}
-                                  >
-                                    {assigningRole[v.id] ? "…" : "Save"}
-                                  </button>
-                                  <button
-                                    onClick={() => { setEditingRoleFor(null); setPendingRoles([]); }}
-                                    style={{ padding: "3px 7px", background: "#fff", color: "#5f6368", border: "1px solid #dadce0", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setEditingRoleFor(v.id);
-                                  setPendingRoles(normalizeMissionRoles(v).length > 0 ? normalizeMissionRoles(v) : ["participant"]);
-                                }}
-                                style={{
-                                  padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8",
-                                  border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                                  cursor: "pointer", whiteSpace: "nowrap",
-                                }}
-                              >
-                                Assign Role
-                              </button>
-                            )
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const dropW = 220;
+                                const dropH = 280;
+                                const wouldClipRight = rect.left + dropW > window.innerWidth - 8;
+                                const wouldClipBottom = rect.bottom + 6 + dropH > window.innerHeight - 8;
+                                setRoleEditPos({
+                                  top: wouldClipBottom ? rect.top - dropH - 6 : rect.bottom + 6,
+                                  ...(wouldClipRight
+                                    ? { right: window.innerWidth - rect.right }
+                                    : { left: rect.left }),
+                                });
+                                setEditingRoleFor(v.id);
+                                setPendingRoles(normalizeMissionRoles(v).length > 0 ? normalizeMissionRoles(v) : ["participant"]);
+                              }}
+                              style={{
+                                padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8",
+                                border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                cursor: "pointer", whiteSpace: "nowrap",
+                              }}
+                            >
+                              Assign Role
+                            </button>
                           )}
                         </div>
                       </td>
@@ -1845,7 +1801,7 @@ export default function CurrentEvent() {
                     <>
                       <button onClick={handleSaveDetails} disabled={savingDetails}
                         style={{ padding: "8px 20px", background: savingDetails ? "#f8f9fa" : "#1a73e8", color: savingDetails ? "#9aa0a6" : "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: savingDetails ? "not-allowed" : "pointer" }}>
-                        {savingDetails ? "Saving…" : "✓ Save Changes"}
+                        {savingDetails ? "Saving…" : "Save Changes"}
                       </button>
                       <button onClick={() => setEditingDetails(false)} disabled={savingDetails}
                         style={{ padding: "8px 16px", background: "#fff", color: "#5f6368", border: "1px solid #dadce0", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
@@ -1933,51 +1889,13 @@ export default function CurrentEvent() {
                       </div>
                       <div style={{ padding: "10px 14px" }}>
                         <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Date Proposed</div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          {de ? (
-                            <div style={{ position: "relative", flex: 1 }}>
-                              <div onClick={() => setCalOpen(o => !o)}
-                                style={{ padding: "5px 10px", border: "1.5px solid #1a73e8", borderRadius: 7, fontSize: "0.88rem", cursor: "pointer", color: "#1e293b", background: "#fff", userSelect: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                                <span>{editDetailsData.targetDate || "Select date…"}</span>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                                </svg>
-                              </div>
-                              {calOpen && (
-                                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 1200, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "12px", boxShadow: "0 6px 24px rgba(0,0,0,0.14)", minWidth: 248 }}>
-                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                                    <button onClick={prevMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>‹</button>
-                                    <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "#1e293b" }}>{CAL_MONTHS[calViewMonth]} {calViewYear}</span>
-                                    <button onClick={nextMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>›</button>
-                                  </div>
-                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center" }}>
-                                    {CAL_DAYS.map(d => <div key={d} style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", padding: "2px 0", marginBottom: 2 }}>{d}</div>)}
-                                    {Array.from({ length: totalCells }).map((_, i) => <div key={"e" + i} />)}
-                                    {Array.from({ length: daysInMo }, (_, i) => i + 1).map(d => (
-                                      <div key={d} onClick={() => pickDay(d)}
-                                        style={{ padding: "5px 2px", fontSize: "0.82rem", borderRadius: 6, cursor: "pointer",
-                                          background: isSelected(d) ? "#1a73e8" : isToday(d) ? "#e8f0fe" : "transparent",
-                                          color: isSelected(d) ? "#fff" : isToday(d) ? "#1a73e8" : "#1e293b" }}>
-                                        {d}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.targetDate || "—"}</div>
-                          )}
-                          {!isFaculty && missionData?.status === "published" && !de && (
-                            <button onClick={() => { setEditDetailsData({ targetDate: missionData.targetDate || "" }); setEditingDetails(true); }}
-                              style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                              </svg>
-                              Edit Date
-                            </button>
-                          )}
+                        <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>
+                          {(() => {
+                            const raw = missionData.dateProposed || missionData.createdAt;
+                            if (!raw) return "—";
+                            const d = raw?.toDate ? raw.toDate() : new Date(raw);
+                            return isNaN(d) ? "—" : d.toLocaleDateString("en-CA");
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -2034,8 +1952,53 @@ export default function CurrentEvent() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1.5px solid #94a3b8" }}>
                       <div style={{ padding: "10px 14px", borderRight: "1.5px solid #94a3b8" }}>
                         <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Target Date</div>
-                        <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.targetDate || "—"}</div>
-                        {missionData.startTime && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          {de ? (
+                            <div style={{ position: "relative", flex: 1 }}>
+                              <div onClick={() => setCalOpen(o => !o)}
+                                style={{ padding: "5px 10px", border: "1.5px solid #1a73e8", borderRadius: 7, fontSize: "0.88rem", cursor: "pointer", color: "#1e293b", background: "#fff", userSelect: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                                <span>{editDetailsData.targetDate || "Select date…"}</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                              </div>
+                              {calOpen && (
+                                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 1200, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "12px", boxShadow: "0 6px 24px rgba(0,0,0,0.14)", minWidth: 248 }}>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                                    <button onClick={prevMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>‹</button>
+                                    <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "#1e293b" }}>{CAL_MONTHS[calViewMonth]} {calViewYear}</span>
+                                    <button onClick={nextMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>›</button>
+                                  </div>
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center" }}>
+                                    {CAL_DAYS.map(d => <div key={d} style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", padding: "2px 0", marginBottom: 2 }}>{d}</div>)}
+                                    {Array.from({ length: totalCells }).map((_, i) => <div key={"e" + i} />)}
+                                    {Array.from({ length: daysInMo }, (_, i) => i + 1).map(d => (
+                                      <div key={d} onClick={() => pickDay(d)}
+                                        style={{ padding: "5px 2px", fontSize: "0.82rem", borderRadius: 6, cursor: "pointer",
+                                          background: isSelected(d) ? "#1a73e8" : isToday(d) ? "#e8f0fe" : "transparent",
+                                          color: isSelected(d) ? "#fff" : isToday(d) ? "#1a73e8" : "#1e293b" }}>
+                                        {d}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.targetDate || "—"}</div>
+                          )}
+                          {!isFaculty && missionData?.status === "published" && !de && (
+                            <button onClick={() => { setEditDetailsData({ targetDate: missionData.targetDate || "" }); setEditingDetails(true); }}
+                              style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              Edit Date
+                            </button>
+                          )}
+                        </div>
+                        {missionData.startTime && !de && (
                           <div style={{ fontSize: "0.82rem", color: "#475569", marginTop: 2 }}>{missionData.startTime}</div>
                         )}
                       </div>
@@ -2408,8 +2371,8 @@ export default function CurrentEvent() {
           const statusInfo = statusColors[accomplishmentReport?.status] || null;
 
           const SectionRow = ({ label, value }) => value ? (
-            <div style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px dashed #f1f5f9" }}>
-              <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#64748b", minWidth: 200, flexShrink: 0 }}>{label}</span>
+            <div className="ce-section-row" style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px dashed #f1f5f9" }}>
+              <span className="ce-section-label" style={{ fontSize: "0.78rem", fontWeight: 600, color: "#64748b", minWidth: 200, flexShrink: 0 }}>{label}</span>
               <span style={{ fontSize: "0.85rem", color: "#1e293b", flex: 1 }}>{value}</span>
             </div>
           ) : null;
@@ -2650,6 +2613,7 @@ export default function CurrentEvent() {
               {/* map */}
               <div
                 ref={mapDivRef}
+                className="ce-picker-map"
                 style={{ width: "100%", height: 320 }}
               />
               {/* selected address */}
@@ -2923,6 +2887,106 @@ export default function CurrentEvent() {
         </div>
       )}
 
+      {/* ── Floating role assignment dropdown ── */}
+      {editingRoleFor && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 14000 }}
+            onClick={() => { setEditingRoleFor(null); setPendingRoles([]); }}
+          />
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              top: roleEditPos.top,
+              ...(roleEditPos.right != null ? { right: roleEditPos.right } : { left: roleEditPos.left }),
+              zIndex: 14001,
+              background: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
+              border: "1px solid #e2e8f0",
+              minWidth: 210,
+              overflow: "hidden",
+            }}
+          >
+            {/* Header */}
+            <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f1f5f9" }}>
+              <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+                Assign Role
+              </div>
+              <div style={{ fontSize: "0.8rem", color: "#475569" }}>
+                {(() => {
+                  const vol = rosterVolunteers.find(v => v.id === editingRoleFor);
+                  const current = (vol?.roles?.filter(r => r !== "volunteer") ?? []);
+                  return current.length > 0
+                    ? current.map(r => ({ lead_organizer: "Lead Organizer", organizer: "Organizer", donor: "Donor", participant: "Participant" })[r] || r).join(", ")
+                    : "No role set";
+                })()}
+              </div>
+            </div>
+
+            {/* Role options */}
+            <div style={{ padding: "6px 0" }}>
+              {[
+                { value: "lead_organizer", label: "Lead Organizer"},
+                { value: "organizer",      label: "Organizer"},
+                { value: "donor",          label: "Donor"},
+                { value: "participant",    label: "Participant"},
+              ].map(opt => {
+                const checked = pendingRoles.includes(opt.value) || (opt.value === "participant" && pendingRoles.includes("volunteer"));
+                return (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "9px 16px", cursor: "pointer", userSelect: "none",
+                      background: checked ? "#eff6ff" : "transparent",
+                    }}
+                  >
+                    <span style={{ flex: 1, fontSize: "0.85rem", fontWeight: checked ? 600 : 400, color: checked ? "#1d4ed8" : "#1e293b" }}>
+                      {opt.label}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!!assigningRole[editingRoleFor]}
+                      onChange={e => setPendingRoles(prev =>
+                        e.target.checked
+                          ? [...prev.filter(r => r !== "volunteer"), opt.value]
+                          : prev.filter(r => r !== opt.value && r !== "volunteer")
+                      )}
+                      style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#1a73e8" }}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* Footer actions */}
+            <div style={{ padding: "10px 14px 14px", borderTop: "1px solid #f1f5f9", display: "flex", gap: 8 }}>
+              <button
+                onClick={() => { setEditingRoleFor(null); setPendingRoles([]); }}
+                style={{ padding: "8px 14px", background: "#f1f5f9", color: "#64748b", border: "none", borderRadius: 10, fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+              <button
+                disabled={pendingRoles.length === 0 || !!assigningRole[editingRoleFor]}
+                onClick={() => handleAssignVolunteerRole(editingRoleFor, pendingRoles)}
+                style={{
+                  flex: 1, padding: "8px 14px", background: "#1a73e8", color: "#fff",
+                  border: "none", borderRadius: 10, fontSize: "0.82rem", fontWeight: 700,
+                  cursor: (pendingRoles.length === 0 || assigningRole[editingRoleFor]) ? "not-allowed" : "pointer",
+                  opacity: (pendingRoles.length === 0 || assigningRole[editingRoleFor]) ? 0.55 : 1,
+                }}
+              >
+                {assigningRole[editingRoleFor] ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       </div>
     );
   }
@@ -3107,6 +3171,7 @@ export default function CurrentEvent() {
           }}
         >
           <div
+            className="ce-flagged-modal-inner"
             onClick={e => e.stopPropagation()}
             style={{
               background: "#fff", borderRadius: 12, padding: 28,
@@ -3127,8 +3192,8 @@ export default function CurrentEvent() {
             ) : flaggedStudents.length === 0 ? (
               <div style={{ color: "#6b7280", padding: 16 }}>No flagged volunteers.</div>
             ) : (
-              <div style={{ overflowY: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+              <div style={{ overflow: "auto" }}>
+                <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse", fontSize: "0.85rem" }}>
                   <thead>
                     <tr style={{ borderBottom: "1.5px solid #e8eaed", textAlign: "left" }}>
                       <th style={{ padding: "10px 12px", fontWeight: 600, color: "#5f6368", fontSize: "0.8rem", letterSpacing: "0.02em" }}>Name</th>
@@ -3179,6 +3244,7 @@ export default function CurrentEvent() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

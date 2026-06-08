@@ -180,9 +180,9 @@
 }
 
 .mission-header h3 {
-  font-size: 18px;
-  color: #000;
-  font-weight: 700;
+  font-size: 1.4rem;
+  color: #1e293b;
+  font-weight: 800;
 }
 
 .pending-badge {
@@ -231,9 +231,9 @@
   gap: 10px;
 }
 .mission-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #000;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e293b;
   margin: 0;
 }
 .mission-header {
@@ -461,5 +461,91 @@
 .ce-action-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* ── Detail view: hero header stacks on narrow screens ──────────────── */
+@media (max-width: 600px) {
+  .ce-detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .ce-detail-header-actions {
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+/* ── Action strip: full-width stacked buttons on phones ─────────────── */
+@media (max-width: 600px) {
+  .ce-action-strip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ce-action-strip .ce-action-btn,
+  .ce-action-strip > button {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .ce-action-strip .ce-action-divider {
+    width: 100% !important;
+    height: 1px !important;
+    margin: 2px 0 !important;
+  }
+}
+
+/* ── Accomplishment report section rows: stack on narrow screens ─────── */
+@media (max-width: 540px) {
+  .ce-section-row {
+    flex-direction: column;
+    gap: 2px !important;
+  }
+
+  .ce-section-row .ce-section-label {
+    min-width: 0 !important;
+  }
+}
+
+/* ── Hero meta items grid: 2-column minimum on phones ───────────────── */
+@media (max-width: 480px) {
+  .ce-meta-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ── Flagged modal padding reduction on phones ───────────────────────── */
+@media (max-width: 480px) {
+  .ce-flagged-modal-inner {
+    padding: 16px !important;
+  }
+}
+
+/* ── Location picker map: shorter on small screens ───────────────────── */
+@media (max-width: 480px) {
+  .ce-picker-map {
+    height: 220px !important;
+  }
+}
+
+/* ── List view controls: stack on mobile ─────────────────────────────── */
+@media (max-width: 600px) {
+  .ap-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ap-controls .ce-tooltip-wrap,
+  .ap-controls > button {
+    width: 100%;
+  }
+
+  .ap-controls .ce-tooltip-wrap button {
+    width: 100%;
+  }
 }
 
