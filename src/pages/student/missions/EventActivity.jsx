@@ -3326,6 +3326,15 @@ export default function EventActivity() {
                           </div>
                         </div>
                       )}
+                      {(event.slFields?.assignedFaculty || event.ceFields?.assignedFaculty) && (
+                        <div className="ea-info-item">
+                          <span className="ea-info-icon">🎓</span>
+                          <div>
+                            <div className="ea-info-label">Assigned Faculty</div>
+                            <div className="ea-info-value">{event.slFields?.assignedFaculty || event.ceFields?.assignedFaculty}</div>
+                          </div>
+                        </div>
+                      )}
                       {(event.partnerSchool || event.beneficiary || event.implementingAgency) && (
                         <div className="ea-info-item">
                           <span className="ea-info-icon">🏫</span>
@@ -3657,7 +3666,7 @@ export default function EventActivity() {
                                           )}
                                         </div>
                                       </div>
-                                      {isEnrolled && isExpanded && !isEndedEnrolled && (
+                                      {isEnrolled && isExpanded && (!isEndedEnrolled || hasSubmittedJournal) && (
                                         <div className="task-journal-section">
                                           {journalsForActivity.map((journal) => (
                                             <div key={journal.id} className="journal-card">
@@ -3697,7 +3706,7 @@ export default function EventActivity() {
                                                 if (estimated > 0 && approvalStatus !== 'rejected' && approvalStatus !== 'approved') return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>Waiting to be checked</span>;
                                                 return null;
                                               })()}
-                                              {journalsForActivity[0]?.adminApprovalStatus !== 'approved' && (
+                                              {!isEndedEnrolled && journalsForActivity[0]?.adminApprovalStatus !== 'approved' && (
                                                 <>
                                                   {journalsForActivity[0]?.adminApprovalStatus === 'rejected' ? (
                                                     editingJournalId === journalsForActivity[0]?.taskId ? (

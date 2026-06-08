@@ -440,12 +440,10 @@
 }
 
 .event-activities-title {
-  color: #000;
-  font-weight: 700;
+  color: #1e293b;
+  font-weight: 800;
   margin-bottom: 4px;
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 1.4rem;
 }
 .event-activities-desc {
   font-size: 12px;
@@ -454,8 +452,8 @@
   font-weight: 400;
 }
 .event-activities-subtitle {
-  font-size: 11px;
-  color: #9ca3af;
+  font-size: 0.9rem;
+  color: #64748b;
   margin: 0 0 16px;
   font-weight: 400;
 }

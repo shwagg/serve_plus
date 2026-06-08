@@ -63,14 +63,14 @@ const likertScale = [
 ];
 
 const likertStatements = [
-  'The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.',
-  'The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.',
-  'Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.',
-  'Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.',
-  'The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.',
-  'I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.',
-  'I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.',
-  'I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.',
+  { text: 'The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.' },
+  { text: 'The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.' },
+  { text: 'Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.' },
+  { text: 'Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.' },
+  { text: 'The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.' },
+  { text: 'I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.' },
+  { text: 'I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.' },
+  { text: 'I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.' },
 ];
 
 const PostActivitySurvey = ({
@@ -202,10 +202,9 @@ const PostActivitySurvey = ({
           color: var(--choice-color);
         }
         .post-activity-survey-form .likert-choice.selected {
-          background: var(--choice-color);
+          background: #fff;
           border-color: var(--choice-color);
-          color: #fff;
-          box-shadow: 0 3px 10px var(--choice-shadow);
+          color: var(--choice-color);
         }
         .post-activity-survey-form .likert-choice-no-basis {
           font-size: 12px;
@@ -326,21 +325,20 @@ const PostActivitySurvey = ({
         <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
           Scale: <b>1</b> Strongly Disagree &rarr; <b>5</b> Strongly Agree, then <b>No basis</b> if not applicable.
         </p>
-        {likertStatements.map((statement, idx) => {
+        {likertStatements.map((item, idx) => {
           const selected = form[`likert_${idx}`];
           const selectedMeta = likertScale.find(s => String(s.val) === selected);
           return (
             <div key={idx} style={{
-              background: selectedMeta ? selectedMeta.light : '#fafbfc',
-              border: `1.5px solid ${selectedMeta ? selectedMeta.color : '#e5e7eb'}`,
+              background: '#fafbfc',
+              border: '1.5px solid #e5e7eb',
               borderRadius: 14,
               padding: '16px 18px',
               marginBottom: 12,
-              transition: 'all 0.2s ease',
             }}>
-              <p style={{ margin: '0 0 12px 0', fontSize: 14, color: '#1f2937', fontWeight: 500, lineHeight: 1.5 }}>
-                {statement}
-              </p>
+              <p style={{ margin: '0 0 12px 0', fontSize: 14, color: '#1f2937', fontWeight: 500, lineHeight: 1.5 }}
+                dangerouslySetInnerHTML={{ __html: item.text }}
+              />
               <div className="post-likert-row">
                 <div className="post-likert-options" role="radiogroup" aria-label={`Statement ${idx + 1}`}>
                   {likertScale.map(({ val, label, display, color }) => {

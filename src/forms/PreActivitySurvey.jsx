@@ -406,10 +406,9 @@ const PreActivitySurvey = ({
           color: var(--choice-color);
         }
         .pre-activity-survey-form .likert-choice.selected {
-          background: var(--choice-color);
+          background: #fff;
           border-color: var(--choice-color);
-          color: #fff;
-          box-shadow: 0 3px 10px var(--choice-shadow);
+          color: var(--choice-color);
         }
         .pre-activity-survey-form .likert-choice-no-basis {
           font-size: 12px;
@@ -584,36 +583,35 @@ const PreActivitySurvey = ({
         <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
           Scale: 1 Strongly Disagree, 2 Disagree, 3 Neutral, 4 Agree, 5 Strongly Agree, then No basis.
         </p>
-        <h3 style={{ fontWeight: 700, color: '#23235b', fontSize: '1.05rem', marginBottom: 4 }}>
-          How much do you agree with each statement? 🤔
+        <h3 style={{ fontWeight: 500, fontSize: '1.05rem', marginBottom: 20, justifySelf: 'center', }}>
+          How much do you agree with each statement?
         </h3>
         <p style={{ display: 'none' }}>
           Tap a number to rate — <b>1</b> = Strongly Disagree, <b>5</b> = Strongly Agree, <b>0</b> = No basis
         </p>
         {[
-          { text: 'There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.', emoji: '💡' },
-          { text: 'Volunteer work along with teamwork would somehow help solve social problems.', emoji: '🤝' },
-          { text: 'People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.', emoji: '🌍' },
-          { text: 'I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.', emoji: '💪' },
-          { text: "Contributing and improving skills I've learned from my degree program or affiliation would somehow solve social problems.", emoji: '🎓' },
-          { text: 'I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.', emoji: '📋' },
-          { text: 'I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.', emoji: '🌐' },
-          { text: 'I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.', emoji: '⏰' },
+          { text: 'There are existing problems in the community and <b>I can come up with ideas, suggestions, and solutions</b> to address these problems and issues.' },
+          { text: 'Volunteer work along with teamwork <b>would somehow help</b> solve social problems.' },
+          { text: 'People in the community come from diverse background, culture, and social standing and <b>it is important to understand these differences</b> in order to help solve problems.' },
+          { text: '<b>I would like to make a difference</b> in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.' },
+          { text: "Contributing and improving skills I've learned from my degree program or affiliation <b>would somehow solve social problems.</b>" },
+          { text: 'I would <b>definitely participate</b> in community development initiatives <b>but it would be the last of my priorities</b> because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.' },
+          { text: 'I think that the magnitude of issues in our country and in the world in general is so big <b>that whatever I do to help would be insignificant and would not make any difference.</b>' },
+          { text: '<b>I would consider participating</b> in community development initiatives <b>whenever I can</b>, and with proper time management and the initiative to do so, I definitely can.' },
         ].map((item, idx) => {
           const selected = form[`likert_${idx}`];
           const selectedMeta = likertScale.find(s => String(s.val) === selected);
           return (
             <div key={idx} className="pre-likert-card" style={{
-              background: selectedMeta ? selectedMeta.light : '#fafbfc',
-              border: `1.5px solid ${selectedMeta ? selectedMeta.color : '#e5e7eb'}`,
+              background: '#fafbfc',
+              border: '1.5px solid #e5e7eb',
               borderRadius: 14,
               padding: '16px 18px',
               marginBottom: 12,
-              transition: 'all 0.2s ease',
             }}>
-              <p style={{ margin: '0 0 12px 0', fontSize: 14, color: '#1f2937', fontWeight: 500, lineHeight: 1.5 }}>
-                <span style={{ marginRight: 8 }}>{item.emoji}</span>{item.text}
-              </p>
+              <p style={{ margin: '0 0 12px 0', fontSize: 14, color: '#1f2937', fontWeight: 500, lineHeight: 1.5 }}
+                dangerouslySetInnerHTML={{ __html: item.text }}
+              />
               <div className="pre-likert-row">
                 <div className="pre-likert-options" role="radiogroup" aria-label={`Statement ${idx + 1}`}>
                   {likertScale.map(({ val, label, display, color }) => {
