@@ -114,6 +114,28 @@ function Modal({ title, subtitle, onClose, children }) {
   );
 }
 
+const Q_LABELS = [
+  "Problem-solving",
+  "Teamwork",
+  "Cultural diversity",
+  "Civic obligation",
+  "Academic–civic link",
+  "Competing priorities",
+  "Perceived insignificance",
+  "Willingness & initiative",
+];
+
+const Q_FULL = [
+  "There are existing problems in the community and I can come up with ideas, suggestions, and solutions to address these problems and issues.",
+  "Volunteer work along with teamwork would somehow help solve social problems.",
+  "People in the community come from diverse background, culture, and social standing and it is important to understand these differences in order to help solve problems.",
+  "I would like to make a difference in the community because I have a social and moral obligation to do so. I would do this even if my contribution would seem very little.",
+  "Contributing and improving skills I've learned from my degree program or affiliation would somehow solve social problems.",
+  "I would definitely participate in community development initiatives but it would be the last of my priorities because I have to consider other aspects of my life first such as academics, friends, family, recreation, etc.",
+  "I think that the magnitude of issues in our country and in the world in general is so big that whatever I do to help would be insignificant and would not make any difference.",
+  "I would consider participating in community development initiatives whenever I can, and with proper time management and the initiative to do so, I definitely can.",
+];
+
 // ── Main component ───────────────────────────────────────────
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -133,9 +155,11 @@ export default function AdminDashboard() {
   const [pendingConsent,         setPendingConsent]         = useState(null);
   const [overdueCount,           setOverdueCount]           = useState(0);
   const [pendingReportsCount,    setPendingReportsCount]    = useState(0);
+  const [attitudeShift,         setAttitudeShift]         = useState([]);
+  const [attitudeLoading,       setAttitudeLoading]       = useState(false);
 
   // UI state
-  const [activeModal,     setActiveModal]     = useState(null); // 'sdg'|'engagement'|'funnel'|'flaggedStudents'
+  const [activeModal,     setActiveModal]     = useState(null); // 'sdg'|'engagement'|'funnel'|'flaggedStudents'|'attitude'
   const [showSidebar,     setShowSidebar]     = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
 
@@ -250,6 +274,60 @@ export default function AdminDashboard() {
         );
         setPendingReportsCount(results.filter(d => d.exists() && d.data().status === "submitted").length);
       } catch { /* non-critical */ }
+    };
+    run();
+  }, []);
+
+  // ── Attitude shift data ──────────────────────────────────
+  useEffect(() => {
+    const run = async () => {
+      setAttitudeLoading(true);
+      try {
+        const missionsSnap = await getDocs(query(collection(db, "missions"), where("status", "==", "published")));
+        const pre  = Array.from({ length: 8 }, () => ({ sum: 0, n: 0 }));
+        const post = Array.from({ length: 8 }, () => ({ sum: 0, n: 0 }));
+
+        for (const mDoc of missionsSnap.docs) {
+          const volSnap = await getDocs(collection(db, "missions", mDoc.id, "volunteer"));
+          const vols = volSnap.docs;
+          if (vols.length === 0) continue;
+
+          const [preResults, postResults] = await Promise.all([
+            Promise.allSettled(vols.map(v => getDoc(doc(db, "missions", mDoc.id, "volunteer", v.id, "preSurvey", "response")))),
+            Promise.allSettled(vols.map(v => getDoc(doc(db, "missions", mDoc.id, "volunteer", v.id, "postSurvey", "response")))),
+          ]);
+
+          for (const r of preResults) {
+            if (r.status === "fulfilled" && r.value.exists()) {
+              const likert = r.value.data().likert || {};
+              for (let i = 0; i < 8; i++) {
+                const val = likert[`q${i + 1}`];
+                if (val && val > 0) { pre[i].sum += val; pre[i].n++; }
+              }
+            }
+          }
+          for (const r of postResults) {
+            if (r.status === "fulfilled" && r.value.exists()) {
+              const likert = r.value.data().likert || {};
+              for (let i = 0; i < 8; i++) {
+                const val = likert[`q${i + 1}`];
+                if (val && val > 0) { post[i].sum += val; post[i].n++; }
+              }
+            }
+          }
+        }
+
+        setAttitudeShift(pre.map((p, i) => ({
+          preAvg:   p.n > 0       ? +(p.sum / p.n).toFixed(2)             : null,
+          postAvg:  post[i].n > 0 ? +(post[i].sum / post[i].n).toFixed(2) : null,
+          preCount:  p.n,
+          postCount: post[i].n,
+        })));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setAttitudeLoading(false);
+      }
     };
     run();
   }, []);
@@ -437,6 +515,71 @@ export default function AdminDashboard() {
                 <p style={{ fontSize: 11, color: G.sub, margin: "10px 0 0", borderTop: `1px solid ${G.border}`, paddingTop: 10 }}>
                   Based on {stepFunnel.total} total volunteer registration{stepFunnel.total !== 1 ? "s" : ""}
                 </p>
+              )}
+            </div>
+          </Card>
+
+          {/* Attitude Shift Analysis */}
+          <Card>
+            <CardHead
+              title="Attitude Shift Analysis"
+              sub="Average Likert scores (1–5) — pre vs. post activity across all surveys"
+              onMore={() => setActiveModal("attitude")}
+            />
+            <Divider />
+            <div style={{ padding: "12px 20px 20px" }}>
+              {attitudeLoading ? (
+                <Empty text="Computing attitude data…" />
+              ) : attitudeShift.length === 0 ? (
+                <Empty text="No survey responses yet." />
+              ) : (
+                <>
+                  <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
+                    {[{ color: G.teal, label: "Pre" }, { color: G.orange, label: "Post" }].map(l => (
+                      <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color }} />
+                        <span style={{ fontSize: 11, color: G.sub, fontWeight: 500 }}>{l.label}-Activity</span>
+                      </div>
+                    ))}
+                  </div>
+                  {attitudeShift.map((d, i) => {
+                    const delta = (d.preAvg !== null && d.postAvg !== null)
+                      ? +(d.postAvg - d.preAvg).toFixed(2) : null;
+                    const isReverse = i === 5 || i === 6;
+                    const improved = delta !== null && (isReverse ? delta < 0 : delta > 0);
+                    const declined = delta !== null && (isReverse ? delta > 0 : delta < 0);
+                    return (
+                      <div key={i} style={{ marginBottom: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                          <span style={{ fontSize: 12, color: G.text, fontWeight: 500 }}>
+                            Q{i + 1} · {Q_LABELS[i]}
+                            {isReverse && <span style={{ fontSize: 10, color: G.sub, marginLeft: 4 }}>↩</span>}
+                          </span>
+                          {delta !== null && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0, marginLeft: 8,
+                              background: improved ? G.greenL : declined ? G.redL : G.bg,
+                              color: improved ? G.green : declined ? G.red : G.sub,
+                            }}>
+                              {delta > 0 ? `▲ +${delta}` : delta < 0 ? `▼ ${delta}` : "→"}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <div style={{ flex: 1 }}><ProgressBar value={d.preAvg ? (d.preAvg / 5) * 100 : 0} color={G.teal} height={4} /></div>
+                          <span style={{ fontSize: 9, color: G.sub, width: 22, textAlign: "right" }}>{d.preAvg ?? "—"}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                          <div style={{ flex: 1 }}><ProgressBar value={d.postAvg ? (d.postAvg / 5) * 100 : 0} color={G.orange} height={4} /></div>
+                          <span style={{ fontSize: 9, color: G.sub, width: 22, textAlign: "right" }}>{d.postAvg ?? "—"}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <p style={{ fontSize: 11, color: G.sub, margin: "10px 0 0", borderTop: `1px solid ${G.border}`, paddingTop: 10 }}>
+                    ↩ = reverse-scored (lower post score = positive shift)
+                  </p>
+                </>
               )}
             </div>
           </Card>
@@ -779,6 +922,82 @@ export default function AdminDashboard() {
               ))}
             </div>
           )}
+        </Modal>
+      )}
+
+      {/* Attitude Shift Modal */}
+      {activeModal === "attitude" && (
+        <Modal
+          title="Attitude Shift Analysis"
+          subtitle="Comparing pre- and post-activity average Likert scores across all submitted surveys"
+          onClose={() => setActiveModal(null)}
+        >
+          <div style={{ display: "flex", gap: 20, marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${G.border}` }}>
+            {[{ color: G.teal, label: "Pre-Activity Average" }, { color: G.orange, label: "Post-Activity Average" }].map(l => (
+              <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: l.color }} />
+                <span style={{ fontSize: 13, color: G.sub, fontWeight: 500 }}>{l.label}</span>
+              </div>
+            ))}
+          </div>
+          {attitudeShift.length === 0 ? (
+            <Empty text="No survey responses available yet." />
+          ) : attitudeShift.map((d, i) => {
+            const delta = (d.preAvg !== null && d.postAvg !== null)
+              ? +(d.postAvg - d.preAvg).toFixed(2) : null;
+            const isReverse = i === 5 || i === 6;
+            const improved = delta !== null && (isReverse ? delta < 0 : delta > 0);
+            const declined = delta !== null && (isReverse ? delta > 0 : delta < 0);
+            return (
+              <div key={i} style={{ marginBottom: 22, paddingBottom: 22, borderBottom: i < 7 ? `1px solid ${G.border}` : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: G.blue }}>Q{i + 1}</span>
+                      {isReverse && (
+                        <span style={{ fontSize: 10, fontWeight: 600, color: G.amber, background: G.amberL, padding: "1px 7px", borderRadius: 999 }}>
+                          Reverse-scored
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, color: G.text, lineHeight: 1.5 }}>{Q_FULL[i]}</p>
+                  </div>
+                  {delta !== null && (
+                    <div style={{
+                      textAlign: "center", padding: "10px 14px", borderRadius: 10, flexShrink: 0, minWidth: 72,
+                      background: improved ? G.greenL : declined ? G.redL : G.bg,
+                      border: `1px solid ${improved ? "#86efac" : declined ? "#fca5a5" : G.border}`,
+                    }}>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: improved ? G.green : declined ? G.red : G.sub, lineHeight: 1 }}>
+                        {delta > 0 ? `+${delta}` : `${delta}`}
+                      </div>
+                      <div style={{ fontSize: 10, color: G.sub, marginTop: 3, fontWeight: 500 }}>
+                        {improved ? "Improved" : declined ? "Declined" : "No change"}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {[
+                  { label: "Pre-Activity", avg: d.preAvg, count: d.preCount, color: G.teal },
+                  { label: "Post-Activity", avg: d.postAvg, count: d.postCount, color: G.orange },
+                ].map(row => (
+                  <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: G.sub, width: 84, flexShrink: 0 }}>{row.label}</span>
+                    <div style={{ flex: 1 }}>
+                      <ProgressBar value={row.avg ? (row.avg / 5) * 100 : 0} color={row.color} height={8} />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: G.text, width: 28, textAlign: "right", flexShrink: 0 }}>
+                      {row.avg ?? "—"}
+                    </span>
+                    <span style={{ fontSize: 11, color: G.sub, width: 52, flexShrink: 0 }}>(n={row.count})</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          <p style={{ fontSize: 12, color: G.sub, margin: "8px 0 0", padding: "12px 0 0", borderTop: `1px solid ${G.border}`, lineHeight: 1.6 }}>
+            <strong>Note:</strong> Q6 and Q7 are reverse-scored — a lower post-activity average indicates a positive shift (reduced barriers to participation). Responses of 0 ("No Basis") are excluded from averages.
+          </p>
         </Modal>
       )}
 
