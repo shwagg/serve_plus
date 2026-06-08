@@ -42,9 +42,9 @@
   margin-bottom: 4px;
 }
 .ar-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e293b;
   margin: 0;
   line-height: 1.3;
 }
@@ -231,6 +231,30 @@
 }
 @media (max-width: 600px) {
   .ar-3col-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .ar-overlay { padding: 8px; }
+
+  .ar-modal { border-radius: 12px; }
+  .ar-header{
+    justify-content: space-between;
+  }
+  .ar-close-btn {
+    justify-self: flex-start;
+    padding: 0;
+    width: auto;
+  }
+
+  .ar-step-bar { padding: 10px 10px 8px; gap: 0; }
+  .ar-step-label { display: none; }
+  .ar-step-dot.active .ar-step-label { display: block; font-size: 0.6rem; max-width: 64px; }
+  .ar-step-num { width: 24px; height: 24px; font-size: 0.68rem; }
+  .ar-step-dot::after { top: 12px; }
+
+  .ar-body { padding: 16px 14px 14px; }
+  .ar-footer { padding: 12px 14px; }
+  .ar-error { margin: 0 14px 4px; }
 }
 
 /* Radio */

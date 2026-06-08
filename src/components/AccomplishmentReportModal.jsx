@@ -577,12 +577,12 @@ export default function AccomplishmentReportModal({ missionId, event, existingRe
           <div className="ar-footer-actions">
             {activeStep > 1 && (
               <button className="ar-btn ar-btn--secondary" onClick={() => setActiveStep(s => s - 1)}>
-                ← Back
+                Back
               </button>
             )}
             {activeStep < TOTAL_STEPS && (
               <button className="ar-btn ar-btn--primary" onClick={() => setActiveStep(s => s + 1)}>
-                Next →
+                Next
               </button>
             )}
             {activeStep === TOTAL_STEPS && !isApproved && (
