@@ -163,9 +163,9 @@
   box-shadow: 0 1px 8px #0001;
 }
 .profile-event-history-title {
-  font-weight: 700;
-  font-size: 24px;
-  color: #000;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #1e293b;
   margin-bottom: 16px;
   text-align: center;
 }
@@ -413,9 +413,6 @@
   .profile-event-history-card {
     padding: 16px;
     gap: 16px;
-  }
-  .profile-event-history-title {
-    font-size: 18px;
   }
   .achievements-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));

@@ -3,7 +3,7 @@
   padding-top: 80px;
   min-height: 100vh;
   background: #f0f2f7;
-  font-family: 'Inter', 'Google Sans', 'Roboto', sans-serif;
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
 }
 
 /* Inside AdminLayout — admin-main already provides offset and padding */
@@ -42,11 +42,10 @@
 }
 
 .review-proposal-title {
-  font-size: 1.6rem;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 800;
   color: #1e293b;
   margin: 0 0 4px;
-  font-family: 'Inter', sans-serif;
 }
 
 .rp-action-hint {
@@ -276,7 +275,7 @@
 /* ── Admin Projects (merged Projects page) ─────────────────── */
 .admin-projects-page {
   width: 100%;
-  font-family: 'Inter', 'Google Sans', 'Roboto', sans-serif;
+  font-family: 'Inter', Helvetica, Arial, sans-serif;
 }
 
 .ap-header {
