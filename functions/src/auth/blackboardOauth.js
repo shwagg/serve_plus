@@ -3,7 +3,7 @@
 const admin = require("firebase-admin");
 const axios = require("axios");
 const crypto = require("crypto");
-const {FieldValue} = require("firebase-admin/firestore");
+const {FieldValue, Timestamp} = require("firebase-admin/firestore");
 const {
   normalizeEmail,
   isAllowedEmailDomain,
@@ -11,6 +11,10 @@ const {
 
 const STATE_COOKIE = "blackboard_oauth_state";
 const STATE_MAX_AGE_SECONDS = 10 * 60;
+const EXCHANGE_COLLECTION = "blackboardLoginExchanges";
+const EXCHANGE_TTL_MS = 60 * 1000;
+const EXCHANGE_CODE_PATTERN = /^[0-9a-f]{64}$/i;
+const EXCHANGE_ERROR_MESSAGE = "Blackboard sign-in code is invalid or expired.";
 
 let cachedJwks = null;
 let cachedJwksAt = 0;
@@ -104,6 +108,109 @@ function getQueryValue(value) {
 function redirectToAuthError(res, frontendUrl, message) {
   const safeMessage = encodeURIComponent(message || "Blackboard sign-in failed.");
   return res.redirect(`${frontendUrl}/auth?error=${safeMessage}`);
+}
+
+function toDate(value) {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  return value instanceof Date ? value : new Date(value);
+}
+
+function getClientIp(req) {
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "");
+  return forwardedFor.split(",")[0].trim() || req.ip || null;
+}
+
+function getCodeAuditMeta(code) {
+  const normalized = String(code || "").trim();
+  return {
+    codeHash: normalized ?
+      crypto.createHash("sha256").update(normalized).digest("hex") :
+      null,
+    codePrefix: EXCHANGE_CODE_PATTERN.test(normalized) ?
+      normalized.slice(0, 8) :
+      null,
+  };
+}
+
+class BlackboardExchangeError extends Error {
+  constructor(outcome, reason, details = {}) {
+    super(EXCHANGE_ERROR_MESSAGE);
+    this.outcome = outcome;
+    this.reason = reason;
+    this.details = details;
+    this.status = 401;
+  }
+}
+
+async function writeBlackboardExchangeAudit({
+  action,
+  code,
+  details = {},
+  email,
+  req,
+  uid,
+}) {
+  const codeMeta = getCodeAuditMeta(code);
+  const auditDetails = {
+    provider: "blackboard",
+    ...codeMeta,
+    ...details,
+    ip: getClientIp(req),
+    userAgent: req.get("User-Agent") || null,
+  };
+
+  try {
+    await admin.firestore().collection("auditLogs").add({
+      action,
+      category: "auth",
+      provider: "blackboard",
+      uid: uid || null,
+      email: email || null,
+      details: auditDetails,
+      timestamp: FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn("Blackboard exchange audit log failed:", {
+      action,
+      message: error.message,
+    });
+  }
+}
+
+async function logBlackboardExchangeAttempt({
+  action,
+  code,
+  details = {},
+  email,
+  level = "warn",
+  req,
+  uid,
+}) {
+  const codeMeta = getCodeAuditMeta(code);
+  const logDetails = {
+    provider: "blackboard",
+    uid: uid || null,
+    email: email || null,
+    ...codeMeta,
+    ...details,
+    ip: getClientIp(req),
+  };
+
+  if (level === "info") {
+    console.info(`Blackboard code exchange ${action}:`, logDetails);
+  } else {
+    console.warn(`Blackboard code exchange ${action}:`, logDetails);
+  }
+
+  await writeBlackboardExchangeAudit({
+    action,
+    code,
+    details,
+    email,
+    req,
+    uid,
+  });
 }
 
 function decodeJwtPart(part) {
@@ -410,6 +517,105 @@ async function createOrUpdateUserProfile(user) {
   });
 }
 
+async function createBlackboardLoginExchange({uid, email, state}) {
+  const exchangeCode = crypto.randomBytes(32).toString("hex");
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + EXCHANGE_TTL_MS);
+  const exchangeData = {
+    uid,
+    email,
+    provider: "blackboard",
+    createdAt: Timestamp.fromDate(createdAt),
+    expiresAt: Timestamp.fromDate(expiresAt),
+    used: false,
+  };
+
+  if (state) exchangeData.state = state;
+
+  await admin
+    .firestore()
+    .collection(EXCHANGE_COLLECTION)
+    .doc(exchangeCode)
+    .set(exchangeData);
+
+  return exchangeCode;
+}
+
+async function consumeBlackboardLoginExchange(code) {
+  const db = admin.firestore();
+  const exchangeRef = db.collection(EXCHANGE_COLLECTION).doc(code);
+
+  return db.runTransaction(async (transaction) => {
+    const exchangeSnap = await transaction.get(exchangeRef);
+
+    if (!exchangeSnap.exists) {
+      throw new BlackboardExchangeError("invalid", "missing");
+    }
+
+    const exchangeData = exchangeSnap.data();
+    const expiresAt = toDate(exchangeData.expiresAt);
+
+    if (exchangeData.used === true) {
+      throw new BlackboardExchangeError("reused", "used", {
+        uid: exchangeData.uid || null,
+        email: exchangeData.email || null,
+      });
+    }
+
+    if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+      throw new BlackboardExchangeError("expired", "expired", {
+        uid: exchangeData.uid || null,
+        email: exchangeData.email || null,
+      });
+    }
+
+    if (
+      exchangeData.provider !== "blackboard" ||
+      !exchangeData.uid ||
+      typeof exchangeData.uid !== "string"
+    ) {
+      throw new BlackboardExchangeError("invalid", "malformed_exchange", {
+        email: exchangeData.email || null,
+      });
+    }
+
+    transaction.update(exchangeRef, {
+      used: true,
+      usedAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      uid: exchangeData.uid,
+      email: exchangeData.email || null,
+      state: exchangeData.state || null,
+    };
+  });
+}
+
+async function createBlackboardCustomToken(uid) {
+  const userSnap = await admin
+    .firestore()
+    .collection("users")
+    .doc(uid)
+    .get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+
+  if (userData.status && userData.status !== "active") {
+    throw new BlackboardExchangeError("invalid", "account_blocked", {
+      uid,
+      email: userData.email || null,
+    });
+  }
+
+  return admin.auth().createCustomToken(uid, {
+    provider: "blackboard",
+    blackboardId: userData.blackboardId || null,
+    role: userData.role || "student",
+    mfa: false,
+    mfaRequired: false,
+  });
+}
+
 async function handleBlackboardStart(req, res) {
   const config = getConfig();
   requireConfig(config, [
@@ -501,8 +707,6 @@ async function handleBlackboardCallback(req, res) {
       .doc(blackboardUser.uid)
       .get();
     const userData = userSnap.exists ? userSnap.data() : {};
-    const role = userData.role || "student";
-
     if (userData.status && userData.status !== "active") {
       return redirectToAuthError(
         res,
@@ -511,22 +715,17 @@ async function handleBlackboardCallback(req, res) {
       );
     }
 
-    const customToken = await admin.auth().createCustomToken(
-      blackboardUser.uid,
-      {
-        provider: "blackboard",
-        blackboardId: blackboardUser.blackboardId,
-        role,
-        mfa: false,
-        mfaRequired: false,
-      },
-    );
+    const exchangeCode = await createBlackboardLoginExchange({
+      uid: blackboardUser.uid,
+      email: blackboardUser.email,
+      state,
+    });
 
     const callbackUrl = new URL(
       "/auth/blackboard/complete",
       config.frontendUrl,
     );
-    callbackUrl.searchParams.set("token", customToken);
+    callbackUrl.searchParams.set("code", exchangeCode);
     return res.redirect(callbackUrl.toString());
   } catch (error) {
     console.error("Blackboard callback failed:", error.message);
@@ -538,7 +737,102 @@ async function handleBlackboardCallback(req, res) {
   }
 }
 
+async function handleExchangeBlackboardCode(req, res) {
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).json({error: "Method not allowed."});
+    return;
+  }
+
+  const contentType = String(req.headers["content-type"] || "").toLowerCase();
+  if (!contentType.includes("application/json")) {
+    await logBlackboardExchangeAttempt({
+      action: "BLACKBOARD_EXCHANGE_INVALID",
+      code: "",
+      details: {reason: "bad_content_type"},
+      req,
+    });
+    res.status(400).json({error: "Bad request."});
+    return;
+  }
+
+  const body = req.body;
+  const code = typeof body?.code === "string" ? body.code.trim() : "";
+
+  if (!body || typeof body !== "object" || Array.isArray(body) || !code) {
+    await logBlackboardExchangeAttempt({
+      action: "BLACKBOARD_EXCHANGE_INVALID",
+      code,
+      details: {reason: "bad_request"},
+      req,
+    });
+    res.status(400).json({error: "Bad request."});
+    return;
+  }
+
+  if (!EXCHANGE_CODE_PATTERN.test(code)) {
+    await logBlackboardExchangeAttempt({
+      action: "BLACKBOARD_EXCHANGE_INVALID",
+      code,
+      details: {reason: "invalid_format"},
+      req,
+    });
+    res.status(400).json({error: "Bad request."});
+    return;
+  }
+
+  let exchange;
+  try {
+    exchange = await consumeBlackboardLoginExchange(code);
+    const customToken = await createBlackboardCustomToken(exchange.uid);
+
+    await logBlackboardExchangeAttempt({
+      action: "BLACKBOARD_EXCHANGE_SUCCESS",
+      code,
+      details: {reason: "success"},
+      email: exchange.email,
+      level: "info",
+      req,
+      uid: exchange.uid,
+    });
+
+    res.status(200).json({customToken});
+  } catch (error) {
+    if (error instanceof BlackboardExchangeError) {
+      const actionByOutcome = {
+        expired: "BLACKBOARD_EXCHANGE_EXPIRED",
+        invalid: "BLACKBOARD_EXCHANGE_INVALID",
+        reused: "BLACKBOARD_EXCHANGE_REUSED",
+      };
+      const details = {
+        reason: error.reason,
+        ...(error.details || {}),
+      };
+
+      await logBlackboardExchangeAttempt({
+        action: actionByOutcome[error.outcome] || "BLACKBOARD_EXCHANGE_INVALID",
+        code,
+        details,
+        email: error.details?.email || exchange?.email || null,
+        req,
+        uid: error.details?.uid || exchange?.uid || null,
+      });
+
+      res.status(error.status).json({error: EXCHANGE_ERROR_MESSAGE});
+      return;
+    }
+
+    console.error("Blackboard code exchange failed:", error.message);
+    res.status(500).json({error: "Blackboard sign-in failed."});
+  }
+}
+
 module.exports = {
+  handleExchangeBlackboardCode,
   handleBlackboardStart,
   handleBlackboardCallback,
   validateOAuthState: assertValidState,

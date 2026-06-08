@@ -204,6 +204,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Blackboard SSO exchange codes are server-only. Cloud Functions use Admin SDK.
+    match /blackboardLoginExchanges/{exchangeId} {
+      allow read, write: if false;
+    }
+
     // Badge overrides — admin customizations of built-in badge names/criteria
     match /badgeOverrides/{badgeId} {
       allow read: if true;
@@ -224,8 +229,8 @@ service cloud.firestore {
 
     // Fallback — allow read on anything not explicitly covered above
     // Write is denied unless a specific rule above grants it
-    match /{document=**} {
-      allow read: if true;
+    match /{collection}/{document=**} {
+      allow read: if collection != "blackboardLoginExchanges";
       allow write: if false;
     }
 

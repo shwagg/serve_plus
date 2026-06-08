@@ -3,6 +3,36 @@ import { signInWithCustomToken } from "firebase/auth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../firebaseConfig";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
+function getBlackboardExchangeUrl() {
+  if (!API_URL) {
+    throw new Error("VITE_API_URL is not configured.");
+  }
+
+  const baseUrl = API_URL.replace(/\/+$/, "");
+
+  try {
+    const url = new URL(baseUrl);
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    const lastPart = pathParts[pathParts.length - 1];
+
+    if (lastPart === "blackboardAuth" || lastPart === "blackboardCallback") {
+      pathParts[pathParts.length - 1] = "exchangeBlackboardCode";
+      url.pathname = `/${pathParts.join("/")}`;
+    } else {
+      url.pathname = `${url.pathname.replace(/\/+$/, "")}/exchangeBlackboardCode`;
+    }
+
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return `${baseUrl.replace(/\/(?:blackboardAuth|blackboardCallback)$/, "")}` +
+      "/exchangeBlackboardCode";
+  }
+}
+
 function OAuthCallback() {
   const [error, setError] = useState("");
   const hasStarted = useRef(false);
@@ -15,22 +45,34 @@ function OAuthCallback() {
         if (hasStarted.current) return;
         hasStarted.current = true;
 
-        const token = searchParams.get("token");
+        const code = searchParams.get("code");
 
-        if (!token) {
-          setError("No authentication token received. Please try again.");
+        if (!code) {
+          setError("No sign-in code received. Please try again.");
           return;
         }
 
         navigate("/auth/blackboard/complete", { replace: true });
-        await signInWithCustomToken(auth, token);
+
+        const response = await fetch(getBlackboardExchangeUrl(), {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({code}),
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || !data.customToken) {
+          throw new Error(data.error || "Blackboard code exchange failed.");
+        }
+
+        await signInWithCustomToken(auth, data.customToken);
         navigate("/auth", {
           replace: true,
           state: {blackboardComplete: true},
         });
       } catch (err) {
         if (import.meta.env.DEV) {
-          console.error("Blackboard custom token sign-in failed:", err);
+          console.error("Blackboard code exchange sign-in failed:", err);
         }
         setError("Authentication failed. Please try signing in again.");
       }

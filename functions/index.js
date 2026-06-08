@@ -169,8 +169,15 @@ const {
   blackboardAuth,
   blackboardCallback,
 } = require("./src/auth/blackboardCallback");
+const {
+  handleExchangeBlackboardCode,
+} = require("./src/auth/blackboardOauth");
 exports.blackboardAuth = blackboardAuth;
 exports.blackboardCallback = blackboardCallback;
+exports.exchangeBlackboardCode = onRequest(
+  defaultFunctionOptions,
+  handleExchangeBlackboardCode
+);
 
 // Backup & Restore functions
 const { createBackup } = require("./src/backup/createBackup");
