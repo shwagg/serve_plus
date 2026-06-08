@@ -118,35 +118,177 @@ export default function NotificationBell() {
     if (!notification.read) {
       await markNotificationAsRead(userId, notification.id);
     }
+    
+    setIsOpen(false);
+    
+    // Badge earned - show replay modal
     if (notification.type === "badge_earned" && notification.badgeId) {
-      setIsOpen(false);
       setReplayBadgeId(notification.badgeId);
+      return;
     }
+    
+    // Certificate ready/obtained - show replay modal
     if ((notification.type === "certificate_obtained" || notification.type === "certificate_ready") &&
         (notification.event || notification.course)) {
-      setIsOpen(false);
       setReplayCert({ notifId: notification.id, course: notification.event || notification.course });
+      return;
     }
+    
+    // Event announcement - show announcement modal
     if (notification.type === "event_announcement") {
       announceHeaderModalOpen("notifications");
-      setIsOpen(false);
       setEventAnnouncementModal(notification);
+      return;
     }
+    
+    // Proposal notifications - navigate to review proposals page
+    if (notification.type === "proposal_submitted" || notification.type === "proposal_status") {
+      if (notification.link) {
+        navigate(notification.link);
+      } else {
+        // Fallback to proposals page
+        navigate("/global/review-proposals");
+      }
+      return;
+    }
+    
+    // Reflection notifications - navigate to event activity page with specific tab
+    if (notification.type === "reflection_submitted" || 
+        notification.type === "reflection_approved" || 
+        notification.type === "reflection_needs_revision" ||
+        notification.type === "reflection_overdue") {
+      if (notification.missionId) {
+        sessionStorage.setItem('ea_activeNav', 'tasks');
+        navigate(`/event/${notification.missionId}/activity`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      }
+      return;
+    }
+    
+    // Event registration/approval notifications
+    if (notification.type === "event_registration" || notification.type === "event_approved") {
+      if (notification.eventId || notification.missionId) {
+        navigate(`/event/${notification.eventId || notification.missionId}/activity`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      }
+      return;
+    }
+    
+    // Event upcoming notifications
+    if (notification.type === "event_upcoming") {
+      if (notification.eventId || notification.missionId) {
+        navigate(`/event/${notification.eventId || notification.missionId}/activity`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      }
+      return;
+    }
+    
+    // Consent form notifications
+    if (notification.type === "consent_approved" || notification.type === "consent_rejected") {
+      if (notification.missionId) {
+        sessionStorage.setItem('ea_activeNav', 'requirements');
+        navigate(`/event/${notification.missionId}/activity`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      }
+      return;
+    }
+    
+    // Accomplishment report notifications
     if (notification.type === "accomplishment_report_due" && notification.missionId) {
-      setIsOpen(false);
       sessionStorage.setItem('ea_activeNav', 'requirements');
       navigate(`/event/${notification.missionId}/activity`);
+      return;
     }
-    if ((notification.type === "accomplishment_report_approved" || notification.type === "accomplishment_report_revision") && notification.missionId) {
-      setIsOpen(false);
+    
+    if ((notification.type === "accomplishment_report_approved" || 
+         notification.type === "accomplishment_report_revision") && notification.missionId) {
       sessionStorage.setItem('ea_activeNav', 'requirements');
       navigate(`/event/${notification.missionId}/activity`);
+      return;
     }
+    
     if (notification.type === "accomplishment_report_submitted" && notification.link) {
-      setIsOpen(false);
       // Extract path from link (e.g. /admin/current-event/abc?tab=accomplishment)
       const url = new URL(notification.link, window.location.origin);
       navigate(url.pathname + url.search);
+      return;
+    }
+    
+    // Attendance flag notifications
+    if (notification.type === "attendance_flag" || notification.type === "attendance_flag_admin") {
+      if (notification.missionId) {
+        sessionStorage.setItem('ea_activeNav', 'requirements');
+        navigate(`/event/${notification.missionId}/activity`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      }
+      return;
+    }
+    
+    // Points notifications (awarded, voided, bonus)
+    if (notification.type === "points_awarded" || 
+        notification.type === "points_earned" ||
+        notification.type === "points_voided" ||
+        notification.type === "bonus_earned") {
+      if (notification.missionId) {
+        navigate(`/event/${notification.missionId}/activity`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      } else {
+        // Fallback to profile to see points
+        navigate("/profile");
+      }
+      return;
+    }
+    
+    // Level up notification - navigate to profile
+    if (notification.type === "level_up") {
+      navigate("/profile");
+      return;
+    }
+    
+    // Leaderboard rank notification - navigate to home/leaderboard
+    if (notification.type === "leaderboard_rank_global") {
+      navigate("/student");
+      return;
+    }
+    
+    // Requirements completed notification
+    if (notification.type === "requirements_completed" || 
+        notification.type === "accomplishment_report_reminder") {
+      if (notification.missionId) {
+        sessionStorage.setItem('ea_activeNav', 'requirements');
+        navigate(`/event/${notification.missionId}/activity`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      }
+      return;
+    }
+    
+    // Event full notification - navigate to event details
+    if (notification.type === "event_full") {
+      if (notification.eventId || notification.missionId) {
+        navigate(`/event/${notification.eventId || notification.missionId}`);
+      } else if (notification.link) {
+        navigate(notification.link);
+      }
+      return;
+    }
+    
+    // Generic fallback - use link if available
+    if (notification.link) {
+      // Check if link is a full URL or just a path
+      if (notification.link.startsWith('http')) {
+        const url = new URL(notification.link);
+        navigate(url.pathname + url.search);
+      } else {
+        navigate(notification.link);
+      }
+      return;
     }
   }, [userId, navigate]);
 
@@ -166,6 +308,9 @@ export default function NotificationBell() {
       case "level_up":           return "🎉";
       case "badge_earned":       return "🏆";
       case "points_earned":      return "⭐";
+      case "points_awarded":     return "⭐";
+      case "points_voided":      return "⚠️";
+      case "bonus_earned":       return "🎁";
       case "reflection_submitted":      return "✍️";
       case "reflection_overdue":        return "⏰";
       case "reflection_approved":       return "✔️";
@@ -174,6 +319,7 @@ export default function NotificationBell() {
       case "proposal_status":    return "📌";
       case "deadline_approaching": return "⚠️";
       case "certificate_ready":  return "📜";
+      case "certificate_obtained": return "📜";
       case "attendance_flag":       return "🚩";
       case "attendance_flag_admin": return "🚩";
       case "event_full":            return "🔒";
@@ -182,6 +328,9 @@ export default function NotificationBell() {
       case "accomplishment_report_submitted":  return "📋";
       case "accomplishment_report_approved":   return "✅";
       case "accomplishment_report_revision":   return "✏️";
+      case "accomplishment_report_reminder":   return "⏰";
+      case "requirements_completed":           return "✅";
+      case "leaderboard_rank_global":          return "🏆";
       default:                                return "🔔";
     }
   };
