@@ -6,8 +6,6 @@ import { auth, db, functions } from "../firebaseConfig";
 import { doc, setDoc, collection, getDocs, query, where, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
-import loginPosterGif from "../assets/login_poster_loop.gif";
-import loginPosterFallback from "../assets/login_poster_img.svg";
 import "../styles/ui.css";
 import { isAllowedEmailDomain, normalizeEmail } from "../utils/emailPolicy";
 
@@ -217,11 +215,6 @@ function Register() {
     return (
         <div className="auth-page">
             <div className="auth-split">
-                {/* Left: poster */}
-                <div className="auth-poster-panel">
-                    <img src={loginPosterGif} alt="SERVE+ illustration" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = loginPosterFallback; }} />
-                </div>
-
                 {/* Right: form */}
                 <div className="auth-form-panel">
                     <form className="ui-form auth-login-form" onSubmit={registerSubmit}>
