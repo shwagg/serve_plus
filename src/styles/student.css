@@ -1619,15 +1619,15 @@
 
 .global-feed-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: #1f2937;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e293b;
 }
 
 .global-feed-subtitle {
   margin-top: 4px;
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 0.9rem;
+  color: #64748b;
 }
 .global-feed-list {
   flex: 1;
@@ -1704,6 +1704,7 @@
   gap: 0;
   width: 100%;
   padding: 30px 50px;
+  border: 1px solid #000;
 }
 .pre-activity-survey-button:hover {
   background: #32CD32 !important;
@@ -2039,7 +2040,7 @@
 }
 .event-details-card--modal {
   margin-top: -16px;
-  padding: 16px 28px 0;
+  padding: 16px 0px 0;
   transform: none;
   box-shadow: none;
   flex: 1;
@@ -2049,7 +2050,7 @@
   overflow: hidden;
 }
 .event-details-grid--modal {
-  padding: 0;
+  padding: 16px 28px 0;
   gap: 12px;
   flex: 1;
   min-height: 0;
