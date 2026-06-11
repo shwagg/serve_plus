@@ -6,7 +6,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { useEffect, useState, useContext, useRef } from "react";
+import { useEffect, useState, useContext, useRef, useCallback } from "react";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ChangeIcon from "../../components/icons/Change.svg";
 import { db, functions } from "../../firebaseConfig";
@@ -52,6 +52,44 @@ const isRoleAllowedForAccount = (user, role) =>
 
 const canResetTotpForUser = (user) =>
   TOTP_REQUIRED_ROLES.has(String(user?.role || "").toLowerCase());
+
+const normalizeSearchText = (value) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const getUserSearchText = (user) => {
+  const fields = [
+    user?.email,
+    user?.name,
+    user?.displayName,
+    user?.username,
+    user?.id,
+    user?.uid,
+    user?.role,
+    user?.status,
+    user?.authProvider,
+    user?.blackboardUsername,
+    user?.blackboardId,
+    user?.blackboardAuthUid,
+    user?.organizationName,
+    user?.department,
+    user?.program,
+    user?.position,
+  ];
+
+  return fields.map(normalizeSearchText).filter(Boolean).join(" ");
+};
+
+const userMatchesSearch = (user, query) => {
+  const terms = normalizeSearchText(query).split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+
+  const searchText = getUserSearchText(user);
+  return terms.every((term) => searchText.includes(term));
+};
 
 export default function RosterAccountManagement({ readOnly = false }) {
   const { userData: actorData } = useContext(SessionContext);
@@ -109,9 +147,55 @@ export default function RosterAccountManagement({ readOnly = false }) {
     fetchUsers();
   }, []);
 
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const usersCollection = collection(db, "users");
+      const querySnapshot = await getDocs(usersCollection);
+      const usersData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setUsers(usersData);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setUsers([]);
+    }
+    setLoading(false);
+  };
+
+  const applyFilters = useCallback(() => {
+    let filtered = [...users];
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter((user) => userMatchesSearch(user, searchTerm));
+    }
+
+    // Apply status filter
+    if (statusFilter === "active") {
+      filtered = filtered.filter(
+        (user) => user.status?.toLowerCase() === "active",
+      );
+    } else if (statusFilter === "inactive") {
+      filtered = filtered.filter(
+        (user) => user.status?.toLowerCase() === "inactive",
+      );
+    }
+
+    // Apply role filter
+    if (roleFilter !== "overall") {
+      filtered = filtered.filter(
+        (user) => user.role?.toLowerCase() === roleFilter.replace("-", " "),
+      );
+    }
+
+    setFilteredUsers(filtered);
+  }, [users, searchTerm, statusFilter, roleFilter]);
+
   useEffect(() => {
     applyFilters();
-  }, [users, searchTerm, statusFilter, roleFilter]);
+  }, [applyFilters]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -175,54 +259,6 @@ export default function RosterAccountManagement({ readOnly = false }) {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const usersCollection = collection(db, "users");
-      const querySnapshot = await getDocs(usersCollection);
-      const usersData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setUsers(usersData);
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setUsers([]);
-    }
-    setLoading(false);
-  };
-
-  const applyFilters = () => {
-    let filtered = [...users];
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter((user) =>
-        user.name?.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter === "active") {
-      filtered = filtered.filter(
-        (user) => user.status?.toLowerCase() === "active",
-      );
-    } else if (statusFilter === "inactive") {
-      filtered = filtered.filter(
-        (user) => user.status?.toLowerCase() === "inactive",
-      );
-    }
-
-    // Apply role filter
-    if (roleFilter !== "overall") {
-      filtered = filtered.filter(
-        (user) => user.role?.toLowerCase() === roleFilter.replace("-", " "),
-      );
-    }
-
-    setFilteredUsers(filtered);
-  };
 
   const handleRoleFilterChange = (filter) => {
     setRoleFilter(filter);
@@ -477,11 +513,22 @@ export default function RosterAccountManagement({ readOnly = false }) {
           <div className="search-wrapper">
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search email, name, username, role..."
+              aria-label="Search roster accounts"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                aria-label="Clear roster search"
+                onClick={() => setSearchTerm("")}
+              >
+                &times;
+              </button>
+            )}
             <svg
               className="search-icon"
               fill="none"
