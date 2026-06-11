@@ -24,7 +24,7 @@ const deleteBackup = async (request) => {
   }
 
   const { backupId } = request.data || {};
-  if (!backupId) {
+  if (!backupId || typeof backupId !== "string") {
     throw new HttpsError("invalid-argument", "Backup ID is required.");
   }
 
@@ -37,18 +37,23 @@ const deleteBackup = async (request) => {
 
   // Delete from Cloud Storage
   try {
-    const file = bucket.file(backupMeta.storagePath);
-    const [exists] = await file.exists();
-    if (exists) {
-      await file.delete();
+    if (backupMeta.storagePath) {
+      const file = bucket.file(backupMeta.storagePath);
+      const [exists] = await file.exists();
+      if (exists) {
+        await file.delete();
+      }
     }
 
     if (backupMeta.storageArchivePrefix) {
       await deleteArchivedStorageFiles(bucket, backupMeta.storageArchivePrefix);
     }
   } catch (err) {
-    // Continue even if storage deletion fails
-    console.warn("Could not delete backup file from storage:", err.message);
+    console.error("Could not delete backup file from storage:", err);
+    throw new HttpsError(
+      "internal",
+      "Failed to delete backup files from storage: " + err.message,
+    );
   }
 
   // Delete metadata from Firestore

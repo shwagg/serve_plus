@@ -29,8 +29,20 @@ const restoreBackup = async (request) => {
   }
 
   const { backupId, collections } = request.data || {};
-  if (!backupId) {
+  if (!backupId || typeof backupId !== "string") {
     throw new HttpsError("invalid-argument", "Backup ID is required.");
+  }
+  if (
+    collections !== undefined &&
+    (
+      !Array.isArray(collections) ||
+      collections.some((collection) => typeof collection !== "string")
+    )
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Collections must be an array of collection names.",
+    );
   }
 
   // Fetch backup metadata
@@ -41,6 +53,12 @@ const restoreBackup = async (request) => {
 
   const backupMeta = backupDoc.data();
   const filePath = backupMeta.storagePath;
+  if (!filePath) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Backup metadata is missing its storage path.",
+    );
+  }
 
   // Download backup JSON from Cloud Storage
   const file = bucket.file(filePath);
@@ -50,11 +68,16 @@ const restoreBackup = async (request) => {
   }
 
   const [contents] = await file.download();
-  const backupData = JSON.parse(contents.toString("utf8"));
+  let backupData;
+  try {
+    backupData = JSON.parse(contents.toString("utf8"));
+  } catch {
+    throw new HttpsError("data-loss", "Backup file is not valid JSON.");
+  }
 
   // Determine which collections to restore
   const collectionsToRestore =
-    collections && collections.length > 0
+    Array.isArray(collections) && collections.length > 0
       ? collections
       : getBackupCollectionNames(backupData);
 
@@ -66,10 +89,15 @@ const restoreBackup = async (request) => {
     if (!collectionData) continue;
 
     try {
+      const restoreOptions = collectionName === "users" ?
+        { preserveDocIds: new Set([callerUid]) } :
+        {};
+
       restoredDocuments += await restoreCollectionTree(
         db.collection(collectionName),
         collectionData,
         restoreTimestamps,
+        restoreOptions,
       );
     } catch (err) {
       errors.push(`Error restoring ${collectionName}: ${err.message}`);
@@ -78,16 +106,18 @@ const restoreBackup = async (request) => {
 
   // Restore Firebase Auth users if backup contains them
   let authRestored = 0;
+  let authUpdated = 0;
   let authDeleted = 0;
   let storageFilesRestored = 0;
   const backupAuthUsers = backupData._authUsers || [];
 
-  if (backupAuthUsers.length > 0) {
+  if (Array.isArray(backupData._authUsers)) {
     // Build a set of UIDs that existed at backup time
     const backupUids = new Set(backupAuthUsers.map((u) => u.uid));
 
     // Get all current Auth users
     const currentUids = new Set();
+    let authUsersListed = true;
     try {
       let nextPageToken;
       do {
@@ -98,64 +128,71 @@ const restoreBackup = async (request) => {
         nextPageToken = listResult.pageToken;
       } while (nextPageToken);
     } catch (err) {
+      authUsersListed = false;
       errors.push("Failed to list current Auth users: " + err.message);
     }
 
-    // Delete Auth users that were created AFTER the backup
-    // (exist now but not in backup), except the admin performing the restore
-    for (const uid of currentUids) {
-      if (!backupUids.has(uid) && uid !== callerUid) {
-        try {
-          await admin.auth().deleteUser(uid);
-          authDeleted++;
-        } catch (err) {
-          errors.push(`Failed to delete Auth user ${uid}: ${err.message}`);
+    if (authUsersListed) {
+      // Delete Auth users that were created AFTER the backup
+      // (exist now but not in backup), except the admin performing the restore
+      for (const uid of currentUids) {
+        if (!backupUids.has(uid) && uid !== callerUid) {
+          try {
+            await admin.auth().deleteUser(uid);
+            authDeleted++;
+          } catch (err) {
+            errors.push(`Failed to delete Auth user ${uid}: ${err.message}`);
+          }
         }
       }
-    }
 
-    // Recreate Auth users that were in the backup but are now missing
-    for (const backupUser of backupAuthUsers) {
-      if (!currentUids.has(backupUser.uid)) {
+      for (const backupUser of backupAuthUsers) {
         try {
-          const createProps = {
-            uid: backupUser.uid,
-            email: backupUser.email || undefined,
-            emailVerified: backupUser.emailVerified || false,
-            displayName: backupUser.displayName || undefined,
-            photoURL: backupUser.photoURL || undefined,
-            phoneNumber: backupUser.phoneNumber || undefined,
-            disabled: backupUser.disabled || false,
-          };
-          await admin.auth().createUser(createProps);
-          authRestored++;
+          if (currentUids.has(backupUser.uid)) {
+            await admin.auth().updateUser(
+              backupUser.uid,
+              getAuthUserUpdateProps(backupUser),
+            );
+            authUpdated++;
+          } else {
+            await admin.auth().createUser(getAuthUserCreateProps(backupUser));
+            authRestored++;
+          }
+
+          await admin.auth().setCustomUserClaims(
+            backupUser.uid,
+            backupUser.customClaims || null,
+          );
         } catch (err) {
           errors.push(
-            `Failed to recreate Auth user ${backupUser.uid}: ${err.message}`,
+            `Failed to restore Auth user ${backupUser.uid}: ${err.message}`,
           );
         }
       }
-    }
 
-    // Also delete Firestore "users" docs for users not in backup
-    // (except the current admin)
-    try {
-      const usersSnapshot = await db.collection("users").get();
-      const deleteBatch = db.batch();
-      let deleteCount = 0;
-      usersSnapshot.forEach((doc) => {
-        if (!backupUids.has(doc.id) && doc.id !== callerUid) {
-          deleteBatch.delete(doc.ref);
-          deleteCount++;
+      // Also delete Firestore "users" docs for users not in backup
+      // (except the current admin). Full user restores already do this
+      // recursively; this covers Auth-only cleanup for older backup payloads.
+      if (!collectionsToRestore.includes("users")) {
+        try {
+          const usersSnapshot = await db.collection("users").get();
+          const deleteBatch = db.batch();
+          let deleteCount = 0;
+          usersSnapshot.forEach((doc) => {
+            if (!backupUids.has(doc.id) && doc.id !== callerUid) {
+              deleteBatch.delete(doc.ref);
+              deleteCount++;
+            }
+          });
+          if (deleteCount > 0) {
+            await deleteBatch.commit();
+          }
+        } catch (err) {
+          errors.push(
+            "Failed to clean up extra Firestore user docs: " + err.message,
+          );
         }
-      });
-      if (deleteCount > 0) {
-        await deleteBatch.commit();
       }
-    } catch (err) {
-      errors.push(
-        "Failed to clean up extra Firestore user docs: " + err.message,
-      );
     }
   }
 
@@ -164,6 +201,7 @@ const restoreBackup = async (request) => {
       storageFilesRestored = await restoreArchivedStorageFiles(
         bucket,
         backupMeta.storageArchivePrefix,
+        backupMeta.storagePrefixes,
       );
     } catch (err) {
       errors.push("Failed to restore Storage files: " + err.message);
@@ -186,6 +224,7 @@ const restoreBackup = async (request) => {
     collectionsRestored: collectionsToRestore,
     restoredDocuments,
     authUsersRestored: authRestored,
+    authUsersUpdated: authUpdated,
     authUsersDeleted: authDeleted,
     storageFilesRestored,
     timestamp: FieldValue.serverTimestamp(),
@@ -196,12 +235,47 @@ const restoreBackup = async (request) => {
     restoredDocuments,
     collectionsRestored: collectionsToRestore,
     authUsersRestored: authRestored,
+    authUsersUpdated: authUpdated,
     authUsersDeleted: authDeleted,
     storageFilesRestored,
     errors,
-    message: `Restored ${restoredDocuments} documents from backup. Auth: ${authRestored} recreated, ${authDeleted} removed. Storage: ${storageFilesRestored} files restored.`,
+    message: `Restored ${restoredDocuments} documents from backup. Auth: ${authRestored} recreated, ${authUpdated} updated, ${authDeleted} removed. Storage: ${storageFilesRestored} files restored.`,
   };
 };
+
+function getAuthUserCreateProps(backupUser) {
+  return {
+    uid: backupUser.uid,
+    email: backupUser.email || undefined,
+    emailVerified: backupUser.emailVerified || false,
+    displayName: backupUser.displayName || undefined,
+    photoURL: backupUser.photoURL || undefined,
+    phoneNumber: backupUser.phoneNumber || undefined,
+    disabled: backupUser.disabled || false,
+  };
+}
+
+function getAuthUserUpdateProps(backupUser) {
+  const updateProps = {
+    emailVerified: backupUser.emailVerified || false,
+    disabled: backupUser.disabled || false,
+  };
+
+  if (backupUser.email) {
+    updateProps.email = backupUser.email;
+  }
+  if (backupUser.displayName !== undefined) {
+    updateProps.displayName = backupUser.displayName || null;
+  }
+  if (backupUser.photoURL !== undefined) {
+    updateProps.photoURL = backupUser.photoURL || null;
+  }
+  if (backupUser.phoneNumber !== undefined) {
+    updateProps.phoneNumber = backupUser.phoneNumber || null;
+  }
+
+  return updateProps;
+}
 
 /**
  * Recursively converts serialized timestamp objects back to Firestore Timestamps.

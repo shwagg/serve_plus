@@ -4,10 +4,20 @@ const ROOT_COLLECTIONS_TO_BACKUP = [
   "users",
   "missions",
   "auditLogs",
+  "adminAnnouncements",
   "proposal",
+  "proposalSubmission",
   "settings",
+  "systemConfig",
   "support",
-  "userMissions"
+  "userMissions",
+  "activityJournals",
+  "badgeOverrides",
+  "customBadges",
+  "loginAttempts",
+  "passwordResetAttempts",
+  "mfaFactors",
+  "mfaSessions",
 ];
 
 async function backupCollectionTree(collectionRef) {
@@ -49,10 +59,15 @@ async function restoreCollectionTree(
   collectionRef,
   collectionData,
   restoreTimestamps,
+  options = {},
 ) {
   const docEntries = Object.entries(collectionData || {});
+  const backupDocIds = new Set(docEntries.map(([docId]) => docId));
+  const preserveDocIds = options.preserveDocIds || new Set();
   let restoredDocuments = 0;
   const batchSize = 450;
+
+  await deleteDocsMissingFromBackup(collectionRef, backupDocIds, preserveDocIds);
 
   for (let i = 0; i < docEntries.length; i += batchSize) {
     const batch = collectionRef.firestore.batch();
@@ -63,7 +78,8 @@ async function restoreCollectionTree(
       const docRef = collectionRef.doc(docId);
       const entry = normalizeBackupEntry(rawEntry);
 
-      batch.set(docRef, restoreTimestamps(entry.data), { merge: true });
+      await deleteReferenceTree(docRef);
+      batch.set(docRef, restoreTimestamps(entry.data));
       nestedRestores.push({ docRef, subcollections: entry.subcollections });
     }
 
@@ -84,6 +100,48 @@ async function restoreCollectionTree(
   }
 
   return restoredDocuments;
+}
+
+async function deleteDocsMissingFromBackup(
+  collectionRef,
+  backupDocIds,
+  preserveDocIds,
+) {
+  const snapshot = await collectionRef.get();
+
+  for (const doc of snapshot.docs) {
+    if (backupDocIds.has(doc.id) || preserveDocIds.has(doc.id)) {
+      continue;
+    }
+
+    await deleteReferenceTree(doc.ref);
+  }
+}
+
+async function deleteReferenceTree(ref) {
+  const firestore = ref.firestore;
+  if (typeof firestore.recursiveDelete === "function") {
+    await firestore.recursiveDelete(ref);
+    return;
+  }
+
+  await fallbackRecursiveDelete(ref);
+}
+
+async function fallbackRecursiveDelete(ref) {
+  if (typeof ref.listCollections === "function") {
+    const subcollections = await ref.listCollections();
+    for (const subcollectionRef of subcollections) {
+      await fallbackRecursiveDelete(subcollectionRef);
+    }
+    await ref.delete();
+    return;
+  }
+
+  const snapshot = await ref.get();
+  for (const doc of snapshot.docs) {
+    await fallbackRecursiveDelete(doc.ref);
+  }
 }
 
 function getBackupCollectionNames(backupData) {

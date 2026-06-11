@@ -1,6 +1,11 @@
 const STORAGE_PREFIXES_TO_BACKUP = [
+  "accomplishment_reports/",
+  "badges/custom/",
   "chat-attachments/",
   "consents/",
+  "event-certificates/",
+  "gallery/",
+  "mission-covers/",
   "profile-pictures/",
   "proposals/",
 ];
@@ -33,19 +38,32 @@ async function archiveStoragePrefixes(
   return totalStorageFiles;
 }
 
-async function restoreArchivedStorageFiles(bucket, archivePrefix) {
+async function restoreArchivedStorageFiles(
+  bucket,
+  archivePrefix,
+  storagePrefixes = [],
+) {
   if (!archivePrefix) {
     return 0;
   }
 
   const [files] = await bucket.getFiles({ prefix: archivePrefix });
+  const archivedFiles = files.filter((file) => {
+    return file.name && !file.name.endsWith("/");
+  });
+  const destinationPaths = new Set(
+    archivedFiles
+      .map((file) => file.name.slice(archivePrefix.length))
+      .filter(Boolean),
+  );
+
+  for (const prefix of normalizeStoragePrefixes(storagePrefixes)) {
+    await deleteStorageFilesWithPrefix(bucket, prefix, destinationPaths);
+  }
+
   let restoredStorageFiles = 0;
 
-  for (const file of files) {
-    if (!file.name || file.name.endsWith("/")) {
-      continue;
-    }
-
+  for (const file of archivedFiles) {
     const destinationPath = file.name.slice(archivePrefix.length);
     if (!destinationPath) {
       continue;
@@ -80,6 +98,40 @@ async function deleteArchivedStorageFiles(bucket, archivePrefix) {
 
 function shouldArchiveFile(fileName, prefix) {
   return Boolean(fileName) && fileName !== prefix && !fileName.endsWith("/");
+}
+
+async function deleteStorageFilesWithPrefix(
+  bucket,
+  prefix,
+  pathsToKeep = new Set(),
+) {
+  const [files] = await bucket.getFiles({ prefix });
+  let deletedStorageFiles = 0;
+
+  for (const file of files) {
+    if (!shouldArchiveFile(file.name, prefix) || pathsToKeep.has(file.name)) {
+      continue;
+    }
+
+    await file.delete({ ignoreNotFound: true });
+    deletedStorageFiles += 1;
+  }
+
+  return deletedStorageFiles;
+}
+
+function normalizeStoragePrefixes(storagePrefixes) {
+  if (!Array.isArray(storagePrefixes)) {
+    return [];
+  }
+
+  return storagePrefixes.filter((prefix) => {
+    return (
+      typeof prefix === "string" &&
+      prefix.length > 0 &&
+      !prefix.startsWith("backup-storage/")
+    );
+  });
 }
 
 module.exports = {

@@ -58,7 +58,14 @@ export default function BackupRestore() {
     try {
       const restoreBackupFn = httpsCallable(functions, "restoreBackup");
       const result = await restoreBackupFn({ backupId });
-      setSuccess(result.data.message);
+      if (result.data?.success === false) {
+        setError(
+          "Restore completed with errors. " +
+            (result.data.errors || []).join(" "),
+        );
+      } else {
+        setSuccess(result.data.message);
+      }
       await fetchBackups();
     } catch (err) {
       setError("Failed to restore backup. " + (err.message || ""));
