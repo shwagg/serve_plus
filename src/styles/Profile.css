@@ -562,10 +562,13 @@
   box-shadow: 0 24px 80px rgba(0,0,0,0.38);
 }
 .cert-modal-header {
-  display: flex; align-items: center; gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
   padding: 16px 20px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
 }
-.cert-modal-header-info { flex: 1; min-width: 0; }
+.cert-modal-header-info { min-width: 0; overflow: hidden; }
 .cert-modal-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
 .cert-modal-course {
   font-weight: 700; font-size: 1.05rem; color: #1e293b;
@@ -573,9 +576,16 @@
 }
 .cert-modal-date { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
 .cert-modal-close {
-  background: none; border: none; font-size: 1.5rem; cursor: pointer;
-  color: #94a3b8; padding: 4px 8px; border-radius: 6px; line-height: 1;
-  flex-shrink: 0; transition: background 0.15s, color 0.15s;
+  justify-self: end;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
 }
 .cert-modal-close:hover { background: #f1f5f9; color: #475569; }
 .cert-modal-body {
@@ -616,10 +626,21 @@
 }
 .cert-modal-download-btn:hover { background: #1558c0; }
 
+@media (max-width: 768px) {
+  .cert-modal-header { padding: 14px 44px 14px 16px; }
+  .cert-modal-label { font-size: 0.68rem; }
+  .cert-modal-course { font-size: 0.98rem; }
+  .cert-modal-date { font-size: 0.7rem; }
+  .cert-modal-close { font-size: 1.35rem; right: 10px; }
+}
+
 @media (max-width: 600px) {
   .cert-modal-box { width: 96vw; max-height: 88vh; border-radius: 10px; }
-  .cert-modal-header { padding: 12px 14px; gap: 8px; }
-  .cert-modal-course { font-size: 0.92rem; }
+  .cert-modal-header { padding: 10px 40px 10px 12px; }
+  .cert-modal-label { font-size: 0.62rem; letter-spacing: 0.3px; }
+  .cert-modal-course { font-size: 0.85rem; }
+  .cert-modal-date { font-size: 0.66rem; }
+  .cert-modal-close { font-size: 1.2rem; right: 8px; }
   .cert-modal-body { min-height: 280px; }
   .cert-modal-iframe { min-height: 280px; }
   .cert-modal-loading { min-height: 280px; }
@@ -629,6 +650,14 @@
   .cert-thumb-iframe { width: 625px; height: 450px; transform: scale(0.125); }
   .cert-list-item { gap: 12px; }
   .cert-list-course { font-size: 0.88rem; }
+}
+
+@media (max-width: 400px) {
+  .cert-modal-header { padding: 8px 36px 8px 10px; }
+  .cert-modal-label { font-size: 0.58rem; }
+  .cert-modal-course { font-size: 0.75rem; }
+  .cert-modal-date { font-size: 0.6rem; }
+  .cert-modal-close { font-size: 1.1rem; right: 6px; }
 }
 
 /* Legacy cert card styles (kept for backwards compat) */

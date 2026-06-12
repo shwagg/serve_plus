@@ -63,14 +63,14 @@ const likertScale = [
 ];
 
 const likertStatements = [
-  { text: 'The ideas, suggestions, and solutions that were implemented during the community service helped in providing solutions to the problems and issues in the community.' },
-  { text: 'The community service brought about initiatives and teamwork that somehow addressed the problems and issues at hand.' },
-  { text: 'Being able to understand the diversity of the people involved in the community allowed for a successful implementation of the community service initiative.' },
-  { text: 'Through the community service initiative, I was able to realize the role that I have to play in the society both as a student and a Filipino citizen.' },
-  { text: 'The profession that I will pursue in the future along with the knowledge and skills that I would be able to develop would contribute to addressing social problems and issues.' },
-  { text: 'I consider community development initiatives to be the last of my priorities. I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.' },
-  { text: 'I think that my participation in the community service initiative did not help the community or the country let alone the world. My involvement was insignificant and did not make any difference.' },
-  { text: 'I was able to realize that participating in community development initiatives, no matter how big or small the involvement is, would make a difference. As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.' },
+  { text: 'The ideas, suggestions, and solutions that were implemented during the community service <b>helped in providing solutions to the problems and issues</b> in the community.' },
+  { text: 'The community service brought about initiatives and teamwork that <b>somehow addressed the problems and issues at hand.</b>' },
+  { text: 'Being able to understand the diversity of the people involved in the community <b>allowed for a successful implementation</b> of the community service initiative.' },
+  { text: 'Through the community service initiative, <b>I was able to realize the role that I have to play</b> in the society both as a student and a Filipino citizen.' },
+  { text: 'The <b>profession that I will pursue</b> in the future along with the knowledge and skills that I <b>would be able to develop would contribute</b> to addressing social problems and issues.' },
+  { text: 'I consider community development initiatives to be the <b>last of my priorities.</b> I think that by focusing on academics, friends, family, recreation, etc. I would be able to help the society more.' },
+  { text: 'I think that my participation in the community service initiative <b>did not help</b> the community or the country let alone the world. My involvement was insignificant and did not make any difference.' },
+  { text: 'I was able to realize that participating in community development initiatives, <b>no matter how big or small the involvement is, would make a difference.</b> As such, I am willing to manage my time and have the initiative to participate whenever there is an opportunity.' },
 ];
 
 const PostActivitySurvey = ({
