@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { functions } from "../../firebaseConfig";
 import "../../styles/BackupRestore.css";
 
+const HEAVY_CALL_OPTIONS = { timeout: 540000 };
+
 export default function BackupRestore() {
   const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,11 @@ export default function BackupRestore() {
     setError("");
     setSuccess("");
     try {
-      const createBackupFn = httpsCallable(functions, "createBackup");
+      const createBackupFn = httpsCallable(
+        functions,
+        "createBackup",
+        HEAVY_CALL_OPTIONS,
+      );
       const result = await createBackupFn({ label: label || undefined });
       setSuccess(result.data.message);
       setLabel("");
@@ -56,7 +62,11 @@ export default function BackupRestore() {
     setSuccess("");
     setConfirmRestore(null);
     try {
-      const restoreBackupFn = httpsCallable(functions, "restoreBackup");
+      const restoreBackupFn = httpsCallable(
+        functions,
+        "restoreBackup",
+        HEAVY_CALL_OPTIONS,
+      );
       const result = await restoreBackupFn({ backupId });
       if (result.data?.success === false) {
         setError(
