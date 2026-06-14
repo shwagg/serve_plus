@@ -488,6 +488,39 @@
   margin: 0 0 8px 0;
 }
 
+.settings-agreement-intro {
+  white-space: pre-wrap;
+}
+
+.settings-agreement-rich-body p {
+  margin: 0 0 8px 0;
+}
+
+.settings-agreement-rich-body ul,
+.settings-agreement-rich-body ol {
+  margin: 4px 0 10px;
+  padding-left: 20px;
+}
+
+.settings-agreement-rich-body li {
+  margin-bottom: 4px;
+}
+
+.settings-agreement-rich-body blockquote {
+  border-left: 3px solid #cbd5e1;
+  color: #475569;
+  margin: 8px 0;
+  padding-left: 10px;
+}
+
+.settings-agreement-rich-body code {
+  background: #eef2f7;
+  border-radius: 4px;
+  color: #334155;
+  font-size: 0.94em;
+  padding: 1px 4px;
+}
+
 .settings-agreement-heading {
   font-size: 13.5px;
   font-weight: 700;

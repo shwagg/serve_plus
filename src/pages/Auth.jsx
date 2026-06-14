@@ -9,13 +9,12 @@ import bbl_icon from "../assets/bbl_icon.svg";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
 // import loginPosterGif from "../assets/login_poster_loop.gif"; // temporarily removed
 // import loginPosterFallback from "../assets/login_poster_img.svg"; // temporarily removed
-import AgreementModal, {
-  fetchCurrentAgreementVersion,
-} from "../components/AgreementModal";
+import AgreementModal from "../components/AgreementModal";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import { auth, db, functions } from "../firebaseConfig";
 import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
+import { fetchCurrentAgreementVersion } from "../utils/agreementVersion";
 import { getMfaRouteForAction, saveMfaSession } from "../utils/mfaSession";
 
 function getBlackboardRedirectPath(role) {

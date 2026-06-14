@@ -15,6 +15,7 @@ import {
   LocalPoliceOutlinedIcon, HistoryOutlinedIcon,
   ArticleOutlinedIcon, FileDownloadOutlinedIcon, PersonOffOutlinedIcon,
 } from "./icons";
+import { renderAgreementContent } from "../utils/agreementContent";
 import "./styles/SettingsModal.css";
 
 const ALL_SECTIONS = [
@@ -102,11 +103,6 @@ export default function SettingsModal({ isOpen, onClose }) {
       setAgreementData({});
     }
     setAgreementLoading(false);
-  };
-
-  const renderAgreementBody = (body) => {
-    if (!body) return null;
-    return <div dangerouslySetInnerHTML={{ __html: body }} />;
   };
 
   const fetchAuditLogs = async () => {
@@ -579,7 +575,11 @@ export default function SettingsModal({ isOpen, onClose }) {
                       <p className="settings-empty">Could not load content.</p>
                     ) : termsTab === "terms" ? (
                       <>
-                        {agreementData.termsIntro && <div dangerouslySetInnerHTML={{ __html: agreementData.termsIntro }} />}
+                        {renderAgreementContent(agreementData.termsIntro, {
+                          richClassName: "settings-agreement-rich-body",
+                          plainClassName: "settings-agreement-intro",
+                          preservePlainTextBreaks: true,
+                        })}
                         {agreementData.version && (
                           <p className="settings-agreement-version">v{agreementData.version}</p>
                         )}
@@ -587,13 +587,19 @@ export default function SettingsModal({ isOpen, onClose }) {
                         {(agreementData.termsSections || []).map((s, i) => (
                           <div key={i}>
                             <h3 className="settings-agreement-heading">{s.heading}</h3>
-                            {renderAgreementBody(s.body)}
+                            {renderAgreementContent(s.body, {
+                              richClassName: "settings-agreement-rich-body",
+                            })}
                           </div>
                         ))}
                       </>
                     ) : (
                       <>
-                        {agreementData.privacyIntro && <div dangerouslySetInnerHTML={{ __html: agreementData.privacyIntro }} />}
+                        {renderAgreementContent(agreementData.privacyIntro, {
+                          richClassName: "settings-agreement-rich-body",
+                          plainClassName: "settings-agreement-intro",
+                          preservePlainTextBreaks: true,
+                        })}
                         {agreementData.version && (
                           <p className="settings-agreement-version">v{agreementData.version}</p>
                         )}
@@ -601,7 +607,9 @@ export default function SettingsModal({ isOpen, onClose }) {
                         {(agreementData.privacySections || []).map((s, i) => (
                           <div key={i}>
                             <h3 className="settings-agreement-heading">{s.heading}</h3>
-                            {renderAgreementBody(s.body)}
+                            {renderAgreementContent(s.body, {
+                              richClassName: "settings-agreement-rich-body",
+                            })}
                           </div>
                         ))}
                       </>

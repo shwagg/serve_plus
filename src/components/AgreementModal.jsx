@@ -1,27 +1,10 @@
-import DOMPurify from "dompurify";
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db } from "../firebaseConfig";
+import { renderAgreementContent } from "../utils/agreementContent";
+import { FALLBACK_AGREEMENT_VERSION } from "../utils/agreementVersion";
 import { showToast } from "../utils/toast";
 import "./styles/AgreementModal.css";
-
-// Fallback version if Firestore doc doesn't exist yet
-const FALLBACK_VERSION = "1.0";
-
-// Helper: fetch the current agreement version from Firestore settings
-export async function fetchCurrentAgreementVersion() {
-  try {
-    const snap = await getDoc(doc(db, "settings", "agreements"));
-    if (snap.exists()) return snap.data().version || FALLBACK_VERSION;
-  } catch (err) {
-    console.warn("Could not fetch agreement version:", err);
-  }
-  return FALLBACK_VERSION;
-}
-
-function hasHtmlTags(text) {
-  return /<\/?[a-z][\s\S]*>/i.test(text || "");
-}
 
 export default function AgreementModal({ uid, onAccepted }) {
   const [activeTab, setActiveTab] = useState("terms"); // "terms" or "privacy"
@@ -31,7 +14,7 @@ export default function AgreementModal({ uid, onAccepted }) {
   const [fetching, setFetching] = useState(true);
 
   // Agreement content from Firestore
-  const [version, setVersion] = useState(FALLBACK_VERSION);
+  const [version, setVersion] = useState(FALLBACK_AGREEMENT_VERSION);
   const [termsIntro, setTermsIntro] = useState("");
   const [termsSections, setTermsSections] = useState([]);
   const [privacyIntro, setPrivacyIntro] = useState("");
@@ -43,7 +26,7 @@ export default function AgreementModal({ uid, onAccepted }) {
         const snap = await getDoc(doc(db, "settings", "agreements"));
         if (snap.exists()) {
           const data = snap.data();
-          setVersion(data.version || FALLBACK_VERSION);
+          setVersion(data.version || FALLBACK_AGREEMENT_VERSION);
           setTermsIntro(data.termsIntro || "");
           setTermsSections(data.termsSections || []);
           setPrivacyIntro(data.privacyIntro || "");
@@ -79,76 +62,16 @@ export default function AgreementModal({ uid, onAccepted }) {
     }
   };
 
-  // Render rich HTML content (new format) or plain text (legacy format)
   const renderBody = (body) => {
-    if (!body) return null;
-
-    if (hasHtmlTags(body)) {
-      const safeHtml = DOMPurify.sanitize(body, {
-        ALLOWED_TAGS: [
-          "p",
-          "br",
-          "ul",
-          "ol",
-          "li",
-          "strong",
-          "em",
-          "b",
-          "i",
-          "u",
-        ],
-      });
-
-      return (
-        <div
-          className="agreement-rich-body"
-          dangerouslySetInnerHTML={{ __html: safeHtml }}
-        />
-      );
-    }
-
-    const lines = body.split("\n").filter((l) => l.trim());
-    if (lines.length > 1) {
-      return (
-        <ul>
-          {lines.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ul>
-      );
-    }
-    return <p>{body}</p>;
+    return renderAgreementContent(body);
   };
 
   const renderIntro = (intro) => {
-    if (!intro) return null;
-
-    if (hasHtmlTags(intro)) {
-      const safeHtml = DOMPurify.sanitize(intro, {
-        ALLOWED_TAGS: [
-          "p",
-          "br",
-          "ul",
-          "ol",
-          "li",
-          "strong",
-          "em",
-          "b",
-          "i",
-          "u",
-        ],
-      });
-
-      return (
-        <div
-          className="agreement-rich-body agreement-intro-rich"
-          dangerouslySetInnerHTML={{ __html: safeHtml }}
-        />
-      );
-    }
-
-    // Preserve newline spacing from plain-text intro content.
-    return <p className="agreement-intro-text">{intro}</p>;
+    return renderAgreementContent(intro, {
+      richClassName: "agreement-rich-body agreement-intro-rich",
+      plainClassName: "agreement-intro-text",
+      preservePlainTextBreaks: true,
+    });
   };
 
   return (

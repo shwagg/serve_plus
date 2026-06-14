@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../../components/Header";
 import { db } from "../../../firebaseConfig";
+import { renderAgreementContent } from "../../../utils/agreementContent";
 import "./PrivacyPolicy.css";
 
 export default function PrivacyPolicy() {
@@ -29,21 +30,6 @@ export default function PrivacyPolicy() {
     };
     fetchPrivacy();
   }, []);
-
-  const renderBody = (body) => {
-    if (!body) return null;
-    const lines = body.split("\n").filter((l) => l.trim());
-    if (lines.length > 1) {
-      return (
-        <ul>
-          {lines.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ul>
-      );
-    }
-    return <p>{body}</p>;
-  };
 
   return (
     <div className="agreement-page">
@@ -77,12 +63,16 @@ export default function PrivacyPolicy() {
           <p style={{ color: "#94a3b8" }}>Loading...</p>
         ) : (
           <>
-            {intro && <p>{intro}</p>}
+            {renderAgreementContent(intro, {
+              richClassName: "agreement-rich-body agreement-intro-rich",
+              plainClassName: "agreement-intro-text",
+              preservePlainTextBreaks: true,
+            })}
             <hr className="agreement-divider" />
             {sections.map((s, i) => (
               <div key={i}>
                 <h2>{s.heading}</h2>
-                {renderBody(s.body)}
+                {renderAgreementContent(s.body)}
               </div>
             ))}
           </>

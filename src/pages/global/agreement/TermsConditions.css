@@ -36,9 +36,52 @@
   line-height: 1.7;
 }
 
-.agreement-content ul {
+.agreement-content ul,
+.agreement-content ol {
   padding-left: 1.5rem;
   margin-bottom: 0.5rem;
+}
+
+.agreement-intro-text {
+  white-space: pre-wrap;
+}
+
+.agreement-rich-body p {
+  margin: 0.65rem 0;
+}
+
+.agreement-rich-body p:first-child {
+  margin-top: 0;
+}
+
+.agreement-rich-body p:empty {
+  min-height: 1.1rem;
+}
+
+.agreement-rich-body ul,
+.agreement-rich-body ol {
+  margin: 0.5rem 0 0.9rem;
+}
+
+.agreement-rich-body blockquote {
+  border-left: 3px solid #cbd5e1;
+  color: #475569;
+  margin: 0.75rem 0;
+  padding-left: 1rem;
+}
+
+.agreement-rich-body code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  color: #334155;
+  font-size: 0.94em;
+  padding: 0.1rem 0.25rem;
+}
+
+.agreement-rich-body hr {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 1.25rem 0;
 }
 
 .agreement-divider {
