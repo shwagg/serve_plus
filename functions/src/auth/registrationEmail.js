@@ -5,6 +5,7 @@ const {HttpsError} = require("firebase-functions/v2/https");
 const {
   normalizeEmail,
   isAllowedEmailDomain,
+  isEmulatorEmailDomain,
 } = require("./emailPolicy");
 
 const UNVERIFIED_RETENTION_HOURS = 72;
@@ -112,7 +113,9 @@ async function validateRegistrationEmail(request) {
   }
 
   await assertEmailIsUnused(email);
-  await assertDomainHasMx(getEmailParts(email).domain);
+  if (!isEmulatorEmailDomain(email)) {
+    await assertDomainHasMx(getEmailParts(email).domain);
+  }
 
   return {ok: true, email};
 }
