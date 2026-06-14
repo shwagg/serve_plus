@@ -142,7 +142,7 @@
 
 .roster-table {
   width: 100%;
-  min-width: 600px;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -195,6 +195,13 @@
   color: #202124;
   font-size: 0.85rem;
   font-weight: 500;
+}
+
+.roster-table td.user-full-name {
+  color: #202124;
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .user-email-stack {

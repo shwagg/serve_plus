@@ -64,7 +64,10 @@ const getUserSearchText = (user) => {
   const fields = [
     user?.email,
     user?.name,
+    user?.fullName,
     user?.displayName,
+    user?.firstName,
+    user?.lastName,
     user?.username,
     user?.id,
     user?.uid,
@@ -89,6 +92,25 @@ const userMatchesSearch = (user, query) => {
 
   const searchText = getUserSearchText(user);
   return terms.every((term) => searchText.includes(term));
+};
+
+const getUserFullName = (user) => {
+  const nameFromParts = [
+    user?.firstName,
+    user?.middleInitial,
+    user?.lastName,
+  ]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    user?.name ||
+    user?.fullName ||
+    user?.displayName ||
+    nameFromParts ||
+    "N/A"
+  );
 };
 
 export default function RosterAccountManagement({ readOnly = false }) {
@@ -300,12 +322,12 @@ export default function RosterAccountManagement({ readOnly = false }) {
       (selectedRole === "faculty" || selectedRole === "admin") &&
       !selectedPosition
     ) {
-      showToast("Please select a position for this role.");
+      showToast("Please select a position for this account level.");
       return;
     }
     // Check if department is required but not selected (faculty only)
     if (selectedRole === "faculty" && !selectedDepartment) {
-      showToast("Please select a department for faculty role.");
+      showToast("Please select a department for the faculty account level.");
       return;
     }
 
@@ -440,7 +462,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
       setSelectedDepartment("");
     } catch (err) {
       console.error("Error updating role:", err);
-      showToast("Failed to update role. Please try again.");
+      showToast("Failed to update account level. Please try again.");
     }
   };
 
@@ -513,7 +535,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
           <div className="search-wrapper">
             <input
               type="text"
-              placeholder="Search email, name, username, role..."
+              placeholder="Search email, name, username, account level..."
               aria-label="Search roster accounts"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -613,8 +635,9 @@ export default function RosterAccountManagement({ readOnly = false }) {
               <thead>
                 <tr>
                   <th className="text-left"> </th>
+                  <th className="text-left">Full Name</th>
                   <th className="text-left">Email</th>
-                  <th className="text-center">Role</th>
+                  <th className="text-center">Account Level</th>
                   <th className="text-center">Account Created</th>
                   {canManageTotp && (
                     <th className="text-center">Actions</th>
@@ -625,7 +648,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
                 {filteredUsers.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canManageTotp ? 5 : 4}
+                      colSpan={canManageTotp ? 6 : 5}
                       className="no-users-message"
                     >
                       No users found
@@ -636,6 +659,9 @@ export default function RosterAccountManagement({ readOnly = false }) {
                     <tr key={user.id}>
                       <td className="row-number">
                         {(currentPage - 1) * pageSize + index + 1}
+                      </td>
+                      <td className="user-full-name">
+                        {getUserFullName(user)}
                       </td>
                       <td className="user-name">
                         <div className="user-email-stack">
@@ -660,7 +686,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
                               className="role-select"
                             >
                               {!isRoleAllowedForAccount(user, selectedRole) && (
-                                <option value="">Select Role</option>
+                                <option value="">Select Account Level</option>
                               )}
                               {getAssignableRoleOptions(user).map(({ value, label }) => (
                                 <option key={value} value={value}>
@@ -736,7 +762,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
                                 }
                                 className="change-role-btn"
                               >
-                                <img src={ChangeIcon} alt="Change Role" />
+                                <img src={ChangeIcon} alt="Change Account Level" />
                               </button>
                             )}
                           </div>
