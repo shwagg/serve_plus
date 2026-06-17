@@ -36,6 +36,24 @@ export default function NotificationBell() {
   const prevPointsRef = useRef(null);
   const prevNotifCountRef = useRef(0);
 
+  const getProposalNotificationPath = useCallback((notification) => {
+    const role = userData?.role;
+
+    if (role === "student") {
+      return "/student/home";
+    }
+
+    if (role === "admin") {
+      return "/admin/review-proposals";
+    }
+
+    if (role === "faculty") {
+      return "/faculty/review-proposals";
+    }
+
+    return notification.link || "/global/review-proposals";
+  }, [userData?.role]);
+
   const closeForOtherHeaderModal = useCallback(() => {
     setIsOpen(false);
     setEventAnnouncementModal(null);
@@ -143,12 +161,12 @@ export default function NotificationBell() {
     
     // Proposal notifications - navigate to review proposals page
     if (notification.type === "proposal_submitted" || notification.type === "proposal_status") {
-      if (notification.link) {
-        navigate(notification.link);
-      } else {
-        // Fallback to proposals page
-        navigate("/global/review-proposals");
-      }
+      navigate(getProposalNotificationPath(notification), {
+        state: {
+          activeTab: userData?.role === "student" ? "proposals" : undefined,
+          proposalId: notification.proposalId,
+        },
+      });
       return;
     }
     
@@ -290,7 +308,7 @@ export default function NotificationBell() {
       }
       return;
     }
-  }, [userId, navigate]);
+  }, [userId, navigate, userData?.role, getProposalNotificationPath]);
 
   const handleMarkAllAsRead = useCallback(async () => {
     if (!userId) return;

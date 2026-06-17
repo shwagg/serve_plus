@@ -71,9 +71,11 @@ const landingPromos = [
 ];
 
 const StudentHome = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(() => location.state?.activeTab || "all");
 
 
   const [level, setLevel] = useState(1);
@@ -222,29 +224,33 @@ const StudentHome = () => {
     return () => unsub();
   }, []);
 
-  // Fetch proposals created by the current user
+  // Keep proposals created by the current user in sync.
   useEffect(() => {
-    const fetchProposals = async () => {
-      const user = currentUser;
-      if (!user) {
-        setProposalCards([]);
-        return;
-      }
-      try {
-        const q = query(
-          collection(db, "missions"),
-          where("createdBy", "==", user.uid)
-        );
-        const snap = await getDocs(q);
+    const user = currentUser;
+    if (!user) {
+      setProposalCards([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "missions"),
+      where("createdBy", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
         const proposals = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .filter(p => p.status !== "published");
         setProposalCards(proposals);
-      } catch (error) {
+      },
+      (error) => {
         console.error("Error fetching proposals:", error);
       }
-    };
-    fetchProposals();
+    );
+
+    return () => unsubscribe();
   }, [currentUser, proposalRefreshKey]);
 
   // Fetch admin announcements for the ticker strip
@@ -271,9 +277,16 @@ const StudentHome = () => {
     return () => document.body.classList.remove('ticker-active');
   }, [tickerAnnouncements]);
 
-  const navigate = useNavigate();
-  const location = useLocation();
   const missionsSectionRef = useRef(null);
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+    if (location.state?.activeTab === "proposals") {
+      setProposalRefreshKey(k => k + 1);
+    }
+  }, [location.key, location.state?.activeTab]);
 
   useLayoutEffect(() => {
     if (location.state?.scrollTo === 'missions' && missionsSectionRef.current) {
