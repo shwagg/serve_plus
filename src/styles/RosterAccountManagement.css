@@ -408,6 +408,17 @@
   color: #0f172a;
 }
 
+.roster-action-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.roster-action-trigger:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #475569;
+}
+
 .roster-action-menu {
   position: absolute;
   top: calc(100% + 0.35rem);

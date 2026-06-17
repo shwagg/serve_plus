@@ -187,6 +187,9 @@ export default function Header() {
       case 'admin':
         navigate('/admin/dashboard');
         break;
+      case 'sysadmin':
+        navigate('/sysadmin/roster');
+        break;
       default:
         break;
     }

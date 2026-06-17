@@ -9,7 +9,7 @@ import { httpsCallable } from "firebase/functions";
 import { useEffect, useState, useContext, useRef, useCallback } from "react";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ChangeIcon from "../../components/icons/Change.svg";
-import { db, functions } from "../../firebaseConfig";
+import { auth, db, functions } from "../../firebaseConfig";
 import { showConfirm, showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
 import { SessionContext } from "../../context/sessionContextCore";
@@ -132,6 +132,12 @@ export default function RosterAccountManagement({ readOnly = false }) {
   const filterDropdownRef = useRef(null);
   const pageSize = 10;
   const canManageTotp = !readOnly && actorData?.role === "sysadmin";
+  const currentUserId = auth.currentUser?.uid || null;
+  const isSelfAccount = (userOrId) => {
+    const targetUserId =
+      typeof userOrId === "string" ? userOrId : userOrId?.id;
+    return Boolean(currentUserId && targetUserId === currentUserId);
+  };
   // Department options for faculty
   const departments = [
     "College of Arts and Science (CAS)",
@@ -292,6 +298,11 @@ export default function RosterAccountManagement({ readOnly = false }) {
     currentPosition,
     currentDepartment,
   ) => {
+    if (isSelfAccount(userId)) {
+      showToast("You cannot change your own account level.");
+      return;
+    }
+
     const currentUser = users.find((u) => u.id === userId) || {};
     const normalizedRole = String(currentRole || "").toLowerCase();
     setEditingRoleUserId(userId);
@@ -303,9 +314,14 @@ export default function RosterAccountManagement({ readOnly = false }) {
   };
 
   const handleRoleChange = async (userId) => {
-    if (!selectedRole) return;
+    if (isSelfAccount(userId)) {
+      showToast("You cannot change your own account level.");
+      return;
+    }
 
     const currentUser = users.find((u) => u.id === userId) || {};
+    if (!selectedRole) return;
+
     if (!isRoleAllowedForAccount(currentUser, selectedRole)) {
       const accountType = isBlackboardAccount(currentUser)
         ? "Blackboard"
@@ -474,6 +490,11 @@ export default function RosterAccountManagement({ readOnly = false }) {
   };
 
   const handleResetTotp = async (targetUser) => {
+    if (isSelfAccount(targetUser)) {
+      showToast("You cannot apply actions to your own account.");
+      return;
+    }
+
     if (!canManageTotp || !canResetTotpForUser(targetUser)) return;
 
     const targetLabel = targetUser.email || targetUser.name || "this user";
@@ -655,180 +676,197 @@ export default function RosterAccountManagement({ readOnly = false }) {
                     </td>
                   </tr>
                 ) : (
-                  paginatedUsers.map((user, index) => (
-                    <tr key={user.id}>
-                      <td className="row-number">
-                        {(currentPage - 1) * pageSize + index + 1}
-                      </td>
-                      <td className="user-full-name">
-                        {getUserFullName(user)}
-                      </td>
-                      <td className="user-name">
-                        <div className="user-email-stack">
-                          <span>{user.email || "N/A"}</span>
-                          {canManageTotp && totpResetRequests[user.id] && (
-                            <span className="totp-request-badge">
-                              TOTP reset requested
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-center role-cell">
-                        {!readOnly && editingRoleUserId === user.id ? (
-                          <div className="role-edit-container">
-                            <select
-                              value={selectedRole}
-                              onChange={(e) => {
-                                setSelectedRole(e.target.value);
-                                setSelectedPosition("");
-                                setSelectedDepartment("");
-                              }}
-                              className="role-select"
-                            >
-                              {!isRoleAllowedForAccount(user, selectedRole) && (
-                                <option value="">Select Account Level</option>
-                              )}
-                              {getAssignableRoleOptions(user).map(({ value, label }) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
+                  paginatedUsers.map((user, index) => {
+                    const isCurrentUserRow = isSelfAccount(user);
 
-                            {(selectedRole === "faculty" ||
-                              selectedRole === "admin") && (
-                                <select
-                                  value={selectedPosition}
-                                  onChange={(e) =>
-                                    setSelectedPosition(e.target.value)
-                                  }
-                                  className="role-select"
-                                >
-                                  <option value="">Select Position</option>
-                                  {positionsByRole[selectedRole]?.map(
-                                    (position) => (
-                                      <option key={position} value={position}>
-                                        {position}
-                                      </option>
-                                    ),
-                                  )}
-                                </select>
-                              )}
-
-                            {selectedRole === "faculty" && (
-                              <select
-                                value={selectedDepartment}
-                                onChange={(e) =>
-                                  setSelectedDepartment(e.target.value)
-                                }
-                                className="role-select"
-                              >
-                                <option value="">Select Department</option>
-                                {departments.map((dept) => (
-                                  <option key={dept} value={dept}>
-                                    {dept}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-
-                            <div className="role-edit-actions">
-                              <button
-                                onClick={() => handleRoleChange(user.id)}
-                                className="role-save-btn"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={handleCancelRoleChange}
-                                className="role-cancel-btn"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="role-display">
-                            <span>{user.role || "N/A"}</span>
-                            {!readOnly && (
-                              <button
-                                onClick={() =>
-                                  handleChangeRoleClick(
-                                    user.id,
-                                    user.role,
-                                    user.position,
-                                    user.department,
-                                  )
-                                }
-                                className="change-role-btn"
-                              >
-                                <img src={ChangeIcon} alt="Change Account Level" />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="text-center account-created-cell">
-                        {formatCreatedAt(user.createdAt)}
-                      </td>
-                      {canManageTotp && (
-                        <td className="text-center roster-actions-cell">
-                          <div
-                            className="roster-row-actions"
-                            ref={
-                              openActionUserId === user.id ?
-                                actionMenuRef :
-                                null
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Escape") {
-                                setOpenActionUserId(null);
-                              }
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="roster-action-trigger"
-                              aria-label={`Actions for ${
-                                user.email || user.name || "user"
-                              }`}
-                              aria-expanded={openActionUserId === user.id}
-                              aria-haspopup="menu"
-                              onClick={() =>
-                                setOpenActionUserId((current) =>
-                                  current === user.id ? null : user.id,
-                                )
-                              }
-                            >
-                              <MoreVertIcon fontSize="small" />
-                            </button>
-
-                            {openActionUserId === user.id && (
-                              <div className="roster-action-menu" role="menu">
-                                {canResetTotpForUser(user) ? (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="roster-action-menu-item"
-                                    disabled={totpActionUserId === user.id}
-                                    onClick={() => handleResetTotp(user)}
-                                  >
-                                    {totpActionUserId === user.id ?
-                                      "Resetting..." :
-                                      "Reset TOTP setup"}
-                                  </button>
-                                ) : (
-                                  <span className="roster-action-menu-empty">
-                                    No actions available
-                                  </span>
-                                )}
-                              </div>
+                    return (
+                      <tr key={user.id}>
+                        <td className="row-number">
+                          {(currentPage - 1) * pageSize + index + 1}
+                        </td>
+                        <td className="user-full-name">
+                          {getUserFullName(user)}
+                        </td>
+                        <td className="user-name">
+                          <div className="user-email-stack">
+                            <span>{user.email || "N/A"}</span>
+                            {canManageTotp && totpResetRequests[user.id] && (
+                              <span className="totp-request-badge">
+                                TOTP reset requested
+                              </span>
                             )}
                           </div>
                         </td>
-                      )}
-                    </tr>
-                  ))
+                        <td className="text-center role-cell">
+                          {!readOnly &&
+                          !isCurrentUserRow &&
+                          editingRoleUserId === user.id ? (
+                            <div className="role-edit-container">
+                              <select
+                                value={selectedRole}
+                                onChange={(e) => {
+                                  setSelectedRole(e.target.value);
+                                  setSelectedPosition("");
+                                  setSelectedDepartment("");
+                                }}
+                                className="role-select"
+                              >
+                                {!isRoleAllowedForAccount(user, selectedRole) && (
+                                  <option value="">Select Account Level</option>
+                                )}
+                                {getAssignableRoleOptions(user).map(({ value, label }) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {(selectedRole === "faculty" ||
+                                selectedRole === "admin") && (
+                                  <select
+                                    value={selectedPosition}
+                                    onChange={(e) =>
+                                      setSelectedPosition(e.target.value)
+                                    }
+                                    className="role-select"
+                                  >
+                                    <option value="">Select Position</option>
+                                    {positionsByRole[selectedRole]?.map(
+                                      (position) => (
+                                        <option key={position} value={position}>
+                                          {position}
+                                        </option>
+                                      ),
+                                    )}
+                                  </select>
+                                )}
+
+                              {selectedRole === "faculty" && (
+                                <select
+                                  value={selectedDepartment}
+                                  onChange={(e) =>
+                                    setSelectedDepartment(e.target.value)
+                                  }
+                                  className="role-select"
+                                >
+                                  <option value="">Select Department</option>
+                                  {departments.map((dept) => (
+                                    <option key={dept} value={dept}>
+                                      {dept}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+
+                              <div className="role-edit-actions">
+                                <button
+                                  onClick={() => handleRoleChange(user.id)}
+                                  className="role-save-btn"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={handleCancelRoleChange}
+                                  className="role-cancel-btn"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="role-display">
+                              <span>{user.role || "N/A"}</span>
+                              {!readOnly && !isCurrentUserRow && (
+                                <button
+                                  onClick={() =>
+                                    handleChangeRoleClick(
+                                      user.id,
+                                      user.role,
+                                      user.position,
+                                      user.department,
+                                    )
+                                  }
+                                  className="change-role-btn"
+                                >
+                                  <img src={ChangeIcon} alt="Change Account Level" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-center account-created-cell">
+                          {formatCreatedAt(user.createdAt)}
+                        </td>
+                        {canManageTotp && (
+                          <td className="text-center roster-actions-cell">
+                            <div
+                              className="roster-row-actions"
+                              ref={
+                                openActionUserId === user.id &&
+                                !isCurrentUserRow ?
+                                  actionMenuRef :
+                                  null
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") {
+                                  setOpenActionUserId(null);
+                                }
+                              }}
+                            >
+                              <button
+                                type="button"
+                                className="roster-action-trigger"
+                                aria-label={
+                                  isCurrentUserRow ?
+                                    "Actions unavailable for your own account" :
+                                    `Actions for ${user.email || user.name || "user"}`
+                                }
+                                aria-expanded={
+                                  !isCurrentUserRow && openActionUserId === user.id
+                                }
+                                aria-haspopup="menu"
+                                disabled={isCurrentUserRow}
+                                title={
+                                  isCurrentUserRow ?
+                                    "You cannot apply actions to your own account." :
+                                    undefined
+                                }
+                                onClick={() =>
+                                  setOpenActionUserId((current) =>
+                                    current === user.id ? null : user.id,
+                                  )
+                                }
+                              >
+                                <MoreVertIcon fontSize="small" />
+                              </button>
+
+                              {!isCurrentUserRow && openActionUserId === user.id && (
+                                <div className="roster-action-menu" role="menu">
+                                  {canResetTotpForUser(user) ? (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="roster-action-menu-item"
+                                      disabled={totpActionUserId === user.id}
+                                      onClick={() => handleResetTotp(user)}
+                                    >
+                                      {totpActionUserId === user.id ?
+                                        "Resetting..." :
+                                        "Reset TOTP setup"}
+                                    </button>
+                                  ) : (
+                                    <span className="roster-action-menu-empty">
+                                      No actions available
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
