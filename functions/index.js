@@ -87,6 +87,7 @@ const {
   listTotpResetRequests,
   resetUserTotp,
 } = require("./src/auth/mfa");
+const { changeUserRole } = require("./src/auth/changeUserRole");
 const { requestPasswordReset } = require("./src/auth/passwordReset");
 const { validateRegistrationEmail, cleanupUnverifiedRegistrations, } = require("./src/auth/registrationEmail");
 
@@ -157,6 +158,10 @@ exports.resetUserTotp = onCall(
 exports.resetUserTotpHttp = onRequest(
   defaultFunctionOptions,
   callableHttpAdapter(resetUserTotp)
+);
+exports.changeUserRole = onCall(
+  defaultFunctionOptions,
+  changeUserRole
 );
 exports.validateRegistrationEmail = onCall(
   defaultFunctionOptions,

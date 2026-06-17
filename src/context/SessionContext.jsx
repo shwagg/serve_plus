@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { auth, functions, db } from "../firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { getIdTokenResult, signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { showToast } from "../utils/toast";
@@ -15,6 +15,9 @@ const SESSION_TIMEOUTS = {
 };
 const DEFAULT_TIMEOUT = 10 * 60 * 1000;
 const MFA_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
+const ROLE_CHANGED_LOGOUT_NOTICE = "roleChangedLogout";
+const ROLE_CHANGED_LOGOUT_MESSAGE =
+  "Your role has been changed. You have been logged out of your session.";
 
 export function SessionProvider({ children }) {
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -24,6 +27,9 @@ export function SessionProvider({ children }) {
   const inactivityTimerRef = useRef(null);
   const userDataRef = useRef(null);
   const isLoggingOutRef = useRef(false);
+  const userDocUnsubscribeRef = useRef(null);
+  const observedRoleRef = useRef(null);
+  const roleChangedLogoutRef = useRef(false);
 
   useEffect(() => {
     userDataRef.current = userData;
@@ -38,6 +44,14 @@ export function SessionProvider({ children }) {
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
     }
+  }, []);
+
+  const clearUserDocSubscription = useCallback(() => {
+    if (userDocUnsubscribeRef.current) {
+      userDocUnsubscribeRef.current();
+      userDocUnsubscribeRef.current = null;
+    }
+    observedRoleRef.current = null;
   }, []);
 
   const handleSessionTimeout = useCallback(async () => {
@@ -78,6 +92,49 @@ export function SessionProvider({ children }) {
     }
   }, []);
 
+  const handleRoleChangedLogout = useCallback(async () => {
+    if (isLoggingOutRef.current || roleChangedLogoutRef.current) return;
+
+    roleChangedLogoutRef.current = true;
+    setIsLoggingOut(true);
+    isLoggingOutRef.current = true;
+
+    try {
+      const user = auth.currentUser;
+
+      if (user) {
+        try {
+          const logLogout = httpsCallable(functions, "logLogout");
+          logLogout({ uid: user.uid }).catch(() => {});
+        } catch (error) {
+          console.error("Audit log (role-change logout) failed:", error);
+        }
+      }
+
+      try {
+        sessionStorage.setItem(
+          ROLE_CHANGED_LOGOUT_NOTICE,
+          ROLE_CHANGED_LOGOUT_MESSAGE,
+        );
+      } catch {
+        // Ignore unavailable sessionStorage.
+      }
+
+      await signOut(auth);
+      setIsSessionActive(false);
+      setUserData(null);
+      clearInactivityTimer();
+      clearUserDocSubscription();
+      window.location.href = "/auth";
+    } catch (error) {
+      console.error("Error during role-change logout:", error);
+    } finally {
+      setIsLoggingOut(false);
+      isLoggingOutRef.current = false;
+      roleChangedLogoutRef.current = false;
+    }
+  }, [clearInactivityTimer, clearUserDocSubscription]);
+
   const resetInactivityTimer = useCallback(() => {
     clearInactivityTimer();
 
@@ -111,6 +168,7 @@ export function SessionProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      clearUserDocSubscription();
       setAuthLoading(true);
       try {
         if (user) {
@@ -144,7 +202,31 @@ export function SessionProvider({ children }) {
               }
 
               userDataRef.current = data;
+              observedRoleRef.current = data.role || null;
               setUserData(data);
+
+              userDocUnsubscribeRef.current = onSnapshot(
+                userRef,
+                (snap) => {
+                  if (!snap.exists()) return;
+
+                  const nextData = snap.data();
+                  const previousRole = observedRoleRef.current;
+                  const nextRole = nextData.role || null;
+
+                  if (previousRole && nextRole && previousRole !== nextRole) {
+                    handleRoleChangedLogout();
+                    return;
+                  }
+
+                  observedRoleRef.current = nextRole;
+                  userDataRef.current = nextData;
+                  setUserData(nextData);
+                },
+                (error) => {
+                  console.error("SessionContext - User listener error:", error);
+                },
+              );
 
               // Award SERVE Ready badge on login (idempotent — won't duplicate)
               if (data.role === "student") {
@@ -166,6 +248,7 @@ export function SessionProvider({ children }) {
         } else {
           setIsSessionActive(false);
           setUserData(null);
+          observedRoleRef.current = null;
           clearInactivityTimer();
         }
       } finally {
@@ -191,9 +274,15 @@ export function SessionProvider({ children }) {
 
     return () => {
       unsubscribe();
+      clearUserDocSubscription();
       clearInactivityTimer();
     };
-  }, [clearInactivityTimer, resetInactivityTimer]);
+  }, [
+    clearInactivityTimer,
+    clearUserDocSubscription,
+    handleRoleChangedLogout,
+    resetInactivityTimer,
+  ]);
 
   useEffect(() => {
     return setupActivityListeners();

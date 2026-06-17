@@ -1,9 +1,6 @@
 import {
   collection,
-  deleteField,
-  doc,
   getDocs,
-  updateDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState, useContext, useRef, useCallback } from "react";
@@ -11,7 +8,6 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ChangeIcon from "../../components/icons/Change.svg";
 import { auth, db, functions } from "../../firebaseConfig";
 import { showConfirm, showToast } from "../../utils/toast";
-import { logAudit } from "../../utils/auditLogger";
 import { SessionContext } from "../../context/sessionContextCore";
 import "../../styles/RosterAccountManagement.css";
 
@@ -348,82 +344,20 @@ export default function RosterAccountManagement({ readOnly = false }) {
     }
 
     try {
-      const userRef = doc(db, "users", userId);
-      let updateData = { role: selectedRole };
-
-      // Student role: delete position, add student fields
-      if (selectedRole === "student") {
-        updateData = {
-          ...updateData,
-          position: deleteField(),
-          department: deleteField(),
-          skills: currentUser.skills || [],
-          eventHistory: currentUser.eventHistory || [],
-          interests: currentUser.interests || [],
-          level: currentUser.level || 1,
-          levelprogress: currentUser.levelprogress || 0,
-        };
-      } else if (selectedRole === "faculty") {
-        // Faculty: set position and department, delete student fields
-        updateData = {
-          ...updateData,
-          position: selectedPosition,
-          department: selectedDepartment,
-          skills: deleteField(),
-          eventHistory: deleteField(),
-          interests: deleteField(),
-          level: deleteField(),
-          levelProgress: deleteField(),
-        };
-      } else if (selectedRole === "admin") {
-        // Admin: set position, delete department and student fields
-        updateData = {
-          ...updateData,
-          position: selectedPosition,
-          department: deleteField(),
-          skills: deleteField(),
-          eventHistory: deleteField(),
-          interests: deleteField(),
-          level: deleteField(),
-          levelProgress: deleteField(),
-        };
-      } else {
-        // Partner or other roles: delete both position, department, and student fields
-        updateData = {
-          ...updateData,
-          position: deleteField(),
-          department: deleteField(),
-          skills: deleteField(),
-          eventHistory: deleteField(),
-          interests: deleteField(),
-          level: deleteField(),
-          levelProgress: deleteField(),
-        };
-      }
-
-      await updateDoc(userRef, updateData);
-
-      logAudit({
-        action: "ROLE_CHANGED",
-        category: "account",
-        actorName: actorData?.name || "",
-        details: {
-          targetUserId: userId,
-          targetUserName: currentUser.name || "",
-          targetUserEmail: currentUser.email || "",
-          previousRole: currentUser.role || "",
-          newRole: selectedRole,
-          newPosition: selectedPosition || "",
-          newDepartment: selectedDepartment || "",
-        },
+      const changeUserRole = httpsCallable(functions, "changeUserRole");
+      const result = await changeUserRole({
+        targetUid: userId,
+        role: selectedRole,
+        position: selectedPosition || "",
+        department: selectedDepartment || "",
       });
 
-      // Update local state
       setUsers(
         users.map((user) => {
           if (user.id !== userId) return user;
           let updatedUser = { ...user, role: selectedRole };
           if (selectedRole === "student") {
+            const progress = user.levelProgress ?? user.levelprogress ?? 0;
             updatedUser = {
               ...updatedUser,
               position: undefined,
@@ -432,8 +366,9 @@ export default function RosterAccountManagement({ readOnly = false }) {
               eventHistory: user.eventHistory || [],
               interests: user.interests || [],
               level: user.level || 1,
-              levelprogress: user.levelprogress || 0,
+              levelProgress: progress,
             };
+            delete updatedUser.levelprogress;
           } else if (selectedRole === "faculty") {
             updatedUser = {
               ...updatedUser,
@@ -444,6 +379,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
             delete updatedUser.eventHistory;
             delete updatedUser.interests;
             delete updatedUser.level;
+            delete updatedUser.levelProgress;
             delete updatedUser.levelprogress;
           } else if (selectedRole === "admin") {
             updatedUser = {
@@ -455,6 +391,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
             delete updatedUser.eventHistory;
             delete updatedUser.interests;
             delete updatedUser.level;
+            delete updatedUser.levelProgress;
             delete updatedUser.levelprogress;
           } else {
             updatedUser = {
@@ -466,6 +403,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
             delete updatedUser.eventHistory;
             delete updatedUser.interests;
             delete updatedUser.level;
+            delete updatedUser.levelProgress;
             delete updatedUser.levelprogress;
           }
           return updatedUser;
@@ -476,9 +414,14 @@ export default function RosterAccountManagement({ readOnly = false }) {
       setSelectedRole("");
       setSelectedPosition("");
       setSelectedDepartment("");
+      showToast(
+        result.data?.roleChanged ?
+          "Account level updated. The user has been logged out." :
+          "Account details updated.",
+      );
     } catch (err) {
       console.error("Error updating role:", err);
-      showToast("Failed to update account level. Please try again.");
+      showToast(err?.message || "Failed to update account level. Please try again.", "error");
     }
   };
 

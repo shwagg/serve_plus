@@ -16,6 +16,9 @@ import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
 import { fetchCurrentAgreementVersion } from "../utils/agreementVersion";
 import { getMfaRouteForAction, saveMfaSession } from "../utils/mfaSession";
+import { showToast } from "../utils/toast";
+
+const ROLE_CHANGED_LOGOUT_NOTICE = "roleChangedLogout";
 
 function getBlackboardRedirectPath(role) {
   if (role === "admin") return "/admin/dashboard";
@@ -80,6 +83,18 @@ function Auth() {
   // Deactivated account reactivation prompt
   const [showReactivatePrompt, setShowReactivatePrompt] = useState(false);
   const [pendingReactivation, setPendingReactivation] = useState(null); // { uid, role, email, authProvider, daysLeft }
+
+  useEffect(() => {
+    try {
+      const message = sessionStorage.getItem(ROLE_CHANGED_LOGOUT_NOTICE);
+      if (!message) return;
+
+      sessionStorage.removeItem(ROLE_CHANGED_LOGOUT_NOTICE);
+      showToast(message, "error");
+    } catch {
+      // Ignore unavailable sessionStorage.
+    }
+  }, []);
 
   useEffect(() => {
     const callbackError = new URLSearchParams(location.search).get("error");

@@ -82,10 +82,7 @@ service cloud.firestore {
         (request.auth.uid == userId || isAccountManager());
       allow update: if request.auth != null && (
         (request.auth.uid == userId && !protectedAccountFieldsChanged()) ||
-        (
-          isAccountManager() &&
-          (!protectedAccountFieldsChanged() || hasValidRosterRolePlacement(request.resource.data))
-        )
+        (isAccountManager() && !protectedAccountFieldsChanged())
       );
       allow delete: if request.auth != null &&
         (request.auth.uid == userId || isAccountManager());
