@@ -132,7 +132,7 @@ const StudentHome = () => {
 
         setMissionCards(missions);
 
-        // Fetch total count, preview volunteers (first 4), and current user enrollment â€" all in parallel
+        // Fetch total count, preview volunteers, and current user enrollment in parallel.
         const [countSnaps, previewSnaps, enrollmentSnaps] = await Promise.all([
           Promise.all(missions.map((m) =>
             getCountFromServer(collection(db, "missions", m.id, "volunteer"))
@@ -665,7 +665,7 @@ const StudentHome = () => {
                 })}
               </div>
             </div>
-            {/* RIGHT: 3-user window â€" logged-in user in the middle */}
+            {/* RIGHT: 3-user window, logged-in user in the middle */}
             <div className="leaderboard-compact-rank-col">
               {(() => {
                 if (sortedLeaderboard.length === 0) {
@@ -794,10 +794,10 @@ const StudentHome = () => {
               ) : (
                 proposalCards.map((proposal) => {
                   const statusLabels = {
-                    for_approval: { label: 'ðŸ"‹ For Approval', color: '#d97706' },
-                    draft: { label: 'ðŸ" For Publishing', color: '#64748b' },
-                    rejected: { label: 'âŒ Rejected', color: '#dc2626' },
-                    approved: { label: 'âœ… Approved', color: '#16a34a' },
+                    for_approval: { label: 'For Approval', color: '#d97706' },
+                    draft: { label: 'For Publishing', color: '#64748b' },
+                    rejected: { label: 'Rejected', color: '#dc2626' },
+                    approved: { label: 'Approved', color: '#16a34a' },
                   };
                   const statusInfo = statusLabels[proposal.status] || { label: proposal.status, color: '#64748b' };
                   const typeLabel = proposal.projectType === 'sl' ? 'Service Learning' : proposal.projectType === 'ce' ? 'Community Engagement' : '';
@@ -968,12 +968,13 @@ const StudentHome = () => {
             <>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#000' }}>
-                  {selectedProposalForView.projectType === 'sl' ? 'ðŸ" Service Learning Proposal' : 'ðŸ" Community Engagement Proposal'}
+                  {selectedProposalForView.projectType === 'sl' ? 'Service Learning Proposal' : 'Community Engagement Proposal'}
                 </h3>
                 <button
                   onClick={() => setSelectedProposalForView(null)}
+                  aria-label="Close proposal"
                   style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#64748b', lineHeight: 1 }}
-                >âœ•</button>
+                >x</button>
               </div>
               <div style={{ overflowY: 'auto', flex: 1 }}>
                 <ProjectProposal
