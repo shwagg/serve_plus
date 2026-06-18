@@ -2994,7 +2994,7 @@ export default function EventActivity() {
             type: "leaderboard_rank_global",
             title,
             message,
-            link: "/student",
+            link: "/student/home",
             rank: {
               from: previousRank,
               to: newRank,
@@ -3227,7 +3227,7 @@ export default function EventActivity() {
                   });
                 }
                 
-                navigate('/student', { state: { scrollTo: 'missions' } });
+                navigate('/student/home', { state: { scrollTo: 'missions' } });
               } catch (err) {
                 console.error('Failed to un-enroll:', err);
                 alert('Failed to un-enroll. Please try again.');

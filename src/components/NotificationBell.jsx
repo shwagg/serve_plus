@@ -115,7 +115,7 @@ export default function NotificationBell() {
           type: "points_earned",
           title: "Points Awarded!",
           message: `You received ${gained} point${gained !== 1 ? "s" : ""} from a completed mission.`,
-          link: "/student",
+          link: "/student/home",
         });
       }
       prevPointsRef.current = pts;
@@ -271,7 +271,7 @@ export default function NotificationBell() {
     
     // Leaderboard rank notification - navigate to home/leaderboard
     if (notification.type === "leaderboard_rank_global") {
-      navigate("/student");
+      navigate("/student/home");
       return;
     }
     

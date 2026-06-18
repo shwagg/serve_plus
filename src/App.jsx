@@ -160,6 +160,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/student" element={<Navigate to="/student/home" replace />} />
           <Route
             path="/global/project-proposal"
             element={
