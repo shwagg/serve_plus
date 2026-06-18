@@ -128,6 +128,18 @@
   line-height: 1.6;
 }
 
+.field-limit-hint {
+  display: block;
+  margin-top: 0.4rem;
+  color: #718096;
+  font-size: 0.8rem;
+}
+
+.field-limit-hint.error {
+  color: #e53e3e;
+  font-weight: 600;
+}
+
 .form-group select {
   cursor: pointer;
   appearance: none;

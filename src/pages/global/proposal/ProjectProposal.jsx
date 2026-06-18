@@ -10,9 +10,33 @@ import { useSession } from '../../../context/useSession';
 
 const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
+const FIELD_LIMITS = {
+  title: 300,
+  location: 50,
+  volunteerHours: 50,
+  stakeholderItem: 50,
+  course: 50,
+  courseCode: 50,
+  section: 50,
+  activityItem: 50,
+  description: 2000,
+  objectives: 2000,
+  successIndicators: 1000,
+  budget: 300,
+  studentOutcomes: 130,
+  proponents: 3,
+};
 
 function normalizeValue(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function trimToLimit(value, limit) {
+  return String(value || '').slice(0, limit);
+}
+
+function getRemainingCount(value, limit) {
+  return `${String(value || '').length} / ${limit} characters`;
 }
 
 function isProposalLockedForUser(userData) {
@@ -169,6 +193,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const [showSummary, setShowSummary] = useState(false);
   const [hasProponentName, setHasProponentName] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formData, setFormData] = useState({
     title: '',
     sdgs: [],
@@ -460,7 +485,34 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const handleInputChange = (e) => {
     hasUserInputRef.current = true;
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const textLimits = {
+      title: FIELD_LIMITS.title,
+      location: FIELD_LIMITS.location,
+      description: FIELD_LIMITS.description,
+      objectives: FIELD_LIMITS.objectives,
+      successIndicators: FIELD_LIMITS.successIndicators,
+      budget: FIELD_LIMITS.budget,
+      studentOutcomes: FIELD_LIMITS.studentOutcomes,
+    };
+
+    if (name === 'volunteerHours') {
+      if (value !== '' && Number(value) > FIELD_LIMITS.volunteerHours) {
+        setFormData(prev => ({ ...prev, [name]: '' }));
+        setFieldErrors(prev => ({ ...prev, [name]: `Volunteer Hours only allows up to ${FIELD_LIMITS.volunteerHours}.` }));
+        showToast(`Volunteer Hours only allows up to ${FIELD_LIMITS.volunteerHours}.`);
+        return;
+      }
+      setFormData(prev => ({ ...prev, [name]: value }));
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    } else if (textLimits[name] && value.length > textLimits[name]) {
+      setFormData(prev => ({ ...prev, [name]: '' }));
+      setFieldErrors(prev => ({ ...prev, [name]: `This field only allows up to ${textLimits[name]} characters.` }));
+      showToast(`This field only allows up to ${textLimits[name]} characters.`);
+      return;
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
     if (name === 'affiliatedDepartment') {
       setSlFields(prev => ({ ...prev, assignedFaculty: '' }));
       setCeFields(prev => ({ ...prev, assignedFaculty: '' }));
@@ -473,10 +525,25 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const handleSlFieldChange = (e) => {
     hasUserInputRef.current = true;
     const { name, value } = e.target;
+    const textLimits = {
+      section: FIELD_LIMITS.section,
+      course: FIELD_LIMITS.course,
+      courseCode: FIELD_LIMITS.courseCode,
+    };
+    if (textLimits[name] && value.length > textLimits[name]) {
+      setSlFields(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+      setFieldErrors(prev => ({ ...prev, [name]: `This field only allows up to ${textLimits[name]} characters.` }));
+      showToast(`This field only allows up to ${textLimits[name]} characters.`);
+      return;
+    }
     setSlFields(prev => ({
       ...prev,
       [name]: value
     }));
+    setFieldErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   /**
@@ -527,7 +594,18 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddProponent = (name) => {
     hasUserInputRef.current = true;
+    if (String(name || '').length > 80) {
+      showToast('Each proponent name only allows up to 80 characters.');
+      setFieldErrors(prev => ({ ...prev, proponents: 'Each proponent name only allows up to 80 characters.' }));
+      return;
+    }
+    if ((formData.proponents || []).length >= FIELD_LIMITS.proponents) {
+      showToast(`Only ${FIELD_LIMITS.proponents} proponent names are allowed.`);
+      setFieldErrors(prev => ({ ...prev, proponents: `Only ${FIELD_LIMITS.proponents} proponent names are allowed.` }));
+      return;
+    }
     setFormData(prev => ({ ...prev, proponents: [...(prev.proponents || []), name] }));
+    setFieldErrors(prev => ({ ...prev, proponents: '' }));
   };
 
   const handleRemoveProponent = (index) => {
@@ -537,7 +615,13 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddStakeholder = (text) => {
     hasUserInputRef.current = true;
+    if (text.length > FIELD_LIMITS.stakeholderItem) {
+      showToast(`Stakeholders are limited to ${FIELD_LIMITS.stakeholderItem} characters each.`);
+      setFieldErrors(prev => ({ ...prev, stakeholders: `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters.` }));
+      return;
+    }
     setFormData(prev => ({ ...prev, stakeholders: [...(prev.stakeholders || []), text] }));
+    setFieldErrors(prev => ({ ...prev, stakeholders: '' }));
   };
 
   const handleRemoveStakeholder = (index) => {
@@ -547,7 +631,13 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddActivity = (text) => {
     hasUserInputRef.current = true;
+    if (text.length > FIELD_LIMITS.activityItem) {
+      showToast(`Each activity is limited to ${FIELD_LIMITS.activityItem} characters.`);
+      setFieldErrors(prev => ({ ...prev, specificActivities: `Each activity can only have ${FIELD_LIMITS.activityItem} characters.` }));
+      return;
+    }
     setFormData(prev => ({ ...prev, specificActivities: [...(prev.specificActivities || []), text] }));
+    setFieldErrors(prev => ({ ...prev, specificActivities: '' }));
   };
 
   const handleRemoveActivity = (index) => {
@@ -565,6 +655,46 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     String(minTargetDate.getMonth() + 1).padStart(2, "0") +
     "-" +
     String(minTargetDate.getDate()).padStart(2, "0");
+  const maxTargetDate = new Date();
+  maxTargetDate.setFullYear(maxTargetDate.getFullYear() + 5);
+  const maxDateString =
+    maxTargetDate.getFullYear() +
+    "-" +
+    String(maxTargetDate.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(maxTargetDate.getDate()).padStart(2, "0");
+
+  const preventManualDateInput = (e) => {
+    const allowedKeys = ['Tab', 'Shift', 'Escape'];
+    if (!allowedKeys.includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const validateBeforeSummary = () => {
+    const nextErrors = {};
+    if ((formData.title || '').length > FIELD_LIMITS.title) nextErrors.title = `Only ${FIELD_LIMITS.title} characters are allowed.`;
+    if ((formData.location || '').length > FIELD_LIMITS.location) nextErrors.location = `Only ${FIELD_LIMITS.location} characters are allowed.`;
+    if ((slFields.course || '').length > FIELD_LIMITS.course) nextErrors.course = `Only ${FIELD_LIMITS.course} characters are allowed.`;
+    if ((slFields.courseCode || '').length > FIELD_LIMITS.courseCode) nextErrors.courseCode = `Only ${FIELD_LIMITS.courseCode} characters are allowed.`;
+    if ((slFields.section || '').length > FIELD_LIMITS.section) nextErrors.section = `Only ${FIELD_LIMITS.section} characters are allowed.`;
+    if ((formData.description || '').length > FIELD_LIMITS.description) nextErrors.description = `Only ${FIELD_LIMITS.description} characters are allowed.`;
+    if ((formData.objectives || '').length > FIELD_LIMITS.objectives) nextErrors.objectives = `Only ${FIELD_LIMITS.objectives} characters are allowed.`;
+    if ((formData.successIndicators || '').length > FIELD_LIMITS.successIndicators) nextErrors.successIndicators = `Only ${FIELD_LIMITS.successIndicators} characters are allowed.`;
+    if ((formData.budget || '').length > FIELD_LIMITS.budget) nextErrors.budget = `Only ${FIELD_LIMITS.budget} characters are allowed.`;
+    if (Number(formData.volunteerHours) > FIELD_LIMITS.volunteerHours) nextErrors.volunteerHours = `Volunteer Hours can only go up to ${FIELD_LIMITS.volunteerHours}.`;
+    if ((formData.proponents || []).length > FIELD_LIMITS.proponents) nextErrors.proponents = `Only ${FIELD_LIMITS.proponents} proponent names are allowed.`;
+    if ((formData.stakeholders || []).some(item => String(item || '').length > FIELD_LIMITS.stakeholderItem)) nextErrors.stakeholders = `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters.`;
+    if ((formData.specificActivities || []).some(item => String(item || '').length > FIELD_LIMITS.activityItem)) nextErrors.specificActivities = `Each activity can only have ${FIELD_LIMITS.activityItem} characters.`;
+    if (formData.targetDate && (formData.targetDate < minDateString || formData.targetDate > maxDateString)) nextErrors.targetDate = `Select a date between ${minDateString} and ${maxDateString}.`;
+
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      showToast('Some fields exceed the allowed limits. Please review the highlighted fields.');
+      return false;
+    }
+    return true;
+  };
 
   // Faculty / chairs / deans filtered by the selected affiliated department
   const filteredFaculty = facultyList.filter(
@@ -634,6 +764,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   onChange={handleInputChange}
                   required
                 />
+                <small className={`field-limit-hint${fieldErrors.title ? ' error' : ''}`}>
+                  {fieldErrors.title || getRemainingCount(formData.title, FIELD_LIMITS.title)}
+                </small>
               </div>
               <div className="form-group">
                 <label htmlFor="partnerSchool">Partner School</label>
@@ -676,6 +809,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     onRemove={handleRemoveProponent}
                     lockedCount={hasProponentName ? 1 : 0}
                   />
+                  <small className={`field-limit-hint${fieldErrors.proponents ? ' error' : ''}`}>
+                    {fieldErrors.proponents || `${(formData.proponents || []).length} / ${FIELD_LIMITS.proponents} proponents`}
+                  </small>
                 </div>
               )}
 
@@ -720,6 +856,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                       onRemove={handleRemoveProponent}
                       lockedCount={hasProponentName ? 1 : 0}
                     />
+                    <small className={`field-limit-hint${fieldErrors.proponents ? ' error' : ''}`}>
+                      {fieldErrors.proponents || `${(formData.proponents || []).length} / ${FIELD_LIMITS.proponents} proponents`}
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="ceAssignedFaculty">Assigned Faculty *</label>
@@ -752,10 +891,14 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   name="targetDate"
                   value={formData.targetDate}
                   onChange={handleInputChange}
+                  onKeyDown={preventManualDateInput}
+                  onPaste={e => e.preventDefault()}
+                  onDrop={e => e.preventDefault()}
                   min={minDateString}
+                  max={maxDateString}
                   required
                 />
-
+                {fieldErrors.targetDate && <small className="field-limit-hint error">{fieldErrors.targetDate}</small>}
               </div>
 
               <div className="form-row">
@@ -824,7 +967,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     onChange={handleInputChange}
                     required
                     min="0"
+                    max={FIELD_LIMITS.volunteerHours}
                   />
+                  {fieldErrors.volunteerHours && <small className="field-limit-hint error">{fieldErrors.volunteerHours}</small>}
                 </div>
 
                 <div className="form-group">
@@ -853,6 +998,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   required
                   placeholder="Venue or community where project will take place"
                 />
+                <small className={`field-limit-hint${fieldErrors.location ? ' error' : ''}`}>
+                  {fieldErrors.location || getRemainingCount(formData.location, FIELD_LIMITS.location)}
+                </small>
               </div>
 
               <div className="form-group">
@@ -862,6 +1010,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   onAdd={handleAddStakeholder}
                   onRemove={handleRemoveStakeholder}
                 />
+                <small className={`field-limit-hint${fieldErrors.stakeholders ? ' error' : ''}`}>
+                  {fieldErrors.stakeholders || `Each stakeholder can use up to ${FIELD_LIMITS.stakeholderItem} characters.`}
+                </small>
               </div>
             </div>
 
@@ -881,6 +1032,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                       required
                       placeholder="e.g., Introduction to Community Development"
                     />
+                    <small className={`field-limit-hint${fieldErrors.course ? ' error' : ''}`}>
+                      {fieldErrors.course || getRemainingCount(slFields.course, FIELD_LIMITS.course)}
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="courseCode">Course Code *</label>
@@ -893,6 +1047,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                       required
                       placeholder="e.g., CD 101"
                     />
+                    <small className={`field-limit-hint${fieldErrors.courseCode ? ' error' : ''}`}>
+                      {fieldErrors.courseCode || getRemainingCount(slFields.courseCode, FIELD_LIMITS.courseCode)}
+                    </small>
                   </div>
                 </div>
                 <div className="form-group">
@@ -906,6 +1063,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     required
                     placeholder="e.g., Section A"
                   />
+                  <small className={`field-limit-hint${fieldErrors.section ? ' error' : ''}`}>
+                    {fieldErrors.section || getRemainingCount(slFields.section, FIELD_LIMITS.section)}
+                  </small>
                 </div>
               </div>
             )}
@@ -945,17 +1105,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     onChange={handleInputChange}
                     placeholder="Describe expected student outcomes"
                   />
-                  {(() => {
-                    const len = (formData.studentOutcomes || '').length;
-                    const limit = 130;
-                    const color = len > limit ? '#e53e3e' : len > 105 ? '#d97706' : '#a0aec0';
-                    const note = len > limit ? ' — text may be cut off in the PDF' : len > 105 ? ' — text will appear smaller in the PDF to fit' : '';
-                    return (
-                      <small style={{ color, fontSize: '0.78rem', marginTop: 4, display: 'block' }}>
-                        {len} / {limit} characters{note}
-                      </small>
-                    );
-                  })()}
+                  <small className="field-limit-hint">
+                    {getRemainingCount(formData.studentOutcomes, FIELD_LIMITS.studentOutcomes)}
+                  </small>
                 </div>
 
                 <div className="form-group">
@@ -1010,6 +1162,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   rows="5"
                   placeholder="Provide a detailed description of the project"
                 />
+                <small className={`field-limit-hint${fieldErrors.description ? ' error' : ''}`}>
+                  {fieldErrors.description || getRemainingCount(formData.description, FIELD_LIMITS.description)}
+                </small>
               </div>
 
               <div className="form-group">
@@ -1023,6 +1178,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   rows="4"
                   placeholder="List the main objectives of the project"
                 />
+                <small className={`field-limit-hint${fieldErrors.objectives ? ' error' : ''}`}>
+                  {fieldErrors.objectives || getRemainingCount(formData.objectives, FIELD_LIMITS.objectives)}
+                </small>
               </div>
 
               <div className="form-group">
@@ -1034,6 +1192,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   placeholder="Type an activity and press Enter"
                   addMorePlaceholder="Add another activity…"
                 />
+                <small className={`field-limit-hint${fieldErrors.specificActivities ? ' error' : ''}`}>
+                  {fieldErrors.specificActivities || `Each activity can use up to ${FIELD_LIMITS.activityItem} characters.`}
+                </small>
                 <small style={{ color: '#718096', fontSize: '0.8rem', marginTop: 4, display: 'block' }}>
                   Each activity will automatically become a volunteer task when the proposal is approved.
                 </small>
@@ -1050,6 +1211,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   rows="4"
                   placeholder="How will you measure the success of this project?"
                 />
+                <small className={`field-limit-hint${fieldErrors.successIndicators ? ' error' : ''}`}>
+                  {fieldErrors.successIndicators || getRemainingCount(formData.successIndicators, FIELD_LIMITS.successIndicators)}
+                </small>
               </div>
 
               <div className="form-group">
@@ -1063,6 +1227,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   rows="4"
                   placeholder="Provide a detailed budget breakdown"
                 />
+                <small className={`field-limit-hint${fieldErrors.budget ? ' error' : ''}`}>
+                  {fieldErrors.budget || getRemainingCount(formData.budget, FIELD_LIMITS.budget)}
+                </small>
               </div>
             </div>
 
@@ -1127,7 +1294,11 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                 type="button"
                 className="btn-next"
                 disabled={loading}
-                onClick={() => setShowSummary(true)}
+                onClick={() => {
+                  if (validateBeforeSummary()) {
+                    setShowSummary(true);
+                  }
+                }}
               >
                 Next
               </button>

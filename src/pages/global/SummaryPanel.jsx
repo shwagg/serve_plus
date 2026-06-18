@@ -7,6 +7,22 @@ import { logAudit } from '../../utils/auditLogger';
 
 import { exportProposalPDF } from './exportProposalPDF';
 
+const FIELD_LIMITS = {
+  title: 300,
+  location: 50,
+  volunteerHours: 50,
+  stakeholderItem: 50,
+  course: 50,
+  courseCode: 50,
+  section: 50,
+  activityItem: 50,
+  description: 2000,
+  objectives: 2000,
+  successIndicators: 1000,
+  budget: 300,
+  proponents: 3,
+};
+
 function SummaryPanel({
   formData,
   slFields,
@@ -22,12 +38,35 @@ function SummaryPanel({
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
 
+  const validateProposalLimits = () => {
+    if ((formData.title || '').length > FIELD_LIMITS.title) return `Title can only have ${FIELD_LIMITS.title} characters.`;
+    if ((formData.location || '').length > FIELD_LIMITS.location) return `Location can only have ${FIELD_LIMITS.location} characters.`;
+    if ((formData.description || '').length > FIELD_LIMITS.description) return `Project Description can only have ${FIELD_LIMITS.description} characters.`;
+    if ((formData.objectives || '').length > FIELD_LIMITS.objectives) return `Objectives can only have ${FIELD_LIMITS.objectives} characters.`;
+    if ((formData.successIndicators || '').length > FIELD_LIMITS.successIndicators) return `Success Indicators can only have ${FIELD_LIMITS.successIndicators} characters.`;
+    if ((formData.budget || '').length > FIELD_LIMITS.budget) return `Budget can only have ${FIELD_LIMITS.budget} characters.`;
+    if (Number(formData.volunteerHours) > FIELD_LIMITS.volunteerHours) return `Volunteer Hours can only go up to ${FIELD_LIMITS.volunteerHours}.`;
+    if ((formData.proponents || []).length > FIELD_LIMITS.proponents) return `Only ${FIELD_LIMITS.proponents} proponents are allowed.`;
+    if ((formData.stakeholders || []).some(item => String(item || '').length > FIELD_LIMITS.stakeholderItem)) return `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters.`;
+    if ((formData.specificActivities || []).some(item => String(item || '').length > FIELD_LIMITS.activityItem)) return `Each specific activity can only have ${FIELD_LIMITS.activityItem} characters.`;
+    if ((slFields.course || '').length > FIELD_LIMITS.course) return `Course can only have ${FIELD_LIMITS.course} characters.`;
+    if ((slFields.courseCode || '').length > FIELD_LIMITS.courseCode) return `Course Code can only have ${FIELD_LIMITS.courseCode} characters.`;
+    if ((slFields.section || '').length > FIELD_LIMITS.section) return `Section can only have ${FIELD_LIMITS.section} characters.`;
+    return '';
+  };
+
   /**
    * Handles form submission: creates a mission document in the unified missions collection.
    */
   const handleSubmit = async () => {
     setLoading(true);
     try {
+      const limitError = validateProposalLimits();
+      if (limitError) {
+        showToast(limitError);
+        setLoading(false);
+        return;
+      }
       const user = auth.currentUser;
       if (!user) {
         showToast('You must be logged in to submit a proposal');
