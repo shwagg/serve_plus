@@ -6,6 +6,10 @@ const {
   restoreCollectionTree,
 } = require("./firestoreTree");
 const { restoreArchivedStorageFiles } = require("./storageArchive");
+const {mapWithConcurrency} = require("./concurrency");
+
+const RESTORE_COLLECTION_CONCURRENCY = 3;
+const AUTH_USER_CONCURRENCY = 10;
 
 //Restores Firestore data from a previously created backup.
 //Reads the backup JSON from Cloud Storage and writes documents back.
@@ -84,25 +88,31 @@ const restoreBackup = async (request) => {
   let restoredDocuments = 0;
   const errors = [];
 
-  for (const collectionName of collectionsToRestore) {
-    const collectionData = backupData[collectionName];
-    if (!collectionData) continue;
+  const restoreCounts = await mapWithConcurrency(
+    collectionsToRestore,
+    RESTORE_COLLECTION_CONCURRENCY,
+    async (collectionName) => {
+      const collectionData = backupData[collectionName];
+      if (!collectionData) return 0;
 
-    try {
-      const restoreOptions = collectionName === "users" ?
-        { preserveDocIds: new Set([callerUid]) } :
-        {};
+      try {
+        const restoreOptions = collectionName === "users" ?
+          { preserveDocIds: new Set([callerUid]) } :
+          {};
 
-      restoredDocuments += await restoreCollectionTree(
-        db.collection(collectionName),
-        collectionData,
-        restoreTimestamps,
-        restoreOptions,
-      );
-    } catch (err) {
-      errors.push(`Error restoring ${collectionName}: ${err.message}`);
-    }
-  }
+        return restoreCollectionTree(
+          db.collection(collectionName),
+          collectionData,
+          restoreTimestamps,
+          restoreOptions,
+        );
+      } catch (err) {
+        errors.push(`Error restoring ${collectionName}: ${err.message}`);
+        return 0;
+      }
+    },
+  );
+  restoredDocuments = restoreCounts.reduce((sum, count) => sum + count, 0);
 
   // Restore Firebase Auth users if backup contains them
   let authRestored = 0;
@@ -135,40 +145,61 @@ const restoreBackup = async (request) => {
     if (authUsersListed) {
       // Delete Auth users that were created AFTER the backup
       // (exist now but not in backup), except the admin performing the restore
-      for (const uid of currentUids) {
-        if (!backupUids.has(uid) && uid !== callerUid) {
+      const uidsToDelete = Array.from(currentUids).filter((uid) => {
+        return !backupUids.has(uid) && uid !== callerUid;
+      });
+      const deleteResults = await mapWithConcurrency(
+        uidsToDelete,
+        AUTH_USER_CONCURRENCY,
+        async (uid) => {
           try {
             await admin.auth().deleteUser(uid);
-            authDeleted++;
+            return 1;
           } catch (err) {
             errors.push(`Failed to delete Auth user ${uid}: ${err.message}`);
+            return 0;
           }
-        }
-      }
+        },
+      );
+      authDeleted = deleteResults.reduce((sum, count) => sum + count, 0);
 
-      for (const backupUser of backupAuthUsers) {
-        try {
-          if (currentUids.has(backupUser.uid)) {
-            await admin.auth().updateUser(
-              backupUser.uid,
-              getAuthUserUpdateProps(backupUser),
+      const authRestoreResults = await mapWithConcurrency(
+        backupAuthUsers,
+        AUTH_USER_CONCURRENCY,
+        async (backupUser) => {
+          try {
+            if (currentUids.has(backupUser.uid)) {
+              await admin.auth().updateUser(
+                backupUser.uid,
+                getAuthUserUpdateProps(backupUser),
+              );
+              await admin.auth().setCustomUserClaims(
+                backupUser.uid,
+                backupUser.customClaims || null,
+              );
+              return {restored: 0, updated: 1};
+            } else {
+              await admin.auth().createUser(getAuthUserCreateProps(backupUser));
+              await admin.auth().setCustomUserClaims(
+                backupUser.uid,
+                backupUser.customClaims || null,
+              );
+              return {restored: 1, updated: 0};
+            }
+          } catch (err) {
+            errors.push(
+              `Failed to restore Auth user ${backupUser.uid}: ${err.message}`,
             );
-            authUpdated++;
-          } else {
-            await admin.auth().createUser(getAuthUserCreateProps(backupUser));
-            authRestored++;
+            return {restored: 0, updated: 0};
           }
-
-          await admin.auth().setCustomUserClaims(
-            backupUser.uid,
-            backupUser.customClaims || null,
-          );
-        } catch (err) {
-          errors.push(
-            `Failed to restore Auth user ${backupUser.uid}: ${err.message}`,
-          );
-        }
-      }
+        },
+      );
+      authRestored = authRestoreResults.reduce((sum, result) => {
+        return sum + result.restored;
+      }, 0);
+      authUpdated = authRestoreResults.reduce((sum, result) => {
+        return sum + result.updated;
+      }, 0);
 
       // Also delete Firestore "users" docs for users not in backup
       // (except the current admin). Full user restores already do this
@@ -176,15 +207,17 @@ const restoreBackup = async (request) => {
       if (!collectionsToRestore.includes("users")) {
         try {
           const usersSnapshot = await db.collection("users").get();
-          const deleteBatch = db.batch();
-          let deleteCount = 0;
+          const docsToDelete = [];
           usersSnapshot.forEach((doc) => {
             if (!backupUids.has(doc.id) && doc.id !== callerUid) {
-              deleteBatch.delete(doc.ref);
-              deleteCount++;
+              docsToDelete.push(doc.ref);
             }
           });
-          if (deleteCount > 0) {
+          for (let i = 0; i < docsToDelete.length; i += 450) {
+            const deleteBatch = db.batch();
+            for (const docRef of docsToDelete.slice(i, i + 450)) {
+              deleteBatch.delete(docRef);
+            }
             await deleteBatch.commit();
           }
         } catch (err) {

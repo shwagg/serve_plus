@@ -10,6 +10,11 @@ const STORAGE_PREFIXES_TO_BACKUP = [
   "proposals/",
 ];
 
+const {mapWithConcurrency} = require("./concurrency");
+
+const STORAGE_PREFIX_CONCURRENCY = 4;
+const STORAGE_FILE_CONCURRENCY = 25;
+
 function getStorageArchivePrefix(backupId) {
   return `backup-storage/${backupId}/`;
 }
@@ -19,23 +24,27 @@ async function archiveStoragePrefixes(
   storagePrefixes = STORAGE_PREFIXES_TO_BACKUP,
   archivePrefix,
 ) {
-  let totalStorageFiles = 0;
+  const counts = await mapWithConcurrency(
+    storagePrefixes,
+    STORAGE_PREFIX_CONCURRENCY,
+    async (prefix) => {
+      const [files] = await bucket.getFiles({ prefix });
+      const filesToArchive = files.filter((file) => {
+        return shouldArchiveFile(file.name, prefix);
+      });
 
-  for (const prefix of storagePrefixes) {
-    const [files] = await bucket.getFiles({ prefix });
+      await mapWithConcurrency(filesToArchive, STORAGE_FILE_CONCURRENCY, (
+        file,
+      ) => {
+        const archivePath = `${archivePrefix}${file.name}`;
+        return file.copy(bucket.file(archivePath));
+      });
 
-    for (const file of files) {
-      if (!shouldArchiveFile(file.name, prefix)) {
-        continue;
-      }
+      return filesToArchive.length;
+    },
+  );
 
-      const archivePath = `${archivePrefix}${file.name}`;
-      await file.copy(bucket.file(archivePath));
-      totalStorageFiles += 1;
-    }
-  }
-
-  return totalStorageFiles;
+  return counts.reduce((sum, count) => sum + count, 0);
 }
 
 async function restoreArchivedStorageFiles(
@@ -57,23 +66,27 @@ async function restoreArchivedStorageFiles(
       .filter(Boolean),
   );
 
-  for (const prefix of normalizeStoragePrefixes(storagePrefixes)) {
-    await deleteStorageFilesWithPrefix(bucket, prefix, destinationPaths);
-  }
+  await mapWithConcurrency(
+    normalizeStoragePrefixes(storagePrefixes),
+    STORAGE_PREFIX_CONCURRENCY,
+    (prefix) => deleteStorageFilesWithPrefix(bucket, prefix, destinationPaths),
+  );
 
-  let restoredStorageFiles = 0;
+  const restoreResults = await mapWithConcurrency(
+    archivedFiles,
+    STORAGE_FILE_CONCURRENCY,
+    async (file) => {
+      const destinationPath = file.name.slice(archivePrefix.length);
+      if (!destinationPath) {
+        return 0;
+      }
 
-  for (const file of archivedFiles) {
-    const destinationPath = file.name.slice(archivePrefix.length);
-    if (!destinationPath) {
-      continue;
-    }
+      await file.copy(bucket.file(destinationPath));
+      return 1;
+    },
+  );
 
-    await file.copy(bucket.file(destinationPath));
-    restoredStorageFiles += 1;
-  }
-
-  return restoredStorageFiles;
+  return restoreResults.reduce((sum, count) => sum + count, 0);
 }
 
 async function deleteArchivedStorageFiles(bucket, archivePrefix) {
@@ -82,18 +95,12 @@ async function deleteArchivedStorageFiles(bucket, archivePrefix) {
   }
 
   const [files] = await bucket.getFiles({ prefix: archivePrefix });
-  let deletedStorageFiles = 0;
+  const filesToDelete = files.filter((file) => {
+    return file.name && !file.name.endsWith("/");
+  });
+  await deleteStorageFiles(filesToDelete);
 
-  for (const file of files) {
-    if (!file.name || file.name.endsWith("/")) {
-      continue;
-    }
-
-    await file.delete({ ignoreNotFound: true });
-    deletedStorageFiles += 1;
-  }
-
-  return deletedStorageFiles;
+  return filesToDelete.length;
 }
 
 function shouldArchiveFile(fileName, prefix) {
@@ -106,18 +113,18 @@ async function deleteStorageFilesWithPrefix(
   pathsToKeep = new Set(),
 ) {
   const [files] = await bucket.getFiles({ prefix });
-  let deletedStorageFiles = 0;
+  const filesToDelete = files.filter((file) => {
+    return shouldArchiveFile(file.name, prefix) && !pathsToKeep.has(file.name);
+  });
+  await deleteStorageFiles(filesToDelete);
 
-  for (const file of files) {
-    if (!shouldArchiveFile(file.name, prefix) || pathsToKeep.has(file.name)) {
-      continue;
-    }
+  return filesToDelete.length;
+}
 
-    await file.delete({ ignoreNotFound: true });
-    deletedStorageFiles += 1;
-  }
-
-  return deletedStorageFiles;
+async function deleteStorageFiles(files) {
+  await mapWithConcurrency(files, STORAGE_FILE_CONCURRENCY, (file) => {
+    return file.delete({ ignoreNotFound: true });
+  });
 }
 
 function normalizeStoragePrefixes(storagePrefixes) {
