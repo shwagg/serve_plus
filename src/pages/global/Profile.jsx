@@ -297,6 +297,8 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
           </div>
 
           {/* ── About Me bio (level 2+) ── */}
+          {role === 'student' && (
+          <>
           {level >= 2 && (
             <div>
               <label className="profile-modal-label">About Me</label>
@@ -501,6 +503,8 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
               </div>
             );
           })()}
+          </>
+          )}
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
@@ -523,6 +527,8 @@ import { doc, getDoc } from "firebase/firestore";
 import { BADGE_BY_ID } from "../../constants/badgeDefinitions";
 import { PROFILE_FRAMES, getUnlockedFrames } from "../../constants/profileFrames";
 const PROFILE_TABS = ["Overview", "Badges", "Portfolio"];
+const VOLUNTEER_PROFILE_TABS = PROFILE_TABS;
+const NON_VOLUNTEER_PROFILE_TABS = PROFILE_TABS.filter(tab => tab !== "Badges");
 
 const SDG_LABELS = {
   1: "No Poverty", 2: "Zero Hunger", 3: "Good Health & Well-being",
@@ -781,6 +787,16 @@ export default function Profile() {
     }, 100);
     return () => clearTimeout(t);
   }, [scrollToCerts, activeTab, certsLoaded]);
+
+  const isVolunteer = profile?.role === "student";
+  const canViewProposedEvents = isVolunteer || profile?.role === "faculty";
+  const visibleProfileTabs = isVolunteer ? VOLUNTEER_PROFILE_TABS : NON_VOLUNTEER_PROFILE_TABS;
+
+  useEffect(() => {
+    if (!visibleProfileTabs.includes(activeTab)) {
+      setActiveTab("Overview");
+    }
+  }, [activeTab, visibleProfileTabs]);
 
   const handleGalleryUpload = async (galleryData) => {
     const user = auth.currentUser;
@@ -1352,8 +1368,8 @@ useEffect(() => {
         <div
           className="profile-card"
           style={{
-            ...(profileBgColor ? { background: profileBgColor } : {}),
-            ...(profileGlow    ? { boxShadow: profileGlow }       : {}),
+            ...(isVolunteer && profileBgColor ? { background: profileBgColor } : {}),
+            ...(isVolunteer && profileGlow    ? { boxShadow: profileGlow }       : {}),
           }}
         >
           <div className="profile-avatar">
@@ -1361,7 +1377,7 @@ useEffect(() => {
               src={profile.avatar}
               displayName={profile.username || profile.name || profile.email || 'User'}
               alt={`${profile.username || profile.name || 'User'}'s avatar`}
-              frameId={activeFrame}
+              frameId={isVolunteer ? activeFrame : "default"}
               size={120}
             />
           </div>
@@ -1373,22 +1389,22 @@ useEffect(() => {
             <h2 className="profile-username">{profile.email.split('@')[0]}</h2>
           )}
           {/* Custom title (level 6+) */}
-          {profileTitle && (
+          {isVolunteer && profileTitle && (
             <div className="profile-custom-title">{profileTitle}</div>
           )}
           <div className="profile-name">{profile.name}</div>
           <div className="profile-email">{profile.email}</div>
-          <div className="profile-level-label">Level {profile.level}</div>
-          <div className="profile-level-section">
+          {isVolunteer && <div className="profile-level-label">Level {profile.level}</div>}
+          {isVolunteer && <div className="profile-level-section">
             <div className="profile-level-bar-bg">
               <div className="profile-level-bar-fill" style={{ width: `${profile.levelProgress}%` }}></div>
               <div className="profile-level-bar-label">
                 {profile.totalPoints || 0} pts ({profile.levelPointsInLevel || 0}/{profile.levelPointsForLevel || 0} to next level)
               </div>
             </div>
-          </div>
+          </div>}
           {/* Next unlock hint */}
-          {profile.level < 10 && (() => {
+          {isVolunteer && profile.level < 10 && (() => {
             const next = getNextUnlock(profile.level, profile.totalPoints);
             if (!next) return null;
             return (
@@ -1437,7 +1453,7 @@ useEffect(() => {
             </div>
           </div>
           {/* Bio (level 2+) */}
-          {bio && (
+          {isVolunteer && bio && (
             <div style={{ width: '100%', marginTop: 14 }}>
               <div className="profile-skills-label">About Me</div>
               <div className="profile-bio-text">{bio}</div>
@@ -1445,7 +1461,7 @@ useEffect(() => {
           )}
 
           {/* Pinned badges (level 9+) */}
-          {pinnedBadges.length > 0 && (() => {
+          {isVolunteer && pinnedBadges.length > 0 && (() => {
             const pinnedDefs = pinnedBadges
               .map(id => earnedBadges.find(b => (b.badgeId ?? b.id) === id))
               .filter(Boolean);
@@ -1486,7 +1502,7 @@ useEffect(() => {
             open={editOpen}
             onClose={() => setEditOpen(false)}
             profile={profile || {}}
-            role={profile?.role}
+            role={isVolunteer ? profile?.role : "non-volunteer"}
             level={profile?.level || 1}
             activeFrame={activeFrame}
             bio={bio}
@@ -1531,7 +1547,7 @@ useEffect(() => {
         <div className="profile-right-column">
           {/* Tab Navigation */}
           <div className="profile-tab-row" role="tablist" aria-label="Profile sections">
-            {PROFILE_TABS.map(tab => (
+            {visibleProfileTabs.map(tab => (
               <button
                 key={tab}
                 role="tab"
@@ -1541,9 +1557,9 @@ useEffect(() => {
                 onClick={() => setActiveTab(tab)}
                 className={`profile-tab-btn ${activeTab === tab ? 'active' : ''}`}
                 onKeyDown={e => {
-                  const idx = PROFILE_TABS.indexOf(tab);
-                  if (e.key === 'ArrowRight') { e.preventDefault(); setActiveTab(PROFILE_TABS[(idx + 1) % PROFILE_TABS.length]); }
-                  if (e.key === 'ArrowLeft') { e.preventDefault(); setActiveTab(PROFILE_TABS[(idx - 1 + PROFILE_TABS.length) % PROFILE_TABS.length]); }
+                  const idx = visibleProfileTabs.indexOf(tab);
+                  if (e.key === 'ArrowRight') { e.preventDefault(); setActiveTab(visibleProfileTabs[(idx + 1) % visibleProfileTabs.length]); }
+                  if (e.key === 'ArrowLeft') { e.preventDefault(); setActiveTab(visibleProfileTabs[(idx - 1 + visibleProfileTabs.length) % visibleProfileTabs.length]); }
                 }}
               >
                 {tab === 'Overview' ? '📋 Overview' : tab === 'Badges' ? '🏅 Badges' : '🗂️ Portfolio'}
@@ -1678,7 +1694,7 @@ useEffect(() => {
               })()}
 
               {/* ── Events I Proposed ───────────────────────────── */}
-              {(() => {
+              {canViewProposedEvents && (() => {
                 const proposed = profile.proposedEvents || [];
                 const statusMeta = {
                   active:    { label: "Active",    bg: "#d1fae5", color: "#065f46" },
@@ -1756,7 +1772,7 @@ useEffect(() => {
             </div>
           )}
 
-          {activeTab === "Badges" && (
+          {isVolunteer && activeTab === "Badges" && (
             <div role="tabpanel" id="profile-tabpanel-Badges" aria-labelledby="profile-tab-Badges" className="profile-tab-panel">
               <BadgeShelf earnedBadges={earnedBadges} customBadges={customBadges} />
             </div>
@@ -1780,8 +1796,7 @@ useEffect(() => {
                   {exportError && <div className="export-error">{exportError}</div>}
                 </div>
 
-                {/* Achievements */}
-                <div className="portfolio-section">
+                {isVolunteer && <div className="portfolio-section">
                   <div className="card-title">🏅 Achievements <span className="muted-count">({earnedBadges.length})</span></div>
                   {earnedBadges.length === 0
                     ? <p className="muted-text">No achievements yet.</p>
@@ -1802,7 +1817,7 @@ useEffect(() => {
                         })}
                       </div>
                     )}
-                </div>
+                </div>}
 
                 {/* SDG Contributions */}
                 <div className="portfolio-section">
@@ -1996,10 +2011,10 @@ useEffect(() => {
                       <div style={{ color: '#fff', fontWeight: 800, fontSize: 26, letterSpacing: 0.5 }}>{displayName}</div>
                       <div style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500, fontSize: 15, marginTop: 2 }}>{profile.name}</div>
                       <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 2 }}>{profile.email}</div>
-                      <div style={{ marginTop: 8, display: 'flex', gap: 10, alignItems: 'center' }}>
+                      {isVolunteer && <div style={{ marginTop: 8, display: 'flex', gap: 10, alignItems: 'center' }}>
                         <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 20, padding: '3px 14px', fontSize: 12, fontWeight: 700 }}>Level {profile.level}</span>
                         <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>{profile.totalPoints || 0} total points</span>
-                      </div>
+                      </div>}
                     </div>
                     <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                       <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>SerVe+ Portfolio</div>
@@ -2035,8 +2050,8 @@ useEffect(() => {
                   {/* Divider */}
                   <div style={{ height: 1, background: '#e0e7ef' }} />
 
-                  {/* Achievements — students only */}
-                  {profile?.role === "student" && (
+                  {/* Achievements — volunteers only */}
+                  {isVolunteer && (
                   <div>
                     <div style={{ fontWeight: 700, color: '#000', fontSize: 15, marginBottom: 12 }}>Achievements <span style={{ color: '#30bdb7', fontWeight: 500, fontSize: 13 }}>({earnedBadges.length})</span></div>
                     {earnedBadges.length === 0 ? (
@@ -2062,7 +2077,7 @@ useEffect(() => {
                   )}
 
                   {/* Divider */}
-                  <div style={{ height: 1, background: '#e0e7ef' }} />
+                  {isVolunteer && <div style={{ height: 1, background: '#e0e7ef' }} />}
 
                   {/* SDG Contributions */}
                   <div>
