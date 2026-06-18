@@ -179,7 +179,7 @@ export default function Header() {
         navigate('/student/home');
         break;
       case 'faculty':
-        navigate('/faculty/home');
+        navigate('/faculty/current-event');
         break;
       case 'partner':
         navigate('/partner/dashboard');

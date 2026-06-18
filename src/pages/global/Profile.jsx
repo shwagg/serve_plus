@@ -529,6 +529,8 @@ import { PROFILE_FRAMES, getUnlockedFrames } from "../../constants/profileFrames
 const PROFILE_TABS = ["Overview", "Badges", "Portfolio"];
 const VOLUNTEER_PROFILE_TABS = PROFILE_TABS;
 const NON_VOLUNTEER_PROFILE_TABS = PROFILE_TABS.filter(tab => tab !== "Badges");
+const OVERVIEW_ONLY_PROFILE_ROLES = new Set(["partner", "admin", "sysadmin"]);
+const OVERVIEW_ONLY_PROFILE_TABS = ["Overview"];
 
 const SDG_LABELS = {
   1: "No Poverty", 2: "Zero Hunger", 3: "Good Health & Well-being",
@@ -788,9 +790,14 @@ export default function Profile() {
     return () => clearTimeout(t);
   }, [scrollToCerts, activeTab, certsLoaded]);
 
-  const isVolunteer = profile?.role === "student";
-  const canViewProposedEvents = isVolunteer || profile?.role === "faculty";
-  const visibleProfileTabs = isVolunteer ? VOLUNTEER_PROFILE_TABS : NON_VOLUNTEER_PROFILE_TABS;
+  const profileRole = String(profile?.role || "").toLowerCase();
+  const isVolunteer = profileRole === "student";
+  const canViewProposedEvents = isVolunteer || profileRole === "faculty";
+  const visibleProfileTabs = isVolunteer
+    ? VOLUNTEER_PROFILE_TABS
+    : OVERVIEW_ONLY_PROFILE_ROLES.has(profileRole)
+      ? OVERVIEW_ONLY_PROFILE_TABS
+      : NON_VOLUNTEER_PROFILE_TABS;
 
   useEffect(() => {
     if (!visibleProfileTabs.includes(activeTab)) {
@@ -1778,7 +1785,7 @@ useEffect(() => {
             </div>
           )}
 
-          {activeTab === "Portfolio" && (() => {
+          {visibleProfileTabs.includes("Portfolio") && activeTab === "Portfolio" && (() => {
             const events = profile.registeredEvents || [];
             const sdgCounts = events.flatMap(e => e.sdgs || []).reduce((acc, sdg) => {
               acc[sdg] = (acc[sdg] || 0) + 1;
