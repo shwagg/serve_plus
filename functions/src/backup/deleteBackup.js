@@ -37,17 +37,19 @@ const deleteBackup = async (request) => {
 
   // Delete from Cloud Storage
   try {
+    const storageDeletes = [];
     if (backupMeta.storagePath) {
-      const file = bucket.file(backupMeta.storagePath);
-      const [exists] = await file.exists();
-      if (exists) {
-        await file.delete();
-      }
+      storageDeletes.push(
+        bucket.file(backupMeta.storagePath).delete({ ignoreNotFound: true }),
+      );
     }
 
     if (backupMeta.storageArchivePrefix) {
-      await deleteArchivedStorageFiles(bucket, backupMeta.storageArchivePrefix);
+      storageDeletes.push(
+        deleteArchivedStorageFiles(bucket, backupMeta.storageArchivePrefix),
+      );
     }
+    await Promise.all(storageDeletes);
   } catch (err) {
     console.error("Could not delete backup file from storage:", err);
     throw new HttpsError(

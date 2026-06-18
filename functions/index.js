@@ -200,7 +200,7 @@ exports.restoreBackup = onCall(
   restoreBackup,
 );
 exports.listBackups = onCall(defaultFunctionOptions, listBackups);
-exports.deleteBackup = onCall(defaultFunctionOptions, deleteBackup);
+exports.deleteBackup = onCall(heavyJobOptions, deleteBackup);
 exports.scheduledBackup = scheduledBackup;
 
 // Attendance flagging

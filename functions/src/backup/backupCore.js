@@ -9,6 +9,9 @@ const {
   deleteArchivedStorageFiles,
   getStorageArchivePrefix,
 } = require("./storageArchive");
+const {mapWithConcurrency} = require("./concurrency");
+
+const ROOT_COLLECTION_CONCURRENCY = 6;
 
 async function createBackupSnapshot({
   admin,
@@ -22,13 +25,20 @@ async function createBackupSnapshot({
 }) {
   const collectionsToBackup = ROOT_COLLECTIONS_TO_BACKUP;
   const backupData = {};
-  let totalDocuments = 0;
 
-  for (const collectionName of collectionsToBackup) {
-    const result = await backupCollectionTree(db.collection(collectionName));
-    backupData[collectionName] = result.documents;
-    totalDocuments += result.totalDocuments;
-  }
+  const documentCounts = await mapWithConcurrency(
+    collectionsToBackup,
+    ROOT_COLLECTION_CONCURRENCY,
+    async (collectionName) => {
+      const result = await backupCollectionTree(db.collection(collectionName));
+      backupData[collectionName] = result.documents;
+      return result.totalDocuments;
+    },
+  );
+
+  const totalDocuments = documentCounts.reduce((sum, count) => {
+    return sum + count;
+  }, 0);
 
   const authUsers = await listAuthUsers(admin);
   backupData._authUsers = authUsers;

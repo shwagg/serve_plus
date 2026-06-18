@@ -1,4 +1,10 @@
 const DOCUMENT_ENTRY_FORMAT = "firestore-document-v1";
+const {mapWithConcurrency} = require("./concurrency");
+
+const BACKUP_DOCUMENT_CONCURRENCY = 25;
+const BACKUP_SUBCOLLECTION_CONCURRENCY = 10;
+const RESTORE_DELETE_CONCURRENCY = 20;
+const RESTORE_NESTED_CONCURRENCY = 10;
 
 const ROOT_COLLECTIONS_TO_BACKUP = [
   "users",
@@ -23,20 +29,25 @@ const ROOT_COLLECTIONS_TO_BACKUP = [
 async function backupCollectionTree(collectionRef) {
   const snapshot = await collectionRef.get();
   const documents = {};
-  let totalDocuments = 0;
 
-  for (const doc of snapshot.docs) {
-    const { subcollections, totalDocuments: nestedDocuments } =
-      await backupSubcollections(doc.ref);
+  const totals = await mapWithConcurrency(
+    snapshot.docs,
+    BACKUP_DOCUMENT_CONCURRENCY,
+    async (doc) => {
+      const { subcollections, totalDocuments: nestedDocuments } =
+        await backupSubcollections(doc.ref);
 
-    documents[doc.id] = {
-      __backupMeta: { format: DOCUMENT_ENTRY_FORMAT },
-      data: doc.data(),
-      subcollections,
-    };
+      documents[doc.id] = {
+        __backupMeta: { format: DOCUMENT_ENTRY_FORMAT },
+        data: doc.data(),
+        subcollections,
+      };
 
-    totalDocuments += 1 + nestedDocuments;
-  }
+      return 1 + nestedDocuments;
+    },
+  );
+
+  const totalDocuments = totals.reduce((sum, count) => sum + count, 0);
 
   return { documents, totalDocuments };
 }
@@ -44,13 +55,18 @@ async function backupCollectionTree(collectionRef) {
 async function backupSubcollections(docRef) {
   const subcollectionRefs = await docRef.listCollections();
   const subcollections = {};
-  let totalDocuments = 0;
 
-  for (const subcollectionRef of subcollectionRefs) {
-    const result = await backupCollectionTree(subcollectionRef);
-    subcollections[subcollectionRef.id] = result.documents;
-    totalDocuments += result.totalDocuments;
-  }
+  const totals = await mapWithConcurrency(
+    subcollectionRefs,
+    BACKUP_SUBCOLLECTION_CONCURRENCY,
+    async (subcollectionRef) => {
+      const result = await backupCollectionTree(subcollectionRef);
+      subcollections[subcollectionRef.id] = result.documents;
+      return result.totalDocuments;
+    },
+  );
+
+  const totalDocuments = totals.reduce((sum, count) => sum + count, 0);
 
   return { subcollections, totalDocuments };
 }
@@ -74,11 +90,16 @@ async function restoreCollectionTree(
     const slice = docEntries.slice(i, i + batchSize);
     const nestedRestores = [];
 
+    await mapWithConcurrency(slice, RESTORE_DELETE_CONCURRENCY, async (
+      [docId],
+    ) => {
+      await deleteReferenceTree(collectionRef.doc(docId));
+    });
+
     for (const [docId, rawEntry] of slice) {
       const docRef = collectionRef.doc(docId);
       const entry = normalizeBackupEntry(rawEntry);
 
-      await deleteReferenceTree(docRef);
       batch.set(docRef, restoreTimestamps(entry.data));
       nestedRestores.push({ docRef, subcollections: entry.subcollections });
     }
@@ -86,17 +107,27 @@ async function restoreCollectionTree(
     await batch.commit();
     restoredDocuments += slice.length;
 
-    for (const nestedRestore of nestedRestores) {
-      for (const [subcollectionName, subcollectionData] of Object.entries(
-        nestedRestore.subcollections,
-      )) {
-        restoredDocuments += await restoreCollectionTree(
-          nestedRestore.docRef.collection(subcollectionName),
+    const nestedTasks = nestedRestores.flatMap((nestedRestore) => {
+      return Object.entries(nestedRestore.subcollections).map(
+        ([subcollectionName, subcollectionData]) => ({
+          docRef: nestedRestore.docRef,
+          subcollectionName,
+          subcollectionData,
+        }),
+      );
+    });
+    const nestedCounts = await mapWithConcurrency(
+      nestedTasks,
+      RESTORE_NESTED_CONCURRENCY,
+      async ({docRef, subcollectionName, subcollectionData}) => {
+        return restoreCollectionTree(
+          docRef.collection(subcollectionName),
           subcollectionData,
           restoreTimestamps,
         );
-      }
-    }
+      },
+    );
+    restoredDocuments += nestedCounts.reduce((sum, count) => sum + count, 0);
   }
 
   return restoredDocuments;
@@ -109,13 +140,17 @@ async function deleteDocsMissingFromBackup(
 ) {
   const snapshot = await collectionRef.get();
 
-  for (const doc of snapshot.docs) {
+  const docsToDelete = snapshot.docs.filter((doc) => {
     if (backupDocIds.has(doc.id) || preserveDocIds.has(doc.id)) {
-      continue;
+      return false;
     }
 
-    await deleteReferenceTree(doc.ref);
-  }
+    return true;
+  });
+
+  await mapWithConcurrency(docsToDelete, RESTORE_DELETE_CONCURRENCY, (doc) => {
+    return deleteReferenceTree(doc.ref);
+  });
 }
 
 async function deleteReferenceTree(ref) {
@@ -131,17 +166,21 @@ async function deleteReferenceTree(ref) {
 async function fallbackRecursiveDelete(ref) {
   if (typeof ref.listCollections === "function") {
     const subcollections = await ref.listCollections();
-    for (const subcollectionRef of subcollections) {
-      await fallbackRecursiveDelete(subcollectionRef);
-    }
+    await mapWithConcurrency(
+      subcollections,
+      RESTORE_NESTED_CONCURRENCY,
+      fallbackRecursiveDelete,
+    );
     await ref.delete();
     return;
   }
 
   const snapshot = await ref.get();
-  for (const doc of snapshot.docs) {
-    await fallbackRecursiveDelete(doc.ref);
-  }
+  await mapWithConcurrency(
+    snapshot.docs,
+    RESTORE_DELETE_CONCURRENCY,
+    (doc) => fallbackRecursiveDelete(doc.ref),
+  );
 }
 
 function getBackupCollectionNames(backupData) {
