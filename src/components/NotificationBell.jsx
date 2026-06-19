@@ -369,11 +369,14 @@ export default function NotificationBell() {
       <button
         ref={bellButtonRef}
         className="notification-bell-button"
-        onClick={() => setIsOpen((prev) => {
-          if (prev) return false;
+        onClick={() => {
+          if (isOpen) {
+            setIsOpen(false);
+            return;
+          }
           announceHeaderModalOpen("notifications");
-          return true;
-        })}
+          setIsOpen(true);
+        }}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"

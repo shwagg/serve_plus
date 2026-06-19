@@ -275,11 +275,14 @@ export default function ChatModal() {
         aria-label="Chat"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        onClick={() => setIsOpen(prev => {
-          if (prev) return false;
+        onClick={() => {
+          if (isOpen) {
+            setIsOpen(false);
+          } else {
           announceHeaderModalOpen('chat');
-          return true;
-        })}
+            setIsOpen(true);
+          }
+        }}
       >
         <img src={chatIcon} alt="" width="24" height="24" aria-hidden="true" />
       </button>
