@@ -3,6 +3,7 @@ import {
   Route,
   BrowserRouter as Router,
   Routes,
+  useLocation,
 } from "react-router-dom";
 import { SessionProvider } from "./context/SessionContext";
 import { useEffect, useState } from "react";
@@ -18,6 +19,7 @@ import "./App.css";
 import ToastContainer from "./components/Toast";
 import "./utils/toast";
 import Auth from "./pages/Auth"; //changed login to authorization page
+import LandingPage from "./pages/LandingPage";
 import ForgotPass from "./pages/ForgotPass";
 import OAuthCallback from "./pages/OAuthCallback";
 import Register from "./pages/Register";
@@ -61,21 +63,31 @@ import VerifyCertificatePage from "./pages/VerifyCertificatePage";
 /** Renders the badge earned popup; subscribes to Firebase Auth state for the UID */
 function BadgePopupManager() {
   const [uid, setUid] = useState(null);
+  const location = useLocation();
   useEffect(() => {
     const auth = getAuth();
     return onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null));
   }, []);
   const { badgeQueue, dismissBadge } = useBadgeEarnedPopup(uid);
+
+  const shouldShowBadgePopup = location.pathname === "/student/home";
+  if (!shouldShowBadgePopup) return null;
+
   return <BadgeEarnedModal badgeQueue={badgeQueue} onDismiss={dismissBadge} />;
 }
 
 function CertPopupManager() {
   const [uid, setUid] = useState(null);
+  const location = useLocation();
   useEffect(() => {
     const auth = getAuth();
     return onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null));
   }, []);
   const { certQueue, dismissCert } = useCertEarnedPopup(uid);
+
+  const shouldShowCertPopup = location.pathname === "/student/home";
+  if (!shouldShowCertPopup) return null;
+
   return <CertEarnedModal certQueue={certQueue} onDismiss={dismissCert} />;
 }
 
@@ -89,10 +101,11 @@ function App() {
   return (
     <SessionProvider>
       <ToastContainer />
-      <BadgePopupManager />
-      <CertPopupManager />
       <Router>
+        <BadgePopupManager />
+        <CertPopupManager />
         <Routes>
+          <Route path="/" element={<LandingPage />} />
                     <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/blackboard/complete" element={<OAuthCallback />} />
@@ -275,7 +288,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="*" element={<Navigate to="/auth" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </SessionProvider>
