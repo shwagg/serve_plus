@@ -39,6 +39,10 @@ function getRemainingCount(value, limit) {
   return `${String(value || '').length} / ${limit} characters`;
 }
 
+function getVisibleCharacterCount(value) {
+  return String(value || '').replace(/[\s\r\n]+/g, '').length;
+}
+
 function isProposalLockedForUser(userData) {
   const role = normalizeValue(userData?.role || userData?.userRole || userData?.Role);
   if (role !== 'student' && role !== 'faculty') return false;
@@ -132,7 +136,11 @@ function ProponentTagInput({ tags, onAdd, onRemove, lockedCount = 0 }) {
         type="text"
         className="proponent-tag-input"
         value={input}
-        onChange={e => setInput(e.target.value)}
+        onChange={e => {
+          const nextValue = e.target.value;
+          if (maxChars && nextValue.length > maxChars) return;
+          setInput(nextValue);
+        }}
         onKeyDown={e => {
           if (e.key === 'Enter') { e.preventDefault(); commit(); }
           if (e.key === ',')    { e.preventDefault(); commit(); }
@@ -147,12 +155,13 @@ function ProponentTagInput({ tags, onAdd, onRemove, lockedCount = 0 }) {
  * Numbered list input for stakeholders. Pressing Enter commits the item and shows it
  * as "1. Name", "2. Name", etc.
  */
-function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMorePlaceholder }) {
+function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMorePlaceholder, maxChars }) {
   const [input, setInput] = useState('');
 
   const commit = () => {
     const val = input.trim();
     if (!val) return;
+    if (maxChars && val.length > maxChars) return;
     onAdd(val);
     setInput('');
   };
@@ -194,6 +203,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const [hasProponentName, setHasProponentName] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const fieldErrorTimeoutsRef = useRef({});
   const [formData, setFormData] = useState({
     title: '',
     sdgs: [],
@@ -416,6 +426,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   // simulated unmount from overwriting a previously saved draft with the initial empty state.
   useEffect(() => {
     return () => {
+      Object.values(fieldErrorTimeoutsRef.current).forEach(clearTimeout);
       if (submittedRef.current) return;
       if (!hasUserInputRef.current) return;
       try {
@@ -433,6 +444,25 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     submittedRef.current = true;
     try { localStorage.removeItem(draftKey); } catch (e) { /* ignore */ }
   }, [draftKey]);
+
+  const showTemporaryFieldError = useCallback((fieldName, message) => {
+    setFieldErrors(prev => ({ ...prev, [fieldName]: message }));
+    if (fieldErrorTimeoutsRef.current[fieldName]) {
+      clearTimeout(fieldErrorTimeoutsRef.current[fieldName]);
+    }
+    fieldErrorTimeoutsRef.current[fieldName] = setTimeout(() => {
+      setFieldErrors(prev => ({ ...prev, [fieldName]: '' }));
+      delete fieldErrorTimeoutsRef.current[fieldName];
+    }, 3000);
+  }, []);
+
+  const showTemporaryFieldErrors = useCallback((errors) => {
+    Object.entries(errors).forEach(([fieldName, message]) => {
+      if (message) {
+        showTemporaryFieldError(fieldName, message);
+      }
+    });
+  }, [showTemporaryFieldError]);
 
   const discardDraft = () => {
     clearDraft();
@@ -498,16 +528,25 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     if (name === 'volunteerHours') {
       if (value !== '' && Number(value) > FIELD_LIMITS.volunteerHours) {
         setFormData(prev => ({ ...prev, [name]: '' }));
-        setFieldErrors(prev => ({ ...prev, [name]: `Volunteer Hours only allows up to ${FIELD_LIMITS.volunteerHours}.` }));
+        showTemporaryFieldError(name, `Volunteer Hours only allows up to ${FIELD_LIMITS.volunteerHours}.`);
         showToast(`Volunteer Hours only allows up to ${FIELD_LIMITS.volunteerHours}.`);
         return;
       }
       setFormData(prev => ({ ...prev, [name]: value }));
       setFieldErrors(prev => ({ ...prev, [name]: '' }));
-    } else if (textLimits[name] && value.length > textLimits[name]) {
+    } else if (name === 'participantLimit') {
+      if (value !== '' && Number(value) > 50) {
+        setFormData(prev => ({ ...prev, [name]: '' }));
+        showTemporaryFieldError(name, 'Participant Limit only allows up to 50.');
+        showToast('Participant Limit only allows up to 50.');
+        return;
+      }
+      setFormData(prev => ({ ...prev, [name]: value }));
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    } else if (textLimits[name] && getVisibleCharacterCount(value) > textLimits[name]) {
       setFormData(prev => ({ ...prev, [name]: '' }));
-      setFieldErrors(prev => ({ ...prev, [name]: `This field only allows up to ${textLimits[name]} characters.` }));
-      showToast(`This field only allows up to ${textLimits[name]} characters.`);
+      showTemporaryFieldError(name, `This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
+      showToast(`This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
       return;
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -530,13 +569,13 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       course: FIELD_LIMITS.course,
       courseCode: FIELD_LIMITS.courseCode,
     };
-    if (textLimits[name] && value.length > textLimits[name]) {
+    if (textLimits[name] && getVisibleCharacterCount(value) > textLimits[name]) {
       setSlFields(prev => ({
         ...prev,
         [name]: ''
       }));
-      setFieldErrors(prev => ({ ...prev, [name]: `This field only allows up to ${textLimits[name]} characters.` }));
-      showToast(`This field only allows up to ${textLimits[name]} characters.`);
+      showTemporaryFieldError(name, `This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
+      showToast(`This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
       return;
     }
     setSlFields(prev => ({
@@ -594,14 +633,14 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddProponent = (name) => {
     hasUserInputRef.current = true;
-    if (String(name || '').length > 80) {
-      showToast('Each proponent name only allows up to 80 characters.');
-      setFieldErrors(prev => ({ ...prev, proponents: 'Each proponent name only allows up to 80 characters.' }));
+    if (getVisibleCharacterCount(name) > 80) {
+      showToast('Each proponent name only allows up to 80 characters, excluding spaces and line breaks.');
+      showTemporaryFieldError('proponents', 'Each proponent name only allows up to 80 characters, excluding spaces and line breaks.');
       return;
     }
     if ((formData.proponents || []).length >= FIELD_LIMITS.proponents) {
       showToast(`Only ${FIELD_LIMITS.proponents} proponent names are allowed.`);
-      setFieldErrors(prev => ({ ...prev, proponents: `Only ${FIELD_LIMITS.proponents} proponent names are allowed.` }));
+      showTemporaryFieldError('proponents', `Only ${FIELD_LIMITS.proponents} proponent names are allowed.`);
       return;
     }
     setFormData(prev => ({ ...prev, proponents: [...(prev.proponents || []), name] }));
@@ -615,9 +654,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddStakeholder = (text) => {
     hasUserInputRef.current = true;
-    if (text.length > FIELD_LIMITS.stakeholderItem) {
-      showToast(`Stakeholders are limited to ${FIELD_LIMITS.stakeholderItem} characters each.`);
-      setFieldErrors(prev => ({ ...prev, stakeholders: `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters.` }));
+    if (String(text || '').trim().length > FIELD_LIMITS.stakeholderItem || getVisibleCharacterCount(text) > FIELD_LIMITS.stakeholderItem) {
+      showToast(`Stakeholders are limited to ${FIELD_LIMITS.stakeholderItem} characters each, excluding spaces and line breaks.`);
+      showTemporaryFieldError('stakeholders', `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters, excluding spaces and line breaks.`);
       return;
     }
     setFormData(prev => ({ ...prev, stakeholders: [...(prev.stakeholders || []), text] }));
@@ -631,9 +670,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddActivity = (text) => {
     hasUserInputRef.current = true;
-    if (text.length > FIELD_LIMITS.activityItem) {
-      showToast(`Each activity is limited to ${FIELD_LIMITS.activityItem} characters.`);
-      setFieldErrors(prev => ({ ...prev, specificActivities: `Each activity can only have ${FIELD_LIMITS.activityItem} characters.` }));
+    if (String(text || '').trim().length > FIELD_LIMITS.activityItem || getVisibleCharacterCount(text) > FIELD_LIMITS.activityItem) {
+      showToast(`Each activity is limited to ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`);
+      showTemporaryFieldError('specificActivities', `Each activity can only have ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`);
       return;
     }
     setFormData(prev => ({ ...prev, specificActivities: [...(prev.specificActivities || []), text] }));
@@ -671,25 +710,40 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     }
   };
 
+  const handleNumericKeyDown = (e) => {
+    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (allowedKeys.includes(e.key)) return;
+    if (!/^\d$/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleNumericPaste = (e) => {
+    const pasted = e.clipboardData.getData('text');
+    if (!/^\d+$/.test(pasted)) {
+      e.preventDefault();
+    }
+  };
+
   const validateBeforeSummary = () => {
     const nextErrors = {};
-    if ((formData.title || '').length > FIELD_LIMITS.title) nextErrors.title = `Only ${FIELD_LIMITS.title} characters are allowed.`;
-    if ((formData.location || '').length > FIELD_LIMITS.location) nextErrors.location = `Only ${FIELD_LIMITS.location} characters are allowed.`;
-    if ((slFields.course || '').length > FIELD_LIMITS.course) nextErrors.course = `Only ${FIELD_LIMITS.course} characters are allowed.`;
-    if ((slFields.courseCode || '').length > FIELD_LIMITS.courseCode) nextErrors.courseCode = `Only ${FIELD_LIMITS.courseCode} characters are allowed.`;
-    if ((slFields.section || '').length > FIELD_LIMITS.section) nextErrors.section = `Only ${FIELD_LIMITS.section} characters are allowed.`;
-    if ((formData.description || '').length > FIELD_LIMITS.description) nextErrors.description = `Only ${FIELD_LIMITS.description} characters are allowed.`;
-    if ((formData.objectives || '').length > FIELD_LIMITS.objectives) nextErrors.objectives = `Only ${FIELD_LIMITS.objectives} characters are allowed.`;
-    if ((formData.successIndicators || '').length > FIELD_LIMITS.successIndicators) nextErrors.successIndicators = `Only ${FIELD_LIMITS.successIndicators} characters are allowed.`;
-    if ((formData.budget || '').length > FIELD_LIMITS.budget) nextErrors.budget = `Only ${FIELD_LIMITS.budget} characters are allowed.`;
+    if (getVisibleCharacterCount(formData.title) > FIELD_LIMITS.title) nextErrors.title = `Only ${FIELD_LIMITS.title} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.location) > FIELD_LIMITS.location) nextErrors.location = `Only ${FIELD_LIMITS.location} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(slFields.course) > FIELD_LIMITS.course) nextErrors.course = `Only ${FIELD_LIMITS.course} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(slFields.courseCode) > FIELD_LIMITS.courseCode) nextErrors.courseCode = `Only ${FIELD_LIMITS.courseCode} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(slFields.section) > FIELD_LIMITS.section) nextErrors.section = `Only ${FIELD_LIMITS.section} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.description) > FIELD_LIMITS.description) nextErrors.description = `Only ${FIELD_LIMITS.description} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.objectives) > FIELD_LIMITS.objectives) nextErrors.objectives = `Only ${FIELD_LIMITS.objectives} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.successIndicators) > FIELD_LIMITS.successIndicators) nextErrors.successIndicators = `Only ${FIELD_LIMITS.successIndicators} characters are allowed, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.budget) > FIELD_LIMITS.budget) nextErrors.budget = `Only ${FIELD_LIMITS.budget} characters are allowed, excluding spaces and line breaks.`;
     if (Number(formData.volunteerHours) > FIELD_LIMITS.volunteerHours) nextErrors.volunteerHours = `Volunteer Hours can only go up to ${FIELD_LIMITS.volunteerHours}.`;
     if ((formData.proponents || []).length > FIELD_LIMITS.proponents) nextErrors.proponents = `Only ${FIELD_LIMITS.proponents} proponent names are allowed.`;
-    if ((formData.stakeholders || []).some(item => String(item || '').length > FIELD_LIMITS.stakeholderItem)) nextErrors.stakeholders = `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters.`;
-    if ((formData.specificActivities || []).some(item => String(item || '').length > FIELD_LIMITS.activityItem)) nextErrors.specificActivities = `Each activity can only have ${FIELD_LIMITS.activityItem} characters.`;
+    if ((formData.stakeholders || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.stakeholderItem)) nextErrors.stakeholders = `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters, excluding spaces and line breaks.`;
+    if ((formData.specificActivities || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.activityItem)) nextErrors.specificActivities = `Each activity can only have ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`;
     if (formData.targetDate && (formData.targetDate < minDateString || formData.targetDate > maxDateString)) nextErrors.targetDate = `Select a date between ${minDateString} and ${maxDateString}.`;
 
-    setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
+      showTemporaryFieldErrors(nextErrors);
       showToast('Some fields exceed the allowed limits. Please review the highlighted fields.');
       return false;
     }
@@ -765,7 +819,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   required
                 />
                 <small className={`field-limit-hint${fieldErrors.title ? ' error' : ''}`}>
-                  {fieldErrors.title || getRemainingCount(formData.title, FIELD_LIMITS.title)}
+                  {fieldErrors.title || `${getVisibleCharacterCount(formData.title)} / ${FIELD_LIMITS.title} characters`}
                 </small>
               </div>
               <div className="form-group">
@@ -963,11 +1017,13 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     type="number"
                     id="volunteerHours"
                     name="volunteerHours"
-                    value={formData.volunteerHours}
-                    onChange={handleInputChange}
-                    required
-                    min="0"
-                    max={FIELD_LIMITS.volunteerHours}
+                  value={formData.volunteerHours}
+                  onChange={handleInputChange}
+                  onKeyDown={handleNumericKeyDown}
+                  onPaste={handleNumericPaste}
+                  required
+                  min="0"
+                  max={FIELD_LIMITS.volunteerHours}
                   />
                   {fieldErrors.volunteerHours && <small className="field-limit-hint error">{fieldErrors.volunteerHours}</small>}
                 </div>
@@ -980,10 +1036,13 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     name="participantLimit"
                     value={formData.participantLimit}
                     onChange={handleInputChange}
+                    onKeyDown={handleNumericKeyDown}
+                    onPaste={handleNumericPaste}
                     min="1"
                     max="50"
                     placeholder="Max participants (optional, up to 50)"
                   />
+                  {fieldErrors.participantLimit && <small className="field-limit-hint error">{fieldErrors.participantLimit}</small>}
                 </div>
               </div>
 
@@ -999,7 +1058,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   placeholder="Venue or community where project will take place"
                 />
                 <small className={`field-limit-hint${fieldErrors.location ? ' error' : ''}`}>
-                  {fieldErrors.location || getRemainingCount(formData.location, FIELD_LIMITS.location)}
+                  {fieldErrors.location || `${getVisibleCharacterCount(formData.location)} / ${FIELD_LIMITS.location} characters`}
                 </small>
               </div>
 
@@ -1009,6 +1068,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   items={formData.stakeholders || []}
                   onAdd={handleAddStakeholder}
                   onRemove={handleRemoveStakeholder}
+                  maxChars={FIELD_LIMITS.stakeholderItem}
                 />
                 <small className={`field-limit-hint${fieldErrors.stakeholders ? ' error' : ''}`}>
                   {fieldErrors.stakeholders || `Each stakeholder can use up to ${FIELD_LIMITS.stakeholderItem} characters.`}
@@ -1033,7 +1093,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                       placeholder="e.g., Introduction to Community Development"
                     />
                     <small className={`field-limit-hint${fieldErrors.course ? ' error' : ''}`}>
-                      {fieldErrors.course || getRemainingCount(slFields.course, FIELD_LIMITS.course)}
+                      {fieldErrors.course || `${getVisibleCharacterCount(slFields.course)} / ${FIELD_LIMITS.course} characters`}
                     </small>
                   </div>
                   <div className="form-group">
@@ -1048,7 +1108,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                       placeholder="e.g., CD 101"
                     />
                     <small className={`field-limit-hint${fieldErrors.courseCode ? ' error' : ''}`}>
-                      {fieldErrors.courseCode || getRemainingCount(slFields.courseCode, FIELD_LIMITS.courseCode)}
+                      {fieldErrors.courseCode || `${getVisibleCharacterCount(slFields.courseCode)} / ${FIELD_LIMITS.courseCode} characters`}
                     </small>
                   </div>
                 </div>
@@ -1064,7 +1124,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     placeholder="e.g., Section A"
                   />
                   <small className={`field-limit-hint${fieldErrors.section ? ' error' : ''}`}>
-                    {fieldErrors.section || getRemainingCount(slFields.section, FIELD_LIMITS.section)}
+                    {fieldErrors.section || `${getVisibleCharacterCount(slFields.section)} / ${FIELD_LIMITS.section} characters`}
                   </small>
                 </div>
               </div>
@@ -1106,7 +1166,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     placeholder="Describe expected student outcomes"
                   />
                   <small className="field-limit-hint">
-                    {getRemainingCount(formData.studentOutcomes, FIELD_LIMITS.studentOutcomes)}
+                    {`${getVisibleCharacterCount(formData.studentOutcomes)} / ${FIELD_LIMITS.studentOutcomes} characters`}
                   </small>
                 </div>
 
@@ -1163,7 +1223,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   placeholder="Provide a detailed description of the project"
                 />
                 <small className={`field-limit-hint${fieldErrors.description ? ' error' : ''}`}>
-                  {fieldErrors.description || getRemainingCount(formData.description, FIELD_LIMITS.description)}
+                  {fieldErrors.description || `${getVisibleCharacterCount(formData.description)} / ${FIELD_LIMITS.description} characters`}
                 </small>
               </div>
 
@@ -1179,7 +1239,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   placeholder="List the main objectives of the project"
                 />
                 <small className={`field-limit-hint${fieldErrors.objectives ? ' error' : ''}`}>
-                  {fieldErrors.objectives || getRemainingCount(formData.objectives, FIELD_LIMITS.objectives)}
+                  {fieldErrors.objectives || `${getVisibleCharacterCount(formData.objectives)} / ${FIELD_LIMITS.objectives} characters`}
                 </small>
               </div>
 
@@ -1189,6 +1249,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   items={formData.specificActivities || []}
                   onAdd={handleAddActivity}
                   onRemove={handleRemoveActivity}
+                  maxChars={FIELD_LIMITS.activityItem}
                   placeholder="Type an activity and press Enter"
                   addMorePlaceholder="Add another activity…"
                 />
@@ -1212,7 +1273,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   placeholder="How will you measure the success of this project?"
                 />
                 <small className={`field-limit-hint${fieldErrors.successIndicators ? ' error' : ''}`}>
-                  {fieldErrors.successIndicators || getRemainingCount(formData.successIndicators, FIELD_LIMITS.successIndicators)}
+                  {fieldErrors.successIndicators || `${getVisibleCharacterCount(formData.successIndicators)} / ${FIELD_LIMITS.successIndicators} characters`}
                 </small>
               </div>
 
@@ -1228,7 +1289,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   placeholder="Provide a detailed budget breakdown"
                 />
                 <small className={`field-limit-hint${fieldErrors.budget ? ' error' : ''}`}>
-                  {fieldErrors.budget || getRemainingCount(formData.budget, FIELD_LIMITS.budget)}
+                  {fieldErrors.budget || `${getVisibleCharacterCount(formData.budget)} / ${FIELD_LIMITS.budget} characters`}
                 </small>
               </div>
             </div>

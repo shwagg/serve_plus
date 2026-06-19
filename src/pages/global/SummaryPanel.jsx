@@ -23,6 +23,10 @@ const FIELD_LIMITS = {
   proponents: 3,
 };
 
+function getVisibleCharacterCount(value) {
+  return String(value || '').replace(/[\s\r\n]+/g, '').length;
+}
+
 function SummaryPanel({
   formData,
   slFields,
@@ -41,17 +45,19 @@ function SummaryPanel({
   const validateProposalLimits = () => {
     if ((formData.title || '').length > FIELD_LIMITS.title) return `Title can only have ${FIELD_LIMITS.title} characters.`;
     if ((formData.location || '').length > FIELD_LIMITS.location) return `Location can only have ${FIELD_LIMITS.location} characters.`;
-    if ((formData.description || '').length > FIELD_LIMITS.description) return `Project Description can only have ${FIELD_LIMITS.description} characters.`;
-    if ((formData.objectives || '').length > FIELD_LIMITS.objectives) return `Objectives can only have ${FIELD_LIMITS.objectives} characters.`;
-    if ((formData.successIndicators || '').length > FIELD_LIMITS.successIndicators) return `Success Indicators can only have ${FIELD_LIMITS.successIndicators} characters.`;
-    if ((formData.budget || '').length > FIELD_LIMITS.budget) return `Budget can only have ${FIELD_LIMITS.budget} characters.`;
+    if (getVisibleCharacterCount(formData.title) > FIELD_LIMITS.title) return `Title can only have ${FIELD_LIMITS.title} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.location) > FIELD_LIMITS.location) return `Location can only have ${FIELD_LIMITS.location} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.description) > FIELD_LIMITS.description) return `Project Description can only have ${FIELD_LIMITS.description} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.objectives) > FIELD_LIMITS.objectives) return `Objectives can only have ${FIELD_LIMITS.objectives} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.successIndicators) > FIELD_LIMITS.successIndicators) return `Success Indicators can only have ${FIELD_LIMITS.successIndicators} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(formData.budget) > FIELD_LIMITS.budget) return `Budget can only have ${FIELD_LIMITS.budget} characters, excluding spaces and line breaks.`;
     if (Number(formData.volunteerHours) > FIELD_LIMITS.volunteerHours) return `Volunteer Hours can only go up to ${FIELD_LIMITS.volunteerHours}.`;
     if ((formData.proponents || []).length > FIELD_LIMITS.proponents) return `Only ${FIELD_LIMITS.proponents} proponents are allowed.`;
-    if ((formData.stakeholders || []).some(item => String(item || '').length > FIELD_LIMITS.stakeholderItem)) return `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters.`;
-    if ((formData.specificActivities || []).some(item => String(item || '').length > FIELD_LIMITS.activityItem)) return `Each specific activity can only have ${FIELD_LIMITS.activityItem} characters.`;
-    if ((slFields.course || '').length > FIELD_LIMITS.course) return `Course can only have ${FIELD_LIMITS.course} characters.`;
-    if ((slFields.courseCode || '').length > FIELD_LIMITS.courseCode) return `Course Code can only have ${FIELD_LIMITS.courseCode} characters.`;
-    if ((slFields.section || '').length > FIELD_LIMITS.section) return `Section can only have ${FIELD_LIMITS.section} characters.`;
+    if ((formData.stakeholders || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.stakeholderItem)) return `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters, excluding spaces and line breaks.`;
+    if ((formData.specificActivities || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.activityItem)) return `Each specific activity can only have ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(slFields.course) > FIELD_LIMITS.course) return `Course can only have ${FIELD_LIMITS.course} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(slFields.courseCode) > FIELD_LIMITS.courseCode) return `Course Code can only have ${FIELD_LIMITS.courseCode} characters, excluding spaces and line breaks.`;
+    if (getVisibleCharacterCount(slFields.section) > FIELD_LIMITS.section) return `Section can only have ${FIELD_LIMITS.section} characters, excluding spaces and line breaks.`;
     return '';
   };
 
