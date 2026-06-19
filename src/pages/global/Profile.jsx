@@ -1589,7 +1589,7 @@ useEffect(() => {
 
               {/* ── Registered Events ─────────────────────────────── */}
               {(() => {
-                const allEvents = profile.registeredEvents || [];
+                const allEvents = (profile.registeredEvents || []).filter(ev => ev.certIssuedAt);
 
                 // Filter
                 const filtered = historyFilter === "all"
