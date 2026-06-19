@@ -67,7 +67,7 @@ export default function AdminMenu({
         </button>
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/global/menu/about")}
+          onClick={() => handleMenuClick("/")}
         >
           <img src={infoIcon} alt="About Us" className="menu-icon" />
           About Us

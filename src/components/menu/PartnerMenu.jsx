@@ -60,7 +60,7 @@ export default function PartnerMenu({
         </button>
         <button
           className="menu-item"
-          onClick={() => { navigate("/partner/dashboard", { state: { expandSection: "review" } }); onClose(); }}
+          onClick={() => handleMenuClick("/global/review-proposals")}
         >
           <img src={viewIcon} alt="Review Proposals" className="menu-icon" />
           Review Proposals
@@ -81,7 +81,7 @@ export default function PartnerMenu({
         </button>
         <button
           className="menu-item"
-          onClick={() => handleMenuClick("/global/menu/about")}
+          onClick={() => handleMenuClick("/")}
         >
           <img src={infoIcon} alt="About Us" className="menu-icon" />
           About Us
