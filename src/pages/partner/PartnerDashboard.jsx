@@ -119,15 +119,28 @@ export default function PartnerDashboard() {
 
   // Handle menu navigation state: expand+scroll to review, or scroll to top for dashboard
   useEffect(() => {
-    if (location.state?.expandSection === "review") {
-      setReviewExpanded(true);
-      setTimeout(() => {
-        sectionRefs.current["section-review"]?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    } else if (location.state?.scrollTop) {
-      setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
+    if (!location.state?.expandSection) return;
+
+    const scrollActions = {
+      dashboard: () => {
+        const el = sectionRefs.current["section-dashboard"];
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+        }
+      },
+      review: () => {
+        setReviewExpanded(true);
+        sectionRefs.current["section-review"]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    };
+
+    const action = scrollActions[location.state.expandSection];
+    if (action) {
+      setTimeout(action, 100);
     }
-  }, [location.state]);
+  }, [location.key, location.state?.expandSection]);
 
   // Collapse review section when it scrolls out of view
   useEffect(() => {
