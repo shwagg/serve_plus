@@ -1,4 +1,15 @@
+let _lastToastMessage = null;
+let _lastToastTimer = null;
+
 export function showToast(message, type = 'success', subtitle = null) {
+  // Deduplicate: ignore if the exact same message is already visible
+  if (_lastToastMessage === message) return;
+  _lastToastMessage = message;
+  if (_lastToastTimer) clearTimeout(_lastToastTimer);
+  _lastToastTimer = setTimeout(() => {
+    _lastToastMessage = null;
+    _lastToastTimer = null;
+  }, 5500); // slightly longer than toast display duration (5000ms)
   window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type, subtitle } }));
 }
 
