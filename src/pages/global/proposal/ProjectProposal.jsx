@@ -43,6 +43,14 @@ function getVisibleCharacterCount(value) {
   return String(value || '').replace(/[\s\r\n]+/g, '').length;
 }
 
+function hasEmoji(str) {
+  return /\p{Extended_Pictographic}/u.test(String(str || ''));
+}
+
+function stripEmojis(str) {
+  return String(str || '').replace(/\p{Extended_Pictographic}/gu, '');
+}
+
 function isProposalLockedForUser(userData) {
   const role = normalizeValue(userData?.role || userData?.userRole || userData?.Role);
   if (role !== 'student' && role !== 'faculty') return false;
@@ -137,7 +145,11 @@ function ProponentTagInput({ tags, onAdd, onRemove, lockedCount = 0 }) {
         className="proponent-tag-input"
         value={input}
         onChange={e => {
-          const nextValue = e.target.value;
+          let nextValue = e.target.value;
+          if (hasEmoji(nextValue)) {
+            nextValue = stripEmojis(nextValue);
+            showToast('Emojis are not allowed in this field.');
+          }
           if (maxChars && nextValue.length > maxChars) return;
           setInput(nextValue);
         }}
@@ -179,7 +191,14 @@ function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMore
         type="text"
         className="numbered-item-add"
         value={input}
-        onChange={e => setInput(e.target.value)}
+        onChange={e => {
+          let nextValue = e.target.value;
+          if (hasEmoji(nextValue)) {
+            nextValue = stripEmojis(nextValue);
+            showToast('Emojis are not allowed in this field.');
+          }
+          setInput(nextValue);
+        }}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
         placeholder={items.length === 0
           ? (placeholder || 'Type a name and press Enter')
@@ -514,7 +533,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
    */
   const handleInputChange = (e) => {
     hasUserInputRef.current = true;
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let value = e.target.value;
+    if (hasEmoji(value)) {
+      value = stripEmojis(value);
+      showToast('Emojis are not allowed in this field.');
+    }
     const textLimits = {
       title: FIELD_LIMITS.title,
       location: FIELD_LIMITS.location,
@@ -563,7 +587,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
    */
   const handleSlFieldChange = (e) => {
     hasUserInputRef.current = true;
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let value = e.target.value;
+    if (hasEmoji(value)) {
+      value = stripEmojis(value);
+      showToast('Emojis are not allowed in this field.');
+    }
     const textLimits = {
       section: FIELD_LIMITS.section,
       course: FIELD_LIMITS.course,
@@ -590,7 +619,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
    */
   const handleCeFieldChange = (e) => {
     hasUserInputRef.current = true;
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let value = e.target.value;
+    if (hasEmoji(value)) {
+      value = stripEmojis(value);
+      showToast('Emojis are not allowed in this field.');
+    }
     setCeFields(prev => ({
       ...prev,
       [name]: value
