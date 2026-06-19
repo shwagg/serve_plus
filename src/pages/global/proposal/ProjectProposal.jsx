@@ -11,7 +11,7 @@ import { useSession } from '../../../context/useSession';
 const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
 const FIELD_LIMITS = {
-  title: 300,
+  title: 200,
   location: 50,
   volunteerHours: 50,
   stakeholderItem: 50,
@@ -22,7 +22,7 @@ const FIELD_LIMITS = {
   description: 2000,
   objectives: 2000,
   successIndicators: 1000,
-  budget: 300,
+  budget: 200,
   studentOutcomes: 130,
   proponents: 3,
 };
@@ -150,7 +150,6 @@ function ProponentTagInput({ tags, onAdd, onRemove, lockedCount = 0 }) {
             nextValue = stripEmojis(nextValue);
             showToast('Emojis are not allowed in this field.');
           }
-          if (maxChars && nextValue.length > maxChars) return;
           setInput(nextValue);
         }}
         onKeyDown={e => {
@@ -556,6 +555,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         showToast(`Volunteer Hours only allows up to ${FIELD_LIMITS.volunteerHours}.`);
         return;
       }
+      if (value !== '' && Number(value) < 4) {
+        setFormData(prev => ({ ...prev, [name]: '' }));
+        showTemporaryFieldError(name, 'Minimum volunteer hours is 4.');
+        showToast('Minimum volunteer hours is 4.');
+        return;
+      }
       setFormData(prev => ({ ...prev, [name]: value }));
       setFieldErrors(prev => ({ ...prev, [name]: '' }));
     } else if (name === 'participantLimit') {
@@ -667,9 +672,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddProponent = (name) => {
     hasUserInputRef.current = true;
-    if (getVisibleCharacterCount(name) > 80) {
-      showToast('Each proponent name only allows up to 80 characters, excluding spaces and line breaks.');
-      showTemporaryFieldError('proponents', 'Each proponent name only allows up to 80 characters, excluding spaces and line breaks.');
+    if (name.length > 50) {
+      showToast('Each proponent name only allows up to 50 characters.');
+      showTemporaryFieldError('proponents', 'Each proponent name only allows up to 50 characters.');
       return;
     }
     if ((formData.proponents || []).length >= FIELD_LIMITS.proponents) {
@@ -771,6 +776,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     if (getVisibleCharacterCount(formData.successIndicators) > FIELD_LIMITS.successIndicators) nextErrors.successIndicators = `Only ${FIELD_LIMITS.successIndicators} characters are allowed, excluding spaces and line breaks.`;
     if (getVisibleCharacterCount(formData.budget) > FIELD_LIMITS.budget) nextErrors.budget = `Only ${FIELD_LIMITS.budget} characters are allowed, excluding spaces and line breaks.`;
     if (Number(formData.volunteerHours) > FIELD_LIMITS.volunteerHours) nextErrors.volunteerHours = `Volunteer Hours can only go up to ${FIELD_LIMITS.volunteerHours}.`;
+    if (formData.volunteerHours !== '' && Number(formData.volunteerHours) < 4) nextErrors.volunteerHours = 'Minimum volunteer hours is 4.';
     if ((formData.proponents || []).length > FIELD_LIMITS.proponents) nextErrors.proponents = `Only ${FIELD_LIMITS.proponents} proponent names are allowed.`;
     if ((formData.stakeholders || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.stakeholderItem)) nextErrors.stakeholders = `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters, excluding spaces and line breaks.`;
     if ((formData.specificActivities || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.activityItem)) nextErrors.specificActivities = `Each activity can only have ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`;
@@ -1056,7 +1062,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   onKeyDown={handleNumericKeyDown}
                   onPaste={handleNumericPaste}
                   required
-                  min="0"
+                  min="4"
                   max={FIELD_LIMITS.volunteerHours}
                   />
                   {fieldErrors.volunteerHours && <small className="field-limit-hint error">{fieldErrors.volunteerHours}</small>}

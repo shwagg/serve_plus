@@ -8,7 +8,7 @@ import { logAudit } from '../../utils/auditLogger';
 import { exportProposalPDF } from './exportProposalPDF';
 
 const FIELD_LIMITS = {
-  title: 300,
+  title: 200,
   location: 50,
   volunteerHours: 50,
   stakeholderItem: 50,
@@ -19,7 +19,7 @@ const FIELD_LIMITS = {
   description: 2000,
   objectives: 2000,
   successIndicators: 1000,
-  budget: 300,
+  budget: 200,
   proponents: 3,
 };
 
