@@ -48,6 +48,8 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
   const [profileTitle, setProfileTitle] = useState(initialTitle);
   const [profileGlow, setProfileGlow] = useState(initialGlow);
   const [pinnedBadges, setPinnedBadges] = useState(initialPinned);
+  const normalizedRole = String(role || "").toLowerCase();
+  const showDepartmentFields = !["partner", "sysadmin", "admin"].includes(normalizedRole);
 
   // Reset state when modal opens or profile changes
   useEffect(() => {
@@ -205,23 +207,25 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
             <label className="profile-modal-label">Email</label><br />
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="profile-modal-input" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} />
           </div>
-          <div>
-            <label className="profile-modal-label">Department</label><br />
-            <select value={department} onChange={e => { setDepartment(e.target.value); setProgram(""); }} className="profile-modal-input">
-              <option value="">Select department</option>
-              <option value="College of Arts and Science (CAS)">College of Arts and Science (CAS)</option>
-              <option value="College of Computer and Information Science (CCIS)">College of Computer and Information Science (CCIS)</option>
-              <option value="College of Health Sciences (CHS)">College of Health Sciences (CHS)</option>
-              <option value="College of Nursing (CN)">College of Nursing (CN)</option>
-              <option value="College of Maritime Education and Training (CMET)">College of Maritime Education and Training (CMET)</option>
-              <option value="E.T. Yuchengco College of Business (ETYCB)">E.T. Yuchengco College of Business (ETYCB)</option>
-              <option value="Mapua-Laguna Institute of Aviation (MIA)">Mapua-Laguna Institute of Aviation (MIA)</option>
-              <option value="Mapua Institute of Technology at Laguna (MITL)">Mapua Institute of Technology at Laguna (MITL)</option>
-              <option value="Mapua MCL Senior High School (SHS)">Mapua MCL Senior High School (SHS)</option>
-              <option value="Non-Academic Organization">Non-Academic Organization</option>
-            </select>
-          </div>
-          {department && departmentPrograms[department] && departmentPrograms[department].length > 0 && (
+          {showDepartmentFields && (
+            <div>
+              <label className="profile-modal-label">Department</label><br />
+              <select value={department} onChange={e => { setDepartment(e.target.value); setProgram(""); }} className="profile-modal-input">
+                <option value="">Select department</option>
+                <option value="College of Arts and Science (CAS)">College of Arts and Science (CAS)</option>
+                <option value="College of Computer and Information Science (CCIS)">College of Computer and Information Science (CCIS)</option>
+                <option value="College of Health Sciences (CHS)">College of Health Sciences (CHS)</option>
+                <option value="College of Nursing (CN)">College of Nursing (CN)</option>
+                <option value="College of Maritime Education and Training (CMET)">College of Maritime Education and Training (CMET)</option>
+                <option value="E.T. Yuchengco College of Business (ETYCB)">E.T. Yuchengco College of Business (ETYCB)</option>
+                <option value="Mapua-Laguna Institute of Aviation (MIA)">Mapua-Laguna Institute of Aviation (MIA)</option>
+                <option value="Mapua Institute of Technology at Laguna (MITL)">Mapua Institute of Technology at Laguna (MITL)</option>
+                <option value="Mapua MCL Senior High School (SHS)">Mapua MCL Senior High School (SHS)</option>
+                <option value="Non-Academic Organization">Non-Academic Organization</option>
+              </select>
+            </div>
+          )}
+          {showDepartmentFields && department && departmentPrograms[department] && departmentPrograms[department].length > 0 && (
             <div>
               <label className="profile-modal-label">Program</label><br />
               <select value={program} onChange={e => setProgram(e.target.value)} className="profile-modal-input">
@@ -1509,7 +1513,7 @@ useEffect(() => {
             open={editOpen}
             onClose={() => setEditOpen(false)}
             profile={profile || {}}
-            role={isVolunteer ? profile?.role : "non-volunteer"}
+            role={profileRole}
             level={profile?.level || 1}
             activeFrame={activeFrame}
             bio={bio}
