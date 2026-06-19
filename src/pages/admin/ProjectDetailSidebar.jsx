@@ -10,11 +10,17 @@ import { SessionContext } from "../../context/sessionContextCore";
 import { createNotification, notifyUsersByRoles } from "../../utils/notificationUtils";
 import { logAudit } from "../../utils/auditLogger";
 import { showToast, showConfirm } from "../../utils/toast";
+import {
+  MAX_GROUP_MEMBERS,
+  TASK_DESCRIPTION_MAX_LENGTH,
+  TASK_POINTS_LIMIT as TASK_POINTS_BUDGET,
+  TASK_TITLE_MAX_LENGTH,
+  clampWholeNumberInput,
+  validateTaskForm,
+} from "../../utils/taskValidation";
 import ImpactMetrics from "./ImpactMetrics";
 import { computeAverageRating } from "../../hooks/rewardSystem";
 import "../../styles/ProjectDetailSidebar.css";
-
-const TASK_POINTS_BUDGET = 30;
 
 function isForApproval(status = "") {
   const s = String(status).toLowerCase();
@@ -381,22 +387,28 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
-    if (!taskFormData.title.trim()) { showToast("Task title is required."); return; }
+    const currentTotal = tasks.reduce((s, t) => s + (Number(t.points) || 0), 0);
+    const budgetLeft = Math.max(0, TASK_POINTS_BUDGET - currentTotal);
+    const validation = validateTaskForm(taskFormData, {
+      maxPoints: budgetLeft,
+      targetDate: project?.targetDate,
+    });
+    if (!validation.isValid) { showToast(validation.message); return; }
+    const taskValues = validation.values;
+
     setSavingTask(true);
     try {
       const snap = await getDocs(collection(db, "missions", project.id, "task"));
       const nextId = snap.size.toString();
-      const currentTotal = tasks.reduce((s, t) => s + (Number(t.points) || 0), 0);
-      const budgetLeft = Math.max(0, TASK_POINTS_BUDGET - currentTotal);
       const taskData = {
-        title: taskFormData.title, description: taskFormData.description,
-        enrollmentDeadline: taskFormData.enrollmentDeadline,
-        points: Math.min(budgetLeft, parseInt(taskFormData.points) || 0),
-        type: taskFormData.type || "individual", createdAt: new Date().toISOString(),
+        title: taskValues.title, description: taskValues.description,
+        enrollmentDeadline: taskValues.enrollmentDeadline,
+        points: taskValues.points,
+        type: taskValues.type, createdAt: new Date().toISOString(),
       };
-      if (taskFormData.type === "grouped") taskData.maxParticipants = parseInt(taskFormData.maxParticipants) || 5;
+      if (taskValues.type === "grouped") taskData.maxParticipants = taskValues.maxParticipants;
       await setDoc(doc(db, "missions", project.id, "task", nextId), taskData);
-      logAudit({ action: "TASK_CREATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskTitle: taskFormData.title } });
+      logAudit({ action: "TASK_CREATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskTitle: taskValues.title } });
       cancelTaskForm();
       await loadTasks();
     } catch { showToast("Failed to create task."); }
@@ -405,20 +417,26 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
   const handleEditTask = async (e) => {
     e.preventDefault();
-    if (!taskFormData.title.trim()) { showToast("Task title is required."); return; }
+    const currentTotal = tasks.reduce((s, t) => s + (Number(t.points) || 0), 0);
+    const existingPts = tasks.find(t => t.id === editingTaskId)?.points || 0;
+    const maxAllowed = Math.min(TASK_POINTS_BUDGET, Math.max(0, TASK_POINTS_BUDGET - currentTotal + existingPts));
+    const validation = validateTaskForm(taskFormData, {
+      maxPoints: maxAllowed,
+      targetDate: project?.targetDate,
+    });
+    if (!validation.isValid) { showToast(validation.message); return; }
+    const taskValues = validation.values;
+
     setSavingTask(true);
     try {
-      const currentTotal = tasks.reduce((s, t) => s + (Number(t.points) || 0), 0);
-      const existingPts = tasks.find(t => t.id === editingTaskId)?.points || 0;
-      const maxAllowed = Math.min(TASK_POINTS_BUDGET, Math.max(0, TASK_POINTS_BUDGET - currentTotal + existingPts));
       const updateData = {
-        title: taskFormData.title, description: taskFormData.description,
-        enrollmentDeadline: taskFormData.enrollmentDeadline,
-        points: Math.min(maxAllowed, parseInt(taskFormData.points) || 0), type: taskFormData.type || "individual",
+        title: taskValues.title, description: taskValues.description,
+        enrollmentDeadline: taskValues.enrollmentDeadline,
+        points: taskValues.points, type: taskValues.type,
       };
-      if (taskFormData.type === "grouped") updateData.maxParticipants = parseInt(taskFormData.maxParticipants) || 5;
+      if (taskValues.type === "grouped") updateData.maxParticipants = taskValues.maxParticipants;
       await updateDoc(doc(db, "missions", project.id, "task", editingTaskId), updateData);
-      logAudit({ action: "TASK_UPDATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId: editingTaskId, taskTitle: taskFormData.title } });
+      logAudit({ action: "TASK_UPDATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId: editingTaskId, taskTitle: taskValues.title } });
       cancelTaskForm();
       await loadTasks();
     } catch { showToast("Failed to update task."); }
@@ -907,24 +925,24 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
           <form onSubmit={editingTaskId ? handleEditTask : handleCreateTask}>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Title *</label>
-              <input type="text" value={taskFormData.title} onChange={e => setTaskFormData(p => ({ ...p, title: e.target.value }))} required style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+              <input type="text" value={taskFormData.title} onChange={e => setTaskFormData(p => ({ ...p, title: e.target.value }))} required maxLength={TASK_TITLE_MAX_LENGTH} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Description</label>
-              <textarea value={taskFormData.description} onChange={e => setTaskFormData(p => ({ ...p, description: e.target.value }))} rows={3} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", resize: "vertical" }} />
+              <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Description *</label>
+              <textarea value={taskFormData.description} onChange={e => setTaskFormData(p => ({ ...p, description: e.target.value }))} rows={3} required maxLength={TASK_DESCRIPTION_MAX_LENGTH} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", resize: "vertical" }} />
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Enrollment Deadline Time</label>
-              <input type="time" value={taskFormData.enrollmentDeadline} onChange={e => setTaskFormData(p => ({ ...p, enrollmentDeadline: e.target.value }))} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+              <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Enrollment Deadline Time *</label>
+              <input type="time" value={taskFormData.enrollmentDeadline} onChange={e => setTaskFormData(p => ({ ...p, enrollmentDeadline: e.target.value }))} required style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>
-                Points
+                Points *
                 <span style={{ fontWeight: 400, color: remainingBudget === 0 && !editingTaskId ? "#dc2626" : "#888", fontSize: 12, marginLeft: 6 }}>
                   ({maxForForm} pts available)
                 </span>
               </label>
-              <input type="number" value={taskFormData.points} onChange={e => setTaskFormData(p => ({ ...p, points: e.target.value }))} min="0" max={String(maxForForm)} disabled={maxForForm === 0} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: `1px solid ${maxForForm === 0 ? "#fca5a5" : "#ccc"}`, boxSizing: "border-box" }} />
+              <input type="text" inputMode="numeric" pattern="[0-9]*" value={taskFormData.points} onChange={e => setTaskFormData(p => ({ ...p, points: clampWholeNumberInput(e.target.value, 0, maxForForm) }))} min="0" max={String(maxForForm)} disabled={maxForForm === 0} required step="1" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: `1px solid ${maxForForm === 0 ? "#fca5a5" : "#ccc"}`, boxSizing: "border-box" }} />
               {maxForForm === 0 && !editingTaskId && (
                 <p style={{ color: "#dc2626", fontSize: 12, margin: "4px 0 0" }}>Task points budget of 30 is fully used.</p>
               )}
@@ -942,8 +960,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
             </div>
             {taskFormData.type === "grouped" && (
               <div style={{ marginBottom: 10 }}>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Max Members per Group</label>
-                <input type="number" value={taskFormData.maxParticipants} onChange={e => setTaskFormData(p => ({ ...p, maxParticipants: e.target.value }))} min="2" max="50" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+                <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Max Members per Group *</label>
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={taskFormData.maxParticipants} onChange={e => setTaskFormData(p => ({ ...p, maxParticipants: clampWholeNumberInput(e.target.value, 2, MAX_GROUP_MEMBERS) }))} min="2" max={String(MAX_GROUP_MEMBERS)} required step="1" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
               </div>
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>

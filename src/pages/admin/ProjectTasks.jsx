@@ -4,6 +4,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebaseConfig";
 import { showToast, showConfirm } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
+import {
+  MAX_GROUP_MEMBERS,
+  TASK_DESCRIPTION_MAX_LENGTH,
+  TASK_POINTS_LIMIT,
+  TASK_TITLE_MAX_LENGTH,
+  clampWholeNumberInput,
+  validateTaskForm,
+} from "../../utils/taskValidation";
 
 import "../../styles/admin.css";
 
@@ -73,19 +81,37 @@ export default function ProjectTasks() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "points") {
+      setFormData((prev) => ({
+        ...prev,
+        points: clampWholeNumberInput(value, 0, TASK_POINTS_LIMIT),
+      }));
+      return;
+    }
+
+    if (name === "maxParticipants") {
+      setFormData((prev) => ({
+        ...prev,
+        maxParticipants: clampWholeNumberInput(value, 2, MAX_GROUP_MEMBERS),
+      }));
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim()) {
-      showToast("Task title is required.");
+    const validation = validateTaskForm(formData, {
+      maxPoints: TASK_POINTS_LIMIT,
+      targetDate: project?.targetDate,
+    });
+    if (!validation.isValid) {
+      showToast(validation.message);
       return;
     }
-    if (formData.enrollmentDeadline && !project?.targetDate) {
-      showToast("Set a target date before adding an enrollment deadline time.");
-      return;
-    }
+    const taskValues = validation.values;
 
     setSaving(true);
     try {
@@ -97,17 +123,17 @@ export default function ProjectTasks() {
 
       const taskRef = doc(db, "missions", projectId, "task", nextId);
       const taskData = {
-        title: formData.title,
-        description: formData.description,
-        enrollmentDeadline: formData.enrollmentDeadline,
-        points: Math.min(30, parseInt(formData.points) || 0),
-        type: formData.type || "individual",
+        title: taskValues.title,
+        description: taskValues.description,
+        enrollmentDeadline: taskValues.enrollmentDeadline,
+        points: taskValues.points,
+        type: taskValues.type,
         createdAt: new Date().toISOString(),
       };
       
       // Add maxParticipants only for grouped tasks
-      if (formData.type === "grouped") {
-        taskData.maxParticipants = parseInt(formData.maxParticipants) || 5;
+      if (taskValues.type === "grouped") {
+        taskData.maxParticipants = taskValues.maxParticipants;
       }
       
       await setDoc(taskRef, taskData);
@@ -118,9 +144,9 @@ export default function ProjectTasks() {
         details: {
           missionId: projectId,
           missionTitle: project?.title || "",
-          taskTitle: formData.title,
-          taskType: formData.type,
-          taskPoints: parseInt(formData.points) || 0,
+          taskTitle: taskValues.title,
+          taskType: taskValues.type,
+          taskPoints: taskValues.points,
         },
       });
 
@@ -145,29 +171,30 @@ export default function ProjectTasks() {
 
   const handleEditTask = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim()) {
-      showToast("Task title is required.");
+    const validation = validateTaskForm(formData, {
+      maxPoints: TASK_POINTS_LIMIT,
+      targetDate: project?.targetDate,
+    });
+    if (!validation.isValid) {
+      showToast(validation.message);
       return;
     }
-    if (formData.enrollmentDeadline && !project?.targetDate) {
-      showToast("Set a target date before adding an enrollment deadline time.");
-      return;
-    }
+    const taskValues = validation.values;
 
     setSaving(true);
     try {
       const taskRef = doc(db, "missions", projectId, "task", editingTaskId);
       const updateData = {
-        title: formData.title,
-        description: formData.description,
-        enrollmentDeadline: formData.enrollmentDeadline,
-        points: parseInt(formData.points) || 0,
-        type: formData.type || "individual",
+        title: taskValues.title,
+        description: taskValues.description,
+        enrollmentDeadline: taskValues.enrollmentDeadline,
+        points: taskValues.points,
+        type: taskValues.type,
       };
       
       // Add maxParticipants only for grouped tasks
-      if (formData.type === "grouped") {
-        updateData.maxParticipants = parseInt(formData.maxParticipants) || 5;
+      if (taskValues.type === "grouped") {
+        updateData.maxParticipants = taskValues.maxParticipants;
       }
       
       await updateDoc(taskRef, updateData);
@@ -179,7 +206,7 @@ export default function ProjectTasks() {
           missionId: projectId,
           missionTitle: project?.title || "",
           taskId: editingTaskId,
-          taskTitle: formData.title,
+          taskTitle: taskValues.title,
         },
       });
 
@@ -317,6 +344,7 @@ export default function ProjectTasks() {
                   value={formData.title}
                   onChange={handleInputChange}
                   required
+                  maxLength={TASK_TITLE_MAX_LENGTH}
                   style={{ width: "100%", padding: 8, fontSize: 14 }}
                 />
               </div>
@@ -330,12 +358,14 @@ export default function ProjectTasks() {
                     color: "#111",
                   }}
                 >
-                  Description
+                  Description *
                 </label>
                 <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
+                  required
+                  maxLength={TASK_DESCRIPTION_MAX_LENGTH}
                   rows={4}
                   style={{ width: "100%", padding: 8, fontSize: 14 }}
                 />
@@ -350,13 +380,14 @@ export default function ProjectTasks() {
                     color: "#111",
                   }}
                 >
-                  Enrollment Deadline Time
+                  Enrollment Deadline Time *
                 </label>
                 <input
                   type="time"
                   name="enrollmentDeadline"
                   value={formData.enrollmentDeadline}
                   onChange={handleInputChange}
+                  required
                   style={{ width: "100%", padding: 8, fontSize: 14 }}
                 />
               </div>
@@ -370,15 +401,19 @@ export default function ProjectTasks() {
                     color: "#111",
                   }}
                 >
-                  Points (0-30)
+                  Points (0-{TASK_POINTS_LIMIT}) *
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   name="points"
                   value={formData.points}
                   onChange={handleInputChange}
                   min="0"
-                  max="30"
+                  max={String(TASK_POINTS_LIMIT)}
+                  required
+                  step="1"
                   style={{ width: "100%", padding: 8, fontSize: 14 }}
                 />
               </div>
@@ -430,15 +465,19 @@ export default function ProjectTasks() {
                       color: "#111",
                     }}
                   >
-                    Max Members per Group
+                    Max Members per Group *
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     name="maxParticipants"
                     value={formData.maxParticipants}
                     onChange={handleInputChange}
                     min="2"
-                    max="50"
+                    max={String(MAX_GROUP_MEMBERS)}
+                    required
+                    step="1"
                     style={{ width: "100%", padding: 8, fontSize: 14 }}
                   />
                 </div>
