@@ -1786,7 +1786,7 @@ useEffect(() => {
           )}
 
           {visibleProfileTabs.includes("Portfolio") && activeTab === "Portfolio" && (() => {
-            const events = profile.registeredEvents || [];
+            const events = (profile.registeredEvents || []).filter(ev => ev.certIssuedAt);
             const sdgCounts = events.flatMap(e => e.sdgs || []).reduce((acc, sdg) => {
               acc[sdg] = (acc[sdg] || 0) + 1;
               return acc;
@@ -1988,7 +1988,7 @@ useEffect(() => {
 
           {/* ── Hidden PDF layout ── */}
           {profile && (() => {
-            const events = profile.registeredEvents || [];
+            const events = (profile.registeredEvents || []).filter(ev => ev.certIssuedAt);
             const sdgCounts = events.flatMap(e => e.sdgs || []).reduce((acc, sdg) => {
               acc[sdg] = (acc[sdg] || 0) + 1;
               return acc;
