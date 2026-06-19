@@ -11,7 +11,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: min(960px, 96vw);
+  width: min(1120px, 96vw);
   max-width: 100vw;
   height: 100vh;
   background: #fff;
@@ -176,13 +176,13 @@
 
 /* Padded content area inside left column (below banner) */
 .pds-col-main-content {
-  padding: 4px 24px 32px;
+  padding: 24px 24px 32px;
   flex: 1;
 }
 
 /* Right column — narrower (9 parts), no scroll */
 .pds-col-side {
-  flex: 9;
+  flex: 7;
   overflow-y: auto;
   padding: 16px 20px 32px;
   background: #f8fafc;
@@ -190,6 +190,181 @@
   scrollbar-width: thin;
   scrollbar-color: #ddd transparent;
   min-width: 220px;
+}
+
+/* ── Project details sheet ───────────────────────── */
+.pds-project-sheet {
+  border: 1.5px solid #9aabc4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.pds-sheet-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1.5px solid #9aabc4;
+}
+
+.pds-sheet-row:last-child { border-bottom: none; }
+.pds-sheet-row--top { grid-template-columns: 1.65fr 1fr; }
+.pds-sheet-row--thirds { grid-template-columns: repeat(3, 1fr); }
+.pds-sheet-row--label-value { grid-template-columns: 0.32fr 1fr; }
+
+.pds-sheet-cell,
+.pds-sheet-label-cell {
+  min-width: 0;
+  padding: 16px 22px;
+  border-right: 1.5px solid #9aabc4;
+}
+
+.pds-sheet-cell:last-child,
+.pds-sheet-label-cell:last-child { border-right: none; }
+
+.pds-sheet-label-cell {
+  background: #f3f6fa;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+}
+
+.pds-sheet-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.pds-sheet-value {
+  color: #1e293b;
+  font-size: 1rem;
+  line-height: 1.55;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.pds-sheet-value--stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pds-detail-list-item {
+  display: block;
+  position: relative;
+  padding-left: 16px;
+}
+
+.pds-detail-list-item::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #1e293b;
+}
+
+.pds-project-sheet .pds-section {
+  margin-top: 16px;
+  padding: 14px 0 0;
+  border-top: 1px solid #d8e0eb;
+  border-bottom: none;
+}
+
+.pds-project-sheet .pds-section-label {
+  margin-bottom: 10px;
+}
+
+.pds-roster-analytics {
+  margin-top: 18px;
+  border: 1.5px solid #9aabc4;
+  border-radius: 10px;
+  background: #fff;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.pds-roster-count-card {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.pds-roster-count-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+}
+
+.pds-roster-count-card strong {
+  color: #1f3b73;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.pds-roster-action,
+.pds-analytics-btn {
+  width: 100%;
+  min-height: 42px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.pds-roster-action {
+  background: #1f3b73;
+  color: #fff;
+}
+.pds-roster-action:hover:not(:disabled) { background: #16306a; }
+
+.pds-analytics-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pds-analytics-btn--pre {
+  background: #e8f0fe;
+  color: #1f3b73;
+}
+.pds-analytics-btn--pre:hover:not(:disabled) { background: #dbe8fd; }
+
+.pds-analytics-btn--post {
+  background: #e8f8f7;
+  color: #0f766e;
+}
+.pds-analytics-btn--post:hover:not(:disabled) { background: #d4f2f0; }
+
+.pds-roster-action:disabled,
+.pds-analytics-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pds-stats-container {
+  margin: 18px 0 18px 0;
+  
+  border: 1.5px solid #9aabc4;
+  border-radius: 10px;
+  background: #fff;
+  padding: 20px;
 }
 
 /* ── Section ─────────────────────────────────────── */
@@ -660,19 +835,175 @@
 /* ── Mobile ──────────────────────────────────────── */
 @media (max-width: 900px) {
   .pds-panel { width: 100vw; }
-  .pds-two-col { flex-direction: column; }
-  .pds-col-main { flex: none; overflow-y: visible; }
-  .pds-col-main-content { padding-bottom: 0; }
+  .pds-two-col {
+    flex: none;
+    flex-direction: column;
+    overflow: visible;
+    min-height: auto;
+  }
+  .pds-col-main { flex: none; overflow: visible; }
+  .pds-col-main-content { padding: 18px 16px 0; }
   .pds-col-side {
-    flex: none; border-left: none; border-top: 2px solid #e5e7eb;
+    flex: none; overflow: visible; border-left: none; border-top: 2px solid #e5e7eb;
+    padding: 16px;
     background: #f8fafc; min-width: unset;
   }
-  .pds-body { overflow-y: auto; }
+  .pds-body {
+    display: block;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
   .pds-ef-row { grid-template-columns: 1fr; }
   .pds-qr-grid { grid-template-columns: 1fr; }
   .pds-meta-grid { grid-template-columns: 1fr; gap: 10px; }
+  .pds-sheet-row,
+  .pds-sheet-row--top,
+  .pds-sheet-row--thirds,
+  .pds-sheet-row--label-value,
+  .pds-analytics-actions {
+    grid-template-columns: 1fr;
+  }
+  .pds-sheet-cell,
+  .pds-sheet-label-cell {
+    border-right: none;
+    border-bottom: 1.5px solid #9aabc4;
+    padding: 14px 16px;
+  }
+  .pds-sheet-cell:last-child,
+  .pds-sheet-label-cell:last-child {
+    border-bottom: none;
+  }
+  .pds-roster-count-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
   .pds-stats-row { flex-direction: column; gap: 16px; }
   .pds-stats-divider { width: 100%; height: 1px; }
   .pds-pdf-modal { height: 70vh; }
   .pds-pdf-modal-overlay { padding: 12px; }
+}
+
+@media (max-width: 560px) {
+  .pds-header {
+    padding: 14px 14px 12px;
+  }
+
+  .pds-header-row {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .pds-title {
+    font-size: 0.95rem;
+  }
+
+  .pds-col-main-content {
+    padding: 14px 12px 0;
+  }
+
+  .pds-col-side {
+    padding: 14px 12px 24px;
+  }
+
+  .pds-sheet-cell,
+  .pds-sheet-label-cell {
+    padding: 12px;
+  }
+
+  .pds-sheet-label,
+  .pds-sheet-label-cell {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+  }
+
+  .pds-sheet-value {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .pds-project-sheet .pds-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .pds-roster-analytics,
+  .pds-stats-container {
+    margin-top: 14px;
+    padding: 14px;
+  }
+
+  .pds-roster-count-card {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .pds-roster-count-card strong {
+    font-size: 1.7rem;
+  }
+
+  .pds-pie-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pds-pie-legend {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .pds-legend-item {
+    justify-content: center;
+  }
+
+  .pds-qr-card {
+    padding: 12px 8px;
+  }
+
+  .pds-fqr-modal {
+    max-width: 300px;
+    padding: 34px 18px 22px;
+  }
+
+  .pds-fqr-modal canvas {
+    width: 200px !important;
+    height: 200px !important;
+  }
+
+  .pds-fqr-url {
+    max-width: 230px;
+  }
+
+  .pds-pdf-modal-overlay {
+    padding: 10px;
+  }
+
+  .pds-pdf-modal {
+    height: 74vh;
+    border-radius: 12px;
+  }
+
+  .pds-btn-pdf,
+  .pds-qr-gen-btn,
+  .pds-qr-regen-btn,
+  .pds-fqr-open-btn {
+    max-width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .pds-sheet-cell,
+  .pds-sheet-label-cell,
+  .pds-roster-analytics,
+  .pds-stats-container {
+    padding: 10px;
+  }
+
+  .pds-fqr-modal canvas {
+    width: 184px !important;
+    height: 184px !important;
+  }
 }

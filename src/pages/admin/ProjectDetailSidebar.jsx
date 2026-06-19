@@ -1,16 +1,15 @@
-import { useState, useEffect, useContext, useRef } from "react";
-import { db, storage } from "../../firebaseConfig";
+import { useState, useEffect, useContext } from "react";
+import { db } from "../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, collection, getDocs, getDoc, setDoc, deleteDoc } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { QRCodeCanvas } from "qrcode.react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import ProposalTimeline from "../../components/ProposalTimeline";
+import AccomplishmentReportModal from "../../components/AccomplishmentReportModal";
 import { SessionContext } from "../../context/sessionContextCore";
 import { createNotification, notifyUsersByRoles } from "../../utils/notificationUtils";
 import { logAudit } from "../../utils/auditLogger";
 import { showToast, showConfirm } from "../../utils/toast";
-import mission1 from "../../assets/mission1.jpg";
 import ImpactMetrics from "./ImpactMetrics";
 import { computeAverageRating } from "../../hooks/rewardSystem";
 import "../../styles/ProjectDetailSidebar.css";
@@ -93,24 +92,20 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const [approveNote, setApproveNote] = useState("");
   const [rejectText, setRejectText] = useState("");
   const [actionMsg, setActionMsg] = useState("");
-  const [coverUrl, setCoverUrl] = useState(project?.img || null);
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const coverInputRef = useRef(null);
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [impactModalOpen, setImpactModalOpen] = useState(false);
   const [impactModalType, setImpactModalType] = useState(null);
   const [volunteersWithSurveys, setVolunteersWithSurveys] = useState([]);
   const [feedbackQROpen, setFeedbackQROpen] = useState(false);
+  const [accomplishmentReport, setAccomplishmentReport] = useState(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   // QR attendance
   const [qrLocation, setQrLocation] = useState(null);
   const [qrLocationName, setQrLocationName] = useState(null);
   const [validQRTimestamp, setValidQRTimestamp] = useState(null);
   const [qrGenerating, setQrGenerating] = useState(false);
-
-  // Inline task points editing
-  const [editingPoints, setEditingPoints] = useState(0);
-  const [savingPoints, setSavingPoints] = useState(false);
+  const [attendanceQROpen, setAttendanceQROpen] = useState(false);
 
   // Task management
   const [tasks, setTasks] = useState([]);
@@ -207,7 +202,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     Promise.all([
       getDocs(collection(db, "missions", project.id, "volunteer")),
       getDocs(collection(db, "missions", project.id, "feedbackResponses")),
-    ]).then(async ([volSnap, fbSnap]) => {
+      getDoc(doc(db, "missions", project.id, "accomplishmentReport", "submission")),
+    ]).then(async ([volSnap, fbSnap, arSnap]) => {
       const volData = volSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
       const profileSnaps = await Promise.all(volData.map(v => getDoc(doc(db, "users", v.uid))));
       const enriched = await Promise.all(
@@ -217,11 +213,15 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
           try {
             const preDoc = await getDoc(doc(db, "missions", project.id, "volunteer", v.uid, "preSurvey", "response"));
             if (preDoc.exists()) preSurveyAnswers = preDoc.data();
-          } catch (_) {}
+          } catch {
+            // Optional survey data may not exist yet.
+          }
           try {
             const postDoc = await getDoc(doc(db, "missions", project.id, "volunteer", v.uid, "postSurvey", "response"));
             if (postDoc.exists()) postSurveyAnswers = postDoc.data();
-          } catch (_) {}
+          } catch {
+            // Optional survey data may not exist yet.
+          }
           return {
             ...v,
             name: p.name || p.username || p.email?.split("@")[0] || "Unknown",
@@ -236,6 +236,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       setVolunteers(enriched);
       setVolunteersWithSurveys(enriched);
       setFeedbackCount(fbSnap.size);
+      setAccomplishmentReport(arSnap.exists() ? arSnap.data() : null);
 
       const allAverages = [];
       fbSnap.docs.forEach(d => {
@@ -280,28 +281,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   }
   const approvalLevel = getApprovalLevel();
   const isAdmin = role === "admin";
-
-  const handleCoverUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !project?.id) return;
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!allowed.includes(file.type)) { alert("Please select a valid image file (JPG, PNG, WEBP, GIF)."); return; }
-    if (file.size > 5 * 1024 * 1024) { alert("Image must be smaller than 5 MB."); return; }
-    setUploadingCover(true);
-    try {
-      const fileRef = storageRef(storage, `mission-covers/${project.id}/${Date.now()}_${file.name}`);
-      await uploadBytes(fileRef, file);
-      const url = await getDownloadURL(fileRef);
-      await updateDoc(doc(db, "missions", project.id), { img: url, updatedAt: serverTimestamp() });
-      setCoverUrl(url);
-      logAudit({ action: "PROPOSAL_COVER_UPDATED", category: "proposal", actorName: userData?.name || userData?.email || "", details: { proposalId: project.id, proposalTitle: project.title || "" } });
-    } catch {
-      alert("Failed to upload cover photo. Please try again.");
-    } finally {
-      setUploadingCover(false);
-      if (coverInputRef.current) coverInputRef.current.value = "";
-    }
-  };
+  const canEditProject = isAdmin && !isPublishedOrDone;
 
   function canApprove() {
     if (!approvalLevel || !project) return false;
@@ -382,7 +362,9 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       list.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
       setTasks(list);
-    } catch (_) {}
+    } catch {
+      // Task data is optional for older projects.
+    }
     finally { setLoadingTasks(false); }
   };
 
@@ -406,7 +388,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       logAudit({ action: "TASK_CREATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskTitle: taskFormData.title } });
       cancelTaskForm();
       await loadTasks();
-    } catch (_) { showToast("Failed to create task."); }
+    } catch { showToast("Failed to create task."); }
     finally { setSavingTask(false); }
   };
 
@@ -428,7 +410,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       logAudit({ action: "TASK_UPDATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId: editingTaskId, taskTitle: taskFormData.title } });
       cancelTaskForm();
       await loadTasks();
-    } catch (_) { showToast("Failed to update task."); }
+    } catch { showToast("Failed to update task."); }
     finally { setSavingTask(false); }
   };
 
@@ -439,7 +421,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       await deleteDoc(doc(db, "missions", project.id, "task", taskId));
       logAudit({ action: "TASK_DELETED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId } });
       await loadTasks();
-    } catch (_) { showToast("Failed to delete task."); }
+    } catch { showToast("Failed to delete task."); }
     finally { setSavingTask(false); }
   };
 
@@ -455,19 +437,6 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     setTaskFormData({ title: "", description: "", enrollmentDeadline: "", points: 0, type: "individual", maxParticipants: 5 });
   };
 
-  const saveTaskPoints = async (taskId) => {
-    setSavingPoints(true);
-    try {
-      await updateDoc(doc(db, "missions", project.id, "task", taskId), { points: Math.min(30, parseInt(editingPoints) || 0) });
-      await loadTasks();
-      setEditingTaskId(null);
-    } catch {
-      showToast("Failed to update points.");
-    } finally {
-      setSavingPoints(false);
-    }
-  };
-
   const generateAttendanceQR = () => {
     if (!navigator.geolocation) { showToast("Geolocation is not supported by your browser."); return; }
     setQrGenerating(true);
@@ -476,6 +445,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         setQrLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
         setValidQRTimestamp(Date.now());
         setQrLocationName(null);
+        setAttendanceQROpen(true);
         setQrGenerating(false);
       },
       () => { showToast("Could not get location. Please allow location access."); setQrGenerating(false); }
@@ -489,8 +459,6 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
   const registered = volunteers.length;
   const attended = volunteers.filter(v => v.progress?.attendance === "present").length;
-  const attendedVolunteers = volunteers.filter(v => v.progress?.attendance === "present");
-  const adviserVolunteers = volunteers.filter(v => v.role === "faculty");
 
   const feedbackUrl = `${window.location.origin}/global/feedback/${project.id}`;
   const attendanceQRValue = qrLocation
@@ -515,59 +483,180 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     } catch { return "N/A"; }
   };
 
-  const bannerSrc = coverUrl || project.img || mission1;
   const adviserName = project.adviser || project.facultyAdviser || project.projectAdviser || null;
   const activities = project.activities || project.agenda || project.programOfActivities || null;
+  const proponentsText = Array.isArray(project.proponents) && project.proponents.length > 0
+    ? project.proponents.join(", ")
+    : project.preparedBy || "—";
+  const sdgSource = project.sdgs || project.sdg || project.sdgGoals;
+  const sdgText = Array.isArray(sdgSource) && sdgSource.length > 0
+    ? sdgSource.join(", ")
+    : sdgSource || "—";
+  const stakeholdersText = Array.isArray(project.stakeholders) && project.stakeholders.length > 0
+    ? project.stakeholders.join(", ")
+    : project.stakeholders || project.partnerName || "—";
+  const activitiesSource = project.specificActivities || activities;
+  const activitiesContent = Array.isArray(activitiesSource) && activitiesSource.length > 0
+    ? activitiesSource.map((item, index) => (
+        <span key={index} className="pds-detail-list-item">
+          {typeof item === "string" ? item : item?.name || item?.title || "—"}
+        </span>
+      ))
+    : activitiesSource || "—";
+  const successSource = project.successIndicators;
+  const successContent = Array.isArray(successSource) && successSource.length > 0
+    ? successSource.map((item, index) => <span key={index} className="pds-detail-list-item">{item}</span>)
+    : successSource || "—";
+  const natureLabel = project.ceFields?.nature || project.slFields?.course || project.nature || typeLabel;
+  const assignedFaculty = project.ceFields?.assignedFaculty || project.slFields?.assignedFaculty || adviserName || "—";
+  const maxVolunteers = project.maxVolunteers || project.maxParticipants || "—";
+  const participantLimit = project.participantLimit || "—";
 
-  // ── Reusable inline task points display ──────────────────────────
-  const renderTaskPoints = () => (
-    <div className="pds-section">
-      <div className="pds-section-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
-        <span>Tasks &amp; Points</span>
-        {tasks.length > 0 && (
-          <span style={{
-            background: remainingBudget === 0 ? "#fee2e2" : remainingBudget <= 8 ? "#fef3c7" : "#dcfce7",
-            color: remainingBudget === 0 ? "#dc2626" : remainingBudget <= 8 ? "#b45309" : "#15803d",
-            borderRadius: 12, padding: "2px 10px", fontSize: 12, fontWeight: 700,
-          }}>
-            {totalAssignedPoints}/{TASK_POINTS_BUDGET} pts · {remainingBudget} remaining
-          </span>
-        )}
-      </div>
-      {loadingTasks ? (
-        <p className="pds-loading">Loading…</p>
-      ) : tasks.length === 0 ? (
-        <p className="pds-field-value pds-muted">No tasks added yet.</p>
-      ) : (
-        <div className="pds-task-list">
-          {tasks.map(task => (
-            <div key={task.id} className="pds-task-row">
-              <span className="pds-task-title">{task.title}</span>
-              {isAdmin && editingTaskId === task.id ? (
-                <div className="pds-task-pts-edit">
-                  <input type="number" className="pds-pts-input" value={editingPoints}
-                    onChange={e => setEditingPoints(e.target.value)}
-                    onBlur={() => saveTaskPoints(task.id)}
-                    onKeyDown={e => { if (e.key === "Enter") saveTaskPoints(task.id); if (e.key === "Escape") setEditingTaskId(null); }}
-                    min="0" max={String(Math.min(TASK_POINTS_BUDGET, remainingBudget + (Number(task.points) || 0)))}
-                    disabled={savingPoints} autoFocus
-                  />
-                  <span className="pds-pts-unit">pts</span>
-                </div>
-              ) : (
-                <button
-                  className={`pds-task-pts-btn${isAdmin ? "" : " pds-task-pts-readonly"}`}
-                  onClick={() => isAdmin && (setEditingTaskId(task.id), setEditingPoints(String(task.points ?? 0)))}
-                  title={isAdmin ? "Click to edit points" : undefined}
-                  style={!isAdmin ? { cursor: "default" } : undefined}
-                >
-                  {task.points ?? 0} pts
-                </button>
-              )}
-            </div>
-          ))}
+  const renderProjectDetailsTable = () => (
+    <div className="pds-project-sheet">
+      <div className="pds-sheet-row pds-sheet-row--top">
+        <div className="pds-sheet-cell pds-sheet-cell--wide">
+          <div className="pds-sheet-label">Title of Community Engagement Initiative</div>
+          <div className="pds-sheet-value">{project.title || "Untitled Project"}</div>
         </div>
-      )}
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Date Proposed</div>
+          <div className="pds-sheet-value">{formatDate(project.dateProposed || project.createdAt)}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row">
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Name of Proponent(s) / College / Program / Department</div>
+          <div className="pds-sheet-value">{proponentsText}</div>
+        </div>
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Student Outcomes</div>
+          <div className="pds-sheet-value">{project.studentOutcomes || project.ceFields?.learningOutcomes || "—"}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--label-value">
+        <div className="pds-sheet-label-cell">SDG(s)</div>
+        <div className="pds-sheet-cell pds-sheet-cell--value">
+          <div className="pds-sheet-value">{sdgText}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--label-value">
+        <div className="pds-sheet-label-cell">Nature of Engagement</div>
+        <div className="pds-sheet-cell pds-sheet-cell--value">
+          <div className="pds-sheet-value">{natureLabel}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row">
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Target Date</div>
+          <div className="pds-sheet-value">{project.targetDate || "—"}</div>
+        </div>
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Location</div>
+          <div className="pds-sheet-value">{project.location || "—"}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row">
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Stakeholders</div>
+          <div className="pds-sheet-value">{stakeholdersText}</div>
+        </div>
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Number of Volunteer Hours</div>
+          <div className="pds-sheet-value">{project.volunteerHours || "—"}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--label-value">
+        <div className="pds-sheet-label-cell">Description</div>
+        <div className="pds-sheet-cell pds-sheet-cell--value">
+          <div className="pds-sheet-value">{project.description || "—"}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--label-value">
+        <div className="pds-sheet-label-cell">Objectives</div>
+        <div className="pds-sheet-cell pds-sheet-cell--value">
+          <div className="pds-sheet-value">{project.objectives || "—"}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--label-value">
+        <div className="pds-sheet-label-cell">Specific Activities</div>
+        <div className="pds-sheet-cell pds-sheet-cell--value">
+          <div className="pds-sheet-value pds-sheet-value--stack">{activitiesContent}</div>
+          {renderTasksCRUD()}
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--label-value">
+        <div className="pds-sheet-label-cell">Success Indicators</div>
+        <div className="pds-sheet-cell pds-sheet-cell--value">
+          <div className="pds-sheet-value pds-sheet-value--stack">{successContent}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--label-value">
+        <div className="pds-sheet-label-cell">Budget</div>
+        <div className="pds-sheet-cell pds-sheet-cell--value">
+          <div className="pds-sheet-value">{project.budget || "—"}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row pds-sheet-row--thirds">
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Max Volunteers</div>
+          <div className="pds-sheet-value">{maxVolunteers}</div>
+        </div>
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Participant Limit</div>
+          <div className="pds-sheet-value">{participantLimit}</div>
+        </div>
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Points</div>
+          <div className="pds-sheet-value">{totalAssignedPoints || "—"}</div>
+        </div>
+      </div>
+
+      <div className="pds-sheet-row">
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Community Engagement Fields</div>
+          <div className="pds-sheet-value">{natureLabel}</div>
+        </div>
+        <div className="pds-sheet-cell">
+          <div className="pds-sheet-label">Assigned Faculty</div>
+          <div className="pds-sheet-value">{assignedFaculty}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderRosterAnalyticsPanel = () => (
+    <div className="pds-roster-analytics">
+      <div className="pds-roster-count-card">
+        <span className="pds-roster-count-label">Number of Volunteers in Project Roster</span>
+        <strong>{loadingData ? "…" : volunteers.length}</strong>
+      </div>
+      <button className="pds-roster-action" onClick={() => setShowRosterModal(true)} disabled={loadingData || volunteers.length === 0}>
+        View Full Roster
+      </button>
+      <div className="pds-analytics-actions">
+        <button className="pds-analytics-btn pds-analytics-btn--pre"
+          onClick={() => { setImpactModalType("pre"); setImpactModalOpen(true); }}
+          disabled={loadingData || volunteersWithSurveys.length === 0}>
+          View Pre-Survey Analytics
+        </button>
+        <button className="pds-analytics-btn pds-analytics-btn--post"
+          onClick={() => { setImpactModalType("post"); setImpactModalOpen(true); }}
+          disabled={loadingData || volunteersWithSurveys.length === 0}>
+          View Post-Survey Analytics
+        </button>
+      </div>
     </div>
   );
 
@@ -712,19 +801,23 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       <div className="pds-section">
         <div className="pds-section-label">QR Codes</div>
         <div className="pds-qr-grid">
-          <div className="pds-qr-card">
+          <div className={`pds-qr-card${attendanceQRValue ? " pds-qr-card--clickable" : ""}`}
+            onClick={() => attendanceQRValue && setAttendanceQROpen(true)}
+            title={attendanceQRValue ? "Click to view attendance QR" : undefined}>
             <div className="pds-qr-label">Student Attendance</div>
             {attendanceQRValue ? (
               <>
-                <QRCodeCanvas value={attendanceQRValue} size={110} />
                 {qrLocationName && <span className="pds-qr-location">{qrLocationName}</span>}
                 {validQRTimestamp && (
                   <span className="pds-qr-time">
                     {new Date(validQRTimestamp).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 )}
+                <button className="pds-qr-gen-btn" type="button" onClick={(e) => { e.stopPropagation(); setAttendanceQROpen(true); }}>
+                  View QR
+                </button>
                 {isAdmin && (
-                  <button className="pds-qr-regen-btn" onClick={generateAttendanceQR} disabled={qrGenerating}>
+                  <button className="pds-qr-regen-btn" type="button" onClick={(e) => { e.stopPropagation(); generateAttendanceQR(); }} disabled={qrGenerating}>
                     {qrGenerating ? "Getting location…" : "Re-generate"}
                   </button>
                 )}
@@ -750,6 +843,20 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         <div className="pds-section-label">Signatory Flow</div>
         <ProposalTimeline proposal={project} />
       </div>
+
+      {accomplishmentReport && (
+        <div className="pds-section">
+          <div className="pds-section-label">Accomplishment Report</div>
+          <div className="pds-report-block">
+            <div className="pds-report-status">
+              {accomplishmentReport.status === "approved" ? "Approved" : accomplishmentReport.status === "revision_needed" ? "Revision Needed" : "Submitted"}
+            </div>
+            <button className="pds-btn-pdf" type="button" onClick={() => setReportModalOpen(true)}>
+              View Submitted Report
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -773,11 +880,14 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       </div>
 
       {!showTaskForm ? (
+        canEditProject && (
         <button onClick={() => setShowTaskForm(true)}
           style={{ background: "#007bff", color: "#fff", padding: "8px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
           + Create New Task
         </button>
+        )
       ) : (
+        canEditProject && (
         <div style={{ border: "1px solid #ddd", padding: 16, borderRadius: 10, background: "#f9f9f9", marginBottom: 14 }}>
           <h4 style={{ margin: "0 0 12px 0", color: "#111" }}>
             {editingTaskId ? "Edit Task" : "Create New Task"}
@@ -809,7 +919,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Task Type</label>
-              <div style={{ display: "flex", gap: 20 }}>
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#111", fontSize: 14 }}>
                   <input type="radio" value="individual" checked={taskFormData.type === "individual"} onChange={() => setTaskFormData(p => ({ ...p, type: "individual" }))} /> Individual
                 </label>
@@ -824,7 +934,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                 <input type="number" value={taskFormData.maxParticipants} onChange={e => setTaskFormData(p => ({ ...p, maxParticipants: e.target.value }))} min="2" max="50" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
               </div>
             )}
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
               <button type="submit" disabled={savingTask} style={{ background: "#28a745", color: "#fff", padding: "8px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
                 {savingTask ? "Saving…" : editingTaskId ? "Update Task" : "Create Task"}
               </button>
@@ -834,17 +944,18 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
             </div>
           </form>
         </div>
+        )
       )}
 
       {loadingTasks ? (
         <p style={{ color: "#888", fontSize: 13 }}>Loading tasks…</p>
       ) : tasks.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>No tasks yet. Create one above.</p>
+        <p style={{ color: "#aaa", fontSize: 13 }}>{canEditProject ? "No tasks yet. Create one above." : "No tasks yet."}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {tasks.map(task => (
             <div key={task.id} style={{ border: "1px solid #e0e4ea", borderRadius: 8, padding: "12px 14px", background: "#fff" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, color: "#111", fontSize: 14, marginBottom: 4 }}>{task.title}</div>
                   {task.description && <p style={{ margin: "0 0 6px 0", color: "#555", fontSize: 13 }}>{task.description}</p>}
@@ -858,10 +969,12 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                     {task.createdAt && <span style={{ color: "#aaa" }}>Created: {new Date(task.createdAt).toLocaleDateString()}</span>}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => startEditTask(task)} disabled={savingTask} style={{ background: "#007bff", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Edit</button>
-                  <button onClick={() => handleDeleteTask(task.id)} disabled={savingTask} style={{ background: "#dc3545", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Delete</button>
-                </div>
+                {canEditProject && (
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                    <button onClick={() => startEditTask(task)} disabled={savingTask} style={{ background: "#007bff", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Edit</button>
+                    <button onClick={() => handleDeleteTask(task.id)} disabled={savingTask} style={{ background: "#dc3545", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Delete</button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -891,7 +1004,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
               >
                 <AutorenewRoundedIcon style={{ fontSize: 18 }} />
               </button>
-              {isAdmin && (
+              {canEditProject && (
                 <button
                   className={`pds-edit-btn${editMode ? " pds-edit-btn--active" : ""}`}
                   onClick={() => setEditMode(!editMode)}
@@ -913,87 +1026,13 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
             {/* ── LEFT: main content ── */}
             <div className="pds-col-main">
-              {/* Banner inside left column only */}
-              <div className="pds-banner">
-                <img src={bannerSrc} alt={project.title || "Project banner"} className="pds-banner-img" />
-                {isAdmin && (
-                  <>
-                    <button className="pds-cover-btn" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} title="Change cover photo">
-                      {uploadingCover ? <span className="pds-cover-spinner" /> : (
-                        <>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                            <circle cx="12" cy="13" r="4" />
-                          </svg>
-                          Change Cover
-                        </>
-                      )}
-                    </button>
-                    <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: "none" }} onChange={handleCoverUpload} />
-                  </>
-                )}
-              </div>
-
               <div className="pds-col-main-content">
-              {editMode ? renderEditForm() : (
+              {canEditProject && editMode ? renderEditForm() : (
                 isApprovalStage ? (
                   /* ── Approval / Draft display ── */
                   <>
-                    <div className="pds-section">
-                      <div className="pds-meta-grid">
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Proposed by</span>
-                          <span className="pds-meta-value">{project.preparedBy || "N/A"}</span>
-                        </div>
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Target Date</span>
-                          <span className="pds-meta-value">{project.targetDate || "N/A"}</span>
-                        </div>
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Date Submitted</span>
-                          <span className="pds-meta-value">{formatDate(project.dateProposed || project.createdAt)}</span>
-                        </div>
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Location</span>
-                          <span className="pds-meta-value">{project.location || "N/A"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {project.description && (
-                      <div className="pds-section">
-                        <div className="pds-section-label">Description</div>
-                        <p className="pds-field-value">{project.description}</p>
-                      </div>
-                    )}
-
-                    {(project.objectives || project.stakeholders || project.budget) && (
-                      <div className="pds-section">
-                        <div className="pds-section-label">Project Details</div>
-                        {project.objectives && (
-                          <div className="pds-field">
-                            <span className="pds-field-label">Objectives</span>
-                            <p className="pds-field-value">{project.objectives}</p>
-                          </div>
-                        )}
-                        {project.stakeholders && (
-                          <div className="pds-field">
-                            <span className="pds-field-label">Partner / Stakeholder</span>
-                            <p className="pds-field-value">
-                              {Array.isArray(project.stakeholders) ? project.stakeholders.join(", ") : project.stakeholders}
-                            </p>
-                          </div>
-                        )}
-                        {project.budget && (
-                          <div className="pds-field">
-                            <span className="pds-field-label">Budget</span>
-                            <p className="pds-field-value">{project.budget}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {renderTaskPoints()}
+                    {renderProjectDetailsTable()}
+                    {renderRosterAnalyticsPanel()}
 
                     {project.signedDocUrl && (
                       <div className="pds-section">
@@ -1007,60 +1046,15 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                 ) : (
                   /* ── Published / Completed display ── */
                   <>
-                    {project.description && (
-                      <div className="pds-section">
-                        <div className="pds-section-label">About this Event</div>
-                        <p className="pds-field-value">{project.description}</p>
-                      </div>
-                    )}
+                    {renderProjectDetailsTable()}
+                    {renderRosterAnalyticsPanel()}
 
-                    <div className="pds-section">
-                      <div className="pds-meta-grid">
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Location</span>
-                          <span className="pds-meta-value">{project.location || "N/A"}</span>
-                        </div>
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Partner / Stakeholder</span>
-                          <span className="pds-meta-value">{project.stakeholders || project.partnerName || "N/A"}</span>
-                        </div>
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Target Date</span>
-                          <span className="pds-meta-value">{project.targetDate || "N/A"}</span>
-                        </div>
-                        <div className="pds-meta-item">
-                          <span className="pds-meta-label">Volunteer Hours</span>
-                          <span className="pds-meta-value">{project.volunteerHours ? `${project.volunteerHours}h` : "N/A"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {(adviserName || (!loadingData && adviserVolunteers.length > 0)) && (
-                      <div className="pds-section">
-                        <div className="pds-section-label">Adviser / Professor</div>
-                        <p className="pds-field-value">
-                          {adviserName || adviserVolunteers.map(v => v.displayName).join(", ")}
-                        </p>
-                      </div>
-                    )}
-
-                    {activities && (
-                      <div className="pds-section">
-                        <div className="pds-section-label">Activities</div>
-                        <p className="pds-field-value">{activities}</p>
-                      </div>
-                    )}
-
-                    {renderTaskPoints()}
-
-                    {/* ── Attendance & Community Feedback ── */}
-                    <div className="pds-section">
+                    <div className="pds-stats-container">
                       <div className="pds-section-label">Attendance &amp; Community Feedback</div>
                       {loadingData ? (
                         <p className="pds-loading">Loading…</p>
                       ) : (
                         <div className="pds-stats-row">
-                          {/* Attendance donut */}
                           <div className="pds-stat-block">
                             <div className="pds-stat-sub-label">Attendance</div>
                             <div className="pds-pie-row">
@@ -1086,7 +1080,6 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
                           <div className="pds-stats-divider" />
 
-                          {/* Community feedback donut */}
                           <div className="pds-stat-block">
                             <div className="pds-stat-sub-label">Community Feedback</div>
                             <div className="pds-pie-row">
@@ -1113,62 +1106,6 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                       )}
                     </div>
 
-                    {/* Attendance roster */}
-                    {!loadingData && attendedVolunteers.length > 0 && (
-                      <div className="pds-section">
-                        <div className="pds-section-label">Attendance Roster</div>
-                        <div className="pds-roster">
-                          {attendedVolunteers.map((v, i) => (
-                            <div key={v.uid || i} className="pds-roster-row">
-                              <div className="pds-roster-avatar">
-                                {v.avatar ? <img src={v.avatar} alt="" /> : <span>{getInitials(v.displayName)}</span>}
-                              </div>
-                              <span className="pds-roster-name">{v.displayName}</span>
-                              {v.role === "faculty" && <span className="pds-roster-badge">Adviser</span>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {!loadingData && volunteers.length > 0 && (
-                      <div className="pds-section">
-                        <button className="pds-btn-pdf"
-                          style={{ background: "#1f3b73", color: "#fff", border: "none", borderRadius: 10, padding: "9px 20px", fontWeight: 600, fontSize: 15, cursor: "pointer", width: "100%" }}
-                          onClick={() => setShowRosterModal(true)}>
-                          👥 View Full Roster
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Survey analytics */}
-                    {!loadingData && volunteersWithSurveys.length > 0 && (
-                      <div className="pds-section">
-                        <div className="pds-section-label">Survey Analytics</div>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 13, color: "#555" }}>
-                            Pre-Survey: <strong>{volunteersWithSurveys.filter(v => v.preSurveyAnswers).length}</strong> submitted
-                          </span>
-                          <span style={{ fontSize: 13, color: "#aaa" }}>·</span>
-                          <span style={{ fontSize: 13, color: "#555" }}>
-                            Post-Survey: <strong>{volunteersWithSurveys.filter(v => v.postSurveyAnswers).length}</strong> submitted
-                          </span>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                          <button className="pds-btn-pdf"
-                            style={{ flex: 1, background: "#1f3b73", color: "#fff", border: "none", borderRadius: 10, padding: "8px 10px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                            onClick={() => { setImpactModalType("pre"); setImpactModalOpen(true); }}>
-                            View Pre-Survey Analytics
-                          </button>
-                          <button className="pds-btn-pdf"
-                            style={{ flex: 1, background: "#30bdb7", color: "#fff", border: "none", borderRadius: 10, padding: "8px 10px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                            onClick={() => { setImpactModalType("post"); setImpactModalOpen(true); }}>
-                            View Post-Survey Analytics
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
                     {impactModalOpen && (
                       <ImpactMetrics open={impactModalOpen} onClose={() => setImpactModalOpen(false)}
                         volunteers={volunteersWithSurveys} showType={impactModalType} />
@@ -1182,7 +1119,6 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                       </div>
                     )}
 
-                    {renderTasksCRUD()}
                   </>
                 )
               )}
@@ -1197,11 +1133,21 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         </div>
       </div>
 
+      {accomplishmentReport && reportModalOpen && (
+        <AccomplishmentReportModal
+          missionId={project.id}
+          event={project}
+          existingReport={accomplishmentReport}
+          onClose={() => setReportModalOpen(false)}
+          onSubmitted={loadEventData}
+        />
+      )}
+
       {/* ── Roster Modal ── */}
       {showRosterModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(44,62,80,0.25)", zIndex: 12000, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={() => setShowRosterModal(false)}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 400, maxWidth: "92vw", boxShadow: "0 4px 24px #0003", position: "relative", color: "#111", maxHeight: "80vh", overflowY: "auto" }}
+          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: "min(560px, 92vw)", boxSizing: "border-box", boxShadow: "0 4px 24px #0003", position: "relative", color: "#111", maxHeight: "80vh", overflowY: "auto", overflowX: "auto" }}
             onClick={e => e.stopPropagation()}>
             <button className="admin-modal-close admin-modal-close--absolute"
               onClick={() => setShowRosterModal(false)}>×</button>
@@ -1209,7 +1155,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
             <p style={{ textAlign: "center", color: "#888", fontSize: 13, marginBottom: 20 }}>
               {project.title} — {volunteers.length} registered
             </p>
-            <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 20 }}>
+            <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
               <div style={{ background: "#eef9f8", borderRadius: 10, padding: "8px 20px", textAlign: "center" }}>
                 <div style={{ fontWeight: 700, fontSize: 22, color: "#30bdb7" }}>{volunteers.length}</div>
                 <div style={{ fontSize: 12, color: "#666" }}>Registered</div>
@@ -1281,6 +1227,28 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
             <a href={feedbackUrl} target="_blank" rel="noopener noreferrer" className="pds-fqr-open-btn">
               Open Link ↗
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* ── Attendance QR modal ── */}
+      {attendanceQROpen && attendanceQRValue && (
+        <div className="pds-pdf-modal-overlay" onClick={() => setAttendanceQROpen(false)}>
+          <div className="pds-fqr-modal" onClick={e => e.stopPropagation()}>
+            <button className="pds-pdf-modal-close" onClick={() => setAttendanceQROpen(false)}>×</button>
+            <div className="pds-fqr-label">Student Attendance</div>
+            <QRCodeCanvas value={attendanceQRValue} size={220} />
+            {qrLocationName && <div className="pds-fqr-url">{qrLocationName}</div>}
+            {validQRTimestamp && (
+              <div className="pds-fqr-url">
+                Generated {new Date(validQRTimestamp).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </div>
+            )}
+            {isAdmin && (
+              <button className="pds-fqr-open-btn" type="button" onClick={generateAttendanceQR} disabled={qrGenerating}>
+                {qrGenerating ? "Getting location…" : "Re-generate"}
+              </button>
+            )}
           </div>
         </div>
       )}
