@@ -5,10 +5,9 @@ import { collection, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc
 import { httpsCallable } from "firebase/functions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useSession } from "../context/useSession";
 import bbl_icon from "../assets/bbl_icon.svg";
 import servePlusIcon from "../assets/serve_plus_icon.svg";
-// import loginPosterGif from "../assets/login_poster_loop.gif"; // temporarily removed
-// import loginPosterFallback from "../assets/login_poster_img.svg"; // temporarily removed
 import AgreementModal from "../components/AgreementModal";
 import { VisibilityIcon, VisibilityOffIcon } from "../components/icons";
 import { auth, db, functions } from "../firebaseConfig";
@@ -100,6 +99,15 @@ function Auth() {
     const callbackError = new URLSearchParams(location.search).get("error");
     if (callbackError) setError(callbackError);
   }, [location.search]);
+
+  // If SessionProvider has already restored an active session, redirect back
+  const { isSessionActive, authLoading } = useSession();
+  useEffect(() => {
+    if (!authLoading && isSessionActive) {
+      const destination = intendedPath || "/student/home";
+      navigate(destination, { replace: true });
+    }
+  }, [authLoading, isSessionActive, intendedPath, navigate]);
 
   useEffect(() => {
     let cancelled = false;

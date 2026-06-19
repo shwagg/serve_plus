@@ -594,7 +594,7 @@ const StudentHome = () => {
         </section>*/}
 
         {/* COMPACT LEADERBOARD */}
-        <section className="leaderboard-compact-section" aria-label="Leaderboard">
+        <section className="leaderboard-compact-section" aria-label="Leaderboard" id="leaderboard-section">
           <div className="leaderboard-compact-header">
             <div>
               <h2 className="leaderboard-compact-title">Leaderboard</h2>
