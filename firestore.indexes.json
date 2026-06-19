@@ -1,4 +1,12 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "certificates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "certificateId", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

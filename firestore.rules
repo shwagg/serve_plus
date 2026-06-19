@@ -458,5 +458,12 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
       allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
+
+    // Allow public collectionGroup reads on certificates for the public verification page.
+    // Certificate data (name, course, date, certificateId) is intentionally public-facing.
+    // Write access is still fully governed by the scoped rule above.
+    match /{path=**}/certificates/{certId} {
+      allow read: if true;
+    }
   }
 }
