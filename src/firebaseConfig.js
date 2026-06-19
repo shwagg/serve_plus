@@ -30,7 +30,7 @@ const emulateFunctions = import.meta.env.VITE_EMULATE_FUNCTIONS === "true" || us
 const emulateStorage = import.meta.env.VITE_EMULATE_STORAGE === "true" || useEmulators;
 
 if (emulateAuth) {
-  //connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
+  connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
 }
 if (emulateFirestore) {
   connectFirestoreEmulator(db, "localhost", 8080);
