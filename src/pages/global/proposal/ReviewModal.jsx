@@ -415,8 +415,8 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
       // Send rejection notification to the proponent in background.
       const notifData = {
         type: "proposal_rejected",
-        title: "Proposal Returned for Revision",
-        message: `${rejectorName || "An approver"} returned your proposal "${proposal.title || "Untitled"}" for revision: ${rejectComments.trim()}`,
+        title: "Proposal Rejected",
+        message: `${rejectorName || "An approver"} rejected your proposal "${proposal.title || "Untitled"}": ${rejectComments.trim()} You can edit and resubmit it.`,
         link: "/student",
         proposalId: proposal.id,
       };

@@ -97,6 +97,7 @@ service cloud.firestore {
           request.resource.data.type in [
             "proposal_submitted",
             "proposal_status",
+            "proposal_rejected",
             "reflection_approved",
             "reflection_needs_revision",
             "badge_earned",

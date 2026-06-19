@@ -346,8 +346,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       logAudit({ action: "PROPOSAL_REJECTED", category: "proposal", actorName: name, details: { proposalId: project.id, proposalTitle: project.title || "", rejectionReason: rejectText.trim(), rejectedByRole: approvalLevel } });
       const notifData = {
         type: "proposal_rejected",
-        title: "Proposal Returned for Revision",
-        message: `${name || "An approver"} returned your proposal "${project.title || "Untitled"}" for revision: ${rejectText.trim()}`,
+        title: "Proposal Rejected",
+        message: `${name || "An approver"} rejected your proposal "${project.title || "Untitled"}": ${rejectText.trim()} You can edit and resubmit it.`,
         link: "/student",
         proposalId: project.id,
       };
