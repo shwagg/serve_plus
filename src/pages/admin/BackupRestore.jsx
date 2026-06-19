@@ -47,7 +47,12 @@ export default function BackupRestore() {
         HEAVY_CALL_OPTIONS,
       );
       const result = await createBackupFn({ label: label || undefined });
-      setSuccess(result.data.message);
+      const prunedBackups = result.data.prunedBackups || 0;
+      setSuccess(
+        prunedBackups > 0
+          ? `${result.data.message} Removed ${prunedBackups} old backup(s).`
+          : result.data.message,
+      );
       setLabel("");
       await fetchBackups();
     } catch (err) {
@@ -126,7 +131,8 @@ export default function BackupRestore() {
           <h2 className="backup-title">Data Backup & Restore</h2>
           <p className="backup-subtitle">
             Manage backups of volunteer and project data. Backups run
-            automatically every week, or create one manually anytime.
+            automatically every week, or create one manually anytime. The
+            newest 10 successful backups are kept.
           </p>
         </div>
       </div>
@@ -194,7 +200,8 @@ export default function BackupRestore() {
         <span>
           <strong>Automatic backups</strong> run every{" "}
           <strong>Sunday at 2:00 AM (PHT)</strong>. They appear in the list
-          below alongside manual backups.
+          below alongside manual backups, and older entries are removed when
+          the list exceeds 10 successful backups.
         </span>
       </div>
 

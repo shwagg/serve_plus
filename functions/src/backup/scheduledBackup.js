@@ -42,6 +42,11 @@ const scheduledBackup = onSchedule(
       console.log(
         `Scheduled backup ${backupId} completed: ${result.totalDocuments} documents, ${result.totalAuthUsers} auth users, ${result.totalStorageFiles} storage files, ${result.sizeInBytes} bytes`,
       );
+      if (result.prunedBackups > 0) {
+        console.log(
+          `Backup retention removed ${result.prunedBackups} old backup(s).`,
+        );
+      }
     } catch (err) {
       console.error("Scheduled backup failed:", err);
       throw err;

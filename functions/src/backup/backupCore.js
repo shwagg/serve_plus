@@ -10,6 +10,7 @@ const {
   getStorageArchivePrefix,
 } = require("./storageArchive");
 const {mapWithConcurrency} = require("./concurrency");
+const {pruneOldCompletedBackups} = require("./backupRetention");
 
 const ROOT_COLLECTION_CONCURRENCY = 6;
 
@@ -87,12 +88,20 @@ async function createBackupSnapshot({
 
     await db.collection("backups").doc(backupId).set(backupMeta);
 
+    let prunedBackups = 0;
+    try {
+      prunedBackups = await pruneOldCompletedBackups({db, bucket});
+    } catch (err) {
+      console.error("Backup retention cleanup failed:", err);
+    }
+
     return {
       backupId,
       totalDocuments,
       totalAuthUsers: authUsers.length,
       totalStorageFiles,
       sizeInBytes,
+      prunedBackups,
     };
   } catch (err) {
     await cleanupBackupArtifacts(bucket, filePath, storageArchivePrefix);
