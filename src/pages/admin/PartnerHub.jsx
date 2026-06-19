@@ -56,7 +56,7 @@ export default function PartnerHub() {
   }
 
   return (
-    <div className="admin-outlet content">
+    <>
       <h1 className="page-title">Partner Hub</h1>
 
       {partners.length === 0 ? (
@@ -189,6 +189,6 @@ export default function PartnerHub() {
           );
         })
       )}
-    </div>
+    </>
   );
 }

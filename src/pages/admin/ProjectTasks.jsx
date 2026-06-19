@@ -259,7 +259,7 @@ export default function ProjectTasks() {
   if (loading && !project) return <p>Loading…</p>;
 
   return (
-    <div className="admin-outlet">
+    <>
       <button
         type="button"
         onClick={() => navigate(`/admin/projects/${projectId}`)}
@@ -267,7 +267,7 @@ export default function ProjectTasks() {
         ← Back to Project Details
       </button>
 
-      <h1 style={{ marginTop: 12, color: "#111" }}>
+      <h1 className="page-title" style={{ marginTop: 12 }}>
         Tasks for {project?.title || project?.alt || "Project"}
       </h1>
 
@@ -592,6 +592,6 @@ export default function ProjectTasks() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

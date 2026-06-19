@@ -811,8 +811,7 @@ export default function AuditLogs() {
   ];
 
   return (
-    <div className="admin-outlet">
-      <div className="audit-logs-container">
+    <>
         {/* Page header */}
         <div className="audit-page-header">
           <div>
@@ -917,7 +916,6 @@ export default function AuditLogs() {
             emptyMessage="No system actions recorded yet."
           />
         )}
-      </div>
-    </div>
+    </>
   );
 }

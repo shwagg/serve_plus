@@ -124,7 +124,7 @@ export default function BackupRestore() {
   };
 
   return (
-    <div className="admin-outlet">
+    <>
       {/* Header */}
       <div className="backup-header">
         <div>
@@ -367,6 +367,6 @@ export default function BackupRestore() {
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }
