@@ -18,7 +18,6 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize services
 const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence); // Ensure persistence
 const db = getFirestore(app);
 const functions = getFunctions(app, import.meta.env.VITE_FUNCTIONS_REGION || "us-central1");
 const storage = getStorage(app);
@@ -31,7 +30,7 @@ const emulateFunctions = import.meta.env.VITE_EMULATE_FUNCTIONS === "true" || us
 const emulateStorage = import.meta.env.VITE_EMULATE_STORAGE === "true" || useEmulators;
 
 if (emulateAuth) {
-  connectAuthEmulator(auth, "http://localhost:9099");
+  //connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
 }
 if (emulateFirestore) {
   connectFirestoreEmulator(db, "localhost", 8080);
@@ -42,5 +41,10 @@ if (emulateFunctions) {
 if (emulateStorage) {
   connectStorageEmulator(storage, "localhost", 9199);
 }
+
+// Ensure persistence after any emulator configuration to avoid emulator-config errors
+setPersistence(auth, browserLocalPersistence).catch(() => {
+  // Ignore persistence errors (e.g., when running in certain emulator configurations)
+});
 
 export { app, auth, db, functions, storage };

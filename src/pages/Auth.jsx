@@ -101,13 +101,22 @@ function Auth() {
   }, [location.search]);
 
   // If SessionProvider has already restored an active session, redirect back
-  const { isSessionActive, authLoading } = useSession();
+  const { userData, isSessionActive, authLoading } = useSession();
+
+  const getRoleRedirect = (role) => {
+    if (role === "admin") return "/admin/dashboard";
+    if (role === "sysadmin") return "/sysadmin/roster";
+    if (role === "faculty") return "/faculty/current-event";
+    if (role === "partner") return "/partner/dashboard";
+    return "/student/home";
+  };
+
   useEffect(() => {
     if (!authLoading && isSessionActive) {
-      const destination = intendedPath || "/student/home";
+      const destination = intendedPath || getRoleRedirect(userData?.role);
       navigate(destination, { replace: true });
     }
-  }, [authLoading, isSessionActive, intendedPath, navigate]);
+  }, [authLoading, isSessionActive, intendedPath, navigate, userData]);
 
   useEffect(() => {
     let cancelled = false;
