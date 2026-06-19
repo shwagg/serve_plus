@@ -15,10 +15,12 @@ const FIELD_LIMITS = {
   location: 50,
   volunteerHours: 50,
   stakeholderItem: 50,
+  stakeholderItems: 5,
   course: 50,
   courseCode: 50,
   section: 50,
   activityItem: 50,
+  activityItems: 5,
   description: 2000,
   objectives: 2000,
   successIndicators: 1000,
@@ -166,16 +168,17 @@ function ProponentTagInput({ tags, onAdd, onRemove, lockedCount = 0 }) {
  * Numbered list input for stakeholders. Pressing Enter commits the item and shows it
  * as "1. Name", "2. Name", etc.
  */
-function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMorePlaceholder, maxChars }) {
+function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMorePlaceholder, maxChars, maxItems }) {
   const [input, setInput] = useState('');
 
   const commit = () => {
     const val = input.trim();
     if (!val) return;
-    if (maxChars && val.length > maxChars) return;
-    onAdd(val);
-    setInput('');
+    const added = onAdd(val);
+    if (added !== false) setInput('');
   };
+
+  const itemLimitReached = Boolean(maxItems && items.length >= maxItems);
 
   return (
     <div className="numbered-list-box">
@@ -190,6 +193,8 @@ function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMore
         type="text"
         className="numbered-item-add"
         value={input}
+        maxLength={maxChars}
+        disabled={itemLimitReached}
         onChange={e => {
           let nextValue = e.target.value;
           if (hasEmoji(nextValue)) {
@@ -199,7 +204,9 @@ function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMore
           setInput(nextValue);
         }}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
-        placeholder={items.length === 0
+        placeholder={itemLimitReached
+          ? `Maximum of ${maxItems} items reached`
+          : items.length === 0
           ? (placeholder || 'Type a name and press Enter')
           : (addMorePlaceholder || 'Add another…')}
       />
@@ -554,12 +561,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         showToast(`Volunteer Hours only allows up to ${FIELD_LIMITS.volunteerHours}.`);
         return;
       }
-      if (value !== '' && Number(value) < 4) {
-        setFormData(prev => ({ ...prev, [name]: '' }));
-        showTemporaryFieldError(name, 'Minimum volunteer hours is 4.');
-        showToast('Minimum volunteer hours is 4.');
-        return;
-      }
       setFormData(prev => ({ ...prev, [name]: value }));
       setFieldErrors(prev => ({ ...prev, [name]: '' }));
     } else if (name === 'participantLimit') {
@@ -692,37 +693,51 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const handleAddStakeholder = (text) => {
     hasUserInputRef.current = true;
+    if ((formData.stakeholders || []).length >= FIELD_LIMITS.stakeholderItems) {
+      showToast(`Only ${FIELD_LIMITS.stakeholderItems} stakeholders are allowed.`);
+      showTemporaryFieldError('stakeholders', `Only ${FIELD_LIMITS.stakeholderItems} stakeholders are allowed.`);
+      return false;
+    }
     if (String(text || '').trim().length > FIELD_LIMITS.stakeholderItem || getVisibleCharacterCount(text) > FIELD_LIMITS.stakeholderItem) {
       showToast(`Stakeholders are limited to ${FIELD_LIMITS.stakeholderItem} characters each, excluding spaces and line breaks.`);
       showTemporaryFieldError('stakeholders', `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters, excluding spaces and line breaks.`);
-      return;
+      return false;
     }
     setFormData(prev => ({ ...prev, stakeholders: [...(prev.stakeholders || []), text] }));
     setFieldErrors(prev => ({ ...prev, stakeholders: '' }));
+    return true;
   };
 
   const handleRemoveStakeholder = (index) => {
     hasUserInputRef.current = true;
     setFormData(prev => ({ ...prev, stakeholders: prev.stakeholders.filter((_, i) => i !== index) }));
+    setFieldErrors(prev => ({ ...prev, stakeholders: '' }));
   };
 
   const handleAddActivity = (text) => {
     hasUserInputRef.current = true;
+    if ((formData.specificActivities || []).length >= FIELD_LIMITS.activityItems) {
+      showToast(`Only ${FIELD_LIMITS.activityItems} specific activities are allowed.`);
+      showTemporaryFieldError('specificActivities', `Only ${FIELD_LIMITS.activityItems} specific activities are allowed.`);
+      return false;
+    }
     if (String(text || '').trim().length > FIELD_LIMITS.activityItem || getVisibleCharacterCount(text) > FIELD_LIMITS.activityItem) {
       showToast(`Each activity is limited to ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`);
       showTemporaryFieldError('specificActivities', `Each activity can only have ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`);
-      return;
+      return false;
     }
     setFormData(prev => ({ ...prev, specificActivities: [...(prev.specificActivities || []), text] }));
     setFieldErrors(prev => ({ ...prev, specificActivities: '' }));
+    return true;
   };
 
   const handleRemoveActivity = (index) => {
     hasUserInputRef.current = true;
     setFormData(prev => ({ ...prev, specificActivities: prev.specificActivities.filter((_, i) => i !== index) }));
+    setFieldErrors(prev => ({ ...prev, specificActivities: '' }));
   };
 
-  //1 month rule for selecting target date for the project
+  // Target date must allow approval processing but stay within the proposal window.
   const minTargetDate = new Date();
   minTargetDate.setMonth(minTargetDate.getMonth() + 1);
 
@@ -733,7 +748,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     "-" +
     String(minTargetDate.getDate()).padStart(2, "0");
   const maxTargetDate = new Date();
-  maxTargetDate.setFullYear(maxTargetDate.getFullYear() + 5);
+  maxTargetDate.setMonth(maxTargetDate.getMonth() + 5);
   const maxDateString =
     maxTargetDate.getFullYear() +
     "-" +
@@ -775,11 +790,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     if (getVisibleCharacterCount(formData.successIndicators) > FIELD_LIMITS.successIndicators) nextErrors.successIndicators = `Only ${FIELD_LIMITS.successIndicators} characters are allowed, excluding spaces and line breaks.`;
     if (getVisibleCharacterCount(formData.budget) > FIELD_LIMITS.budget) nextErrors.budget = `Only ${FIELD_LIMITS.budget} characters are allowed, excluding spaces and line breaks.`;
     if (Number(formData.volunteerHours) > FIELD_LIMITS.volunteerHours) nextErrors.volunteerHours = `Volunteer Hours can only go up to ${FIELD_LIMITS.volunteerHours}.`;
-    if (formData.volunteerHours !== '' && Number(formData.volunteerHours) < 4) nextErrors.volunteerHours = 'Minimum volunteer hours is 4.';
     if ((formData.proponents || []).length > FIELD_LIMITS.proponents) nextErrors.proponents = `Only ${FIELD_LIMITS.proponents} proponent names are allowed.`;
+    if ((formData.stakeholders || []).length > FIELD_LIMITS.stakeholderItems) nextErrors.stakeholders = `Only ${FIELD_LIMITS.stakeholderItems} stakeholders are allowed.`;
+    if ((formData.specificActivities || []).length > FIELD_LIMITS.activityItems) nextErrors.specificActivities = `Only ${FIELD_LIMITS.activityItems} specific activities are allowed.`;
     if ((formData.stakeholders || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.stakeholderItem)) nextErrors.stakeholders = `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters, excluding spaces and line breaks.`;
     if ((formData.specificActivities || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.activityItem)) nextErrors.specificActivities = `Each activity can only have ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`;
-    if (formData.targetDate && (formData.targetDate < minDateString || formData.targetDate > maxDateString)) nextErrors.targetDate = `Select a date between ${minDateString} and ${maxDateString}.`;
+    if (formData.targetDate && (formData.targetDate < minDateString || formData.targetDate > maxDateString)) nextErrors.targetDate = `Select a date at least 1 month from today and no later than 5 months from today.`;
 
     if (Object.keys(nextErrors).length > 0) {
       showTemporaryFieldErrors(nextErrors);
@@ -976,7 +992,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
               <div className="form-group">
                 <label htmlFor="targetDate">Target Date</label>
                 <small className="date-hint">
-                  Must be at least 1 month from today to allow approval processing.
+                  Must be at least 1 month from today and no later than 5 months from today.
                 </small>
                 <input
                   type="date"
@@ -1061,7 +1077,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   onKeyDown={handleNumericKeyDown}
                   onPaste={handleNumericPaste}
                   required
-                  min="4"
                   max={FIELD_LIMITS.volunteerHours}
                   />
                   {fieldErrors.volunteerHours && <small className="field-limit-hint error">{fieldErrors.volunteerHours}</small>}
@@ -1108,9 +1123,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   onAdd={handleAddStakeholder}
                   onRemove={handleRemoveStakeholder}
                   maxChars={FIELD_LIMITS.stakeholderItem}
+                  maxItems={FIELD_LIMITS.stakeholderItems}
+                  placeholder="Type a stakeholder and press Enter"
+                  addMorePlaceholder="Add another stakeholder..."
                 />
                 <small className={`field-limit-hint${fieldErrors.stakeholders ? ' error' : ''}`}>
-                  {fieldErrors.stakeholders || `Each stakeholder can use up to ${FIELD_LIMITS.stakeholderItem} characters.`}
+                  {fieldErrors.stakeholders || `Add up to ${FIELD_LIMITS.stakeholderItems} stakeholders. Each stakeholder can use up to ${FIELD_LIMITS.stakeholderItem} characters.`}
                 </small>
               </div>
             </div>
@@ -1289,11 +1307,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   onAdd={handleAddActivity}
                   onRemove={handleRemoveActivity}
                   maxChars={FIELD_LIMITS.activityItem}
+                  maxItems={FIELD_LIMITS.activityItems}
                   placeholder="Type an activity and press Enter"
-                  addMorePlaceholder="Add another activity…"
+                  addMorePlaceholder="Add another activity..."
                 />
                 <small className={`field-limit-hint${fieldErrors.specificActivities ? ' error' : ''}`}>
-                  {fieldErrors.specificActivities || `Each activity can use up to ${FIELD_LIMITS.activityItem} characters.`}
+                  {fieldErrors.specificActivities || `Add up to ${FIELD_LIMITS.activityItems} activities. Each activity can use up to ${FIELD_LIMITS.activityItem} characters.`}
                 </small>
                 <small style={{ color: '#718096', fontSize: '0.8rem', marginTop: 4, display: 'block' }}>
                   Each activity will automatically become a volunteer task when the proposal is approved.

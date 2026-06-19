@@ -10,6 +10,7 @@ import "../styles/ui.css";
 import { isAllowedEmailDomain, normalizeEmail } from "../utils/emailPolicy";
 
 const isEmulator = import.meta.env.VITE_USE_EMULATORS === "true";
+const NAME_MAX_LENGTH = 64;
 const NAME_REGEX = /^[A-Za-z]+(?:[ '-][A-Za-z]+)*$/;
 const MIDDLE_INITIAL_REGEX = /^[A-Za-z]$/;
 const USERNAME_REGEX = /^(?=.*[a-z0-9])[a-z0-9._]{3,20}$/;
@@ -34,6 +35,24 @@ function validateRegistrationFields({ firstName, middleInitial, lastName, userna
     const trimmedMiddleInitial = middleInitial.trim();
     const trimmedLastName = lastName.trim();
     const normalizedUsername = username.trim().toLowerCase();
+
+    if (trimmedFirstName.length > NAME_MAX_LENGTH) {
+        return {
+            message: `First name must not exceed ${NAME_MAX_LENGTH} characters.`,
+        };
+    }
+
+    if (trimmedLastName.length > NAME_MAX_LENGTH) {
+        return {
+            message: `Last name must not exceed ${NAME_MAX_LENGTH} characters.`,
+        };
+    }
+
+    if (trimmedMiddleInitial.length > NAME_MAX_LENGTH) {
+        return {
+            message: `Middle name must not exceed ${NAME_MAX_LENGTH} characters.`,
+        };
+    }
 
     if (!NAME_REGEX.test(trimmedFirstName)) {
         return {
@@ -304,6 +323,7 @@ function Register() {
                                 type="text"
                                 placeholder="First Name"
                                 value={firstName}
+                                maxLength={NAME_MAX_LENGTH}
                                 onChange={(e) => setFirstName(e.target.value)}
                                 onBlur={() => setFirstName(capitalizeName(firstName))}
                                 required
@@ -313,6 +333,7 @@ function Register() {
                                 type="text"
                                 placeholder="Last Name"
                                 value={lastName}
+                                maxLength={NAME_MAX_LENGTH}
                                 onChange={(e) => setLastName(e.target.value)}
                                 onBlur={() => setLastName(capitalizeName(lastName))}
                                 required

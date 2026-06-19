@@ -101,6 +101,7 @@ function Auth() {
   }, [location.search]);
 
   // If SessionProvider has already restored an active session, redirect back
+  // only after the current agreement has been accepted.
   const { userData, isSessionActive, authLoading } = useSession();
 
   const getRoleRedirect = (role) => {
@@ -112,11 +113,50 @@ function Auth() {
   };
 
   useEffect(() => {
-    if (!authLoading && isSessionActive) {
-      const destination = intendedPath || getRoleRedirect(userData?.role);
+    let cancelled = false;
+
+    const redirectActiveSession = async () => {
+      if (
+        authLoading ||
+        !isSessionActive ||
+        !userData ||
+        showAgreement ||
+        showReactivatePrompt
+      ) {
+        return;
+      }
+
+      const currentVersion = await fetchCurrentAgreementVersion();
+      if (cancelled) return;
+
+      if ((userData.agreementVersion || null) !== currentVersion) {
+        setPendingNavigation({
+          role: userData.role,
+          uid: auth.currentUser?.uid || userData.uid,
+          authProvider: userData.authProvider || "password",
+        });
+        setShowAgreement(true);
+        return;
+      }
+
+      const destination = intendedPath || getRoleRedirect(userData.role);
       navigate(destination, { replace: true });
-    }
-  }, [authLoading, isSessionActive, intendedPath, navigate, userData]);
+    };
+
+    redirectActiveSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authLoading,
+    isSessionActive,
+    intendedPath,
+    navigate,
+    showAgreement,
+    showReactivatePrompt,
+    userData,
+  ]);
 
   useEffect(() => {
     let cancelled = false;

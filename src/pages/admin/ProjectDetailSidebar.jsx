@@ -282,6 +282,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const approvalLevel = getApprovalLevel();
   const isAdmin = role === "admin";
   const canEditProject = isAdmin && !isPublishedOrDone;
+  const canManageTasks = isAdmin && statusStr !== "archived" && statusStr !== "cancelled";
 
   function canApprove() {
     if (!approvalLevel || !project) return false;
@@ -891,14 +892,14 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       </div>
 
       {!showTaskForm ? (
-        canEditProject && (
+        canManageTasks && (
         <button onClick={() => setShowTaskForm(true)}
           style={{ background: "#007bff", color: "#fff", padding: "8px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
           + Create New Task
         </button>
         )
       ) : (
-        canEditProject && (
+        canManageTasks && (
         <div style={{ border: "1px solid #ddd", padding: 16, borderRadius: 10, background: "#f9f9f9", marginBottom: 14 }}>
           <h4 style={{ margin: "0 0 12px 0", color: "#111" }}>
             {editingTaskId ? "Edit Task" : "Create New Task"}
@@ -961,7 +962,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       {loadingTasks ? (
         <p style={{ color: "#888", fontSize: 13 }}>Loading tasks…</p>
       ) : tasks.length === 0 ? (
-        <p style={{ color: "#aaa", fontSize: 13 }}>{canEditProject ? "No tasks yet. Create one above." : "No tasks yet."}</p>
+        <p style={{ color: "#aaa", fontSize: 13 }}>{canManageTasks ? "No tasks yet. Create one above." : "No tasks yet."}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {tasks.map(task => (
@@ -980,7 +981,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                     {task.createdAt && <span style={{ color: "#aaa" }}>Created: {new Date(task.createdAt).toLocaleDateString()}</span>}
                   </div>
                 </div>
-                {canEditProject && (
+                {canManageTasks && (
                   <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
                     <button onClick={() => startEditTask(task)} disabled={savingTask} style={{ background: "#007bff", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Edit</button>
                     <button onClick={() => handleDeleteTask(task.id)} disabled={savingTask} style={{ background: "#dc3545", color: "#fff", padding: "5px 12px", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Delete</button>
