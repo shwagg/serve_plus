@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { db } from "../../firebaseConfig";
 import {
   collection, getDocs, addDoc, deleteDoc,
-  doc, serverTimestamp, orderBy, query, where, limit,
+  doc, serverTimestamp, orderBy, query,
 } from "firebase/firestore";
 import { showToast } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
@@ -24,16 +24,11 @@ export default function AnnouncementsManager() {
 
   const loadMissions = async () => {
     try {
-      const q = query(collection(db, "missions"), where("status", "==", "published"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
-      const published = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const withVolunteers = await Promise.all(
-        published.map(async (m) => {
-          const volSnap = await getDocs(query(collection(db, "missions", m.id, "volunteer"), limit(1)));
-          return volSnap.empty ? null : m;
-        })
-      );
-      setMissions(withVolunteers.filter(Boolean));
+      const snap = await getDocs(collection(db, "missions"));
+      const published = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((m) => m.status === "published");
+      setMissions(published);
     } catch (error) {
       console.error("Error loading missions:", error);
     }
@@ -72,7 +67,6 @@ export default function AnnouncementsManager() {
 
       // If it's an event-specific announcement, notify all participants (don't save to DB)
       if (form.type === "event") {
-        const selectedMission = missions.find(m => m.id === form.eventId);
         await notifyEventParticipants(form.eventId, {
           type: "event_announcement",
           title: form.title.trim(),
