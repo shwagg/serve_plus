@@ -272,11 +272,11 @@ service cloud.firestore {
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
         );
 
-      // PROPOSAL CREATOR - can update their own proposal only while it's still 'for_approval' (not yet reviewed)
+      // PROPOSAL CREATOR - can update their own proposal while awaiting first review or after being returned.
       allow update: if
         request.auth != null &&
         request.auth.uid == resource.data.createdBy &&
-        resource.data.status == 'for_approval';
+        resource.data.status in ['for_approval', 'rejected'];
 
       // FACULTY - can update approval chain fields (reviewedBy, recommendedBy) and nested approvals map
       allow update: if

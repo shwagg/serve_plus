@@ -1411,6 +1411,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             setLoading={setLoading}
             onClearDraft={clearDraft}
             proposalId={editProposal?.id}
+            isResubmission={editProposal?.status === 'rejected'}
           />
       )}
     </div>

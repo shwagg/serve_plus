@@ -124,7 +124,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const [savingEdit, setSavingEdit] = useState(false);
 
   const statusStr = (project?.status || "").toLowerCase();
-  const isApprovalStage = isForApproval(statusStr) || statusStr === "draft";
+  const isApprovalStage = isForApproval(statusStr) || statusStr === "draft" || statusStr === "rejected";
   const isPublishedOrDone = statusStr === "published" || statusStr === "completed";
 
   // Init edit data when project changes
@@ -337,14 +337,24 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     try {
       const name = userData?.name || userData?.email;
       await updateDoc(doc(db, "missions", project.id), {
-        status: "for_approval", rejectionReason: rejectText,
+        status: "rejected", rejectionReason: rejectText.trim(),
         rejectedBy: approvalLevel, rejectedAt: serverTimestamp(), rejectedByUser: name,
         reviewedBy: "", recommendedBy: "", endorsedBy: "", approvedBy: "",
         "approvals.reviewedBy": null, "approvals.recommendedBy": null,
         "approvals.endorsedBy": null, "approvals.approvedBy": null,
       });
-      logAudit({ action: "PROPOSAL_REJECTED", category: "proposal", actorName: name, details: { proposalId: project.id, proposalTitle: project.title || "", rejectionReason: rejectText, rejectedByRole: approvalLevel } });
-      setActionMsg("Returned to proposer. All approvals cleared.");
+      logAudit({ action: "PROPOSAL_REJECTED", category: "proposal", actorName: name, details: { proposalId: project.id, proposalTitle: project.title || "", rejectionReason: rejectText.trim(), rejectedByRole: approvalLevel } });
+      const notifData = {
+        type: "proposal_rejected",
+        title: "Proposal Returned for Revision",
+        message: `${name || "An approver"} returned your proposal "${project.title || "Untitled"}" for revision: ${rejectText.trim()}`,
+        link: "/student",
+        proposalId: project.id,
+      };
+      Promise.allSettled([
+        project.createdBy ? createNotification(project.createdBy, notifData) : Promise.resolve(),
+      ]).catch(() => {});
+      setActionMsg("Returned to proposer for revision. All approvals cleared.");
       if (onApprovalChange) onApprovalChange();
       setTimeout(onClose, 1500);
     } catch {
@@ -470,6 +480,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     : project.projectType || "Proposal";
 
   const statusLabel = isForApproval(project.status) ? "For Approval"
+    : statusStr === "rejected" ? "Returned for Revision"
     : project.status ? project.status.charAt(0).toUpperCase() + project.status.slice(1)
     : "Draft";
 

@@ -197,6 +197,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     const s = status.toLowerCase();
     if (s === "for_approval" || s === "for-approval") return "pending";
     if (s === "draft") return "draft";
+    if (s === "rejected") return "rejected";
     if (s === "pending") return "pending";
     if (s === "published") return "published";
     if (s === "completed") return "completed";
@@ -209,6 +210,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     if (s === "for_approval" || s === "for-approval") return "For Approval";
     if (s === "pending") return "For Approval";
     if (s === "draft") return "Ready for Publishing";
+    if (s === "rejected") return "Returned for Revision";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
@@ -236,6 +238,8 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
   // Only allow approval if previous steps are completed
   function canApproveSequential() {
     if (!approvalLevel || !proposal) return false;
+    const status = String(proposal.status || "").toLowerCase();
+    if (!["for_approval", "for-approval", "pending"].includes(status)) return false;
     const approverName = userData?.name || "";
     if (approvalLevel === "reviewedBy") {
       // Guard: only the designated Program Chair may approve
@@ -379,7 +383,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
       const proposalRef = doc(db, "missions", proposal.id);
       const rejectorName = userData.name || userData.email;
       const updateData = {
-        status: "for_approval",
+        status: "rejected",
         rejectionReason: rejectComments,
         rejectedBy: approvalLevel,
         rejectedAt: serverTimestamp(),
@@ -395,7 +399,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
         "approvals.endorsedBy": null,
         "approvals.approvedBy": null,
       };
-      setApprovalMessage("Proposal rejected. All approvals cleared and returned to For Approval for resubmission.");
+      setApprovalMessage("Proposal returned for revision. The proponent can edit and resubmit it.");
 
       await updateDoc(proposalRef, updateData);
 
@@ -408,23 +412,18 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
         onClose();
       }, 1500);
 
-      // Send notifications in background
-      const statusLabel = formatStatus(updateData.status);
+      // Send rejection notification to the proponent in background.
       const notifData = {
-        type: "proposal_status",
-        title: "Proposal Status Updated",
-        message: `"${proposal.title || "Untitled"}" is now ${statusLabel}.`,
-        link: "/global/review-proposals",
+        type: "proposal_rejected",
+        title: "Proposal Returned for Revision",
+        message: `${rejectorName || "An approver"} returned your proposal "${proposal.title || "Untitled"}" for revision: ${rejectComments.trim()}`,
+        link: "/student",
         proposalId: proposal.id,
       };
       Promise.allSettled([
         proposal.createdBy
-          ? createNotification(proposal.createdBy, {
-              ...notifData,
-              message: `Your proposal "${proposal.title || "Untitled"}" is now ${statusLabel}.`,
-            })
+          ? createNotification(proposal.createdBy, notifData)
           : Promise.resolve(),
-        notifyUsersByRoles(["admin", "faculty"], notifData),
       ]).catch((err) => console.error("Error sending proposal status notifications:", err));
     } catch (error) {
       console.error("Error rejecting proposal:", error);

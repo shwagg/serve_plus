@@ -40,7 +40,7 @@ export default function NotificationBell() {
     const role = userData?.role;
 
     if (role === "student") {
-      return "/student/home";
+      return "/student";
     }
 
     if (role === "admin") {
@@ -160,7 +160,7 @@ export default function NotificationBell() {
     }
     
     // Proposal notifications - navigate to review proposals page
-    if (notification.type === "proposal_submitted" || notification.type === "proposal_status") {
+    if (notification.type === "proposal_submitted" || notification.type === "proposal_status" || notification.type === "proposal_rejected") {
       navigate(getProposalNotificationPath(notification), {
         state: {
           activeTab: userData?.role === "student" ? "proposals" : undefined,
@@ -335,6 +335,7 @@ export default function NotificationBell() {
       case "reflection_needs_revision": return "📝";
       case "proposal_submitted": return "📨";
       case "proposal_status":    return "📌";
+      case "proposal_rejected":  return "📝";
       case "deadline_approaching": return "⚠️";
       case "certificate_ready":  return "📜";
       case "certificate_obtained": return "📜";

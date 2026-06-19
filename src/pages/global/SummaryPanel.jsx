@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
 import { showToast } from '../../utils/toast';
@@ -39,6 +39,7 @@ function SummaryPanel({
   setLoading,
   onClearDraft,
   proposalId,
+  isResubmission = false,
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
 
@@ -110,6 +111,28 @@ function SummaryPanel({
           affiliatedDepartment: formData.affiliatedDepartment || '',
           partnerSchool: formData.partnerSchool || '',
           participantLimit: formData.participantLimit ? Math.min(Number(formData.participantLimit), 50) : null,
+          ...(isResubmission ? {
+            status: 'for_approval',
+            submittedForApprovalAt: now,
+            submittedBy: user.uid,
+            reviewedBy: '',
+            recommendedBy: '',
+            endorsedBy: '',
+            approvedBy: '',
+            lastApprovedAt: deleteField(),
+            lastApprovedBy: deleteField(),
+            rejectionReason: deleteField(),
+            rejectedBy: deleteField(),
+            rejectedAt: deleteField(),
+            rejectedByUser: deleteField(),
+            'approvals.reviewedBy': null,
+            'approvals.recommendedBy': null,
+            'approvals.endorsedBy': null,
+            'approvals.approvedBy': null,
+            'approvals.submitted.approved': true,
+            'approvals.submitted.decidedAt': now,
+            'approvals.submitted.name': formData.proponents?.[0] || formData.preparedBy || user.email || '',
+          } : {}),
         };
         if (projectType === 'service-learning') {
           updateData.slFields = {
@@ -128,11 +151,31 @@ function SummaryPanel({
         }
         await updateDoc(doc(db, 'missions', proposalId), updateData);
         logAudit({
-          action: "PROPOSAL_UPDATED",
+          action: isResubmission ? "PROPOSAL_RESUBMITTED" : "PROPOSAL_UPDATED",
           category: "proposal",
           details: { proposalId, proposalTitle: formData.title || "" },
         });
-        showToast('Proposal updated successfully!');
+        if (isResubmission) {
+          try {
+            await createNotification(user.uid, {
+              type: 'proposal_submitted',
+              title: 'Proposal Resubmitted',
+              message: `Your proposal "${formData.title}" was resubmitted for approval.`,
+              link: '/student',
+              proposalId,
+            });
+            await notifyUsersByRoles(['admin', 'faculty'], {
+              type: 'proposal_submitted',
+              title: 'Proposal Resubmitted',
+              message: `"${formData.title}" was resubmitted for approval.`,
+              link: '/global/review-proposals',
+              proposalId,
+            });
+          } catch (notificationError) {
+            console.error('Error creating proposal resubmission notifications:', notificationError);
+          }
+        }
+        showToast(isResubmission ? 'Proposal resubmitted successfully!' : 'Proposal updated successfully!');
         onClearDraft?.();
         onClose();
         return;

@@ -64,11 +64,16 @@ export default function ReviewProposal() {
     if (s === "for_approval" || s === "for-approval") return "For Approval";
     if (s === "pending") return "Pending";
     if (s === "draft") return "Ready for Publishing";
+    if (s === "rejected") return "Returned for Revision";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   // Helper: context-aware status label for each row
   function getContextStatusLabel(proposal) {
+    const status = (proposal.status || "").toLowerCase();
+    const activeApprovalStatuses = new Set(["for_approval", "for-approval", "pending"]);
+    if (!activeApprovalStatuses.has(status)) return formatStatus(proposal.status);
+
     // Determine which step this user is on
     if (userApprovalField === "reviewedBy") {
       if (!proposal.reviewedBy) return "For Approval";
@@ -98,34 +103,36 @@ export default function ReviewProposal() {
     } else if (userApprovalField) {
       data = data.filter(p => {
         const status = (p.status || "").toLowerCase();
+        const activeApprovalStatuses = new Set(["for_approval", "for-approval", "pending"]);
         // Always show drafts and published in overall/draft/published filters for all roles
         if (statusFilter === "overall" || statusFilter === "draft" || statusFilter === "published") {
           if (status === "draft" || status === "published") return true;
         }
+        if (!activeApprovalStatuses.has(status)) return false;
         if (userApprovalField === "reviewedBy") {
           // Only show proposals designated for this specific Program Chair
           const userName = userData?.name || "";
           const isDesignated = !p.selectedReviewedBy || p.selectedReviewedBy === userName;
-          const isForApproval = isDesignated && !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy && (!status || (status !== "published" && status !== "completed"));
-          const isPending = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
+          const isForApproval = isDesignated && !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy;
+          const isPending = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "";
           return isForApproval || isPending;
         }
         if (userApprovalField === "recommendedBy") {
           // Only show proposals designated for this specific College Dean
           const userName = userData?.name || "";
           const isDesignated = !p.selectedRecommendedBy || p.selectedRecommendedBy === userName;
-          const isForApproval = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
-          const isPending = isDesignated && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
+          const isForApproval = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "");
+          const isPending = isDesignated && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "";
           return isForApproval || isPending;
         }
         if (userApprovalField === "endorsedBy") {
           // Show if not published/completed and this user is/was the endorser
-          const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
-          const isPending = typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!status || (status !== "published" && status !== "completed"));
+          const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "");
+          const isPending = typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "";
           return isForApproval || isPending;
         }
         if (userApprovalField === "approvedBy") {
-          return typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!p.approvedBy || p.approvedBy.trim() === "") && (!status || (status !== "published" && status !== "completed"));
+          return typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "" && typeof p.endorsedBy === "string" && p.endorsedBy.trim() !== "" && (!p.approvedBy || p.approvedBy.trim() === "");
         }
         return false;
       });
@@ -152,6 +159,7 @@ export default function ReviewProposal() {
     const s = status.toLowerCase();
     if (s === "for_approval" || s === "for-approval") return "pending";
     if (s === "draft") return "draft";
+    if (s === "rejected") return "rejected";
     if (s === "pending") return "pending";
     if (s === "published") return "published";
     if (s === "completed") return "completed";

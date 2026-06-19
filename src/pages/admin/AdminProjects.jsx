@@ -178,6 +178,7 @@ export default function AdminProjects() {
     const s = status.toLowerCase();
     if (isForApproval(s)) return "pending";
     if (s === "draft") return "draft";
+    if (s === "rejected") return "rejected";
     if (s === "published") return "published";
     if (s === "completed") return "completed";
     if (s === "archived") return "archived";
@@ -187,6 +188,7 @@ export default function AdminProjects() {
   function formatStatus(status = "") {
     if (!status) return "Ready for Publishing";
     if (status.toLowerCase() === "draft") return "Ready for Publishing";
+    if (status.toLowerCase() === "rejected") return "Returned for Revision";
     if (isForApproval(status)) return "Pending";
     if (status.toLowerCase() === "published") return "Active · Open";
     if (status.toLowerCase() === "archived") return "Archived";

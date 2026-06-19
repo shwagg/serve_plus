@@ -232,7 +232,7 @@ export default function Header() {
 
     setIsCheckingPendingProposal(true);
     try {
-      const blockedStatuses = new Set(['for_approval', 'for-approval', 'pending']);
+      const blockedStatuses = new Set(['for_approval', 'for-approval', 'pending', 'rejected']);
       const missionsQuery = query(collection(db, 'missions'), where('createdBy', '==', user.uid));
       const missionsSnap = await getDocs(missionsQuery);
       const hasPendingProposal = missionsSnap.docs.some((docSnap) => {
@@ -241,7 +241,7 @@ export default function Header() {
       });
 
       if (hasPendingProposal) {
-        showToast('You cannot propose an activity if you have a pending proposal.', 'error');
+        showToast('You cannot propose an activity while you have a pending or returned proposal. Please edit and resubmit the existing one.', 'error');
         return;
       }
 

@@ -421,7 +421,7 @@ const StudentHome = () => {
 
   const getProposalStatusLine = (proposal) => {
     const { reviewedBy, recommendedBy, endorsedBy, approvedBy, status, rejectedBy, rejectedByUser } = proposal;
-    if (rejectedBy && status === 'for_approval' && !reviewedBy) {
+    if (rejectedBy && status === 'rejected' && !reviewedBy) {
       return `Returned for revision${rejectedByUser ? ` by ${rejectedByUser}` : ''}`;
     }
     if (approvedBy && recommendedBy && endorsedBy && reviewedBy) {
@@ -796,7 +796,7 @@ const StudentHome = () => {
                   const statusLabels = {
                     for_approval: { label: 'For Approval', color: '#d97706' },
                     draft: { label: 'For Publishing', color: '#64748b' },
-                    rejected: { label: 'Rejected', color: '#dc2626' },
+                    rejected: { label: 'Returned for Revision', color: '#dc2626' },
                     approved: { label: 'Approved', color: '#16a34a' },
                   };
                   const statusInfo = statusLabels[proposal.status] || { label: proposal.status, color: '#64748b' };
@@ -964,7 +964,7 @@ const StudentHome = () => {
         onClick={(e) => { if (e.target === e.currentTarget) setSelectedProposalForView(null); }}
       >
         <div className="student-modal student-proposal-modal">
-          {selectedProposalForView.status === 'for_approval' ? (
+          {selectedProposalForView.status === 'for_approval' || selectedProposalForView.status === 'rejected' ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#000' }}>

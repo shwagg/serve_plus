@@ -194,6 +194,7 @@
 .status-badge.draft     { background: #f1f5f9; color: #475569; }
 .status-badge.pending   { background: #fef3c7; color: #92400e; }
 .status-badge.for-approval { background: #fef3c7; color: #92400e; }
+.status-badge.rejected  { background: #fee2e2; color: #991b1b; }
 .status-badge.published {
   background: #e6f4ea;
   color: #137333;

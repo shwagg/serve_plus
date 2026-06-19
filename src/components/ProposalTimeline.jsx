@@ -27,7 +27,7 @@ export default function ProposalTimeline({ proposal, compact = false }) {
     } catch { return null; }
   };
 
-  const isRejected = rejectedBy && status === "for_approval" && !reviewedBy;
+  const isRejected = rejectedBy && status === "rejected";
   const isAllDone = reviewedBy && recommendedBy && endorsedBy && approvedBy;
 
   const badgeLabel = isRejected ? "Returned" : isAllDone ? "Completed" : "In Progress";
@@ -143,7 +143,7 @@ export default function ProposalTimeline({ proposal, compact = false }) {
       {/* Rejection notice */}
       {isRejected && rejectionReason && (
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", marginBottom: 14, fontSize: "0.8rem", color: "#991b1b" }}>
-          <strong>Returned:</strong> {rejectionReason}
+          <strong>Returned{rejectedByUser ? ` by ${rejectedByUser}` : ""}:</strong> {rejectionReason}
         </div>
       )}
 
