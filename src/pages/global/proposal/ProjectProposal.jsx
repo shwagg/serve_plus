@@ -254,7 +254,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     "E.T. Yuchengco College of Business (ETYCB)",
     "Mapua-Laguna Institute of Aviation (MIA)",
     "Mapua Institute of Technology at Laguna (MITL)",
-    "Mapua MCL Senior High School (SHS)"
   ];
   const [partnerSchools, setPartnerSchools] = useState([]);
   const [facultyList, setFacultyList] = useState([]);

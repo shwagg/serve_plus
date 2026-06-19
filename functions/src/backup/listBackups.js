@@ -26,24 +26,26 @@ const listBackups = async (request) => {
     .orderBy("createdAt", "desc")
     .get();
 
-  const backups = snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      backupId: data.backupId,
-      label: data.label,
-      createdAt: data.createdAt?.toDate?.()
-        ? data.createdAt.toDate().toISOString()
-        : null,
-      createdByEmail: data.createdByEmail || data.createdBy,
-      collections: data.collections,
-      totalDocuments: data.totalDocuments,
-      sizeInBytes: data.sizeInBytes,
-      status: data.status,
-      lastRestoredAt: data.lastRestoredAt?.toDate?.()
-        ? data.lastRestoredAt.toDate().toISOString()
-        : null,
-    };
-  });
+  const backups = snapshot.docs
+    .filter((doc) => doc.data()?.status === "completed")
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        backupId: data.backupId,
+        label: data.label,
+        createdAt: data.createdAt?.toDate?.()
+          ? data.createdAt.toDate().toISOString()
+          : null,
+        createdByEmail: data.createdByEmail || data.createdBy,
+        collections: data.collections,
+        totalDocuments: data.totalDocuments,
+        sizeInBytes: data.sizeInBytes,
+        status: data.status,
+        lastRestoredAt: data.lastRestoredAt?.toDate?.()
+          ? data.lastRestoredAt.toDate().toISOString()
+          : null,
+      };
+    });
 
   return { success: true, backups };
 };

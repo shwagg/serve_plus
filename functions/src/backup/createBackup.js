@@ -55,6 +55,7 @@ const createBackup = async (request) => {
       totalDocuments: result.totalDocuments,
       sizeInBytes: result.sizeInBytes,
       totalStorageFiles: result.totalStorageFiles,
+      prunedBackups: result.prunedBackups,
       message: `Backup created successfully with ${result.totalDocuments} documents, ${result.totalAuthUsers} auth users, and ${result.totalStorageFiles} storage files.`,
     };
   } catch (err) {
