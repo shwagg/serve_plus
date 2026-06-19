@@ -10,6 +10,16 @@ import "../styles/ui.css";
 import { isAllowedEmailDomain, normalizeEmail } from "../utils/emailPolicy";
 
 const isEmulator = import.meta.env.VITE_USE_EMULATORS === "true";
+const NAME_REGEX = /^[A-Za-z]+(?:[ '-][A-Za-z]+)*$/;
+const MIDDLE_INITIAL_REGEX = /^[A-Za-z]$/;
+const USERNAME_REGEX = /^(?=.*[a-z0-9])[a-z0-9._]{3,20}$/;
+
+function capitalizeName(value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
 
 function getRegistrationErrorMessage(err) {
     if (err?.code === "auth/invalid-sender") {
@@ -17,6 +27,44 @@ function getRegistrationErrorMessage(err) {
     }
 
     return err?.message || "Registration failed. Please try again.";
+}
+
+function validateRegistrationFields({ firstName, middleInitial, lastName, username }) {
+    const trimmedFirstName = firstName.trim();
+    const trimmedMiddleInitial = middleInitial.trim();
+    const trimmedLastName = lastName.trim();
+    const normalizedUsername = username.trim().toLowerCase();
+
+    if (!NAME_REGEX.test(trimmedFirstName)) {
+        return {
+            message: "First name can only contain letters, spaces, apostrophes, or hyphens.",
+        };
+    }
+
+    if (!NAME_REGEX.test(trimmedLastName)) {
+        return {
+            message: "Last name can only contain letters, spaces, apostrophes, or hyphens.",
+        };
+    }
+
+    if (trimmedMiddleInitial && !MIDDLE_INITIAL_REGEX.test(trimmedMiddleInitial)) {
+        return {
+            message: "Middle initial must be a single letter.",
+        };
+    }
+
+    if (!USERNAME_REGEX.test(normalizedUsername)) {
+        return {
+            message: "Username must be 3-20 characters and can only contain letters, numbers, . or _.",
+        };
+    }
+
+    return {
+        normalizedFirstName: capitalizeName(trimmedFirstName),
+        normalizedMiddleInitial: trimmedMiddleInitial.toUpperCase(),
+        normalizedLastName: capitalizeName(trimmedLastName),
+        normalizedUsername,
+    };
 }
 
 function Register() {
@@ -36,8 +84,9 @@ function Register() {
     const navigate = useNavigate();
 
     const handleUsernameBlur = async () => {
-        const input = username.trim();
+        const input = username.trim().toLowerCase();
         if (!input) { setUsernameStatus(null); return; }
+        if (!USERNAME_REGEX.test(input)) { setUsernameStatus(null); return; }
         setUsernameStatus("checking");
         try {
             const snap = await getDocs(query(collection(db, "users"), where("username", "==", input)));
@@ -51,6 +100,19 @@ function Register() {
         e.preventDefault();
         setError("");
         setLoading(true);
+
+        const fieldValidation = validateRegistrationFields({
+            firstName,
+            middleInitial,
+            lastName,
+            username,
+        });
+
+        if (fieldValidation.message) {
+            setError(fieldValidation.message);
+            setLoading(false);
+            return;
+        }
 
         if (password !== confirmPassword) {
             setConfirmPasswordError("Passwords do not match.");
@@ -79,7 +141,7 @@ function Register() {
 
         try {
             // Check username uniqueness
-            const usernameSnap = await getDocs(query(collection(db, "users"), where("username", "==", username.trim())));
+            const usernameSnap = await getDocs(query(collection(db, "users"), where("username", "==", fieldValidation.normalizedUsername)));
             if (!usernameSnap.empty) {
                 setError("Username is already taken. Please choose another.");
                 setLoading(false);
@@ -150,14 +212,18 @@ function Register() {
                 });
             }
 
-            const fullName = [firstName.trim(), middleInitial.trim() ? middleInitial.trim().toUpperCase() : null, lastName.trim()]
+            const fullName = [
+                fieldValidation.normalizedFirstName,
+                fieldValidation.normalizedMiddleInitial ? fieldValidation.normalizedMiddleInitial.toUpperCase() : null,
+                fieldValidation.normalizedLastName,
+            ]
                 .filter(Boolean).join(" ");
 
             createdUserDocRef = doc(db, "users", uid);
             await setDoc(createdUserDocRef, {
                 uid,
                 name: fullName,
-                username,
+                username: fieldValidation.normalizedUsername,
                 email: normalizedEmail,
                 emailVerified: isEmulator,
                 emailVerificationPending: !isEmulator,
@@ -203,7 +269,9 @@ function Register() {
 
                 try {
                     await signOut(auth);
-                } catch (_) {}
+                } catch {
+                    // Sign-out cleanup is best effort after a failed registration.
+                }
             }
 
             setError(getRegistrationErrorMessage(err));
@@ -235,14 +303,18 @@ function Register() {
                                 className="ui-input"
                                 type="text"
                                 placeholder="First Name"
+                                value={firstName}
                                 onChange={(e) => setFirstName(e.target.value)}
+                                onBlur={() => setFirstName(capitalizeName(firstName))}
                                 required
                             />
                             <input
                                 className="ui-input"
                                 type="text"
                                 placeholder="Last Name"
+                                value={lastName}
                                 onChange={(e) => setLastName(e.target.value)}
+                                onBlur={() => setLastName(capitalizeName(lastName))}
                                 required
                             />
                             <input
@@ -250,7 +322,9 @@ function Register() {
                                 type="text"
                                 placeholder="M.I."
                                 maxLength={1}
+                                value={middleInitial}
                                 onChange={(e) => setMiddleInitial(e.target.value)}
+                                onBlur={() => setMiddleInitial(middleInitial.trim().toUpperCase())}
                             />
                         </div>
 
@@ -261,6 +335,8 @@ function Register() {
                                     className="ui-input-bare"
                                     type="text"
                                     placeholder="Username"
+                                    value={username}
+                                    maxLength={20}
                                     onChange={(e) => { setUsername(e.target.value); setUsernameStatus(null); }}
                                     onBlur={handleUsernameBlur}
                                     required
