@@ -47,16 +47,13 @@ export default function BadgeEarnedModal({ badgeQueue = [], onDismiss }) {
         style={{ position: "relative" }}
       >
         {/* X close button */}
-        <button
-          onClick={handleClose}
-          aria-label="Close"
-          style={{
-            position: "absolute", top: 14, right: 16,
-            background: "none", border: "none", cursor: "pointer",
-            fontSize: 20, color: "#94a3b8", lineHeight: 1, padding: 4,
-            zIndex: 2,
-          }}
-        >✕</button>
+        <div className="badge-earned-close-wrap">
+          <button
+            className="badge-earned-close-btn"
+            onClick={handleClose}
+            aria-label="Close"
+          >✕</button>
+        </div>
 
         <div className="badge-earned-icon-wrap">
           <BadgeIcon badgeId={definition.id} earned size="lg" />

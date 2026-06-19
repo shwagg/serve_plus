@@ -140,7 +140,7 @@ export default function ToastContainer() {
             ...sharedStyle,
             ...itemSizing,
             color: '#1a1a1a',
-            padding: isMobile ? '14px 44px 14px 16px' : '12px 16px',
+            padding: isMobile ? '14px 16px' : '12px 16px',
             position: 'relative',
             transform: t.visible ? 'translateY(0)' : 'translateY(20px)',
             opacity: t.visible ? 1 : 0,
@@ -148,8 +148,8 @@ export default function ToastContainer() {
             whiteSpace: 'normal',
           }}
         >
-          <div style={{ display: isMobile ? 'block' : 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            <div style={{ display: 'block', flex: 1, minWidth: 0, overflowWrap: 'break-word', wordBreak: 'normal' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flexWrap: 'wrap' }}>
+            <div style={{ display: 'block', flex: '1 1 auto', minWidth: 0, overflowWrap: 'break-word', wordBreak: 'normal' }}>
               <span style={{ display: 'block', lineHeight: 1.4, fontWeight: t.subtitle ? 600 : 400 }}>{t.message}</span>
               {t.subtitle && <span style={{ display: 'block', lineHeight: 1.4, fontSize: 13, color: '#555', marginTop: 1 }}>{t.subtitle}</span>}
             </div>
@@ -158,20 +158,17 @@ export default function ToastContainer() {
               onMouseEnter={(e) => e.currentTarget.style.color = '#30bdb7'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#888'}
               style={{
-                position: isMobile ? 'absolute' : 'static',
-                top: isMobile ? '50%' : 'auto',
-                right: isMobile ? 14 : 'auto',
-                transform: isMobile ? 'translateY(-50%)' : 'none',
                 background: 'transparent',
                 border: 'none',
                 color: '#888',
                 fontSize: isMobile ? 18 : 20,
                 fontWeight: 400,
                 cursor: 'pointer',
-                padding: isMobile ? 4 : 0,
+                padding: 4,
                 lineHeight: 1,
                 transition: 'color 0.2s',
                 flexShrink: 0,
+                marginLeft: 'auto',
               }}
               aria-label="Dismiss notification"
             >

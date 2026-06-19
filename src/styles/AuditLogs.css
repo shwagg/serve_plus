@@ -19,7 +19,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 2rem 2rem 1.25rem;
+  padding: 0 0 1.25rem;
   border-bottom: 1px solid #f1f5f9;
 }
 
@@ -39,10 +39,19 @@
 /* ── Main tabs ───────────────────────────────────────────────── */
 .audit-main-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
-  border-bottom: 2px solid #f1f5f9;
-  padding: 0 1.5rem;
+  padding: 0 0;
   background: #f8fafc;
+  overflow-x: auto;
+  overflow-y: visible;
+  flex-shrink: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.audit-main-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .audit-main-tab {
@@ -60,6 +69,7 @@
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .audit-main-tab:hover {
@@ -81,7 +91,7 @@
 .audit-sub-tabs {
   display: flex;
   gap: 0.5rem;
-  padding: 1rem 2rem 0;
+  padding: 1rem 0 0;
 }
 
 .audit-sub-tab {
@@ -110,7 +120,7 @@
 
 /* ── Tab content wrapper ─────────────────────────────────────── */
 .audit-tab-content {
-  padding: 1.25rem 2rem 2rem;
+  padding: 1.25rem 0 2rem;
 }
 
 /* ── Filters row ─────────────────────────────────────────────── */
@@ -458,12 +468,13 @@
   }
 
   .audit-main-tabs {
-    padding: 0 1rem;
+    padding: 0 0.75rem;
   }
 
   .audit-main-tab {
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
+    padding: 0.75rem 0.875rem;
+    font-size: 0.82rem;
+    flex-shrink: 0;
   }
 
   .audit-sub-tabs {

@@ -32,7 +32,7 @@
 }
 .admin-main{ /* contains outlet pages */
   width: calc(100% - var(--sidebar-width));
-  padding: 12px 32px;
+  padding: 20px 32px;
   overflow-x: hidden;
   margin-top: calc(var(--header-height) + var(--context-height));
   margin-left: var(--sidebar-width);
@@ -319,9 +319,10 @@
 /* CSS Design for every pages in Outlet under Admin*/
 .page-title{
   max-width: 1200px;
-  color: #000;
-  font-size: 26px;
-  font-weight: 600;
+  color: #1e293b;
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 10px 0 24px;
 }
 
 
@@ -577,7 +578,7 @@
 
   /* Slightly smaller page title on phone */
   .page-title {
-    font-size: 20px;
+    font-size: 1.2rem;
   }
 
   /* Two-column event grid → single column on phone */

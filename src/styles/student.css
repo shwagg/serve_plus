@@ -479,10 +479,10 @@
 }
 .current-section-title {
   font-family: 'Inter', Helvetica, Arial, sans-serif;
-  font-size: 38px;
+  font-size: 1.4rem;
   font-weight: 800;
   letter-spacing: -0.3px;
-  color: #111827;
+  color: #1e293b;
   text-transform: none;
   margin: 0;
   line-height: 1.1;
@@ -677,10 +677,10 @@
 }
 .mission-section-title {
   font-family: 'Inter', Helvetica, Arial, sans-serif;
-  font-size: 28px;
+  font-size: 1.4rem;
   font-weight: 800;
   letter-spacing: -0.3px;
-  color: #111827;
+  color: #1e293b;
   text-transform: none;
   margin: 0;
   line-height: 1.1;
@@ -1276,10 +1276,10 @@
 }
 .leaderboard-compact-title {
   font-family: 'Inter', Helvetica, Arial, sans-serif;
-  font-size: 28px;
+  font-size: 1.4rem;
   font-weight: 800;
   letter-spacing: -0.3px;
-  color: #111827;
+  color: #1e293b;
   margin: 0;
   text-transform: none;
   line-height: 1.1;
@@ -2508,7 +2508,7 @@
   .current-section-title,
   .leaderboard-compact-title,
   .mission-section-title {
-    font-size: 24px;
+    font-size: 1.2rem;
   }
   .current-section-desc,
   .leaderboard-rank-text {
