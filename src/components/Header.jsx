@@ -411,7 +411,7 @@ export default function Header() {
           <HelpOutlineRoundedIcon style={{ fontSize: 22, color: '#6b7280' }} />
         </button>
       )}
-      {userRole !== 'admin' && announcementsEnabled && (
+      {userRole !== 'admin' && userRole !== 'partner' && userRole !== 'sysadmin' && announcementsEnabled && (
         <>
           <GlobalNotificationButton
             unreadCount={announcementUnreadCount}
