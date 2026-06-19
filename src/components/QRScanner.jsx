@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import jsQR from "jsqr";
 import { showToast } from "../utils/toast";
 import "./QRScanner.css";
 
@@ -79,37 +78,31 @@ export default function QRScanner({ onScan, statusOverride }) {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new window.Image();
-      img.onload = async () => {
-        const c = document.createElement("canvas");
-        c.width = img.width; c.height = img.height;
-        const cx = c.getContext("2d");
-        cx.drawImage(img, 0, 0, img.width, img.height);
-        const id   = cx.getImageData(0, 0, img.width, img.height);
-        const code = jsQR(id.data, img.width, img.height);
-        if (code?.data) {
-          let position = null;
-          try {
-            position = await new Promise((resolve) => {
-              if (!navigator.geolocation) return resolve(null);
-              const t = setTimeout(() => resolve(null), 5000);
-              navigator.geolocation.getCurrentPosition(
-                (p) => { clearTimeout(t); resolve(p); },
-                ()  => { clearTimeout(t); resolve(null); },
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-              );
-            });
-          } catch { position = null; }
-          if (onScan) onScan(code.data, position);
-        } else {
-          showToast("No QR code found in image.");
-        }
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    // Reset so the same file can be re-selected after a failed scan
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    try {
+      // Html5Qrcode.scanFile is more robust than manual canvas+jsQR for file uploads
+      const tempScanner = new Html5Qrcode("qr-reader-region");
+      const decodedText = await tempScanner.scanFile(file, /* showImage= */ false);
+
+      let position = null;
+      try {
+        position = await new Promise((resolve) => {
+          if (!navigator.geolocation) return resolve(null);
+          const t = setTimeout(() => resolve(null), 5000);
+          navigator.geolocation.getCurrentPosition(
+            (p) => { clearTimeout(t); resolve(p); },
+            ()  => { clearTimeout(t); resolve(null); },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+          );
+        });
+      } catch { position = null; }
+
+      if (onScan) onScan(decodedText, position);
+    } catch {
+      showToast("No QR code found in image.");
+    }
   };
 
   const statusLabel = {

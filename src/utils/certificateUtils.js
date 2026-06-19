@@ -26,16 +26,17 @@ export async function buildCertificateBlob({ recipient, course, date, loc, day, 
   form.getTextField("text_10gqgh").setText(certId || "");
   form.flatten();
 
-  const qrValue = JSON.stringify({ recipient, course, date, loc, day, month, year, certificateId: certId });
+  // Encode only the certificateId — shorter data = simpler QR = larger modules = easier to scan
+  const qrValue = certId;
   const qrDataUrl = await QRCode.toDataURL(qrValue, {
-    margin: 1,
-    width: 120,
-    color: { dark: "#000", light: "#0000" },
+    margin: 2,
+    width: 200,
+    color: { dark: "#000000", light: "#ffffff" },
   });
   const pngImageBytes = await fetch(qrDataUrl).then((r) => r.arrayBuffer());
   const pngImage = await pdfDoc.embedPng(pngImageBytes);
   const page = pdfDoc.getPages()[0];
-  page.drawImage(pngImage, { x: 382, y: 55, width: 90, height: 90 });
+  page.drawImage(pngImage, { x: 378, y: 50, width: 100, height: 100 });
 
   const pdfBytes = await pdfDoc.save();
   return new Blob([pdfBytes], { type: "application/pdf" });
