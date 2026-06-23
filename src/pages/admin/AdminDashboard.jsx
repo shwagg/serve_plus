@@ -411,7 +411,7 @@ export default function AdminDashboard() {
     { key: "preSurvey",  label: "Pre-Survey",   color: G.teal,   desc: "Volunteer completed the pre-activity survey before the event."      },
     { key: "consent",    label: "Consent Form",  color: G.yellow, desc: "Volunteer uploaded and submitted their signed consent form."        },
     { key: "attendance", label: "Attendance",    color: G.orange, desc: "Volunteer was marked present via QR scan or manual entry."          },
-    { key: "postSurvey", label: "Post-Survey",   color: G.pink,   desc: "Volunteer completed the post-activity reflection survey."           },
+    { key: "postSurvey", label: "Post-Survey",   color: G.pink,   desc: "Volunteer completed the post-activity survey."                      },
   ];
 
   const PART_STATUSES = [

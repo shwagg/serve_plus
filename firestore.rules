@@ -100,6 +100,10 @@ service cloud.firestore {
             "proposal_rejected",
             "reflection_approved",
             "reflection_needs_revision",
+            "photo_submitted",
+            "photo_approved",
+            "photo_rejected",
+            "photo_overdue",
             "badge_earned",
             "accomplishment_report_submitted",
             "accomplishment_report_status"

@@ -76,7 +76,7 @@ const STEPS = [
     features: [
       "Pre-activity survey and consent form",
       "Attendance QR scan at the venue",
-      "Task journal and post-survey",
+      "Task photo proof and post-survey",
     ],
   },
   {

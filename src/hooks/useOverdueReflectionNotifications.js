@@ -7,8 +7,8 @@ export function useOverdueReflectionNotifications() {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) return;
 
-      // Check when the last reflection check was performed
-      const lastCheck = localStorage.getItem(`lastReflectionCheck_${user.uid}`);
+      // Check when the last task proof check was performed
+      const lastCheck = localStorage.getItem(`lastTaskProofCheck_${user.uid}`);
       const now = Date.now();
 
       // Only check once per day (86400000 ms = 24 hours)
@@ -20,7 +20,7 @@ export function useOverdueReflectionNotifications() {
       await checkOverdueReflections(user.uid);
 
       // Update last check time
-      localStorage.setItem(`lastReflectionCheck_${user.uid}`, now.toString());
+      localStorage.setItem(`lastTaskProofCheck_${user.uid}`, now.toString());
     });
 
     return () => unsubscribe();

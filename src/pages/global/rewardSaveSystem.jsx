@@ -71,7 +71,7 @@ export const releaseVolunteerPoints = async (missionId, volunteerId) => {
 
     const roleRatingPoints = breakdown.finalPoints;
 
-    // Sum approved task-journal points for this volunteer
+    // Sum approved task proof points for this volunteer
     const tasksSnap = await getDocs(collection(db, "missions", missionId, "task"));
     let approvedTaskPoints = 0;
     for (const taskDoc of tasksSnap.docs) {

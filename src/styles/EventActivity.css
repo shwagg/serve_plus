@@ -660,6 +660,27 @@
   font-size: 13px;
   line-height: 1.6;
 }
+.task-photo-proof-link {
+  display: block;
+  width: fit-content;
+}
+
+.task-photo-proof-img {
+  width: 160px;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.task-photo-file-name {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 
 .journal-card-actions {
   display: flex;
@@ -689,6 +710,12 @@
   flex: 1;
   font-size: 11px;
   margin: 0;
+}
+.task-photo-capture-note {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
 }
 .journal-submit-compact {
   width: auto;

@@ -1,5 +1,5 @@
 
-import { collection, doc, getDoc, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, updateDoc, serverTimestamp, query, where } from "firebase/firestore";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -7,6 +7,18 @@ import { db } from "../../firebaseConfig";
 import { createNotification } from "../../utils/notificationUtils";
 import { logAudit } from "../../utils/auditLogger";
 import ImpactMetrics from "./ImpactMetrics";
+
+function hasTaskPhoto(data = {}) {
+  return !!data?.taskPhoto?.url;
+}
+
+function hasLegacyReflection(data = {}) {
+  return !data?.legacyReflectionArchived && String(data?.reflection || "").trim().length > 0;
+}
+
+function hasTaskProof(data = {}) {
+  return hasTaskPhoto(data) || hasLegacyReflection(data);
+}
 
 export default function CurrentEventMonitoring() {
   // Support both missionId (partner route) and eventId (admin route)
@@ -217,16 +229,14 @@ export default function CurrentEventMonitoring() {
     );
   };
 
-  const reflectionItems = taskParticipants.filter(
-    (participant) => participant.reflection && participant.reflection.trim()
-  );
+  const proofItems = taskParticipants.filter((participant) => hasTaskProof(participant));
 
   const taskTitleById = tasks.reduce((acc, task) => {
     acc[task.id] = task.title || "Task";
     return acc;
   }, {});
 
-  const handleReflectionReview = async (participant, action) => {
+  const handleProofReview = async (participant, action) => {
     const participantRef = doc(
       db,
       "missions",
@@ -237,29 +247,45 @@ export default function CurrentEventMonitoring() {
       participant.id
     );
 
-    const newStatus = action === "approve" ? "approved" : "needs_revision";
+    const newStatus = action === "approve" ? "approved" : "rejected";
+    const approvalData = {
+      adminApprovalStatus: newStatus,
+      adminReviewedAt: serverTimestamp(),
+    };
+    let notificationTargets = [participant.id];
 
-    await updateDoc(participantRef, {
-      reflectionStatus: newStatus,
-      reflectionReviewedAt: serverTimestamp(),
-    });
+    if (participant.groupId) {
+      await updateDoc(
+        doc(db, "missions", missionId, "task", participant.taskId, "group", participant.groupId),
+        approvalData,
+      );
+      const membersSnap = await getDocs(query(
+        collection(db, "missions", missionId, "task", participant.taskId, "participants"),
+        where("groupId", "==", participant.groupId),
+      ));
+      notificationTargets = membersSnap.docs.map((memberDoc) => memberDoc.id);
+      await Promise.all(membersSnap.docs.map((memberDoc) => updateDoc(memberDoc.ref, approvalData)));
+    } else {
+      await updateDoc(participantRef, approvalData);
+    }
 
-    await createNotification(participant.id, {
-      type: newStatus === "approved" ? "reflection_approved" : "reflection_needs_revision",
-      title: newStatus === "approved" ? "Reflection Approved" : "Reflection Needs Revision",
+    await Promise.allSettled(notificationTargets.map((targetId) => createNotification(targetId, {
+      type: newStatus === "approved" ? "photo_approved" : "photo_rejected",
+      title: newStatus === "approved" ? "Task Photo Approved" : "Task Photo Rejected",
       message:
         newStatus === "approved"
-          ? `Your reflection for "${taskTitleById[participant.taskId]}" was approved.`
-          : `Your reflection for "${taskTitleById[participant.taskId]}" needs revision.`,
+          ? `Your task photo proof for "${taskTitleById[participant.taskId]}" was approved.`
+          : `Your task photo proof for "${taskTitleById[participant.taskId]}" was rejected.`,
       link: `/event/${missionId}/activity?mode=active`,
       eventId: missionId,
+      missionId,
       taskId: participant.taskId,
-    });
+    })));
 
     setTaskParticipants((prev) =>
       prev.map((item) =>
-        item.id === participant.id && item.taskId === participant.taskId
-          ? { ...item, reflectionStatus: newStatus }
+        item.taskId === participant.taskId && (!participant.groupId || item.groupId === participant.groupId) && (participant.groupId || item.id === participant.id)
+          ? { ...item, adminApprovalStatus: newStatus }
           : item
       )
     );
@@ -719,10 +745,10 @@ export default function CurrentEventMonitoring() {
           </div>
 
           <div className="cem-panel cem-analytics">
-            <h2 className="cem-panel-title">Reflection Reviews</h2>
-            {reflectionItems.length === 0 ? (
+            <h2 className="cem-panel-title">Task Photo Proof Reviews</h2>
+            {proofItems.length === 0 ? (
               <div className="cem-analytics-content">
-                No reflections submitted.
+                No task proofs submitted.
               </div>
             ) : (
               <div
@@ -734,13 +760,13 @@ export default function CurrentEventMonitoring() {
                     <tr>
                       <th>Volunteer</th>
                       <th>Task</th>
-                      <th>Reflection</th>
+                      <th>Proof</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {reflectionItems.map((participant) => {
+                    {proofItems.map((participant) => {
                       const userData = usersById[participant.id] || {};
                       const studentName =
                         userData.name ||
@@ -752,14 +778,26 @@ export default function CurrentEventMonitoring() {
                           <td>{studentName}</td>
                           <td>{taskTitleById[participant.taskId]}</td>
                           <td style={{ maxWidth: 360 }}>
-                            {participant.reflection}
+                            {participant.taskPhoto?.url ? (
+                              <a href={participant.taskPhoto.url} target="_blank" rel="noreferrer">
+                                <img
+                                  src={participant.taskPhoto.url}
+                                  alt={`${taskTitleById[participant.taskId]} proof`}
+                                  style={{ width: 140, aspectRatio: "4 / 3", objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }}
+                                />
+                              </a>
+                            ) : (
+                              <span>
+                                <strong>Legacy reflection:</strong> {participant.reflection}
+                              </span>
+                            )}
                           </td>
-                          <td>{participant.reflectionStatus || "submitted"}</td>
+                          <td>{participant.adminApprovalStatus || "submitted"}</td>
                           <td>
                             <button
                               className="approve-btn"
                               onClick={() =>
-                                handleReflectionReview(participant, "approve")
+                                handleProofReview(participant, "approve")
                               }
                             >
                               Approve
@@ -767,13 +805,13 @@ export default function CurrentEventMonitoring() {
                             <button
                               className="reject-btn"
                               onClick={() =>
-                                handleReflectionReview(
+                                handleProofReview(
                                   participant,
-                                  "needs_revision",
+                                  "reject",
                                 )
                               }
                             >
-                              Needs Revision
+                              Reject
                             </button>
                           </td>
                         </tr>

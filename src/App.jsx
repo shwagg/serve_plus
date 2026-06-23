@@ -95,7 +95,7 @@ function App() {
   // Check for upcoming events and create notifications
   useUpcomingEventNotifications();
 
-  // Check for overdue reflections and create notifications
+  // Check for overdue task photo proofs and create notifications
   useOverdueReflectionNotifications();
 
   return (

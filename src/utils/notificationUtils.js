@@ -23,6 +23,11 @@ export async function createNotification(userId, notificationData) {
   });
 }
 
+function hasTaskProof(data = {}) {
+  return !!data?.taskPhoto?.url ||
+    (!data?.legacyReflectionArchived && String(data?.reflection || "").trim().length > 0);
+}
+
 export async function notifyUsersByRoles(roles, notificationData) {
   if (!roles || roles.length === 0) return;
 
@@ -227,10 +232,10 @@ export async function checkUpcomingEvents(userId) {
   }
 }
 
-// Check for overdue reflections and create notifications
+// Check for overdue task photo proofs and create notifications
 export async function checkOverdueReflections(userId) {
   try {
-    console.log('[checkOverdueReflections] Starting check for user:', userId);
+    console.log('[checkOverdueReflections] Starting photo proof check for user:', userId);
     
     // Get all missions
     const missionsRef = collection(db, "missions");
@@ -262,7 +267,7 @@ export async function checkOverdueReflections(userId) {
         
         // Check if deadline has passed
         if (dueDate < now) {
-          // Check if user has submitted reflection
+          // Check if user has submitted a photo proof or active legacy reflection
           const participantRef = doc(
             db,
             "missions",
@@ -274,17 +279,14 @@ export async function checkOverdueReflections(userId) {
           );
           const participantSnap = await getDoc(participantRef);
           
-          // If no participant doc or no reflection, it's overdue
-          const hasReflection = participantSnap.exists() && 
-                               participantSnap.data().reflection && 
-                               participantSnap.data().reflection.trim();
+          const hasProof = participantSnap.exists() && hasTaskProof(participantSnap.data());
           
-          if (!hasReflection) {
+          if (!hasProof) {
             // Check if notification already exists
             const notificationsRef = collection(db, "users", userId, "notifications");
             const existingQuery = query(
               notificationsRef,
-              where("type", "==", "reflection_overdue"),
+              where("type", "==", "photo_overdue"),
               where("taskId", "==", taskId),
               where("missionId", "==", missionId)
             );
@@ -292,11 +294,11 @@ export async function checkOverdueReflections(userId) {
             
             // Only create if no notification exists yet
             if (existingNotifications.empty) {
-              console.log(`[checkOverdueReflections] Task ${taskId} overdue for mission ${missionId}`);
+              console.log(`[checkOverdueReflections] Task photo proof ${taskId} overdue for mission ${missionId}`);
               await createNotification(userId, {
-                type: "reflection_overdue",
-                title: "Reflection Overdue",
-                message: `Your reflection for "${taskData.title}" has passed its deadline.`,
+                type: "photo_overdue",
+                title: "Photo Proof Overdue",
+                message: `Your photo proof for "${taskData.title}" has passed its deadline.`,
                 link: `/event/${missionId}/activity`,
                 taskId: taskId,
                 missionId: missionId,
@@ -307,8 +309,8 @@ export async function checkOverdueReflections(userId) {
       }
     }
     
-    console.log('[checkOverdueReflections] Check complete');
+    console.log('[checkOverdueReflections] Photo proof check complete');
   } catch (error) {
-    console.error("Error checking overdue reflections:", error);
+    console.error("Error checking overdue photo proofs:", error);
   }
 }

@@ -170,11 +170,15 @@ export default function NotificationBell() {
       return;
     }
     
-    // Reflection notifications - navigate to event activity page with specific tab
+    // Task proof notifications - navigate to event activity page with specific tab
     if (notification.type === "reflection_submitted" || 
         notification.type === "reflection_approved" || 
         notification.type === "reflection_needs_revision" ||
-        notification.type === "reflection_overdue") {
+        notification.type === "reflection_overdue" ||
+        notification.type === "photo_submitted" ||
+        notification.type === "photo_approved" ||
+        notification.type === "photo_rejected" ||
+        notification.type === "photo_overdue") {
       if (notification.missionId) {
         sessionStorage.setItem('ea_activeNav', 'tasks');
         navigate(`/event/${notification.missionId}/activity`);
@@ -333,6 +337,10 @@ export default function NotificationBell() {
       case "reflection_overdue":        return "⏰";
       case "reflection_approved":       return "✔️";
       case "reflection_needs_revision": return "📝";
+      case "photo_submitted":           return "📷";
+      case "photo_overdue":             return "⏰";
+      case "photo_approved":            return "✔️";
+      case "photo_rejected":            return "❌";
       case "proposal_submitted": return "📨";
       case "proposal_status":    return "📌";
       case "proposal_rejected":  return "📝";

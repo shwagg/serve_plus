@@ -1,6 +1,6 @@
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction, increment, deleteField, addDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "../../../firebaseConfig";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -44,6 +44,65 @@ const taskPointIncrementUpdate = (points) => ({
   "pointsBreakdown.taskPoints": increment(points),
   "pointsBreakdown.missionPoints": increment(points),
 });
+
+const MAX_TASK_PHOTO_BYTES = 5 * 1024 * 1024;
+
+function hasTaskPhoto(data = {}) {
+  return !!data?.taskPhoto?.url;
+}
+
+function hasLegacyReflection(data = {}) {
+  return !data?.legacyReflectionArchived && String(data?.reflection || "").trim().length > 0;
+}
+
+function hasTaskProof(data = {}) {
+  return hasTaskPhoto(data) || hasLegacyReflection(data);
+}
+
+function isApprovedTaskProof(data = {}) {
+  return hasTaskProof(data) && data.adminApprovalStatus === "approved";
+}
+
+function getProofKind(data = {}) {
+  return hasTaskPhoto(data) ? "photo" : "legacy_reflection";
+}
+
+async function compressTaskPhoto(file) {
+  if (!file || !file.type?.startsWith("image/")) {
+    throw new Error("INVALID_PHOTO_TYPE");
+  }
+
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("PHOTO_READ_FAILED"));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("PHOTO_DECODE_FAILED"));
+    img.src = dataUrl;
+  });
+
+  const maxSide = 1600;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (!result) reject(new Error("PHOTO_COMPRESS_FAILED"));
+      else resolve(result);
+    }, "image/jpeg", 0.82);
+  });
+
+  return new File([blob], `${Date.now()}_task-photo.jpg`, { type: "image/jpeg" });
+}
 
 function normalizeMissionRoles(rawRoles) {
   const roles = Array.isArray(rawRoles) ? rawRoles : (rawRoles ? [rawRoles] : []);
@@ -396,13 +455,12 @@ export default function EventActivity() {
   const [moderateSkills, setModerateSkills] = React.useState("");
   const [hardSkills, setHardSkills] = React.useState("");
 
-  const [journalReflections, setJournalReflections] = useState({});
+  const [taskPhotoFiles, setTaskPhotoFiles] = useState({});
+  const [taskPhotoPreviews, setTaskPhotoPreviews] = useState({});
+  const [uploadingTaskId, setUploadingTaskId] = useState(null);
   const [submitStatus, setSubmitStatus] = useState({});
   const [userJournals, setUserJournals] = useState([]);
-  const [editingJournalId, setEditingJournalId] = useState(null);
-  const [editingJournalText, setEditingJournalText] = useState("");
   const [enrolledTasks, setEnrolledTasks] = useState({});
-  const [taskPointsEarned, setTaskPointsEarned] = useState({});
   const [tasks, setTasks] = useState([]);
   const [volunteerProgress, setVolunteerProgress] = useState(null);
   const [volunteerCount, setVolunteerCount] = useState(null);
@@ -432,6 +490,9 @@ export default function EventActivity() {
   const touchStartYRef = useRef(0);
   const pullingRef = useRef(false);
   const activeNavRef = useRef(activeNav);
+  const cameraInputRefs = useRef({});
+  const uploadInputRefs = useRef({});
+  const taskPhotoPreviewsRef = useRef({});
 
   const compareParticipantsByEnrollment = useCallback((a, b) => {
     const aData = a?.data ? a.data() : a;
@@ -547,11 +608,62 @@ export default function EventActivity() {
     setShowSpecializedDropdown(false);
   };
 
-  // Journal handlers
-  const handleJournalChange = (idx, value) => {
-    setJournalReflections((prev) => ({ ...prev, [idx]: value }));
+  // Task photo proof handlers
+  const handleTaskPhotoSelect = (activityIdx, file) => {
+    if (!file) return;
+    if (!file.type?.startsWith("image/")) {
+      setSubmitStatus((prev) => ({
+        ...prev,
+        [activityIdx]: "Please select an image file.",
+      }));
+      return;
+    }
+
+    setTaskPhotoFiles((prev) => ({ ...prev, [activityIdx]: file }));
+    setTaskPhotoPreviews((prev) => {
+      if (prev[activityIdx]) URL.revokeObjectURL(prev[activityIdx]);
+      return { ...prev, [activityIdx]: URL.createObjectURL(file) };
+    });
+    setSubmitStatus((prev) => ({ ...prev, [activityIdx]: "" }));
   };
-  const handleJournalSubmit = async (activityIdx, activity) => {
+
+  const clearSelectedTaskPhoto = (activityIdx) => {
+    setTaskPhotoFiles((prev) => {
+      const next = { ...prev };
+      delete next[activityIdx];
+      return next;
+    });
+    setTaskPhotoPreviews((prev) => {
+      if (prev[activityIdx]) URL.revokeObjectURL(prev[activityIdx]);
+      const next = { ...prev };
+      delete next[activityIdx];
+      return next;
+    });
+  };
+
+  const uploadTaskPhoto = async ({ activity, file, user, submittedAt }) => {
+    const compressedFile = await compressTaskPhoto(file);
+    if (compressedFile.size > MAX_TASK_PHOTO_BYTES) {
+      throw new Error("PHOTO_TOO_LARGE");
+    }
+
+    const storagePath = `task-photos/${id}/${activity.id}/${user.uid}/${Date.now()}.jpg`;
+    const photoRef = ref(storage, storagePath);
+    await uploadBytes(photoRef, compressedFile, { contentType: compressedFile.type });
+    const url = await getDownloadURL(photoRef);
+
+    return {
+      url,
+      storagePath,
+      originalName: file.name || "task-photo.jpg",
+      contentType: compressedFile.type,
+      size: compressedFile.size,
+      submittedBy: user.uid,
+      submittedAt,
+    };
+  };
+
+  const handleTaskPhotoSubmit = async (activityIdx, activity) => {
     const user = auth.currentUser;
     if (!user) {
       setSubmitStatus((prev) => ({
@@ -560,21 +672,25 @@ export default function EventActivity() {
       }));
       return;
     }
-    if (
-      !journalReflections[activityIdx] ||
-      !journalReflections[activityIdx].trim()
-    ) {
+    const selectedPhoto = taskPhotoFiles[activityIdx];
+    if (!selectedPhoto) {
       setSubmitStatus((prev) => ({
         ...prev,
-        [activityIdx]: "Reflection cannot be empty.",
+        [activityIdx]: "Please choose a photo first.",
       }));
       return;
     }
 
-    const reflectionText = journalReflections[activityIdx].trim();
-
     try {
-      // Update the reflection field in the participant document
+      setUploadingTaskId(activity.id);
+      const submittedAt = new Date().toISOString();
+      const taskPhoto = await uploadTaskPhoto({
+        activity,
+        file: selectedPhoto,
+        user,
+        submittedAt,
+      });
+
       const participantRef = doc(
         db,
         "missions",
@@ -604,7 +720,6 @@ export default function EventActivity() {
           return;
         }
 
-        const submittedAt = new Date().toISOString();
         const groupRef = doc(db, "missions", id, "task", activity.id, "group", groupId);
 
         await runTransaction(db, async (transaction) => {
@@ -614,15 +729,16 @@ export default function EventActivity() {
             throw new Error("GROUP_NOT_FOUND");
           }
 
-          const existingReflection = String(groupSnap.data()?.reflection || "").trim();
-          if (existingReflection) {
-            throw new Error("GROUP_REFLECTION_ALREADY_SUBMITTED");
+          if (groupSnap.data()?.adminApprovalStatus === "approved") {
+            throw new Error("GROUP_PROOF_ALREADY_APPROVED");
           }
 
           transaction.update(groupRef, {
-            reflection: reflectionText,
-            reflectionSubmittedBy: user.uid,
-            reflectionSubmittedAt: submittedAt,
+            taskPhoto,
+            proofType: "photo",
+            legacyReflectionArchived: true,
+            photoSubmittedBy: user.uid,
+            photoSubmittedAt: submittedAt,
             status: "completed",
             adminApprovalStatus: "pending",
             lastUpdated: submittedAt,
@@ -652,7 +768,9 @@ export default function EventActivity() {
           try {
             await updateDoc(targetParticipantRef, {
               status: "completed",
-              reflection: reflectionText,
+              taskPhoto,
+              proofType: "photo",
+              legacyReflectionArchived: true,
               adminApprovalStatus: "pending",
               pointsEarned: 0,
               estimatedPoints: groupPoints,
@@ -666,7 +784,7 @@ export default function EventActivity() {
             }
           } catch (groupParticipantSyncError) {
             console.warn(
-              `Failed to sync grouped reflection to participant ${groupParticipantDoc.id}:`,
+              `Failed to sync grouped photo proof to participant ${groupParticipantDoc.id}:`,
               groupParticipantSyncError,
             );
           }
@@ -675,7 +793,9 @@ export default function EventActivity() {
         if (!didUpdateCurrentUser) {
           await updateDoc(participantRef, {
             status: "completed",
-            reflection: reflectionText,
+            taskPhoto,
+            proofType: "photo",
+            legacyReflectionArchived: true,
             adminApprovalStatus: "pending",
             pointsEarned: 0,
             estimatedPoints: groupPoints,
@@ -687,15 +807,17 @@ export default function EventActivity() {
 
         setSubmitStatus((prev) => ({
           ...prev,
-          [activityIdx]: "Group reflection submitted! Awaiting admin approval.",
+          [activityIdx]: "Group photo submitted! Awaiting admin approval.",
         }));
-        setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
+        clearSelectedTaskPhoto(activityIdx);
 
         await createNotification(user.uid, {
-          type: "reflection_submitted",
-          title: "Group Reflection Submitted",
-          message: `Your group reflection for "${activity.title}" has been submitted successfully!`,
+          type: "photo_submitted",
+          title: "Group Photo Submitted",
+          message: `Your group photo proof for "${activity.title}" has been submitted successfully!`,
           link: `/event/${id}/activity`,
+          missionId: id,
+          taskId: activity.id,
         });
 
         await fetchUserJournals();
@@ -730,7 +852,9 @@ export default function EventActivity() {
       }
 
       await updateDoc(participantRef, {
-        reflection: reflectionText,
+        taskPhoto,
+        proofType: "photo",
+        legacyReflectionArchived: true,
         status: "completed",
         adminApprovalStatus: "pending",
         pointsEarned: 0,
@@ -741,44 +865,43 @@ export default function EventActivity() {
 
       setSubmitStatus((prev) => ({
         ...prev,
-        [activityIdx]: "Reflection submitted! Awaiting admin approval.",
+        [activityIdx]: "Photo submitted! Awaiting admin approval.",
       }));
-      setJournalReflections((prev) => ({ ...prev, [activityIdx]: "" }));
+      clearSelectedTaskPhoto(activityIdx);
 
       // Send notification to student
       await createNotification(user.uid, {
-        type: "reflection_submitted",
-        title: "Reflection Submitted",
-        message: `Your reflection for "${activity.title}" has been submitted successfully!`,
-        link: `/event/${id}/activity`
+        type: "photo_submitted",
+        title: "Photo Submitted",
+        message: `Your photo proof for "${activity.title}" has been submitted successfully!`,
+        link: `/event/${id}/activity`,
+        missionId: id,
+        taskId: activity.id,
       });
 
-      // Refresh journals and check if all requirements are now complete
-      const updatedJournals = await fetchUserJournals();
-      await checkAndWriteRequirementsCompleted({
-        preSurveyDone: volunteerProgress?.preSurvey === 'submitted',
-        consentDone: ['submitted', 'verified'].includes(volunteerProgress?.consent),
-        attendanceDone: volunteerProgress?.attendance === 'present',
-        journalDone: updatedJournals.length > 0,
-        postSurveyDone: volunteerProgress?.postSurvey === 'submitted',
-      });
+      await fetchUserJournals();
     } catch (err) {
-      console.error("Error submitting reflection:", err);
-      const isGroupReflectionConflict = err?.message === "GROUP_REFLECTION_ALREADY_SUBMITTED";
+      console.error("Error submitting task photo:", err);
+      const isGroupProofApproved = err?.message === "GROUP_PROOF_ALREADY_APPROVED";
       const isGroupMissing = err?.message === "GROUP_NOT_FOUND";
+      const isTooLarge = err?.message === "PHOTO_TOO_LARGE";
 
       setSubmitStatus((prev) => ({
         ...prev,
-        [activityIdx]: isGroupReflectionConflict
-          ? "This group reflection has already been submitted by a teammate."
+        [activityIdx]: isGroupProofApproved
+          ? "This group photo has already been approved."
           : isGroupMissing
             ? "Group not found. Please rejoin the grouped task."
-            : "Error submitting. Try again.",
+            : isTooLarge
+              ? "Photo must be less than 5MB after compression."
+              : "Error submitting photo. Try again.",
       }));
+    } finally {
+      setUploadingTaskId(null);
     }
   };
 
-  // Helper function to fetch user journals from participant documents
+  // Helper function to fetch user task proofs from participant documents.
   const fetchUserJournals = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -790,7 +913,7 @@ export default function EventActivity() {
 
       const journals = [];
       let backfilledPoints = 0;
-      // For each task, check if user has a participant document with a reflection
+      // For each task, check if user has a participant document with an active proof.
       for (const taskDoc of tasksSnap.docs) {
         const participantRef = doc(
           db,
@@ -805,7 +928,7 @@ export default function EventActivity() {
 
         if (participantSnap.exists()) {
           const data = participantSnap.data();
-          if (data.reflection && data.reflection.trim()) {
+          if (hasTaskProof(data)) {
             let resolvedData = { ...data };
             if (data.adminApprovalStatus === 'approved' && !Number(data.pointsEarned)) {
               const taskData = taskDoc.data();
@@ -829,14 +952,16 @@ export default function EventActivity() {
                   backfilledPoints += pts;
                 }
               } catch (e) {
-                console.warn('Failed to award journal points:', e);
+                console.warn('Failed to award task proof points:', e);
               }
             }
             journals.push({
               id: taskDoc.id,
               taskId: taskDoc.id,
               activityId: taskDoc.data().title,
-              reflection: data.reflection,
+              reflection: data.reflection || "",
+              taskPhoto: data.taskPhoto || null,
+              proofType: getProofKind(data),
               ...resolvedData,
             });
           }
@@ -849,9 +974,25 @@ export default function EventActivity() {
       }
       return journals;
     } catch (err) {
-      console.error("Error fetching journals:", err);
+      console.error("Error fetching task proofs:", err);
       return [];
     }
+  };
+
+  const getJoinedTaskProofsApproved = async (tasksData = tasks) => {
+    const user = auth.currentUser;
+    if (!user) return false;
+    if (!Array.isArray(tasksData) || tasksData.length === 0) return true;
+
+    for (const task of tasksData) {
+      const participantSnap = await getDoc(
+        doc(db, "missions", id, "task", task.id, "participants", user.uid),
+      );
+      if (!participantSnap.exists()) continue;
+      if (!isApprovedTaskProof(participantSnap.data())) return false;
+    }
+
+    return true;
   };
 
   const checkAndWriteRequirementsCompleted = async ({ preSurveyDone, consentDone, attendanceDone, journalDone, postSurveyDone }) => {
@@ -948,8 +1089,6 @@ export default function EventActivity() {
           // Fallback: ensure enrollment and task points reflect Firestore state
           // in case fetchEvent's enrollment check was skipped due to an error.
           setEnrolledTasks(prev => prev[task.id] ? prev : { ...prev, [task.id]: true });
-          const pts = Number(data.pointsEarned) || 0;
-          if (pts > 0) setTaskPointsEarned(prev => prev[task.id] ? prev : { ...prev, [task.id]: pts });
           return;
         }
 
@@ -958,11 +1097,19 @@ export default function EventActivity() {
         prevStatuses[task.id] = newStatus;
         if (prevStatus === newStatus) return;
 
-        if (data.reflection && data.reflection.trim()) {
+        if (hasTaskProof(data)) {
           setUserJournals(prev => {
             const exists = prev.some(j => j.taskId === task.id);
             if (exists) return prev.map(j => j.taskId === task.id ? { ...j, ...data } : j);
-            return [...prev, { id: task.id, taskId: task.id, activityId: task.title, reflection: data.reflection, ...data }];
+            return [...prev, {
+              id: task.id,
+              taskId: task.id,
+              activityId: task.title,
+              reflection: data.reflection || "",
+              taskPhoto: data.taskPhoto || null,
+              proofType: getProofKind(data),
+              ...data,
+            }];
           });
         }
 
@@ -983,18 +1130,25 @@ export default function EventActivity() {
               await updateDoc(participantRef, { pointsEarned: pts, estimatedPoints: deleteField() });
               await updateDoc(doc(db, 'users', user.uid), { totalPoints: increment(pts) });
               await updateDoc(volunteerRef, taskPointIncrementUpdate(pts));
-              setTaskPointsEarned(prev => ({ ...prev, [task.id]: pts }));
               setTotalPointsEarned(prev => prev + pts);
               setUserJournals(prev => prev.map(j => j.taskId === task.id ? { ...j, pointsEarned: pts, estimatedPoints: undefined } : j));
-              window.showToast?.(`Your journal for "${task.title}" was approved! +${pts} pts earned.`, 'success');
-            } catch (e) {
-              window.showToast?.(`Your journal for "${task.title}" was approved!`, 'success');
+              window.showToast?.(`Your task proof for "${task.title}" was approved! +${pts} pts earned.`, 'success');
+            } catch {
+              window.showToast?.(`Your task proof for "${task.title}" was approved!`, 'success');
             }
           } else {
-            window.showToast?.(`Your journal for "${task.title}" was approved!`, 'success');
+            window.showToast?.(`Your task proof for "${task.title}" was approved!`, 'success');
           }
+          const taskProofDone = await getJoinedTaskProofsApproved();
+          await checkAndWriteRequirementsCompleted({
+            preSurveyDone: volunteerProgress?.preSurvey === 'submitted',
+            consentDone: ['submitted', 'verified'].includes(volunteerProgress?.consent),
+            attendanceDone: volunteerProgress?.attendance === 'present',
+            journalDone: taskProofDone,
+            postSurveyDone: volunteerProgress?.postSurvey === 'submitted',
+          });
         } else if (newStatus === 'rejected') {
-          window.showToast?.(`Your journal for "${task.title}" was rejected. Please re-edit.`, 'error');
+          window.showToast?.(`Your task proof for "${task.title}" was rejected. Please replace the photo.`, 'error');
         }
       });
     });
@@ -1003,6 +1157,18 @@ export default function EventActivity() {
   }, [tasks, authChecked]);
 
   useEffect(() => { activeNavRef.current = activeNav; }, [activeNav]);
+
+  useEffect(() => {
+    taskPhotoPreviewsRef.current = taskPhotoPreviews;
+  }, [taskPhotoPreviews]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(taskPhotoPreviewsRef.current).forEach((previewUrl) => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const el = pullContainerEl;
@@ -1053,109 +1219,12 @@ export default function EventActivity() {
     };
   }, [pullContainerEl]);
 
-  // Edit journal handler
-  const handleEditJournal = (journal) => {
-    setEditingJournalId(journal.taskId);
-    setEditingJournalText(journal.reflection);
-  };
-
-  const handleSaveEditJournal = async (journal) => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const updatedReflection = editingJournalText.trim();
-    if (!updatedReflection) {
-      alert("Reflection cannot be empty.");
-      return;
-    }
-
+  const deleteStoredTaskPhoto = async (taskPhoto) => {
+    if (!taskPhoto?.storagePath) return;
     try {
-      const taskDetails = tasks.find((task) => task.id === journal.taskId);
-      const participantRef = doc(
-        db,
-        "missions",
-        id,
-        "task",
-        journal.taskId,
-        "participants",
-        user.uid
-      );
-
-      if (taskDetails?.type === "grouped") {
-        const participantSnap = await getDoc(participantRef);
-        if (!participantSnap.exists()) {
-          alert("You must join a group before editing this reflection.");
-          return;
-        }
-
-        const participantData = participantSnap.data() || {};
-        const groupId = participantData.groupId || journal.groupId;
-        if (!groupId) {
-          alert("Group assignment missing. Rejoin the grouped task.");
-          return;
-        }
-
-        const editedAt = new Date().toISOString();
-        const groupRef = doc(db, "missions", id, "task", journal.taskId, "group", groupId);
-        await updateDoc(groupRef, {
-          reflection: updatedReflection,
-          reflectionEditedBy: user.uid,
-          reflectionEditedAt: editedAt,
-          status: "completed",
-          adminApprovalStatus: "pending",
-          lastUpdated: editedAt,
-        });
-
-        const groupedParticipantsRef = collection(
-          db,
-          "missions",
-          id,
-          "task",
-          journal.taskId,
-          "participants",
-        );
-        const groupedParticipantsQuery = query(
-          groupedParticipantsRef,
-          where("groupId", "==", groupId),
-        );
-        const groupedParticipantsSnap = await getDocs(groupedParticipantsQuery);
-
-        for (const groupedParticipantDoc of groupedParticipantsSnap.docs) {
-          const groupedParticipantData = groupedParticipantDoc.data() || {};
-          try {
-            await updateDoc(groupedParticipantDoc.ref, {
-              reflection: updatedReflection,
-              status: "completed",
-              adminApprovalStatus: "pending",
-              completedAt: groupedParticipantData.completedAt || editedAt,
-              lastUpdated: editedAt,
-              groupId,
-            });
-          } catch (groupParticipantEditError) {
-            console.warn(
-              `Failed to sync edited group reflection to participant ${groupedParticipantDoc.id}:`,
-              groupParticipantEditError,
-            );
-          }
-        }
-
-        setEditingJournalId(null);
-        setEditingJournalText("");
-        await fetchUserJournals();
-        window.showToast?.("Group reflection updated", "success");
-        return;
-      }
-
-      await updateDoc(participantRef, {
-        reflection: updatedReflection,
-        adminApprovalStatus: "pending",
-        lastUpdated: new Date().toISOString(),
-      });
-      setEditingJournalId(null);
-      setEditingJournalText("");
-      await fetchUserJournals();
-    } catch (err) {
-      alert("Failed to update journal.");
+      await deleteObject(ref(storage, taskPhoto.storagePath));
+    } catch (error) {
+      console.warn("Task photo file cleanup skipped:", error);
     }
   };
 
@@ -1165,7 +1234,6 @@ export default function EventActivity() {
 
     try {
       const taskDetails = tasks.find((task) => task.id === taskId);
-      // Clear the reflection field instead of deleting the participant document
       const participantRef = doc(
         db,
         "missions",
@@ -1191,57 +1259,85 @@ export default function EventActivity() {
 
         const clearedAt = new Date().toISOString();
         const groupRef = doc(db, "missions", id, "task", taskId, "group", groupId);
+        const groupSnap = await getDoc(groupRef);
+        const groupData = groupSnap.exists() ? groupSnap.data() : {};
+        if (groupData.adminApprovalStatus === "approved") {
+          alert("Approved photo proofs cannot be removed.");
+          return;
+        }
+
+        await deleteStoredTaskPhoto(groupData.taskPhoto || participantData.taskPhoto);
+
         await updateDoc(groupRef, {
-          reflection: "",
+          taskPhoto: deleteField(),
+          proofType: deleteField(),
+          legacyReflectionArchived: true,
           status: "in_progress",
-          reflectionSubmittedBy: deleteField(),
-          reflectionSubmittedAt: deleteField(),
-          reflectionEditedBy: deleteField(),
-          reflectionEditedAt: deleteField(),
+          photoSubmittedBy: deleteField(),
+          photoSubmittedAt: deleteField(),
           adminApprovalStatus: deleteField(),
           lastUpdated: clearedAt,
         });
 
-        const pointsToRemove = Number(participantData.pointsEarned) || 0;
-        await updateDoc(participantRef, {
-          reflection: "",
-          status: "todo",
-          pointsEarned: 0,
-          estimatedPoints: deleteField(),
-          adminApprovalStatus: deleteField(),
-          completedAt: deleteField(),
-          lastUpdated: clearedAt,
-          groupId,
-        });
+        const groupedParticipantsSnap = await getDocs(query(
+          collection(db, "missions", id, "task", taskId, "participants"),
+          where("groupId", "==", groupId),
+        ));
 
-        if (pointsToRemove > 0) {
-          const volunteerRef = doc(db, "missions", id, "volunteer", user.uid);
-          const volunteerSnap = await getDoc(volunteerRef);
-          if (volunteerSnap.exists()) {
-            const currentTotal = volunteerSnap.data().pointsEarned || 0;
-            const newTotal = Math.max(0, currentTotal - pointsToRemove);
-            await updateDoc(volunteerRef, {
-              pointsEarned: newTotal,
-              taskPoints: newTotal,
-              missionPoints: increment(-pointsToRemove),
-              "pointsBreakdown.taskPoints": newTotal,
-              "pointsBreakdown.missionPoints": increment(-pointsToRemove),
-            });
-            setTotalPointsEarned(newTotal);
+        for (const groupedParticipantDoc of groupedParticipantsSnap.docs) {
+          const groupedParticipantData = groupedParticipantDoc.data() || {};
+          const pointsToRemove = Number(groupedParticipantData.pointsEarned) || 0;
+          await updateDoc(groupedParticipantDoc.ref, {
+            taskPhoto: deleteField(),
+            proofType: deleteField(),
+            legacyReflectionArchived: true,
+            status: "todo",
+            pointsEarned: 0,
+            estimatedPoints: deleteField(),
+            adminApprovalStatus: deleteField(),
+            completedAt: deleteField(),
+            lastUpdated: clearedAt,
+            groupId,
+          });
+
+          if (pointsToRemove > 0) {
+            const volunteerRef = doc(db, "missions", id, "volunteer", groupedParticipantDoc.id);
+            const volunteerSnap = await getDoc(volunteerRef);
+            if (volunteerSnap.exists()) {
+              const currentTotal = volunteerSnap.data().pointsEarned || 0;
+              const newTotal = Math.max(0, currentTotal - pointsToRemove);
+              await updateDoc(volunteerRef, {
+                pointsEarned: newTotal,
+                taskPoints: newTotal,
+                missionPoints: increment(-pointsToRemove),
+                "pointsBreakdown.taskPoints": newTotal,
+                "pointsBreakdown.missionPoints": increment(-pointsToRemove),
+              });
+              if (groupedParticipantDoc.id === user.uid) {
+                setTotalPointsEarned(newTotal);
+              }
+            }
           }
         }
 
         setUserJournals((prev) => prev.filter((j) => j.taskId !== taskId));
-        window.showToast?.("Group reflection removed", "success");
+        window.showToast?.("Group photo proof removed", "success");
         return;
       }
 
-      const pointsToRemove = participantSnap.exists()
-        ? participantSnap.data().pointsEarned || 0
-        : 0;
+      if (participantData.adminApprovalStatus === "approved") {
+        alert("Approved photo proofs cannot be removed.");
+        return;
+      }
+
+      await deleteStoredTaskPhoto(participantData.taskPhoto);
+
+      const pointsToRemove = Number(participantData.pointsEarned) || 0;
 
       await updateDoc(participantRef, {
-        reflection: "",
+        taskPhoto: deleteField(),
+        proofType: deleteField(),
+        legacyReflectionArchived: true,
         status: "todo",
         pointsEarned: 0,
         estimatedPoints: deleteField(),
@@ -1268,8 +1364,8 @@ export default function EventActivity() {
       }
 
       setUserJournals(userJournals.filter((j) => j.taskId !== taskId));
-    } catch (err) {
-      alert("Failed to delete journal.");
+    } catch {
+      alert("Failed to delete task proof.");
     }
   };
 
@@ -1313,20 +1409,24 @@ export default function EventActivity() {
       }
 
       const groupData = groupSnap.data() || {};
-      const groupReflection = String(groupData.reflection || "").trim();
-      if (!groupReflection) {
+      const groupHasProof = hasTaskProof(groupData);
+      if (!groupHasProof) {
         const participantPoints = Number(participantData.pointsEarned) || 0;
-        const hasReflection = String(participantData.reflection || "").trim().length > 0;
+        const participantHasProof = hasTaskProof(participantData);
         const isCompleted = participantData.status === "completed";
 
-        if (!participantPoints && !hasReflection && !isCompleted) {
+        if (!participantPoints && !participantHasProof && !isCompleted) {
           continue;
         }
 
         await updateDoc(participantRef, {
           status: "todo",
-          reflection: "",
+          taskPhoto: deleteField(),
+          proofType: deleteField(),
+          legacyReflectionArchived: true,
           pointsEarned: 0,
+          estimatedPoints: deleteField(),
+          adminApprovalStatus: deleteField(),
           completedAt: deleteField(),
           lastUpdated: new Date().toISOString(),
           groupId,
@@ -1355,36 +1455,45 @@ export default function EventActivity() {
 
       const groupPoints = Number(task.points) || 0;
       const participantPoints = Number(participantData.pointsEarned) || 0;
+      const groupApprovalStatus = groupData.adminApprovalStatus || participantData.adminApprovalStatus || "pending";
+      const targetPoints = groupApprovalStatus === "approved" ? groupPoints : 0;
+      const groupReflection = String(groupData.reflection || "").trim();
       const alreadySynced =
         participantData.status === "completed" &&
-        participantPoints === groupPoints &&
-        String(participantData.reflection || "").trim() === groupReflection;
+        participantPoints === targetPoints &&
+        participantData.adminApprovalStatus === groupApprovalStatus &&
+        ((groupData.taskPhoto?.url && participantData.taskPhoto?.url === groupData.taskPhoto.url) ||
+          (!groupData.taskPhoto?.url && String(participantData.reflection || "").trim() === groupReflection));
 
       if (!alreadySynced) {
         const completedAt =
           participantData.completedAt ||
-          groupData.reflectionSubmittedAt ||
+          groupData.photoSubmittedAt ||
+          groupData.taskPhoto?.submittedAt ||
           new Date().toISOString();
 
         await updateDoc(participantRef, {
           status: "completed",
-          reflection: groupReflection,
-          pointsEarned: groupPoints,
+          ...(groupData.taskPhoto?.url ? { taskPhoto: groupData.taskPhoto, proofType: "photo", legacyReflectionArchived: true } : {}),
+          ...(!groupData.taskPhoto?.url ? { reflection: groupReflection, proofType: "legacy_reflection" } : {}),
+          adminApprovalStatus: groupApprovalStatus,
+          pointsEarned: targetPoints,
+          estimatedPoints: groupApprovalStatus === "approved" ? deleteField() : groupPoints,
           completedAt,
           lastUpdated: new Date().toISOString(),
           groupId,
         });
 
-        const pointsToAdd = Math.max(groupPoints - participantPoints, 0);
-        if (pointsToAdd > 0) {
+        const pointsDelta = targetPoints - participantPoints;
+        if (pointsDelta !== 0) {
           await setDoc(
             doc(db, "missions", id, "volunteer", userId),
             {
-              ...taskPointIncrementUpdate(pointsToAdd),
+              ...taskPointIncrementUpdate(pointsDelta),
             },
             { merge: true },
           );
-          totalPointsDelta += pointsToAdd;
+          totalPointsDelta += pointsDelta;
         }
 
         hasParticipantUpdates = true;
@@ -2320,7 +2429,7 @@ export default function EventActivity() {
   }
 
   //for when this event will be able to
-  //add journal, scan attendance, and answer post-survey
+  // Submit task photo proofs, scan attendance, and answer post-survey
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
@@ -2418,7 +2527,6 @@ export default function EventActivity() {
   const currentUserRef = useRef(null);
   const previousRankRef = useRef(null);
   const hasLeaderboardLoadedRef = useRef(false);
-
   useEffect(() => {
     if (!authChecked) return;
     let unsubscribe = null;
@@ -2490,21 +2598,16 @@ export default function EventActivity() {
           // Check enrollment status for each task and get volunteer points
           const user = auth.currentUser;
           if (user) {
-            // Load existing task enrollment status and earned points for this user
+            // Load existing task enrollment status for this user
             const enrolledMap = {};
-            const pointsMap = {};
             await Promise.allSettled(
               tasksData.map(async (task) => {
                 const participantRef = doc(db, "missions", id, "task", task.id, "participants", user.uid);
                 const participantSnap = await getDoc(participantRef);
                 enrolledMap[task.id] = participantSnap.exists();
-                if (participantSnap.exists()) {
-                  pointsMap[task.id] = Number(participantSnap.data().pointsEarned) || 0;
-                }
               })
             );
             setEnrolledTasks(enrolledMap);
-            setTaskPointsEarned(pointsMap);
 
             // Auto-enroll the proponent/organizer (event creator) into the roster
             // so they appear in the leaderboard and volunteer list without manually joining.
@@ -3144,8 +3247,7 @@ export default function EventActivity() {
             if (volunteerProgress?.attendance === 'present') done++;
             if (volunteerProgress?.postSurvey === 'submitted') done++;
             enrolledTaskIds.forEach(tid => {
-              const task = tasks.find(t => t.id === tid);
-              if (task && userJournals.some(j => j.activityId === task.title)) done++;
+              if (userJournals.some(j => j.taskId === tid && j.adminApprovalStatus === 'approved' && hasTaskProof(j))) done++;
             });
           }
           const pct = totalItems > 0 ? Math.round((done / totalItems) * 100) : 0;
@@ -3420,6 +3522,13 @@ export default function EventActivity() {
                       const attendanceDone = volunteerProgress?.attendance === 'present';
                       const postSurveyDone = volunteerProgress?.postSurvey === 'submitted';
                       const postLocked = !attendanceDone;
+                      const enrolledTaskIdsForReq = (tasks || []).filter(t => !!enrolledTasks[t.id]).map(t => t.id);
+                      const approvedProofTaskIds = new Set(
+                        userJournals
+                          .filter(j => j.adminApprovalStatus === 'approved' && hasTaskProof(j))
+                          .map(j => j.taskId),
+                      );
+                      const taskProofDone = enrolledTaskIdsForReq.every(tid => approvedProofTaskIds.has(tid));
                       const preSurveyStep = {
                         label: 'Pre-Activity Survey',
                         desc: !isEditable ? 'Closed after the event date' : 'Fill out before the event',
@@ -3463,8 +3572,8 @@ export default function EventActivity() {
                         },
                         {
                           label: 'Task Assignment',
-                          desc: !attendanceDone ? 'Scan attendance first to unlock' : 'Pick an extra role you want to take on for this event',
-                          done: false,
+                          desc: !attendanceDone ? 'Scan attendance first to unlock' : 'Join tasks and submit approved photo proofs',
+                          done: taskProofDone,
                           locked: !attendanceDone,
                           onOpen: attendanceDone ? () => {
                             const wasOpen = showTasksInReq;
@@ -3535,7 +3644,7 @@ export default function EventActivity() {
                                   </div>
                                   <span className="req-timeline-desc">{step.desc}</span>
                                   {step.type === 'tasks' && (
-                                    <span style={{ fontSize: 12, color: '#0d9488', fontWeight: 600, marginTop: 2 }}>{tasks ? tasks.filter(t => !!enrolledTasks[t.id]).length : 0} / {tasks?.length || 0} tasks joined</span>
+                                    <span style={{ fontSize: 12, color: '#0d9488', fontWeight: 600, marginTop: 2 }}>{approvedProofTaskIds.size} / {enrolledTaskIdsForReq.length} proofs approved</span>
                                   )}
                                 </div>
                                 <div className="req-timeline-action">
@@ -3585,8 +3694,11 @@ export default function EventActivity() {
                                   const maxSlots = Number.isFinite(Number(activity.maxParticipants)) ? Number(activity.maxParticipants) : null;
                                   const isTaskCapacityFull = !isGrouped && maxSlots !== null && filledSlots >= maxSlots;
                                   const isDeadlineClosed = isEnrollmentClosed(activity);
-                                  const journalsForActivity = userJournals.filter(j => j.activityId === activity.title);
+                                  const journalsForActivity = userJournals.filter(j => j.taskId === activity.id);
                                   const hasSubmittedJournal = journalsForActivity.length > 0;
+                                  const selectedPhoto = taskPhotoFiles[idx];
+                                  const selectedPhotoPreview = taskPhotoPreviews[idx];
+                                  const isUploadingPhoto = uploadingTaskId === activity.id;
                                   const enrollmentCountdown = getEnrollmentCountdown(activity);
 
                                   const attendanceDoneLocal = volunteerProgress?.attendance === 'present';
@@ -3636,11 +3748,10 @@ export default function EventActivity() {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                               {(() => {
                                                 const journalData = userJournals.find(j => j.taskId === activity.id);
-                                                const hasEarnedPoints = (taskPointsEarned[activity.id] || 0) > 0 || (journalData?.pointsEarned || 0) > 0;
-                                                const isApprovedWithPoints = journalData?.adminApprovalStatus === 'approved' && hasEarnedPoints;
-                                                const isDisabled = !isEditable || isApprovedWithPoints;
+                                                const isApprovedProof = journalData?.adminApprovalStatus === 'approved' && hasTaskProof(journalData);
+                                                const isDisabled = !isEditable || isApprovedProof;
                                                 return (
-                                                  <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={isDisabled} title={isApprovedWithPoints ? "Cannot unjoin — reflection approved and points awarded." : undefined}>
+                                                  <button className="task-enrolled-badge" onClick={(e) => { e.stopPropagation(); handleUnjoinActivity(activity.id, activity); }} disabled={isDisabled} title={isApprovedProof ? "Cannot unjoin - photo proof approved." : undefined}>
                                                     <span className="joined-text">✓ Joined</span><span className="remove-text">✕ Unjoin</span>
                                                   </button>
                                                 );
@@ -3670,81 +3781,99 @@ export default function EventActivity() {
                                         <div className="task-journal-section">
                                           {journalsForActivity.map((journal) => (
                                             <div key={journal.id} className="journal-card">
-                                              {editingJournalId === journal.taskId ? (
-                                                <>
-                                                  <textarea value={editingJournalText} onChange={(e) => setEditingJournalText(e.target.value)} className="journal-edit-textarea" />
-                                                  {journal.adminApprovalStatus !== 'rejected' && (
-                                                    <div className="journal-card-actions">
-                                                      <button onClick={() => handleSaveEditJournal(journal)} className="journal-button journal-button-save">Save</button>
-                                                      <button onClick={() => setEditingJournalId(null)} className="journal-button journal-button-cancel">Cancel</button>
-                                                    </div>
-                                                  )}
-                                                </>
+                                              {journal.taskPhoto?.url ? (
+                                                <a href={journal.taskPhoto.url} target="_blank" rel="noreferrer" className="task-photo-proof-link">
+                                                  <img src={journal.taskPhoto.url} alt={`${activity.title} proof`} className="task-photo-proof-img" />
+                                                </a>
                                               ) : (
-                                                <div className="journal-text">{journal.reflection}</div>
+                                                <div className="journal-text">
+                                                  <span className="journal-group-note">Legacy reflection</span>
+                                                  <span>{journal.reflection}</span>
+                                                </div>
                                               )}
                                             </div>
                                           ))}
-                                          {hasSubmittedJournal ? (
-                                            <div className="journal-submit-row">
-                                              {(() => {
-                                                const j = journalsForActivity[0];
-                                                const approvalStatus = j?.adminApprovalStatus;
-                                                if (approvalStatus === 'approved') {
-                                                  return <span className="journal-submitted-badge journal-approved-badge">Approved</span>;
-                                                } else if (approvalStatus === 'rejected') {
-                                                  return <span className="journal-submitted-badge journal-rejected-badge">Rejected</span>;
-                                                }
-                                                return <span className="journal-submitted-badge">Submitted</span>;
-                                              })()}
-                                              {(() => {
-                                                const j = journalsForActivity[0];
-                                                const approvalStatus = j?.adminApprovalStatus;
-                                                const earned = Number(j?.pointsEarned) || 0;
-                                                const estimated = Number(j?.estimatedPoints) || 0;
-                                                if (earned > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>+{earned} pts earned</span>;
-                                                if (estimated > 0 && approvalStatus !== 'rejected' && approvalStatus !== 'approved') return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>Waiting to be checked</span>;
-                                                return null;
-                                              })()}
-                                              {!isEndedEnrolled && journalsForActivity[0]?.adminApprovalStatus !== 'approved' && (
-                                                <>
-                                                  {journalsForActivity[0]?.adminApprovalStatus === 'rejected' ? (
-                                                    editingJournalId === journalsForActivity[0]?.taskId ? (
-                                                      <>
-                                                        <button onClick={() => handleSaveEditJournal(journalsForActivity[0])} className="journal-reedit-btn journal-reedit-btn--save">Save</button>
-                                                        <button onClick={() => setEditingJournalId(null)} className="journal-reedit-btn journal-reedit-btn--cancel">Cancel</button>
-                                                      </>
-                                                    ) : (
-                                                      <button onClick={() => handleEditJournal(journalsForActivity[0])} className="journal-reedit-btn" title={isGrouped ? 'Re-edit group reflection' : 'Re-edit reflection'}>
-                                                        <ModeRoundedIcon sx={{ fontSize: 15 }} />
-                                                        Re-edit
-                                                      </button>
-                                                    )
-                                                  ) : null}
-                                                  <button onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)} className="journal-edit-icon-btn journal-delete-icon-btn" title={isGrouped ? 'Delete group reflection' : 'Delete reflection'}>
+
+                                          {selectedPhotoPreview && (
+                                            <div className="journal-card">
+                                              <img src={selectedPhotoPreview} alt="Selected proof preview" className="task-photo-proof-img" />
+                                              <span className="task-photo-file-name">{selectedPhoto?.name}</span>
+                                            </div>
+                                          )}
+
+                                          <input
+                                            ref={(el) => { cameraInputRefs.current[activity.id] = el; }}
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => handleTaskPhotoSelect(idx, e.target.files?.[0])}
+                                          />
+                                          <input
+                                            ref={(el) => { uploadInputRefs.current[activity.id] = el; }}
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => handleTaskPhotoSelect(idx, e.target.files?.[0])}
+                                          />
+
+                                          <div className="journal-submit-row">
+                                            {hasSubmittedJournal && (() => {
+                                              const j = journalsForActivity[0];
+                                              const approvalStatus = j?.adminApprovalStatus;
+                                              if (approvalStatus === 'approved') {
+                                                return <span className="journal-submitted-badge journal-approved-badge">Approved</span>;
+                                              } else if (approvalStatus === 'rejected') {
+                                                return <span className="journal-submitted-badge journal-rejected-badge">Rejected</span>;
+                                              }
+                                              return <span className="journal-submitted-badge">Submitted</span>;
+                                            })()}
+                                            {hasSubmittedJournal && (() => {
+                                              const j = journalsForActivity[0];
+                                              const approvalStatus = j?.adminApprovalStatus;
+                                              const earned = Number(j?.pointsEarned) || 0;
+                                              const estimated = Number(j?.estimatedPoints) || 0;
+                                              if (earned > 0) return <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>+{earned} pts earned</span>;
+                                              if (estimated > 0 && approvalStatus !== 'rejected' && approvalStatus !== 'approved') return <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap' }}>Waiting to be checked</span>;
+                                              return null;
+                                            })()}
+                                            {!isEndedEnrolled && (!hasSubmittedJournal || journalsForActivity[0]?.adminApprovalStatus !== 'approved') && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  className="journal-reedit-btn"
+                                                  disabled={!isHalfwayDone || isUploadingPhoto}
+                                                  onClick={() => cameraInputRefs.current[activity.id]?.click()}
+                                                  title="Take photo"
+                                                >
+                                                  <ModeRoundedIcon sx={{ fontSize: 15 }} />
+                                                  Take Photo
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="journal-reedit-btn journal-reedit-btn--cancel"
+                                                  disabled={!isHalfwayDone || isUploadingPhoto}
+                                                  onClick={() => uploadInputRefs.current[activity.id]?.click()}
+                                                >
+                                                  Upload Photo
+                                                </button>
+                                                <button
+                                                  className="activity-submit-button journal-submit-compact"
+                                                  disabled={!isHalfwayDone || !selectedPhoto || isUploadingPhoto}
+                                                  onClick={() => handleTaskPhotoSubmit(idx, activity)}
+                                                >
+                                                  {!isHalfwayDone ? 'LOCKED' : isUploadingPhoto ? 'UPLOADING...' : isGrouped ? 'SUBMIT FOR GROUP' : 'SUBMIT'}
+                                                </button>
+                                                {hasSubmittedJournal && (
+                                                  <button onClick={() => handleDeleteJournal(journalsForActivity[0].taskId)} className="journal-edit-icon-btn journal-delete-icon-btn" title={isGrouped ? 'Delete group photo proof' : 'Delete photo proof'}>
                                                     <DeleteRoundedIcon sx={{ fontSize: 15 }} />
                                                   </button>
-                                                </>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <>
-                                              <textarea
-                                                placeholder={!isHalfwayDone ? 'Journal will unlock once the event has started' : isGrouped ? 'Only one member needs to submit this reflection for your group.' : 'Write your reflection for this task...'}
-                                                className="journal-textarea"
-                                                value={journalReflections[idx] || ''}
-                                                onChange={(e) => handleJournalChange(idx, e.target.value)}
-                                                disabled={!isHalfwayDone}
-                                              />
-                                              <div className="journal-submit-row">
-                                                {submitStatus[idx] && (
-                                                  <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
                                                 )}
-                                                <button className="activity-submit-button journal-submit-compact" disabled={!isHalfwayDone || !journalReflections[idx]?.trim()} onClick={() => handleJournalSubmit(idx, activity)}>
-                                                  {!isHalfwayDone ? 'LOCKED' : isGrouped ? 'SUBMIT FOR GROUP' : 'SUBMIT'}
-                                                </button>
-                                              </div>
-                                            </>
+                                              </>
+                                            )}
+                                          </div>
+                                          {submitStatus[idx] && (
+                                            <div className={`submit-status journal-submit-status ${submitStatus[idx].includes('submitted') ? 'submit-status-success' : 'submit-status-error'}`}>{submitStatus[idx]}</div>
                                           )}
                                         </div>
                                       )}
@@ -4166,11 +4295,12 @@ export default function EventActivity() {
                 } else {
                   window.showToast?.("Post-Activity Survey submitted!", "success");
                 }
+                const taskProofDone = await getJoinedTaskProofsApproved();
                 await checkAndWriteRequirementsCompleted({
                   preSurveyDone: volunteerProgress?.preSurvey === 'submitted',
                   consentDone: ['submitted', 'verified'].includes(volunteerProgress?.consent),
                   attendanceDone: volunteerProgress?.attendance === 'present',
-                  journalDone: userJournals.length > 0,
+                  journalDone: taskProofDone,
                   postSurveyDone: true,
                 });
                 sessionStorage.setItem('ea_activeNav', activeNavRef.current);

@@ -1138,6 +1138,8 @@ useEffect(() => {
                     pointsEarned: pdata.pointsEarned || 0,
                     completedAt: pdata.completedAt || pdata.lastUpdated || pdata.joinedAt || null,
                     reflection: pdata.reflection || "",
+                    taskPhoto: pdata.taskPhoto || null,
+                    proofType: pdata.taskPhoto?.url ? "photo" : (pdata.reflection ? "legacy_reflection" : ""),
                   };
                 });
             } catch (e) {
@@ -1875,6 +1877,7 @@ useEffect(() => {
                                       <span className="task-title">{t.title}</span>
                                     </div>
                                     <div className="task-right">
+                                      {t.taskPhoto?.url && <a href={t.taskPhoto.url} target="_blank" rel="noreferrer" className="task-status-badge">Photo</a>}
                                       <span className={`task-status-badge task-status-${t.status}`}>{t.status}</span>
                                       {t.pointsEarned > 0 && <span className="task-points">+{t.pointsEarned} pts</span>}
                                     </div>
@@ -2142,7 +2145,7 @@ useEffect(() => {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                       {event.tasksDone.map(t => (
                                         <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 11, paddingLeft: 20 }}>
-                                          <div style={{ color: '#000', fontWeight: 600, fontSize: 11 }}>{t.title} <span style={{ color: '#666', fontWeight: 500, fontSize: 11 }}>· {t.status}</span></div>
+                                          <div style={{ color: '#000', fontWeight: 600, fontSize: 11 }}>{t.title} <span style={{ color: '#666', fontWeight: 500, fontSize: 11 }}>· {t.status}{t.taskPhoto?.url ? ' · Photo' : ''}</span></div>
                                           <div style={{ color: '#000', fontWeight: 600, fontSize: 11 }}>+{t.pointsEarned} pts</div>
                                         </div>
                                       ))}

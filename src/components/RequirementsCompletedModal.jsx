@@ -166,7 +166,7 @@ export default function RequirementsCompletedModal({ reqItem, onDismiss, hasCont
 
         <p className="badge-earned-desc" style={{ color: "#475569" }}>
           You&apos;ve submitted all your requirements for this mission. Please wait while the admin
-          reviews your consent form and task journal — your points will be released once approved.
+          reviews your consent form and task photo proofs — your points will be released once approved.
         </p>
 
         {reqItem.isOrganizer && (
