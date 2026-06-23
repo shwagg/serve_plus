@@ -663,6 +663,7 @@
 .task-photo-proof-link {
   display: block;
   width: fit-content;
+  max-width: 100%;
 }
 
 .task-photo-proof-img {
@@ -673,6 +674,7 @@
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: #fff;
+  display: block;
 }
 
 .task-photo-file-name {
@@ -694,6 +696,8 @@
   justify-content: flex-end;
   gap: 8px;
   padding-top: 4px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .journal-submit-row .journal-submitted-badge {
   margin-right: auto;
@@ -724,6 +728,7 @@
   border-radius: 20px;
   box-shadow: none;
   transform: none !important;
+  white-space: nowrap;
 }
 .journal-submitted-badge {
   font-size: 11px;
@@ -2749,6 +2754,85 @@
   .ea-tab-content { padding: 12px; }
   .ea-strip-progress-bar-wrap { flex: 0 0 60px; }
   .ea-strip-event-title { font-size: clamp(10px, 2.5vw, 13px); z-index: 9999; }
+
+  .task-list-scroll--compact .task-card {
+    padding: 12px;
+  }
+
+  .task-list-scroll--compact .task-card__row {
+    align-items: flex-start;
+  }
+
+  .task-list-scroll--compact .task-card__info {
+    min-width: 0;
+  }
+
+  .task-list-scroll--compact .task-card__title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+
+  .task-list-scroll--compact .task-card__action {
+    gap: 6px;
+  }
+
+  .task-journal-section {
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    min-width: 0;
+  }
+
+  .journal-card {
+    padding: 10px;
+  }
+
+  .task-photo-proof-link,
+  .task-photo-proof-img {
+    width: 100%;
+  }
+
+  .journal-submit-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .journal-submit-row .journal-submitted-badge {
+    grid-column: 1 / -1;
+    margin-right: 0;
+    width: fit-content;
+  }
+
+  .journal-reedit-btn,
+  .journal-submit-compact {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    padding: 9px 10px;
+    font-size: 11px;
+  }
+
+  .journal-submit-compact {
+    grid-column: 1 / -1;
+  }
+
+  .journal-edit-icon-btn {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    border-radius: 999px;
+  }
+
+  .task-photo-capture-note {
+    text-align: left;
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 768px) {

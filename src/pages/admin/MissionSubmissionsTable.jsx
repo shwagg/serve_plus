@@ -1153,56 +1153,56 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
       {/* Task Proof Review Modal */}
       {showJournalModal && journalModalVolunteer && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 11000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          className="task-proof-modal-overlay"
           onClick={() => setShowJournalModal(false)}
         >
           <div
-            style={{ background: "#fff", borderRadius: 16, padding: 32, minWidth: 480, maxWidth: "90vw", boxShadow: "0 4px 24px rgba(0,0,0,0.18)", position: "relative", color: "#202124", maxHeight: "82vh", overflowY: "auto" }}
+            className="task-proof-modal"
             onClick={e => e.stopPropagation()}
           >
             <button className="admin-modal-close admin-modal-close--absolute" onClick={() => setShowJournalModal(false)}>×</button>
-            <h2 style={{ textAlign: "center", marginBottom: 4, color: "#202124", fontSize: "1.05rem", fontWeight: 700 }}>Task Photo Proofs</h2>
-            <p style={{ textAlign: "center", color: "#5f6368", fontSize: "0.85rem", marginBottom: 24 }}>{journalModalVolunteer.name}</p>
+            <h2 className="task-proof-modal-title">Task Photo Proofs</h2>
+            <p className="task-proof-modal-subtitle">{journalModalVolunteer.name}</p>
             {journalModalVolunteer.journals.length === 0 ? (
-              <p style={{ textAlign: "center", color: "#9aa0a6" }}>No task proof submissions found.</p>
+              <p className="task-proof-modal-empty">No task proof submissions found.</p>
             ) : journalModalVolunteer.journals.map(journal => {
               const isApproving = approvingJournal?.volunteerId === journalModalVolunteer.id && approvingJournal?.taskId === journal.taskId;
               return (
-                <div key={journal.taskId} style={{ marginBottom: 20, border: "1px solid #e8eaed", borderRadius: 10, padding: "16px 18px" }}>
-                  <div style={{ marginBottom: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#202124" }}>{journal.taskTitle}</span>
-                    <span style={{ marginLeft: 8, fontSize: "0.72rem", color: "#80868b", background: "#f1f3f4", borderRadius: 99, padding: "1px 7px" }}>
+                <div key={journal.taskId} className="task-proof-review-card">
+                  <div className="task-proof-review-header">
+                    <span className="task-proof-review-title">{journal.taskTitle}</span>
+                    <span className="task-proof-review-type">
                       {journal.type === "grouped" ? "Group" : "Individual"}
                     </span>
                   </div>
                   {journal.taskPhoto?.url ? (
-                    <a href={journal.taskPhoto.url} target="_blank" rel="noreferrer" style={{ display: "inline-block", margin: "0 0 12px 0" }}>
+                    <a href={journal.taskPhoto.url} target="_blank" rel="noreferrer" className="task-proof-review-image-link">
                       <img
                         src={journal.taskPhoto.url}
                         alt={`${journal.taskTitle} proof`}
-                        style={{ width: 220, maxWidth: "100%", aspectRatio: "4 / 3", objectFit: "cover", borderRadius: 8, border: "1px solid #e8eaed", display: "block" }}
+                        className="task-proof-review-image"
                       />
                     </a>
                   ) : (
-                    <p style={{ fontSize: "0.85rem", color: "#3c4043", lineHeight: 1.6, margin: "0 0 12px 0", background: "#f8f9fa", borderRadius: 6, padding: "10px 12px" }}>
-                      <span style={{ display: "inline-block", marginBottom: 6, fontSize: "0.72rem", fontWeight: 700, color: "#1a73e8", background: "#e8f0fe", borderRadius: 999, padding: "2px 8px" }}>Legacy reflection</span>
+                    <p className="task-proof-review-legacy">
+                      <span className="task-proof-review-legacy-label">Legacy reflection</span>
                       <br />
                       {journal.reflection}
                     </p>
                   )}
                   {journal.adminApprovalStatus === "pending" && (
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div className="task-proof-review-actions">
                       <button
                         disabled={isApproving}
                         onClick={() => handleJournalApproval(journalModalVolunteer, journal, "approved")}
-                        style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: isApproving ? "#e6f4ea" : "#137333", color: isApproving ? "#137333" : "#fff", fontWeight: 600, fontSize: "0.78rem", cursor: isApproving ? "not-allowed" : "pointer" }}
+                        className="task-proof-review-btn task-proof-review-btn--approve"
                       >
                         {isApproving ? "Saving…" : "Approve"}
                       </button>
                       <button
                         disabled={isApproving}
                         onClick={() => handleJournalApproval(journalModalVolunteer, journal, "rejected")}
-                        style={{ padding: "5px 14px", borderRadius: 6, border: "1px solid #d93025", background: "#fff", color: "#d93025", fontWeight: 600, fontSize: "0.78rem", cursor: isApproving ? "not-allowed" : "pointer" }}
+                        className="task-proof-review-btn task-proof-review-btn--reject"
                       >
                         Reject
                       </button>
@@ -1210,26 +1210,18 @@ export default function MissionSubmissionsTable({ missionId, missionTitle, refre
                   )}
                   {journal.adminApprovalStatus !== "pending" && (
                     <button
-                      disabled={isApproving}
+                      disabled={isApproving || !!journalModalVolunteer.releasedAt}
                       onClick={() => {
                         if (!journalModalVolunteer.releasedAt && !isApproving) {
                           handleJournalApproval(journalModalVolunteer, journal, "pending");
                         }
                       }}
                       title={journalModalVolunteer.releasedAt ? undefined : "Click to undo and reset to pending"}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "4px 12px", borderRadius: 99, border: "none",
-                        background: journal.adminApprovalStatus === "approved" ? "#dcfce7" : "#fee2e2",
-                        color: journal.adminApprovalStatus === "approved" ? "#137333" : "#d93025",
-                        fontWeight: 700, fontSize: "0.78rem",
-                        cursor: journalModalVolunteer.releasedAt || isApproving ? "default" : "pointer",
-                        opacity: isApproving ? 0.6 : 1,
-                      }}
+                      className={`task-proof-status-pill task-proof-status-pill--${journal.adminApprovalStatus}`}
                     >
-                      {journal.adminApprovalStatus === "approved" ? "✓ Approved" : "✗ Rejected"}
+                      {journal.adminApprovalStatus === "approved" ? "Approved" : "Rejected"}
                       {!journalModalVolunteer.releasedAt && (
-                        <span style={{ fontSize: "0.65rem", opacity: 0.65 }}>↩ undo</span>
+                        <span className="task-proof-status-undo">undo</span>
                       )}
                     </button>
                   )}
