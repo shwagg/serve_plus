@@ -62,6 +62,10 @@ function getUserRoleLabel(role, positionField) {
     return normalizedPosition && normalizedPosition !== 'regular' ? 'Director' : 'Admin';
   }
 
+  if (normalizedRole === 'sysadmin') {
+    return 'System Admin';
+  }
+
   return formatDisplayLabel(role);
 }
 
@@ -339,7 +343,6 @@ export default function Header() {
   const renderMenu = () => {
     const commonProps = {
       userName, userEmail, userUsername, userAvatar,
-      userRoleLabel,
       onLogout: handleLogout,
       onClose: () => setShowMenu(false),
       onOpenSettings: handleOpenSettings,
@@ -420,8 +423,15 @@ export default function Header() {
                       size={28}
                       ringWidth={2}
                     />
-                    {userName && (
-                      <span className="header-greeting">Hi, {userName.trim().split(/\s+/)[0]}!</span>
+                    {(userName || userRoleLabel) && (
+                      <span className="header-user-text">
+                        {userName && (
+                          <span className="header-greeting">Hi, {userName.trim().split(/\s+/)[0]}!</span>
+                        )}
+                        {userRoleLabel && (
+                          <span className="header-role-label">{userRoleLabel}</span>
+                        )}
+                      </span>
                     )}
                     {showMenu ? (
                       <ExpandLessRoundedIcon style={{ fontSize: 26, color: '#000' }} />

@@ -40,7 +40,6 @@ export default function SysAdminMenu({
           <p className="user-name">{displayName}</p>
           <p className="user-email">{userEmail}</p>
         </div>
-        <span className="user-role">Sys Admin</span>
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">

@@ -88,22 +88,6 @@
   text-overflow: ellipsis;
 }
 
-.user-role {
-  display: inline-block;
-  flex-shrink: 0;
-  align-self: center;
-  padding: 3px 10px;
-  background: #f0fdf9;
-  border: 1px solid #d1fae5;
-  border-radius: 20px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #30bdb7;
-  text-transform: capitalize;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
-
 /* ── Divider ─────────────────────────────────────────── */
 .menu-divider {
   height: 1px;

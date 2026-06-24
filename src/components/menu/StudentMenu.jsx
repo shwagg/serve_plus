@@ -48,7 +48,6 @@ export default function StudentMenu({
           <p className="user-name">{displayName}</p>
           <p className="user-email">{userEmail}</p>
         </div>
-        <span className="user-role">Volunteer</span>
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">
