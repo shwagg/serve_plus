@@ -22,6 +22,11 @@ const ROLE_OPTIONS = [
 const BLACKBOARD_ALLOWED_ROLES = new Set(["student", "faculty"]);
 const NON_BLACKBOARD_ALLOWED_ROLES = new Set(["partner", "admin", "sysadmin"]);
 const TOTP_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
+const SHS_DEPARTMENT = "Mapua MCL Senior High School (SHS)";
+const FACULTY_POSITIONS_WITHOUT_DEPARTMENT = new Set([
+  "sao director",
+  "student organization adviser",
+]);
 
 const ROLE_FILTER_OPTIONS = [
   { value: "overall", label: "All" },
@@ -144,7 +149,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
     "E.T. Yuchengco College of Business (ETYCB)",
     "Mapua-Laguna Institute of Aviation (MIA)",
     "Mapua Institute of Technology at Laguna (MITL)",
-    "Mapua MCL Senior High School (SHS)",
+    SHS_DEPARTMENT,
   ];
 
   // Filter states
@@ -166,6 +171,16 @@ export default function RosterAccountManagement({ readOnly = false }) {
     ],
     admin: ["director", "regular"],
   };
+  const normalizedSelectedPosition = String(selectedPosition || "")
+    .trim()
+    .toLowerCase();
+  const facultyPositionSkipsDepartment =
+    selectedRole === "faculty" &&
+    FACULTY_POSITIONS_WITHOUT_DEPARTMENT.has(normalizedSelectedPosition);
+  const facultyDepartmentOptions =
+    selectedRole === "faculty" && normalizedSelectedPosition === "shs principal"
+      ? [SHS_DEPARTMENT]
+      : departments;
 
   useEffect(() => {
     fetchUsers();
@@ -337,9 +352,24 @@ export default function RosterAccountManagement({ readOnly = false }) {
       showToast("Please select a position for this account level.");
       return;
     }
+    const departmentToSave = facultyPositionSkipsDepartment
+      ? ""
+      : normalizedSelectedPosition === "shs principal"
+        ? SHS_DEPARTMENT
+        : selectedDepartment;
+
     // Check if department is required but not selected (faculty only)
-    if (selectedRole === "faculty" && !selectedDepartment) {
+    if (selectedRole === "faculty" && !facultyPositionSkipsDepartment && !departmentToSave) {
       showToast("Please select a department for the faculty account level.");
+      return;
+    }
+
+    if (
+      selectedRole === "faculty" &&
+      normalizedSelectedPosition === "shs principal" &&
+      departmentToSave !== SHS_DEPARTMENT
+    ) {
+      showToast("SHS Principal must be assigned to Mapua MCL Senior High School (SHS).");
       return;
     }
 
@@ -349,7 +379,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
         targetUid: userId,
         role: selectedRole,
         position: selectedPosition || "",
-        department: selectedDepartment || "",
+        department: departmentToSave,
       });
 
       setUsers(
@@ -373,8 +403,12 @@ export default function RosterAccountManagement({ readOnly = false }) {
             updatedUser = {
               ...updatedUser,
               position: selectedPosition,
-              department: selectedDepartment,
             };
+            if (departmentToSave) {
+              updatedUser.department = departmentToSave;
+            } else {
+              delete updatedUser.department;
+            }
             delete updatedUser.skills;
             delete updatedUser.eventHistory;
             delete updatedUser.interests;
@@ -668,9 +702,18 @@ export default function RosterAccountManagement({ readOnly = false }) {
                                 selectedRole === "admin") && (
                                   <select
                                     value={selectedPosition}
-                                    onChange={(e) =>
-                                      setSelectedPosition(e.target.value)
-                                    }
+                                    onChange={(e) => {
+                                      const nextPosition = e.target.value;
+                                      const normalizedNextPosition = nextPosition
+                                        .trim()
+                                        .toLowerCase();
+                                      setSelectedPosition(nextPosition);
+                                      if (FACULTY_POSITIONS_WITHOUT_DEPARTMENT.has(normalizedNextPosition)) {
+                                        setSelectedDepartment("");
+                                      } else if (normalizedNextPosition === "shs principal") {
+                                        setSelectedDepartment(SHS_DEPARTMENT);
+                                      }
+                                    }}
                                     className="role-select"
                                   >
                                     <option value="">Select Position</option>
@@ -684,16 +727,20 @@ export default function RosterAccountManagement({ readOnly = false }) {
                                   </select>
                                 )}
 
-                              {selectedRole === "faculty" && (
+                              {selectedRole === "faculty" && !facultyPositionSkipsDepartment && (
                                 <select
-                                  value={selectedDepartment}
+                                  value={
+                                    normalizedSelectedPosition === "shs principal"
+                                      ? SHS_DEPARTMENT
+                                      : selectedDepartment
+                                  }
                                   onChange={(e) =>
                                     setSelectedDepartment(e.target.value)
                                   }
                                   className="role-select"
                                 >
                                   <option value="">Select Department</option>
-                                  {departments.map((dept) => (
+                                  {facultyDepartmentOptions.map((dept) => (
                                     <option key={dept} value={dept}>
                                       {dept}
                                     </option>

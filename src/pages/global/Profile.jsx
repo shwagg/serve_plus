@@ -49,7 +49,11 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
   const [profileGlow, setProfileGlow] = useState(initialGlow);
   const [pinnedBadges, setPinnedBadges] = useState(initialPinned);
   const normalizedRole = String(role || "").toLowerCase();
-  const showDepartmentFields = !["partner", "sysadmin", "admin"].includes(normalizedRole);
+  const isFacultyProfile = normalizedRole === "faculty";
+  const canEditDepartmentFields = !["partner", "sysadmin", "admin", "faculty"].includes(normalizedRole);
+  const showDepartmentFields =
+    canEditDepartmentFields ||
+    (isFacultyProfile && Boolean(profile.department || department));
 
   // Reset state when modal opens or profile changes
   useEffect(() => {
@@ -149,6 +153,31 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
     }
   };
 
+  const handleConfirm = () => {
+    const updatedProfile = {
+      avatar,
+      name,
+      email,
+      username,
+      organizationName,
+      skills,
+      interests,
+      activeFrame: selectedFrame,
+      bio,
+      profileBgColor,
+      profileTitle,
+      profileGlow,
+      pinnedBadges,
+    };
+
+    if (!isFacultyProfile) {
+      updatedProfile.department = department;
+      updatedProfile.program = program;
+    }
+
+    onConfirm(updatedProfile);
+  };
+
   if (!open) return null;
   return (
     <div className="profile-modal-bg">
@@ -210,22 +239,32 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
           {showDepartmentFields && (
             <div>
               <label className="profile-modal-label">Department</label><br />
-              <select value={department} onChange={e => { setDepartment(e.target.value); setProgram(""); }} className="profile-modal-input">
-                <option value="">Select department</option>
-                <option value="College of Arts and Science (CAS)">College of Arts and Science (CAS)</option>
-                <option value="College of Computer and Information Science (CCIS)">College of Computer and Information Science (CCIS)</option>
-                <option value="College of Health Sciences (CHS)">College of Health Sciences (CHS)</option>
-                <option value="College of Nursing (CN)">College of Nursing (CN)</option>
-                <option value="College of Maritime Education and Training (CMET)">College of Maritime Education and Training (CMET)</option>
-                <option value="E.T. Yuchengco College of Business (ETYCB)">E.T. Yuchengco College of Business (ETYCB)</option>
-                <option value="Mapua-Laguna Institute of Aviation (MIA)">Mapua-Laguna Institute of Aviation (MIA)</option>
-                <option value="Mapua Institute of Technology at Laguna (MITL)">Mapua Institute of Technology at Laguna (MITL)</option>
-                <option value="Mapua MCL Senior High School (SHS)">Mapua MCL Senior High School (SHS)</option>
-                <option value="Non-Academic Organization">Non-Academic Organization</option>
-              </select>
+              {canEditDepartmentFields ? (
+                <select value={department} onChange={e => { setDepartment(e.target.value); setProgram(""); }} className="profile-modal-input">
+                  <option value="">Select department</option>
+                  <option value="College of Arts and Science (CAS)">College of Arts and Science (CAS)</option>
+                  <option value="College of Computer and Information Science (CCIS)">College of Computer and Information Science (CCIS)</option>
+                  <option value="College of Health Sciences (CHS)">College of Health Sciences (CHS)</option>
+                  <option value="College of Nursing (CN)">College of Nursing (CN)</option>
+                  <option value="College of Maritime Education and Training (CMET)">College of Maritime Education and Training (CMET)</option>
+                  <option value="E.T. Yuchengco College of Business (ETYCB)">E.T. Yuchengco College of Business (ETYCB)</option>
+                  <option value="Mapua-Laguna Institute of Aviation (MIA)">Mapua-Laguna Institute of Aviation (MIA)</option>
+                  <option value="Mapua Institute of Technology at Laguna (MITL)">Mapua Institute of Technology at Laguna (MITL)</option>
+                  <option value="Mapua MCL Senior High School (SHS)">Mapua MCL Senior High School (SHS)</option>
+                  <option value="Non-Academic Organization">Non-Academic Organization</option>
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={department}
+                  className="profile-modal-input"
+                  disabled
+                  style={{ opacity: 0.65, cursor: 'not-allowed' }}
+                />
+              )}
             </div>
           )}
-          {showDepartmentFields && department && departmentPrograms[department] && departmentPrograms[department].length > 0 && (
+          {canEditDepartmentFields && department && departmentPrograms[department] && departmentPrograms[department].length > 0 && (
             <div>
               <label className="profile-modal-label">Program</label><br />
               <select value={program} onChange={e => setProgram(e.target.value)} className="profile-modal-input">
@@ -512,7 +551,7 @@ function EditProfileModal({ open, onClose, profile, onConfirm, role, level = 1, 
         </div>
         <div className="profile-modal-btn-row">
           <button onClick={onClose} className="profile-modal-cancel-btn">Cancel</button>
-          <button onClick={() => onConfirm({ avatar, name, email, username, organizationName, department, program, skills, interests, activeFrame: selectedFrame, bio, profileBgColor, profileTitle, profileGlow, pinnedBadges })} className="profile-modal-confirm-btn">Confirm</button>
+          <button onClick={handleConfirm} className="profile-modal-confirm-btn">Confirm</button>
         </div>
       </div>
     </div>
@@ -1528,25 +1567,30 @@ useEffect(() => {
               try {
                 const user = auth.currentUser;
                 if (!user) throw new Error("No user logged in");
+                const updatePayload = { ...updated };
+                if (profileRole === "faculty") {
+                  delete updatePayload.department;
+                  delete updatePayload.program;
+                }
                 // Update Firestore user profile
                 const userRef = doc(db, "users", user.uid);
                 await import("firebase/firestore").then(({ updateDoc, setDoc }) =>
-                  updateDoc(userRef, updated).catch(async err => {
+                  updateDoc(userRef, updatePayload).catch(async err => {
                     // If doc doesn't exist, create it
                     if (err.code === "not-found") {
-                      await setDoc(userRef, updated);
+                      await setDoc(userRef, updatePayload);
                     } else {
                       throw err;
                     }
                   })
                 );
-                setProfile(prev => ({ ...prev, ...updated }));
-                if (updated.activeFrame) setActiveFrame(updated.activeFrame);
-                if ('bio'            in updated) setBio(updated.bio ?? '');
-                if ('profileBgColor' in updated) setProfileBgColor(updated.profileBgColor ?? '');
-                if ('profileTitle'   in updated) setProfileTitle(updated.profileTitle ?? '');
-                if ('profileGlow'    in updated) setProfileGlow(updated.profileGlow ?? '');
-                if (Array.isArray(updated.pinnedBadges)) setPinnedBadges(updated.pinnedBadges);
+                setProfile(prev => ({ ...prev, ...updatePayload }));
+                if (updatePayload.activeFrame) setActiveFrame(updatePayload.activeFrame);
+                if ('bio'            in updatePayload) setBio(updatePayload.bio ?? '');
+                if ('profileBgColor' in updatePayload) setProfileBgColor(updatePayload.profileBgColor ?? '');
+                if ('profileTitle'   in updatePayload) setProfileTitle(updatePayload.profileTitle ?? '');
+                if ('profileGlow'    in updatePayload) setProfileGlow(updatePayload.profileGlow ?? '');
+                if (Array.isArray(updatePayload.pinnedBadges)) setPinnedBadges(updatePayload.pinnedBadges);
                 refreshUserData();
                 setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
               } catch (err) {

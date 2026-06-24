@@ -24,6 +24,11 @@ const FACULTY_POSITIONS = new Set([
 ]);
 const ADMIN_POSITIONS = new Set(["director", "regular"]);
 const MFA_SESSION_COLLECTION = "mfaSessions";
+const SHS_DEPARTMENT = "Mapua MCL Senior High School (SHS)";
+const FACULTY_POSITIONS_WITHOUT_DEPARTMENT = new Set([
+  "sao director",
+  "student organization adviser",
+]);
 
 function getDb() {
   return admin.firestore();
@@ -93,10 +98,19 @@ function validateRoleUpdate({targetData, role, position, department}) {
       );
     }
 
-    if (!department) {
+    const skipsDepartment = FACULTY_POSITIONS_WITHOUT_DEPARTMENT.has(position);
+
+    if (!skipsDepartment && !department) {
       throw new HttpsError(
         "invalid-argument",
         "Please select a department for the faculty account level.",
+      );
+    }
+
+    if (position === "shs principal" && department !== SHS_DEPARTMENT) {
+      throw new HttpsError(
+        "invalid-argument",
+        "SHS Principal must be assigned to Mapua MCL Senior High School (SHS).",
       );
     }
   }
@@ -143,7 +157,9 @@ function buildRoleUpdateData({targetData, role, position, department}) {
     return {
       ...sharedNonStudentFields,
       position,
-      department,
+      department: FACULTY_POSITIONS_WITHOUT_DEPARTMENT.has(position) ?
+        FieldValue.delete() :
+        department,
     };
   }
 
