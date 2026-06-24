@@ -11,6 +11,7 @@ export default function FacultyMenu({
   userEmail,
   userUsername,
   userAvatar,
+  userRoleLabel = "Faculty",
   onLogout,
   onClose,
   onCreateProposal,
@@ -48,7 +49,7 @@ export default function FacultyMenu({
           <p className="user-name">{displayName}</p>
           <p className="user-email">{userEmail}</p>
         </div>
-        <span className="user-role">Faculty</span>
+        <span className="user-role">{userRoleLabel}</span>
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">

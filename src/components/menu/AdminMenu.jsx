@@ -9,6 +9,7 @@ export default function AdminMenu({
   userEmail,
   userUsername,
   userAvatar,
+  userRoleLabel = "Admin",
   onLogout,
   onClose,
   onCreateProposal,
@@ -43,7 +44,7 @@ export default function AdminMenu({
           <p className="user-name">{displayName}</p>
           <p className="user-email">{userEmail}</p>
         </div>
-        <span className="user-role">Admin</span>
+        <span className="user-role">{userRoleLabel}</span>
       </button>
       <div className="menu-divider"></div>
       <div className="menu-items">

@@ -32,6 +32,39 @@ function normalizeValue(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function formatDisplayLabel(value) {
+  return String(value || '')
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function getPrimaryPosition(positionField) {
+  if (Array.isArray(positionField)) {
+    return positionField.find((position) => String(position || '').trim()) || '';
+  }
+  return positionField || '';
+}
+
+function getUserRoleLabel(role, positionField) {
+  const normalizedRole = normalizeValue(role);
+  const position = getPrimaryPosition(positionField);
+  const normalizedPosition = normalizeValue(position);
+
+  if (normalizedRole === 'faculty') {
+    return normalizedPosition && normalizedPosition !== 'regular'
+      ? formatDisplayLabel(position)
+      : 'Faculty';
+  }
+
+  if (normalizedRole === 'admin') {
+    return normalizedPosition && normalizedPosition !== 'regular' ? 'Director' : 'Admin';
+  }
+
+  return formatDisplayLabel(role);
+}
+
 function canUserCreateProposal(role, authProvider) {
   const normalizedRole = normalizeValue(role);
   if (normalizedRole === 'admin') return true;
@@ -90,6 +123,8 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
 export default function Header() {
   const { userData } = useSession();
   const userRole = userData?.role || null;
+  const userPosition = userData?.position || userData?.positions || '';
+  const userRoleLabel = getUserRoleLabel(userRole, userPosition);
   const userAuthProvider = userData?.authProvider || '';
   const canCreateProposal = canUserCreateProposal(userRole, userAuthProvider);
   const userName = userData?.name || '';
@@ -304,6 +339,7 @@ export default function Header() {
   const renderMenu = () => {
     const commonProps = {
       userName, userEmail, userUsername, userAvatar,
+      userRoleLabel,
       onLogout: handleLogout,
       onClose: () => setShowMenu(false),
       onOpenSettings: handleOpenSettings,
