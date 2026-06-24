@@ -20,8 +20,14 @@ const {
   recordLoginFailureForEmail,
 } = require("./loginAttempts");
 
-const REQUIRED_MFA_ROLES = new Set(["student", "faculty", "admin"]);
-const EXEMPT_MFA_ROLES = new Set(["partner", "sysadmin"]);
+const REQUIRED_MFA_ROLES = new Set([
+  "student",
+  "faculty",
+  "admin",
+  "partner",
+  "sysadmin",
+]);
+const EXEMPT_MFA_ROLES = new Set();
 const MFA_SESSION_TTL_MS = 10 * 60 * 1000;
 const MAX_MFA_ATTEMPTS = 5;
 const TOTP_STEP_SECONDS = 30;
