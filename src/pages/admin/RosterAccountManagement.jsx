@@ -450,7 +450,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
       setSelectedDepartment("");
       showToast(
         result.data?.roleChanged ?
-          "Account level updated. The user has been logged out." :
+          "Account level updated. The user's page will refresh to the new role." :
           "Account details updated.",
       );
     } catch (err) {

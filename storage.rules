@@ -5,6 +5,16 @@ rules_version = '2';
 //    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    function isAdmin() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isAccountManager() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ["admin", "sysadmin"];
+    }
+
     // Chat attachments: allow authenticated users to upload and read
     match /chat-attachments/{missionId}/{fileName} {
       allow write: if request.auth != null;
@@ -13,8 +23,7 @@ service firebase.storage {
 
     // Mission cover photos: only admins can upload; authenticated users can read
     match /mission-covers/{missionId}/{fileName} {
-      allow write: if request.auth != null
-                   && request.auth.token.role == "admin"
+      allow write: if isAccountManager()
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
       allow read: if request.auth != null;
@@ -35,8 +44,8 @@ service firebase.storage {
 
     // Consent uploads: allow authenticated users and admins to upload and read consent files
     match /consents/{missionId}/{userId}/{fileName} {
-      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.role == "admin");
-      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.role == "admin");
+      allow write: if request.auth != null && (request.auth.uid == userId || isAccountManager());
+      allow read: if request.auth != null && (request.auth.uid == userId || isAccountManager());
     }
 
     // Task photo proofs: students upload their own image proof; authenticated reviewers can read
@@ -47,12 +56,45 @@ service firebase.storage {
                            && request.resource.size < 5 * 1024 * 1024
                            && request.resource.contentType.matches('image/.*');
       allow delete: if request.auth != null
-                    && (request.auth.uid == userId || request.auth.token.role == "admin");
+                    && (request.auth.uid == userId || isAccountManager());
+    }
+
+    // Profile gallery uploads: users manage their own gallery images
+    match /gallery/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Event certificates: admins/sysadmins issue; owners and managers can read
+    match /event-certificates/{userId}/{fileName} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAccountManager());
+      allow write: if isAccountManager()
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('application/pdf');
+    }
+
+    // Custom badge artwork: managed by admins/sysadmins, visible to clients
+    match /badges/custom/{fileName} {
+      allow read: if true;
+      allow write: if isAccountManager()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Accomplishment report photos: admins/sysadmins submit report media
+    match /accomplishment_reports/{missionId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if isAccountManager()
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
     }
 
     // Default: deny all other access
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

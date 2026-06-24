@@ -210,7 +210,7 @@ async function writeRoleChangeAudit({
   position,
   department,
   clearedMfaSessions,
-  refreshTokensRevoked,
+  sessionPreserved,
 }) {
   await getDb().collection("auditLogs").add({
     action: "ROLE_CHANGED",
@@ -227,7 +227,7 @@ async function writeRoleChangeAudit({
       newPosition: position || "",
       newDepartment: department || "",
       clearedMfaSessions,
-      refreshTokensRevoked,
+      sessionPreserved,
     },
     timestamp: FieldValue.serverTimestamp(),
   });
@@ -276,10 +276,6 @@ async function changeUserRole(request) {
     await clearMfaSessionsForUser(targetUid) :
     0;
 
-  if (roleChanged) {
-    await admin.auth().revokeRefreshTokens(targetUid);
-  }
-
   await writeRoleChangeAudit({
     actor,
     targetUid,
@@ -289,7 +285,7 @@ async function changeUserRole(request) {
     position,
     department,
     clearedMfaSessions,
-    refreshTokensRevoked: roleChanged,
+    sessionPreserved: roleChanged,
   });
 
   return {

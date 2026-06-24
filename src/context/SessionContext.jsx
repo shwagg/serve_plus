@@ -5,6 +5,7 @@ import { getIdTokenResult, signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { showToast } from "../utils/toast";
 import { SessionContext } from "./sessionContextCore";
+import { getRoleRedirectPath } from "../utils/roleRedirect";
 
 const SESSION_TIMEOUTS = {
   admin:    10 * 60 * 1000,  // 10 minutes
@@ -14,10 +15,7 @@ const SESSION_TIMEOUTS = {
   partner:  30 * 60 * 1000,  // 30 minutes
 };
 const DEFAULT_TIMEOUT = 10 * 60 * 1000;
-const MFA_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
-const ROLE_CHANGED_LOGOUT_NOTICE = "roleChangedLogout";
-const ROLE_CHANGED_LOGOUT_MESSAGE =
-  "Your role has been changed. You have been logged out of your session.";
+const MFA_REQUIRED_ROLES = new Set(["student", "faculty", "admin", "partner", "sysadmin"]);
 
 export function SessionProvider({ children }) {
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -29,7 +27,7 @@ export function SessionProvider({ children }) {
   const isLoggingOutRef = useRef(false);
   const userDocUnsubscribeRef = useRef(null);
   const observedRoleRef = useRef(null);
-  const roleChangedLogoutRef = useRef(false);
+  const roleChangeRefreshRef = useRef(false);
 
   useEffect(() => {
     userDataRef.current = userData;
@@ -92,49 +90,6 @@ export function SessionProvider({ children }) {
     }
   }, []);
 
-  const handleRoleChangedLogout = useCallback(async () => {
-    if (isLoggingOutRef.current || roleChangedLogoutRef.current) return;
-
-    roleChangedLogoutRef.current = true;
-    setIsLoggingOut(true);
-    isLoggingOutRef.current = true;
-
-    try {
-      const user = auth.currentUser;
-
-      if (user) {
-        try {
-          const logLogout = httpsCallable(functions, "logLogout");
-          logLogout({ uid: user.uid }).catch(() => {});
-        } catch (error) {
-          console.error("Audit log (role-change logout) failed:", error);
-        }
-      }
-
-      try {
-        sessionStorage.setItem(
-          ROLE_CHANGED_LOGOUT_NOTICE,
-          ROLE_CHANGED_LOGOUT_MESSAGE,
-        );
-      } catch {
-        // Ignore unavailable sessionStorage.
-      }
-
-      await signOut(auth);
-      setIsSessionActive(false);
-      setUserData(null);
-      clearInactivityTimer();
-      clearUserDocSubscription();
-      window.location.href = "/auth";
-    } catch (error) {
-      console.error("Error during role-change logout:", error);
-    } finally {
-      setIsLoggingOut(false);
-      isLoggingOutRef.current = false;
-      roleChangedLogoutRef.current = false;
-    }
-  }, [clearInactivityTimer, clearUserDocSubscription]);
-
   const resetInactivityTimer = useCallback(() => {
     clearInactivityTimer();
 
@@ -145,6 +100,27 @@ export function SessionProvider({ children }) {
       handleSessionTimeout();
     }, timeout);
   }, [clearInactivityTimer, handleSessionTimeout]);
+
+  const handleRoleChangedRefresh = useCallback((nextData) => {
+    if (isLoggingOutRef.current || roleChangeRefreshRef.current) return;
+
+    const nextRole = nextData?.role || null;
+    if (!nextRole) return;
+
+    roleChangeRefreshRef.current = true;
+    observedRoleRef.current = nextRole;
+    userDataRef.current = nextData;
+    setUserData(nextData);
+    resetInactivityTimer();
+
+    try {
+      sessionStorage.setItem("roleChangedRefresh", "1");
+    } catch {
+      // Ignore unavailable sessionStorage.
+    }
+
+    window.location.replace(getRoleRedirectPath(nextRole));
+  }, [resetInactivityTimer]);
 
   const setupActivityListeners = useCallback(() => {
     const events = ["mousedown", "keydown", "scroll", "touchstart", "click"];
@@ -215,7 +191,7 @@ export function SessionProvider({ children }) {
                   const nextRole = nextData.role || null;
 
                   if (previousRole && nextRole && previousRole !== nextRole) {
-                    handleRoleChangedLogout();
+                    handleRoleChangedRefresh(nextData);
                     return;
                   }
 
@@ -280,7 +256,7 @@ export function SessionProvider({ children }) {
   }, [
     clearInactivityTimer,
     clearUserDocSubscription,
-    handleRoleChangedLogout,
+    handleRoleChangedRefresh,
     resetInactivityTimer,
   ]);
 

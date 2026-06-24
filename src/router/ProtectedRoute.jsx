@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useSession } from "../context/useSession";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getRoleRedirectPath } from "../utils/roleRedirect";
 
 export function ProtectedRoute({ children, allowedRoles }) {
   const { userData, isSessionActive, authLoading } = useSession();
@@ -26,9 +27,9 @@ export function ProtectedRoute({ children, allowedRoles }) {
     return children;
   }
 
-  // If role is not allowed, goes back to login
+  // If the signed-in user's role changed, move them to their new role area.
   if (!allowedRoles.includes(userData?.role)) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to={getRoleRedirectPath(userData?.role)} replace />;
   }
 
   return children;
