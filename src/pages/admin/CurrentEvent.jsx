@@ -20,6 +20,7 @@ import MissionSubmissionsTable from "./MissionSubmissionsTable";
 import { computeAverageRating, getProgramMultiplier } from "../../hooks/rewardSystem";
 import { exportAccomplishmentPDF } from "../global/exportAccomplishmentPDF";
 import { issueCertificate } from "../../utils/certificateUtils";
+import TargetDatePicker from "../../components/TargetDatePicker";
 
 // ── helpers ───────────────────────────────────────────────────────────
 const ROSTER_ROLE_TAG = {
@@ -238,9 +239,6 @@ export default function CurrentEvent() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [editDetailsData, setEditDetailsData] = useState({});
   const [savingDetails, setSavingDetails] = useState(false);
-  const [calOpen, setCalOpen] = useState(false);
-  const [calViewYear, setCalViewYear] = useState(new Date().getFullYear());
-  const [calViewMonth, setCalViewMonth] = useState(new Date().getMonth());
 
   // ── community feedback tab state ─────────────────────────────────
   const [feedbackResponses, setFeedbackResponses] = useState([]);
@@ -356,16 +354,22 @@ export default function CurrentEvent() {
     // Published missions: only the target date may be changed
     if (missionData?.status === "published") {
       if (!editDetailsData.targetDate) { showToast("Target date is required."); return; }
+      // Normalise the existing date to a YYYY-MM-DD string for comparison
+      let oldDateStr = "";
+      if (missionData.targetDate?.toDate) {
+        oldDateStr = missionData.targetDate.toDate().toLocaleDateString("en-CA");
+      } else if (typeof missionData.targetDate === "string") {
+        oldDateStr = missionData.targetDate;
+      }
+      const newDateStr = editDetailsData.targetDate;
+      if (newDateStr === oldDateStr) {
+        setEditingDetails(false);
+        return;
+      }
+      if (!await showConfirm("Do you really want to change the date?")) return;
+
       setSavingDetails(true);
       try {
-        // Normalise the existing date to a YYYY-MM-DD string for comparison
-        let oldDateStr = "";
-        if (missionData.targetDate?.toDate) {
-          oldDateStr = missionData.targetDate.toDate().toLocaleDateString("en-CA");
-        } else if (typeof missionData.targetDate === "string") {
-          oldDateStr = missionData.targetDate;
-        }
-        const newDateStr = editDetailsData.targetDate;
 
         const updatePayload = { targetDate: newDateStr, updatedAt: serverTimestamp() };
         // On first date change, freeze the approved date as plannedTargetDate
@@ -558,17 +562,6 @@ export default function CurrentEvent() {
   useEffect(() => {
     if (activeTab === "docs") setDocsTabVisited(true);
   }, [activeTab]);
-
-  useEffect(() => {
-    if (editingDetails && missionData?.status === "published") {
-      const d = editDetailsData.targetDate ? new Date(editDetailsData.targetDate + "T00:00:00") : new Date();
-      setCalViewYear(d.getFullYear());
-      setCalViewMonth(d.getMonth());
-      setTimeout(() => setCalOpen(true), 60);
-    } else {
-      setCalOpen(false);
-    }
-  }, [editingDetails]);
 
   useEffect(() => {
     if (!missionId || activeTab !== "feedback") return;
@@ -1861,22 +1854,6 @@ export default function CurrentEvent() {
                 const dGrayBg = de ? "#f4f6f8" : "#f1f5f9";
                 const dCellBg = de ? "#fafbfc" : "transparent";
 
-                const CAL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-                const CAL_DAYS   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
-                const selDate    = editDetailsData.targetDate ? new Date(editDetailsData.targetDate + "T00:00:00") : null;
-                const totalCells = new Date(calViewYear, calViewMonth, 1).getDay();
-                const daysInMo   = new Date(calViewYear, calViewMonth + 1, 0).getDate();
-                const prevMo = () => { if (calViewMonth === 0) { setCalViewMonth(11); setCalViewYear(y => y - 1); } else setCalViewMonth(m => m - 1); };
-                const nextMo = () => { if (calViewMonth === 11) { setCalViewMonth(0); setCalViewYear(y => y + 1); } else setCalViewMonth(m => m + 1); };
-                const pickDay = d => {
-                  const val = `${calViewYear}-${String(calViewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-                  setEditDetailsData(p => ({ ...p, targetDate: val }));
-                  setCalOpen(false);
-                };
-                const isSelected = d => selDate && d === selDate.getDate() && calViewMonth === selDate.getMonth() && calViewYear === selDate.getFullYear();
-                const today = new Date();
-                const isToday = d => d === today.getDate() && calViewMonth === today.getMonth() && calViewYear === today.getFullYear();
-
                 return (
                 <>
                   <div style={{ border: "1.5px solid #94a3b8", borderRadius: 8, overflow: "hidden" }}>
@@ -1954,35 +1931,14 @@ export default function CurrentEvent() {
                         <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Target Date</div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                           {de ? (
-                            <div style={{ position: "relative", flex: 1 }}>
-                              <div onClick={() => setCalOpen(o => !o)}
-                                style={{ padding: "5px 10px", border: "1.5px solid #1a73e8", borderRadius: 7, fontSize: "0.88rem", cursor: "pointer", color: "#1e293b", background: "#fff", userSelect: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                                <span>{editDetailsData.targetDate || "Select date…"}</span>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                                </svg>
-                              </div>
-                              {calOpen && (
-                                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 1200, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "12px", boxShadow: "0 6px 24px rgba(0,0,0,0.14)", minWidth: 248 }}>
-                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                                    <button onClick={prevMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>‹</button>
-                                    <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "#1e293b" }}>{CAL_MONTHS[calViewMonth]} {calViewYear}</span>
-                                    <button onClick={nextMo} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#475569", padding: "2px 6px" }}>›</button>
-                                  </div>
-                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center" }}>
-                                    {CAL_DAYS.map(d => <div key={d} style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", padding: "2px 0", marginBottom: 2 }}>{d}</div>)}
-                                    {Array.from({ length: totalCells }).map((_, i) => <div key={"e" + i} />)}
-                                    {Array.from({ length: daysInMo }, (_, i) => i + 1).map(d => (
-                                      <div key={d} onClick={() => pickDay(d)}
-                                        style={{ padding: "5px 2px", fontSize: "0.82rem", borderRadius: 6, cursor: "pointer",
-                                          background: isSelected(d) ? "#1a73e8" : isToday(d) ? "#e8f0fe" : "transparent",
-                                          color: isSelected(d) ? "#fff" : isToday(d) ? "#1a73e8" : "#1e293b" }}>
-                                        {d}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                            <div style={{ flex: 1 }}>
+                              <TargetDatePicker
+                                id="event-target-date"
+                                name="targetDate"
+                                value={editDetailsData.targetDate || ""}
+                                onChange={e => setEditDetailsData(p => ({ ...p, targetDate: e.target.value }))}
+                                required
+                              />
                             </div>
                           ) : (
                             <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.targetDate || "—"}</div>
