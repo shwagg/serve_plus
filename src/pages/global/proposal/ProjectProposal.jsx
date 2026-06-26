@@ -117,6 +117,123 @@ function CustomSelect({ id, name, value, onChange, options, placeholder }) {
   );
 }
 
+function parseLocalDate(dateString) {
+  const [year, month, day] = String(dateString).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDateValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Calendar control with explicitly styled unavailable dates. Native date inputs do
+ * not expose their calendar-day elements for styling, so their disabled-day colors
+ * differ by browser and operating system.
+ */
+function TargetDatePicker({ id, name, value, onChange, minDate, maxDate, required }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => parseLocalDate(value || minDate));
+  const pickerRef = useRef(null);
+  const selectedDate = value ? parseLocalDate(value) : null;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleOutsideClick = event => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isOpen]);
+
+  const firstDayOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+  const calendarStart = new Date(firstDayOfMonth);
+  calendarStart.setDate(1 - firstDayOfMonth.getDay());
+  const monthLabel = visibleMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const selectedLabel = selectedDate
+    ? selectedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Select target date';
+
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(calendarStart);
+    date.setDate(calendarStart.getDate() + index);
+    const dateValue = formatDateValue(date);
+    return {
+      date,
+      dateValue,
+      isCurrentMonth: date.getMonth() === visibleMonth.getMonth(),
+      isDisabled: dateValue < minDate || dateValue > maxDate,
+    };
+  });
+
+  return (
+    <div className="target-date-picker" ref={pickerRef}>
+      <button
+        type="button"
+        id={id}
+        className={`target-date-trigger${value ? '' : ' placeholder'}`}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-required={required}
+        onClick={() => {
+          if (!isOpen) setVisibleMonth(parseLocalDate(value || minDate));
+          setIsOpen(open => !open);
+        }}
+      >
+        <span>{selectedLabel}</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+      {isOpen && (
+        <div className="target-date-calendar" role="dialog" aria-label="Choose target date">
+          <div className="target-date-calendar-header">
+            <button
+              type="button"
+              className="calendar-nav-button"
+              aria-label="Previous month"
+              onClick={() => setVisibleMonth(current => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+            >
+              ‹
+            </button>
+            <strong>{monthLabel}</strong>
+            <button
+              type="button"
+              className="calendar-nav-button"
+              aria-label="Next month"
+              onClick={() => setVisibleMonth(current => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+            >
+              ›
+            </button>
+          </div>
+          <div className="calendar-weekdays" aria-hidden="true">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <span key={day}>{day}</span>)}
+          </div>
+          <div className="calendar-days">
+            {days.map(({ date, dateValue, isCurrentMonth, isDisabled }) => {
+              const isSelected = dateValue === value;
+              return (
+                <button
+                  key={dateValue}
+                  type="button"
+                  className={`calendar-day${isDisabled ? ' disabled' : ''}${!isCurrentMonth ? ' outside-month' : ''}${isSelected ? ' selected' : ''}`}
+                  disabled={isDisabled}
+                  aria-label={date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                  aria-pressed={isSelected}
+                  onClick={() => {
+                    onChange({ target: { name, value: dateValue } });
+                    setIsOpen(false);
+                  }}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Tag input for proponents. Pressing Enter or comma commits the typed name as a tag.
  * The first `lockedCount` tags show a lock instead of a remove button.
@@ -756,13 +873,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     "-" +
     String(maxTargetDate.getDate()).padStart(2, "0");
 
-  const preventManualDateInput = (e) => {
-    const allowedKeys = ['Tab', 'Shift', 'Escape'];
-    if (!allowedKeys.includes(e.key)) {
-      e.preventDefault();
-    }
-  };
-
   const handleNumericKeyDown = (e) => {
     const allowedKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
     if (allowedKeys.includes(e.key)) return;
@@ -994,17 +1104,13 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                 <small className="date-hint">
                   Must be at least 1 month from today and no later than 5 months from today.
                 </small>
-                <input
-                  type="date"
+                <TargetDatePicker
                   id="targetDate"
                   name="targetDate"
                   value={formData.targetDate}
                   onChange={handleInputChange}
-                  onKeyDown={preventManualDateInput}
-                  onPaste={e => e.preventDefault()}
-                  onDrop={e => e.preventDefault()}
-                  min={minDateString}
-                  max={maxDateString}
+                  minDate={minDateString}
+                  maxDate={maxDateString}
                   required
                 />
                 {fieldErrors.targetDate && <small className="field-limit-hint error">{fieldErrors.targetDate}</small>}
