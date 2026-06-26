@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useContext, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { showToast, showConfirm } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
 import { createNotification } from "../../utils/notificationUtils";
@@ -210,11 +210,48 @@ export default function AdminProjects() {
     e.stopPropagation();
     if (!await showConfirm(`Publish "${project.title}"? Volunteers will be able to join the event.`)) return;
     try {
-      await updateDoc(doc(db, "missions", project.id), {
+      const taskCollectionRef = collection(db, "missions", project.id, "task");
+      const existingTasksSnap = await getDocs(taskCollectionRef);
+      const existingTaskIds = new Set(existingTasksSnap.docs.map(taskDoc => taskDoc.id));
+      const activities = Array.isArray(project.specificActivities)
+        ? project.specificActivities
+          .map(item => String(typeof item === "string" ? item : item?.name || item?.title || "").trim())
+          .filter(Boolean)
+        : [];
+      const batch = writeBatch(db);
+
+      activities.forEach((activityTitle, index) => {
+        const taskRef = doc(db, "missions", project.id, "task", String(index));
+        const proposalTaskFields = {
+          title: activityTitle,
+          sourceActivityIndex: index,
+          sourceActivityTitle: activityTitle,
+          isProposalActivity: true,
+          updatedAt: serverTimestamp(),
+        };
+
+        if (existingTaskIds.has(String(index))) {
+          batch.set(taskRef, proposalTaskFields, { merge: true });
+        } else {
+          batch.set(taskRef, {
+            ...proposalTaskFields,
+            description: "",
+            points: 0,
+            type: "individual",
+            maxParticipants: 5,
+            participantCount: 0,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      const projectRef = doc(db, "missions", project.id);
+      batch.update(projectRef, {
         status: "published",
         publishedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      await batch.commit();
       logAudit({
         action: "PROPOSAL_PUBLISHED",
         category: "proposal",

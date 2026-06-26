@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
 import { showToast } from '../../utils/toast';
@@ -195,7 +195,7 @@ function SummaryPanel({
         const chairName = chairSnap.docs.length > 0 ? (chairSnap.docs[0].data().name || '') : '';
         const deanName  = deanSnap.docs.length  > 0 ? (deanSnap.docs[0].data().name  || '') : '';
         approvalFlow = [chairName, deanName, 'Admin Regular', 'Admin Director'];
-      } catch (e) {
+      } catch {
         approvalFlow = [];
       }
 
@@ -287,22 +287,6 @@ function SummaryPanel({
           projectType: projectType,
         },
       });
-
-      // Create task subcollection documents from specific activities
-      const activities = Array.isArray(formData.specificActivities) ? formData.specificActivities : [];
-      for (let i = 0; i < activities.length; i++) {
-        try {
-          await setDoc(doc(db, 'missions', docRef.id, 'task', String(i)), {
-            title: activities[i],
-            description: '',
-            points: 0,
-            type: 'individual',
-            createdAt: new Date().toISOString(),
-          });
-        } catch (taskErr) {
-          console.warn('Failed to create task:', activities[i], taskErr);
-        }
-      }
 
       try {
         await createNotification(user.uid, {

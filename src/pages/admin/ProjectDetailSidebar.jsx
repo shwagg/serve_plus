@@ -426,7 +426,9 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const handleEditTask = async (e) => {
     e.preventDefault();
     const currentTotal = tasks.reduce((s, t) => s + (Number(t.points) || 0), 0);
-    const existingPts = tasks.find(t => t.id === editingTaskId)?.points || 0;
+    const existingTask = tasks.find(t => t.id === editingTaskId);
+    const titleLocked = isProposalActivityTask(existingTask);
+    const existingPts = existingTask?.points || 0;
     const maxAllowed = Math.min(TASK_POINTS_BUDGET, Math.max(0, TASK_POINTS_BUDGET - currentTotal + existingPts));
     const validation = validateTaskForm(taskFormData, {
       maxPoints: maxAllowed,
@@ -437,10 +439,10 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
     setSavingTask(true);
     try {
-      const existingTask = tasks.find(t => t.id === editingTaskId);
       const participantsSnap = await getDocs(collection(db, "missions", project.id, "task", editingTaskId, "participants"));
       const updateData = {
-        title: taskValues.title, description: taskValues.description,
+        title: titleLocked ? existingTask.title : taskValues.title,
+        description: taskValues.description,
         enrollmentDeadline: taskValues.enrollmentDeadline,
         points: taskValues.points,
         type: taskValues.type,
@@ -460,7 +462,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         updateData.groupCount = deleteField();
       }
       await updateDoc(doc(db, "missions", project.id, "task", editingTaskId), updateData);
-      logAudit({ action: "TASK_UPDATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId: editingTaskId, taskTitle: taskValues.title } });
+      logAudit({ action: "TASK_UPDATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId: editingTaskId, taskTitle: updateData.title } });
       cancelTaskForm();
       await loadTasks();
     } catch { showToast("Failed to update task."); }
@@ -550,13 +552,26 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
     ? project.stakeholders.join(", ")
     : project.stakeholders || project.partnerName || "—";
   const activitiesSource = project.specificActivities || activities;
-  const activitiesContent = Array.isArray(activitiesSource) && activitiesSource.length > 0
-    ? activitiesSource.map((item, index) => (
-        <span key={index} className="pds-detail-list-item">
-          {typeof item === "string" ? item : item?.name || item?.title || "—"}
-        </span>
+  const proposalActivityTitles = Array.isArray(activitiesSource)
+    ? activitiesSource.map(item => String(typeof item === "string" ? item : item?.name || item?.title || "").trim()).filter(Boolean)
+    : [];
+  const activitiesContent = proposalActivityTitles.length > 0
+    ? proposalActivityTitles.map((item, index) => (
+        <span key={index} className="pds-detail-list-item">{item}</span>
       ))
     : activitiesSource || "—";
+  const normalizeTaskTitle = (value) => String(value || "").trim().toLowerCase();
+  const isProposalActivityTask = (task) => {
+    if (!task) return false;
+    const taskIndex = Number.parseInt(task.id, 10);
+    const taskTitle = normalizeTaskTitle(task.title);
+    return (
+      task.isProposalActivity === true ||
+      (task.sourceActivityTitle && normalizeTaskTitle(task.sourceActivityTitle) === taskTitle) ||
+      (Number.isInteger(taskIndex) && proposalActivityTitles[taskIndex] && normalizeTaskTitle(proposalActivityTitles[taskIndex]) === taskTitle) ||
+      proposalActivityTitles.some(title => normalizeTaskTitle(title) === taskTitle)
+    );
+  };
   const successSource = project.successIndicators;
   const successContent = Array.isArray(successSource) && successSource.length > 0
     ? successSource.map((item, index) => <span key={index} className="pds-detail-list-item">{item}</span>)
@@ -641,10 +656,11 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       </div>
 
       <div className="pds-sheet-row pds-sheet-row--label-value">
-        <div className="pds-sheet-label-cell">Specific Activities</div>
+        <div className="pds-sheet-label-cell">Specific Activities / Task Assignment</div>
         <div className="pds-sheet-cell pds-sheet-cell--value">
-          <div className="pds-sheet-value pds-sheet-value--stack">{activitiesContent}</div>
-          {renderTasksCRUD()}
+          {isPublishedOrDone ? renderTasksCRUD() : (
+            <div className="pds-sheet-value pds-sheet-value--stack">{activitiesContent}</div>
+          )}
         </div>
       </div>
 
@@ -917,6 +933,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   // ── Tasks CRUD section (published left col) ───────────────────────
   const renderTasksCRUD = () => {
     const editingTaskCurrentPts = editingTaskId ? (tasks.find(t => t.id === editingTaskId)?.points || 0) : 0;
+    const editingTask = editingTaskId ? tasks.find(t => t.id === editingTaskId) : null;
+    const titleLocked = isProposalActivityTask(editingTask);
     const maxForForm = editingTaskId
       ? Math.min(TASK_POINTS_BUDGET, remainingBudget + editingTaskCurrentPts)
       : remainingBudget;
@@ -949,7 +967,10 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
           <form onSubmit={editingTaskId ? handleEditTask : handleCreateTask}>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Title *</label>
-              <input type="text" value={taskFormData.title} onChange={e => setTaskFormData(p => ({ ...p, title: e.target.value }))} required maxLength={TASK_TITLE_MAX_LENGTH} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+              <input type="text" value={taskFormData.title} onChange={e => setTaskFormData(p => ({ ...p, title: e.target.value }))} readOnly={titleLocked} required maxLength={TASK_TITLE_MAX_LENGTH} style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", background: titleLocked ? "#f3f4f6" : "#fff", color: titleLocked ? "#4b5563" : "#111", cursor: titleLocked ? "not-allowed" : "text" }} />
+              {titleLocked && (
+                <p style={{ color: "#6b7280", fontSize: 12, margin: "4px 0 0" }}>This title came from the submitted proposal activity and cannot be changed.</p>
+              )}
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Description *</label>
@@ -1023,7 +1044,12 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
             <div key={task.id} style={{ border: "1px solid #e0e4ea", borderRadius: 8, padding: "12px 14px", background: "#fff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, color: "#111", fontSize: 14, marginBottom: 4 }}>{task.title}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                    <div style={{ fontWeight: 700, color: "#111", fontSize: 14 }}>{task.title}</div>
+                    {isProposalActivityTask(task) && (
+                      <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 999, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>Proposal activity</span>
+                    )}
+                  </div>
                   {task.description && <p style={{ margin: "0 0 6px 0", color: "#555", fontSize: 13 }}>{task.description}</p>}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 12 }}>
                     <span style={{ color: "#007bff", fontWeight: 600 }}>Type: {task.type === "grouped" ? "Grouped" : "Individual"}</span>
