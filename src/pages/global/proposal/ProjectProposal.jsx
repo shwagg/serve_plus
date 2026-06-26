@@ -343,7 +343,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const [loading, setLoading] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [hasProponentName, setHasProponentName] = useState(false);
-  const [userRole, setUserRole] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const fieldErrorTimeoutsRef = useRef({});
   const [formData, setFormData] = useState({
@@ -380,7 +379,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     "Mapua Institute of Technology at Laguna (MITL)",
   ];
   const [partnerSchools, setPartnerSchools] = useState([]);
-  const [facultyList, setFacultyList] = useState([]);
   const [chairList, setChairList] = useState([]);
   const [deanList, setDeanList] = useState([]);
   const [loadingSchools, setLoadingSchools] = useState(true);
@@ -391,12 +389,10 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         const snap = await getDocs(collection(db, 'users'));
         const allUsers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setPartnerSchools(allUsers.filter(u => u.role === 'partner'));
-        setFacultyList(allUsers.filter(u => u.role === 'faculty'));
         setChairList(allUsers.filter(u => u.position === 'program chair'));
         setDeanList(allUsers.filter(u => u.position === 'college dean'));
       } catch {
         setPartnerSchools([]);
-        setFacultyList([]);
         setChairList([]);
         setDeanList([]);
       } finally {
@@ -427,12 +423,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             } else {
               setHasProponentName(false);
             }
-            if (data.role) {
-              setUserRole(data.role);
-              if (data.role === 'faculty') {
-                setSlFields(prev => ({ ...prev, assignedFaculty: data.name || '' }));
-              }
-            }
           } else {
             setHasProponentName(false);
           }
@@ -449,7 +439,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     section: '',
     course: '',
     courseCode: '',
-    assignedFaculty: ''
   });
 
   // Community Engagement specific fields
@@ -457,7 +446,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     nature: '',
     learningOutcomes: '0', // Default to first option (Intellectual Development)
     customLearningOutcome: '',
-    assignedFaculty: '',
   });
 
   // Draft persistence — placed after all state declarations so refs initialise correctly
@@ -504,7 +492,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         section: p.slFields.section || '',
         course: p.slFields.course || '',
         courseCode: p.slFields.courseCode || '',
-        assignedFaculty: p.slFields.assignedFaculty || '',
       });
     }
     if (p.projectType === 'ce' && p.ceFields) {
@@ -512,7 +499,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         nature: p.ceFields.nature || '',
         learningOutcomes: p.ceFields.learningOutcomes || '0',
         customLearningOutcome: p.ceFields.customLearningOutcome || '',
-        assignedFaculty: p.ceFields.assignedFaculty || '',
       });
     }
     setHasProponentName(true);
@@ -610,8 +596,8 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     submittedRef.current = false;
     hasUserInputRef.current = false;
     setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '' });
-    setSlFields({ section: '', course: '', courseCode: '', assignedFaculty: slFieldsRef.current?.assignedFaculty || '' });
-    setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '', assignedFaculty: '' });
+    setSlFields({ section: '', course: '', courseCode: '' });
+    setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '' });
     setDraftRestored(false);
     showToast('Draft discarded.');
   };
@@ -641,17 +627,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   ];
 
   /**
-   * Returns the title for the proposal based on project type.
-   */
-  const getProjectTypeTitle = () => {
-    return projectType === 'service-learning'
-      ? 'Service Learning Project Proposal'
-      : 'Community Engagement Project Proposal';
-  };
-
-  /**
    * Handles changes to main form fields (formData).
-   * Clears assigned faculty selections when the affiliated department changes.
    */
   const handleInputChange = (e) => {
     hasUserInputRef.current = true;
@@ -697,10 +673,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
       setFieldErrors(prev => ({ ...prev, [name]: '' }));
-    }
-    if (name === 'affiliatedDepartment') {
-      setSlFields(prev => ({ ...prev, assignedFaculty: '' }));
-      setCeFields(prev => ({ ...prev, assignedFaculty: '' }));
     }
   };
 
@@ -915,10 +887,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     return true;
   };
 
-  // Faculty / chairs / deans filtered by the selected affiliated department
-  const filteredFaculty = facultyList.filter(
-    f => !formData.affiliatedDepartment || f.department === formData.affiliatedDepartment
-  );
+  // Chairs and deans are filtered by the selected affiliated department.
   const filteredChairs = chairList.filter(
     c => !formData.affiliatedDepartment || c.department === formData.affiliatedDepartment
   );
@@ -1034,36 +1003,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                 </div>
               )}
 
-              {projectType === 'service-learning' && (
-                <div className="form-group">
-                  <label htmlFor="assignedFaculty">Assigned Faculty *</label>
-                  {userRole === 'faculty' ? (
-                    <input
-                      type="text"
-                      id="assignedFaculty"
-                      name="assignedFaculty"
-                      value={slFields.assignedFaculty}
-                      readOnly
-                      required
-                    />
-                  ) : (
-                    <CustomSelect
-                      id="assignedFaculty"
-                      name="assignedFaculty"
-                      value={slFields.assignedFaculty}
-                      onChange={handleSlFieldChange}
-                      placeholder={
-                        !formData.affiliatedDepartment
-                          ? 'Select a department first'
-                          : filteredFaculty.length === 0
-                            ? 'No faculty available for this department'
-                            : 'Select Faculty'
-                      }
-                      options={filteredFaculty.map(f => ({ value: f.name || f.email, label: f.name || f.email }))}
-                    />
-                  )}
-                </div>
-              )}
 
               {projectType === 'community-engagement' && (
                 <div className="form-row">
@@ -1078,23 +1017,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     <small className={`field-limit-hint${fieldErrors.proponents ? ' error' : ''}`}>
                       {fieldErrors.proponents || `${(formData.proponents || []).length} / ${FIELD_LIMITS.proponents} proponents`}
                     </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="ceAssignedFaculty">Assigned Faculty *</label>
-                    <CustomSelect
-                      id="ceAssignedFaculty"
-                      name="assignedFaculty"
-                      value={ceFields.assignedFaculty}
-                      onChange={handleCeFieldChange}
-                      placeholder={
-                        !formData.affiliatedDepartment
-                          ? 'Select a department first'
-                          : filteredFaculty.length === 0
-                            ? 'No faculty available for this department'
-                            : 'Select Faculty'
-                      }
-                      options={filteredFaculty.map(f => ({ value: f.name || f.email, label: f.name || f.email }))}
-                    />
                   </div>
                 </div>
               )}

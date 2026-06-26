@@ -139,14 +139,12 @@ function SummaryPanel({
             section: slFields.section,
             course: slFields.course,
             courseCode: slFields.courseCode,
-            assignedFaculty: slFields.assignedFaculty,
           };
         } else {
           updateData.ceFields = {
             nature: ceFields.nature,
             learningOutcomes: ceFields.learningOutcomes,
             customLearningOutcome: ceFields.customLearningOutcome || '',
-            assignedFaculty: ceFields.assignedFaculty || '',
           };
         }
         await updateDoc(doc(db, 'missions', proposalId), updateData);
@@ -268,14 +266,12 @@ function SummaryPanel({
           section: slFields.section,
           course: slFields.course,
           courseCode: slFields.courseCode,
-          assignedFaculty: slFields.assignedFaculty,
         };
       } else {
         missionData.ceFields = {
           nature: ceFields.nature,
           learningOutcomes: ceFields.learningOutcomes,
           customLearningOutcome: ceFields.customLearningOutcome || '',
-          assignedFaculty: ceFields.assignedFaculty || '',
         };
       }
 
