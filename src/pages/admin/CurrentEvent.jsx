@@ -961,7 +961,22 @@ export default function CurrentEvent() {
   };
 
   // ── attendance QR helpers ─────────────────────────────────────────
-  const generateAttendanceQR = () => {
+  const needsAttendanceQRConfirmation = () => {
+    const timestamp = missionData?.validQRTimestamp;
+    if (!timestamp) return true;
+
+    const createdAt = timestamp?.toDate ? timestamp.toDate().getTime() : Number(timestamp);
+    const QR_EXPIRY_MS = 30 * 60 * 1000;
+    return !Number.isFinite(createdAt) || Date.now() < createdAt + QR_EXPIRY_MS;
+  };
+
+  const confirmAttendanceQRGeneration = async () => {
+    if (!needsAttendanceQRConfirmation()) return true;
+    return showConfirm("Do you really want to generate a new attendance QR?");
+  };
+
+  const generateAttendanceQR = async () => {
+    if (!await confirmAttendanceQRGeneration()) return;
     if (!navigator.geolocation) {
       showToast("Geolocation is not supported by this browser.");
       return;
@@ -1006,6 +1021,7 @@ export default function CurrentEvent() {
 
   // Generate QR at a manually picked location
   const generateAttendanceQRAtLocation = async (lat, lng, address) => {
+    if (!await confirmAttendanceQRGeneration()) return;
     setPickerSaving(true);
     try {
       const newTimestamp = Date.now();
