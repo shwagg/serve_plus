@@ -200,6 +200,10 @@ export default function EventActivity() {
       setQRStatus("You must be logged in to record attendance.");
       return;
     }
+    if (volunteerProgress?.preSurvey !== "submitted" || !["submitted", "verified"].includes(volunteerProgress?.consent)) {
+      setQRStatus("Complete the pre-activity survey and submit your parent consent form before recording attendance.");
+      return;
+    }
     try {
       let parsed = null;
       try {
@@ -350,6 +354,10 @@ export default function EventActivity() {
       }
       if (!isEditable) {
         alert("Consent submission is closed because this event has ended.");
+        return;
+      }
+      if (volunteerProgress?.preSurvey !== "submitted") {
+        alert("Complete the Pre-Activity Survey before submitting the parent consent form.");
         return;
       }
       if (!selectedConsentFile) {
@@ -979,20 +987,19 @@ export default function EventActivity() {
     }
   };
 
-  const getJoinedTaskProofsApproved = async (tasksData = tasks) => {
+  const hasCompletedTask = async (tasksData = tasks) => {
     const user = auth.currentUser;
     if (!user) return false;
-    if (!Array.isArray(tasksData) || tasksData.length === 0) return true;
+    if (!Array.isArray(tasksData) || tasksData.length === 0) return false;
 
     for (const task of tasksData) {
       const participantSnap = await getDoc(
         doc(db, "missions", id, "task", task.id, "participants", user.uid),
       );
-      if (!participantSnap.exists()) continue;
-      if (!isApprovedTaskProof(participantSnap.data())) return false;
+      if (participantSnap.exists() && isApprovedTaskProof(participantSnap.data())) return true;
     }
 
-    return true;
+    return false;
   };
 
   const checkAndWriteRequirementsCompleted = async ({ preSurveyDone, consentDone, attendanceDone, journalDone, postSurveyDone }) => {
@@ -1139,7 +1146,7 @@ export default function EventActivity() {
           } else {
             window.showToast?.(`Your task proof for "${task.title}" was approved!`, 'success');
           }
-          const taskProofDone = await getJoinedTaskProofsApproved();
+          const taskProofDone = await hasCompletedTask();
           await checkAndWriteRequirementsCompleted({
             preSurveyDone: volunteerProgress?.preSurvey === 'submitted',
             consentDone: ['submitted', 'verified'].includes(volunteerProgress?.consent),
@@ -3521,14 +3528,16 @@ export default function EventActivity() {
                       const consentDone = volunteerProgress?.consent === 'submitted' || volunteerProgress?.consent === 'verified';
                       const attendanceDone = volunteerProgress?.attendance === 'present';
                       const postSurveyDone = volunteerProgress?.postSurvey === 'submitted';
-                      const postLocked = !attendanceDone;
+                      const consentLocked = !preSurveyDone;
+                      const attendanceLocked = !consentDone;
                       const enrolledTaskIdsForReq = (tasks || []).filter(t => !!enrolledTasks[t.id]).map(t => t.id);
                       const approvedProofTaskIds = new Set(
                         userJournals
                           .filter(j => j.adminApprovalStatus === 'approved' && hasTaskProof(j))
                           .map(j => j.taskId),
                       );
-                      const taskProofDone = enrolledTaskIdsForReq.every(tid => approvedProofTaskIds.has(tid));
+                      const taskProofDone = approvedProofTaskIds.size > 0;
+                      const postLocked = !preSurveyDone || !consentDone || !attendanceDone || !taskProofDone;
                       const preSurveyStep = {
                         label: 'Pre-Activity Survey',
                         desc: !isEditable ? 'Closed after the event date' : 'Fill out before the event',
@@ -3551,8 +3560,8 @@ export default function EventActivity() {
                               ? 'Previous consent was rejected. Upload a new signed consent form'
                               : 'Upload the signed consent form',
                           done: consentDone,
-                          locked: !isEditable,
-                          onOpen: isEditable ? () => setShowConsentModal(true) : null,
+                          locked: !isEditable || consentLocked,
+                          onOpen: isEditable && !consentLocked ? () => setShowConsentModal(true) : null,
                           type: 'upload',
                           previewable: !!consentFileUrl,
                           onPreview: () => window.open(consentFileUrl, '_blank'),
@@ -3561,10 +3570,10 @@ export default function EventActivity() {
                         },
                         {
                           label: 'Attendance',
-                          desc: !isEditable ? 'Event has ended' : 'Scan QR code on event day',
+                          desc: !isEditable ? 'Event has ended' : attendanceLocked ? 'Submit parent consent first to unlock' : 'Scan QR code on event day',
                           done: attendanceDone,
-                          locked: !isEventDay || !isEditable,
-                          onOpen: isEventDay && isEditable ? () => setShowQRModal(true) : null,
+                          locked: !isEventDay || !isEditable || attendanceLocked,
+                          onOpen: isEventDay && isEditable && !attendanceLocked ? () => setShowQRModal(true) : null,
                           type: 'qr',
                           previewable: false,
                           points: 5,
@@ -3589,7 +3598,7 @@ export default function EventActivity() {
                         },
                         {
                           label: 'Post-Activity Survey',
-                          desc: postLocked ? 'Complete the previous requirements first' : 'Fill out after the event',
+                          desc: postLocked ? 'Complete and have one task proof approved first' : 'Fill out after completing a task',
                           done: postSurveyDone,
                           locked: postLocked,
                           onOpen: postLocked ? null : () => setShowPostSurveyModal(true),
@@ -4228,6 +4237,13 @@ export default function EventActivity() {
                   alert('You must be logged in.');
                   return;
                 }
+                if (volunteerProgress?.preSurvey !== 'submitted' ||
+                    !['submitted', 'verified'].includes(volunteerProgress?.consent) ||
+                    volunteerProgress?.attendance !== 'present' ||
+                    !(await hasCompletedTask())) {
+                  alert('Complete the pre-activity survey, parent consent, attendance, and one approved task before submitting the post-activity survey.');
+                  return;
+                }
 
                 await setDoc(
                   doc(
@@ -4295,7 +4311,7 @@ export default function EventActivity() {
                 } else {
                   window.showToast?.("Post-Activity Survey submitted!", "success");
                 }
-                const taskProofDone = await getJoinedTaskProofsApproved();
+                const taskProofDone = await hasCompletedTask();
                 await checkAndWriteRequirementsCompleted({
                   preSurveyDone: volunteerProgress?.preSurvey === 'submitted',
                   consentDone: ['submitted', 'verified'].includes(volunteerProgress?.consent),
