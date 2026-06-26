@@ -2938,7 +2938,7 @@ export default function EventActivity() {
               if (pts > 0) taskPointsMap.set(pDoc.id, (taskPointsMap.get(pDoc.id) || 0) + pts);
             });
           } else {
-            // Individual: weighted by enrollment position among all participants
+            // Individual: fixed task points for each approved participant.
             const sorted = [...participantsSnap.docs].sort((a, b) => {
               const aData = a.data(); const bData = b.data();
               const aOrder = Number(aData?.enrollmentOrder);
