@@ -1490,7 +1490,6 @@
 .task-list-scroll--compact .task-join-btn { padding: 5px 12px; font-size: 12px; }
 .task-list-scroll--compact .task-enrolled-badge { padding: 4px 8px; font-size: 11px; }
 .task-list-scroll--compact .task-participants-indicator { padding: 2px 7px; font-size: 10px; }
-.task-list-scroll--compact .task-deadline-chip { padding: 2px 7px; font-size: 10px; }
 
 /* ── TASK CARDS ───────────────────────────────── */
 .task-card {
@@ -1587,24 +1586,6 @@
   font-size: 12px;
   font-weight: 700;
   color: #1976d2;
-}
-.task-deadline-chip {
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: #0f766e;
-  background: #ecfeff;
-  border: 1px solid #a5f3fc;
-  border-radius: 20px;
-  padding: 3px 10px;
-  width: fit-content;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.task-deadline-chip--closed {
-  color: #b91c1c;
-  background: #fee2e2;
-  border-color: #fecaca;
 }
 .task-card__action {
   flex-shrink: 0;

@@ -479,7 +479,6 @@ export default function EventActivity() {
   const [selectedTaskForParticipants, setSelectedTaskForParticipants] = useState(null);
   const [selectedTaskForGroups, setSelectedTaskForGroups] = useState(null);
   const [groupModalMode, setGroupModalMode] = useState("view");
-  const [timerNow, setTimerNow] = useState(Date.now());
   const [activeNav, setActiveNav] = useState(() => {
     const saved = sessionStorage.getItem('ea_activeNav');
     if (saved) { sessionStorage.removeItem('ea_activeNav'); return saved; }
@@ -527,14 +526,6 @@ export default function EventActivity() {
     );
   }, []);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setTimerNow(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
-
   // Auto-expand Task Assignment when attendance is first marked present
   useEffect(() => {
     if (volunteerProgress?.attendance === 'present') {
@@ -566,36 +557,6 @@ export default function EventActivity() {
     }
 
     return new Date(year, month - 1, day, hour, minute, 0, 0);
-  };
-
-  const getEnrollmentCountdown = (task) => {
-    const deadline = getTaskEnrollmentDeadline(task);
-    if (!deadline) return null;
-
-    const remainingMs = deadline.getTime() - timerNow;
-    if (remainingMs <= 0) {
-      return {
-        isClosed: true,
-        label: "Enrollment closed",
-      };
-    }
-
-    const totalSeconds = Math.floor(remainingMs / 1000);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const pad2 = (value) => String(value).padStart(2, "0");
-
-    const label =
-      days > 0
-        ? `Closes in ${days}d ${pad2(hours)}h ${pad2(minutes)}m ${pad2(seconds)}s`
-        : `Closes in ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
-
-    return {
-      isClosed: false,
-      label,
-    };
   };
 
   const isEnrollmentClosed = (task) => {
@@ -3708,7 +3669,6 @@ export default function EventActivity() {
                                   const selectedPhoto = taskPhotoFiles[idx];
                                   const selectedPhotoPreview = taskPhotoPreviews[idx];
                                   const isUploadingPhoto = uploadingTaskId === activity.id;
-                                  const enrollmentCountdown = getEnrollmentCountdown(activity);
 
                                   const attendanceDoneLocal = volunteerProgress?.attendance === 'present';
                                   if (!isEnrolled && (!isEventDay || !attendanceDoneLocal)) {
@@ -3744,11 +3704,6 @@ export default function EventActivity() {
                                               >
                                                 {isGrouped ? 'Groups' : 'Participants'}: {participantsText}
                                               </button>
-                                            )}
-                                            {enrollmentCountdown && (
-                                              <span className={`task-deadline-chip${enrollmentCountdown.isClosed ? ' task-deadline-chip--closed' : ''}`}>
-                                                {enrollmentCountdown.label}
-                                              </span>
                                             )}
                                           </div>
                                         </div>
