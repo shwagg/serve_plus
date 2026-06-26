@@ -1,4 +1,6 @@
 export const TASK_POINTS_LIMIT = 30;
+export const MAX_TASK_PARTICIPANTS = 500;
+export const MAX_TASK_GROUPS = 100;
 export const MIN_GROUP_MEMBERS = 2;
 export const MAX_GROUP_MEMBERS = 50;
 export const TASK_TITLE_MAX_LENGTH = 64;
@@ -87,19 +89,46 @@ export function validateTaskForm(
 
   const values = { title, description, enrollmentDeadline, points, type };
 
-  if (type === "grouped") {
-    const maxParticipants = parseRequiredWholeNumber(formData.maxParticipants);
-    if (maxParticipants === null) {
-      return {
-        isValid: false,
-        message: "Max members per group is required.",
-      };
-    }
+  const maxParticipants = parseRequiredWholeNumber(formData.maxParticipants);
+  if (maxParticipants === null) {
+    return {
+      isValid: false,
+      message: type === "grouped"
+        ? "Max members per group is required."
+        : "Max participants is required.",
+    };
+  }
 
+  if (type === "grouped") {
     if (maxParticipants < MIN_GROUP_MEMBERS || maxParticipants > MAX_GROUP_MEMBERS) {
       return {
         isValid: false,
         message: `Max members per group must be between ${MIN_GROUP_MEMBERS} and ${MAX_GROUP_MEMBERS}.`,
+      };
+    }
+
+    const maxGroups = parseRequiredWholeNumber(formData.maxGroups);
+    if (maxGroups === null) {
+      return {
+        isValid: false,
+        message: "Max groups is required.",
+      };
+    }
+
+    if (maxGroups < 1 || maxGroups > MAX_TASK_GROUPS) {
+      return {
+        isValid: false,
+        message: `Max groups must be between 1 and ${MAX_TASK_GROUPS}.`,
+      };
+    }
+
+    values.maxParticipants = maxParticipants;
+    values.maxGroups = maxGroups;
+  } else {
+    if (maxParticipants < 1 || maxParticipants > MAX_TASK_PARTICIPANTS) {
+      return {
+        isValid: false,
+        message: `Max participants must be between 1 and ${MAX_TASK_PARTICIPANTS}.`,
       };
     }
 

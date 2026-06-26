@@ -1517,19 +1517,10 @@ export default function EventActivity() {
         "participants",
         user.uid,
       );
-      const participantsRef = collection(
-        db,
-        "missions",
-        id,
-        "task",
-        groupedTask.id,
-        "participants",
-      );
+      const taskRef = doc(db, "missions", id, "task", groupedTask.id);
 
-      const [participantSnap, participantsSnap] = await Promise.all([
-        getDoc(participantRef),
-        getDocs(participantsRef),
-      ]);
+      const participantSnap = await getDoc(participantRef);
+      const currentCount = taskParticipantCounts[groupedTask.id] || 0;
 
       if (participantSnap.exists()) {
         await updateDoc(participantRef, {
@@ -1541,7 +1532,7 @@ export default function EventActivity() {
         setEnrolledTasks((prev) => ({ ...prev, [groupedTask.id]: true }));
         setTaskParticipantCounts((prev) => ({
           ...prev,
-          [groupedTask.id]: participantsSnap.size,
+          [groupedTask.id]: currentCount,
         }));
         if (isNew) {
           setTaskGroupCounts((prev) => ({
@@ -1554,21 +1545,52 @@ export default function EventActivity() {
         return;
       }
 
-      await setDoc(participantRef, {
-        status: "todo",
-        role: "",
-        proof: "",
-        reflection: "",
-        pointsEarned: 0,
-        groupId,
-        joinedAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
+      await runTransaction(db, async (transaction) => {
+        const [taskSnap, latestParticipantSnap] = await Promise.all([
+          transaction.get(taskRef),
+          transaction.get(participantRef),
+        ]);
+
+        if (!taskSnap.exists()) {
+          throw new Error("Task not found.");
+        }
+
+        if (latestParticipantSnap.exists()) {
+          transaction.update(participantRef, {
+            groupId,
+            enrollmentOrder: deleteField(),
+            lastUpdated: new Date().toISOString(),
+          });
+          return;
+        }
+
+        const taskData = taskSnap.data();
+        const storedParticipantCount = Number(taskData?.participantCount);
+        const nextParticipantCount = Number.isFinite(storedParticipantCount)
+          ? storedParticipantCount + 1
+          : currentCount + 1;
+
+        transaction.set(participantRef, {
+          status: "todo",
+          role: "",
+          proof: "",
+          reflection: "",
+          pointsEarned: 0,
+          groupId,
+          joinedAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        });
+        transaction.update(taskRef, {
+          participantCount: Number.isFinite(storedParticipantCount)
+            ? increment(1)
+            : nextParticipantCount,
+        });
       });
 
       setEnrolledTasks((prev) => ({ ...prev, [groupedTask.id]: true }));
       setTaskParticipantCounts((prev) => ({
         ...prev,
-        [groupedTask.id]: participantsSnap.size + 1,
+        [groupedTask.id]: currentCount + 1,
       }));
       if (isNew) {
         setTaskGroupCounts((prev) => ({
@@ -1632,54 +1654,68 @@ export default function EventActivity() {
         "participants",
         user.uid
       );
+      const taskRef = doc(db, "missions", id, "task", taskId);
+      let nextParticipantCount = taskParticipantCounts[taskId] || 0;
 
-      const participantSnap = await getDoc(participantRef);
+      await runTransaction(db, async (transaction) => {
+        const [taskSnap, participantSnap] = await Promise.all([
+          transaction.get(taskRef),
+          transaction.get(participantRef),
+        ]);
 
-      if (participantSnap.exists()) {
-        alert("You are already enrolled in this activity!");
-        return;
-      }
-
-      const participantsRef = collection(
-        db,
-        "missions",
-        id,
-        "task",
-        taskId,
-        "participants"
-      );
-      const participantsSnap = await getDocs(participantsRef);
-      const highestOrder = participantsSnap.docs.reduce((maxOrder, participantDoc) => {
-        const order = Number(participantDoc.data()?.enrollmentOrder);
-        if (Number.isFinite(order) && order > maxOrder) {
-          return order;
+        if (!taskSnap.exists()) {
+          throw new Error("Task not found.");
         }
-        return maxOrder;
-      }, 0);
-      const enrollmentOrder = highestOrder + 1;
 
-      // Create participant document with user UID as document ID
-      await setDoc(participantRef, {
-        status: "todo",
-        role: "",
-        proof: "",
-        reflection: "",
-        enrollmentOrder,
-        joinedAt: new Date().toISOString(),
+        if (participantSnap.exists()) {
+          throw new Error("ALREADY_ENROLLED");
+        }
+
+        const taskData = taskSnap.data();
+        const maxParticipants = Number(taskData?.maxParticipants);
+        const currentCount = Number.isFinite(Number(taskData?.participantCount))
+          ? Number(taskData.participantCount)
+          : nextParticipantCount;
+
+        if (Number.isFinite(maxParticipants) && currentCount >= maxParticipants) {
+          throw new Error("TASK_FULL");
+        }
+
+        nextParticipantCount = currentCount + 1;
+
+        transaction.set(participantRef, {
+          status: "todo",
+          role: "",
+          proof: "",
+          reflection: "",
+          enrollmentOrder: nextParticipantCount,
+          joinedAt: new Date().toISOString(),
+        });
+        transaction.update(taskRef, {
+          participantCount: Number.isFinite(Number(taskData?.participantCount))
+            ? increment(1)
+            : nextParticipantCount,
+        });
       });
 
       // Update local state
       setEnrolledTasks((prev) => ({ ...prev, [taskId]: true }));
       setTaskParticipantCounts((prev) => ({
         ...prev,
-        [taskId]: participantsSnap.size + 1,
+        [taskId]: nextParticipantCount,
       }));
-      setJoiningTaskId(null);
       window.showToast?.("Joined task successfully!", "success");
     } catch (err) {
       console.error("Error enrolling in activity:", err);
+      if (err?.message === "ALREADY_ENROLLED") {
+        alert("You are already enrolled in this activity!");
+      } else if (err?.message === "TASK_FULL") {
+        window.showToast?.("This task is already full.", "error");
+      } else {
+        window.showToast?.("Failed to join. Please try again.", "error");
+      }
+    } finally {
       setJoiningTaskId(null);
-      window.showToast?.("Failed to join. Please try again.", "error");
     }
   };
 
@@ -1775,7 +1811,26 @@ export default function EventActivity() {
       const remainingParticipantDocs = participantDocs
         .filter((participantDoc) => participantDoc.id !== user.uid);
 
-      await deleteDoc(participantRef);
+      const taskRef = doc(db, "missions", id, "task", taskId);
+      await runTransaction(db, async (transaction) => {
+        const [taskSnap, latestParticipantSnap] = await Promise.all([
+          transaction.get(taskRef),
+          transaction.get(participantRef),
+        ]);
+
+        if (!latestParticipantSnap.exists()) return;
+
+        transaction.delete(participantRef);
+
+        if (taskSnap.exists()) {
+          const currentCount = Number(taskSnap.data()?.participantCount);
+          transaction.update(taskRef, {
+            participantCount: Number.isFinite(currentCount)
+              ? Math.max(currentCount - 1, 0)
+              : Math.max(participantDocs.length - 1, 0),
+          });
+        }
+      });
 
       if (task?.type !== "grouped") {
         const sortedRemainingParticipantDocs = [...remainingParticipantDocs].sort(

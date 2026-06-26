@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import { db } from "../../firebaseConfig";
-import { doc, updateDoc, serverTimestamp, collection, getDocs, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, collection, getDocs, getDoc, setDoc, deleteDoc, deleteField } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
@@ -12,6 +12,8 @@ import { logAudit } from "../../utils/auditLogger";
 import { showToast, showConfirm } from "../../utils/toast";
 import {
   MAX_GROUP_MEMBERS,
+  MAX_TASK_GROUPS,
+  MAX_TASK_PARTICIPANTS,
   TASK_DESCRIPTION_MAX_LENGTH,
   TASK_POINTS_LIMIT as TASK_POINTS_BUDGET,
   TASK_TITLE_MAX_LENGTH,
@@ -121,7 +123,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [taskFormData, setTaskFormData] = useState({
     title: "", description: "", enrollmentDeadline: "", points: 0,
-    type: "individual", maxParticipants: 5,
+    type: "individual", maxParticipants: 5, maxGroups: 5,
   });
 
   // Edit mode
@@ -404,9 +406,15 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         title: taskValues.title, description: taskValues.description,
         enrollmentDeadline: taskValues.enrollmentDeadline,
         points: taskValues.points,
-        type: taskValues.type, createdAt: new Date().toISOString(),
+        type: taskValues.type,
+        maxParticipants: taskValues.maxParticipants,
+        participantCount: 0,
+        createdAt: new Date().toISOString(),
       };
-      if (taskValues.type === "grouped") taskData.maxParticipants = taskValues.maxParticipants;
+      if (taskValues.type === "grouped") {
+        taskData.maxGroups = taskValues.maxGroups;
+        taskData.groupCount = 0;
+      }
       await setDoc(doc(db, "missions", project.id, "task", nextId), taskData);
       logAudit({ action: "TASK_CREATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskTitle: taskValues.title } });
       cancelTaskForm();
@@ -429,12 +437,28 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
     setSavingTask(true);
     try {
+      const existingTask = tasks.find(t => t.id === editingTaskId);
+      const participantsSnap = await getDocs(collection(db, "missions", project.id, "task", editingTaskId, "participants"));
       const updateData = {
         title: taskValues.title, description: taskValues.description,
         enrollmentDeadline: taskValues.enrollmentDeadline,
-        points: taskValues.points, type: taskValues.type,
+        points: taskValues.points,
+        type: taskValues.type,
+        maxParticipants: taskValues.maxParticipants,
+        participantCount: Number.isFinite(Number(existingTask?.participantCount))
+          ? Number(existingTask.participantCount)
+          : participantsSnap.size,
       };
-      if (taskValues.type === "grouped") updateData.maxParticipants = taskValues.maxParticipants;
+      if (taskValues.type === "grouped") {
+        const groupsSnap = await getDocs(collection(db, "missions", project.id, "task", editingTaskId, "group"));
+        updateData.maxGroups = taskValues.maxGroups;
+        updateData.groupCount = Number.isFinite(Number(existingTask?.groupCount))
+          ? Number(existingTask.groupCount)
+          : groupsSnap.size;
+      } else {
+        updateData.maxGroups = deleteField();
+        updateData.groupCount = deleteField();
+      }
       await updateDoc(doc(db, "missions", project.id, "task", editingTaskId), updateData);
       logAudit({ action: "TASK_UPDATED", category: "event", details: { missionId: project.id, missionTitle: project.title || "", taskId: editingTaskId, taskTitle: taskValues.title } });
       cancelTaskForm();
@@ -456,14 +480,14 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
 
   const startEditTask = (task) => {
     setEditingTaskId(task.id);
-    setTaskFormData({ title: task.title || "", description: task.description || "", enrollmentDeadline: task.enrollmentDeadline || "", points: task.points || 0, type: task.type || "individual", maxParticipants: task.maxParticipants || 5 });
+    setTaskFormData({ title: task.title || "", description: task.description || "", enrollmentDeadline: task.enrollmentDeadline || "", points: task.points || 0, type: task.type || "individual", maxParticipants: task.maxParticipants || 5, maxGroups: task.maxGroups || 5 });
     setShowTaskForm(true);
   };
 
   const cancelTaskForm = () => {
     setShowTaskForm(false);
     setEditingTaskId(null);
-    setTaskFormData({ title: "", description: "", enrollmentDeadline: "", points: 0, type: "individual", maxParticipants: 5 });
+    setTaskFormData({ title: "", description: "", enrollmentDeadline: "", points: 0, type: "individual", maxParticipants: 5, maxGroups: 5 });
   };
 
   const generateAttendanceQR = () => {
@@ -958,10 +982,22 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                 </label>
               </div>
             </div>
+            {taskFormData.type === "individual" && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Max Participants *</label>
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={taskFormData.maxParticipants} onChange={e => setTaskFormData(p => ({ ...p, maxParticipants: clampWholeNumberInput(e.target.value, 1, MAX_TASK_PARTICIPANTS) }))} min="1" max={String(MAX_TASK_PARTICIPANTS)} required step="1" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+              </div>
+            )}
             {taskFormData.type === "grouped" && (
               <div style={{ marginBottom: 10 }}>
                 <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Max Members per Group *</label>
                 <input type="text" inputMode="numeric" pattern="[0-9]*" value={taskFormData.maxParticipants} onChange={e => setTaskFormData(p => ({ ...p, maxParticipants: clampWholeNumberInput(e.target.value, 2, MAX_GROUP_MEMBERS) }))} min="2" max={String(MAX_GROUP_MEMBERS)} required step="1" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+              </div>
+            )}
+            {taskFormData.type === "grouped" && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "#111", fontSize: 13 }}>Max Groups *</label>
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={taskFormData.maxGroups} onChange={e => setTaskFormData(p => ({ ...p, maxGroups: clampWholeNumberInput(e.target.value, 1, MAX_TASK_GROUPS) }))} min="1" max={String(MAX_TASK_GROUPS)} required step="1" style={{ width: "100%", padding: "7px 10px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
               </div>
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
@@ -993,6 +1029,12 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
                     <span style={{ color: "#007bff", fontWeight: 600 }}>Type: {task.type === "grouped" ? "Grouped" : "Individual"}</span>
                     {task.type === "grouped" && task.maxParticipants && (
                       <span style={{ color: "#1976d2", fontWeight: 600 }}>Max/Group: {task.maxParticipants}</span>
+                    )}
+                    {task.type === "grouped" && task.maxGroups && (
+                      <span style={{ color: "#7c3aed", fontWeight: 600 }}>Max Groups: {task.maxGroups}</span>
+                    )}
+                    {task.type !== "grouped" && task.maxParticipants && (
+                      <span style={{ color: "#1976d2", fontWeight: 600 }}>Max Participants: {task.maxParticipants}</span>
                     )}
                     {task.points !== undefined && <span style={{ color: "#388e3c", fontWeight: 600 }}>Points: {task.points}</span>}
                     {task.enrollmentDeadline && <span style={{ color: "#555" }}>Deadline: {task.enrollmentDeadline}</span>}

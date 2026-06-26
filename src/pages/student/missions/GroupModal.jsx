@@ -48,6 +48,9 @@ export default function GroupModal({
 	const taskMaxParticipants = Number.isFinite(Number(task?.maxParticipants))
 		? Number(task.maxParticipants)
 		: null;
+	const taskMaxGroups = Number.isFinite(Number(task?.maxGroups))
+		? Number(task.maxGroups)
+		: null;
 
 	useEffect(() => {
 		let isMounted = true;
@@ -148,6 +151,7 @@ export default function GroupModal({
 		() => groups.find((group) => group.members.some((member) => member.uid === currentUserUid)),
 		[groups, currentUserUid],
 	);
+	const isGroupCreationFull = Number.isFinite(taskMaxGroups) && groups.length >= taskMaxGroups;
 
 	const getEffectiveMaxParticipants = (group) => {
 		const groupLimit = Number(group?.maxParticipants);
@@ -184,16 +188,37 @@ export default function GroupModal({
 		try {
 			const groupsRef = collection(db, "missions", missionId, "task", taskId, "group");
 			const newGroupRef = doc(groupsRef);
+			const taskRef = doc(db, "missions", missionId, "task", taskId);
 			const groupNumber = getNextGroupNumber();
 			const createdAt = new Date().toISOString();
 			const memberName = resolveDisplayName();
 
 			await runTransaction(db, async (transaction) => {
+				const taskSnap = await transaction.get(taskRef);
+				if (!taskSnap.exists()) {
+					throw new Error("Task not found.");
+				}
+
+				const taskData = taskSnap.data();
+				const maxGroups = Number(taskData?.maxGroups);
+				const currentGroupCount = Number.isFinite(Number(taskData?.groupCount))
+					? Number(taskData.groupCount)
+					: groups.length;
+
+				if (Number.isFinite(maxGroups) && currentGroupCount >= maxGroups) {
+					throw new Error("Maximum groups reached for this task.");
+				}
+
 				transaction.set(newGroupRef, {
 					groupNumber,
 					memberCount: 1,
 					createdAt,
 					status: "in_progress",
+				});
+				transaction.update(taskRef, {
+					groupCount: Number.isFinite(Number(taskData?.groupCount))
+						? increment(1)
+						: currentGroupCount + 1,
 				});
 
 				const memberRef = doc(newGroupRef, "members", user.uid);
@@ -285,6 +310,10 @@ export default function GroupModal({
 		});
 
 		if (!availableGroups.length) {
+			if (Number.isFinite(taskMaxGroups) && groups.length >= taskMaxGroups) {
+				setError("Maximum groups reached for this task.");
+				return;
+			}
 			handleCreateGroup();
 			return;
 		}
@@ -319,6 +348,12 @@ export default function GroupModal({
 						<span className="task-participants-modal__summary-label">Points per member:</span>
 						<span className="task-participants-modal__summary-value">{baseTaskPoints} pts</span>
 					</div>
+					{Number.isFinite(taskMaxGroups) ? (
+						<div className="task-participants-modal__summary group-modal__summary">
+							<span className="task-participants-modal__summary-label">Groups:</span>
+							<span className="task-participants-modal__summary-value">{groups.length}/{taskMaxGroups}</span>
+						</div>
+					) : null}
 
 					{currentUserGroup ? (
 						<div className="group-modal__current">Your current group: Group {currentUserGroup.groupNumber ?? currentUserGroup.id}</div>
@@ -326,8 +361,8 @@ export default function GroupModal({
 
 					{allowJoin ? (
 						<div className="group-modal__actions">
-							<button className="task-join-btn" onClick={handleCreateGroup} disabled={working}>
-								Create Group
+							<button className="task-join-btn" onClick={handleCreateGroup} disabled={working || isGroupCreationFull}>
+								{isGroupCreationFull ? "Groups Full" : "Create Group"}
 							</button>
 							<button className="task-join-btn group-modal__random-btn" onClick={handleJoinRandomGroup} disabled={working}>
 								Join Random
