@@ -559,6 +559,29 @@ export default function EventActivity() {
     return new Date(year, month - 1, day, hour, minute, 0, 0);
   };
 
+  const getEnrollmentDeadlineLabel = (task) => {
+    if (!task?.enrollmentDeadline) return null;
+
+    const [rawHour, rawMinute] = task.enrollmentDeadline.split(":");
+    const hour = Number(rawHour);
+    const minute = Number(rawMinute);
+    if (
+      !Number.isInteger(hour) ||
+      !Number.isInteger(minute) ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59
+    ) {
+      return null;
+    }
+
+    return `Enrollment closes at ${new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(2000, 0, 1, hour, minute))}`;
+  };
+
   const isEnrollmentClosed = (task) => {
     const deadline = getTaskEnrollmentDeadline(task);
     if (!deadline) return false;
@@ -3669,12 +3692,16 @@ export default function EventActivity() {
                                   const selectedPhoto = taskPhotoFiles[idx];
                                   const selectedPhotoPreview = taskPhotoPreviews[idx];
                                   const isUploadingPhoto = uploadingTaskId === activity.id;
+                                  const enrollmentDeadlineLabel = getEnrollmentDeadlineLabel(activity);
 
                                   const attendanceDoneLocal = volunteerProgress?.attendance === 'present';
                                   if (!isEnrolled && (!isEventDay || !attendanceDoneLocal)) {
                                     return (
                                       <div key={idx} className="task-card task-card--locked">
                                         <span className="task-card__title-only">{activity.title}</span>
+                                        {enrollmentDeadlineLabel && (
+                                          <span className="task-deadline-label">{enrollmentDeadlineLabel}</span>
+                                        )}
                                         {isEventDay && !attendanceDoneLocal && (
                                           <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to unlock</span>
                                         )}
@@ -3704,6 +3731,9 @@ export default function EventActivity() {
                                               >
                                                 {isGrouped ? 'Groups' : 'Participants'}: {participantsText}
                                               </button>
+                                            )}
+                                            {enrollmentDeadlineLabel && (
+                                              <span className="task-deadline-label">{enrollmentDeadlineLabel}</span>
                                             )}
                                           </div>
                                         </div>
