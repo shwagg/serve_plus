@@ -1030,6 +1030,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
               <div className="form-group">
                 <label>Stakeholders</label>
+                <small className="field-limit-hint">
+                  Stakeholders are individuals or groups who are involved in or will benefit from this activity.
+                </small>
                 <NumberedStakeholderInput
                   items={formData.stakeholders || []}
                   onAdd={handleAddStakeholder}
