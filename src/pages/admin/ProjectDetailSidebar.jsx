@@ -363,7 +363,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       Promise.allSettled([
         project.createdBy ? createNotification(project.createdBy, notifData) : Promise.resolve(),
       ]).catch(() => {});
-      setActionMsg("Returned to proposer for revision. All approvals cleared.");
+      setActionMsg("Returned to proponent for revision. All approvals cleared.");
       if (onApprovalChange) onApprovalChange();
       setTimeout(onClose, 1500);
     } catch {
@@ -850,7 +850,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
               <button className="pds-btn-approve" onClick={handleApprove} disabled={approving}>
                 {approving ? "Submitting…" : approvalLevel === "endorsedBy" ? "✓ Endorse" : "✓ Approve"}
               </button>
-              <div className="pds-return-label" style={{ marginTop: 16 }}>Reject / Return to proposer</div>
+              <div className="pds-return-label" style={{ marginTop: 16 }}>Reject / Return to proponent</div>
               <textarea className="pds-textarea" placeholder="Reason for rejection (required)…"
                 value={rejectText} onChange={e => setRejectText(e.target.value)}
                 rows={3} disabled={approving} />

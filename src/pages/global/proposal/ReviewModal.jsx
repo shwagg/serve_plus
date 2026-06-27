@@ -692,7 +692,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
                               ? "✓ Approved"
                             : "✓ Approve"}
                     </button>
-                    <div className="rm-return-label">Return to proposer</div>
+                    <div className="rm-return-label">Return to proponent</div>
                     <textarea
                       className="rm-rejection-textarea"
                       placeholder="Explain what must be revised before resubmission (required)..."
