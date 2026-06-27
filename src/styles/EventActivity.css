@@ -468,6 +468,10 @@
   align-items: flex-start;
   gap: 12px;
   position: relative;
+  padding: 10px 0;
+}
+.req-timeline-item:not(:last-child) {
+  border-bottom: 1px solid #e6e9ec;
 }
 .req-timeline-left {
   display: flex;
