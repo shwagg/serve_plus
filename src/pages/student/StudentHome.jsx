@@ -1,7 +1,6 @@
 ﻿import { useNavigate, useLocation } from "react-router-dom";
 import EventDetails from "./missions/EventDetails";
 import ProjectProposal from "../global/proposal/ProjectProposal";
-import ReviewModal from "../global/proposal/ReviewModal";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Fragment } from "react";
@@ -18,6 +17,7 @@ import ProposalTimeline from '../../components/ProposalTimeline';
 import banner from '../../assets/banner.jpg';
 import emptyFile from '../../assets/empty_file.svg';
 import servePlusIcon from '../../assets/serve_plus_icon.svg';
+import { hasSignatoryApproval, PROPOSAL_LOCKED_NOTICE } from "../../utils/proposalApproval";
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
   const radius = (size - stroke) / 2;
@@ -90,6 +90,7 @@ const StudentHome = () => {
   const [selectedMissionId, setSelectedMissionId] = useState(null);
   const [enrollmentRefreshKey, setEnrollmentRefreshKey] = useState(0);
   const [selectedProposalForView, setSelectedProposalForView] = useState(null);
+  const [selectedProposalEditMode, setSelectedProposalEditMode] = useState(false);
   const [proposalRefreshKey, setProposalRefreshKey] = useState(0);
   const [proposalCards, setProposalCards] = useState([]);
   const [volunteerInfo, setVolunteerInfo] = useState({});
@@ -425,12 +426,12 @@ const StudentHome = () => {
       return `Returned for revision${rejectedByUser ? ` by ${rejectedByUser}` : ''}`;
     }
     if (approvedBy && recommendedBy && endorsedBy && reviewedBy) {
-      return 'All approvals complete Â· Ready to publish';
+      return 'All approvals complete - Ready to publish';
     }
-    if (endorsedBy) return `Endorsed by Admin Â· Awaiting Director approval`;
-    if (recommendedBy) return `Recommended by ${recommendedBy} Â· Awaiting Admin (CSCE) endorsement`;
-    if (reviewedBy) return `Reviewed by ${reviewedBy} Â· Awaiting College Dean recommendation`;
-    return 'Submitted Â· Awaiting Program Chair review';
+    if (endorsedBy) return `Endorsed by Admin - Awaiting Director approval`;
+    if (recommendedBy) return `Recommended by ${recommendedBy} - Awaiting Admin (CSCE) endorsement`;
+    if (reviewedBy) return `Reviewed by ${reviewedBy} - Awaiting College Dean recommendation`;
+    return 'Submitted - Awaiting Program Chair review';
   };
 
   const formatDate = (dateStr) => {
@@ -458,6 +459,25 @@ const StudentHome = () => {
     if (j === 2 && k !== 12) return `${rank}nd`;
     if (j === 3 && k !== 13) return `${rank}rd`;
     return `${rank}th`;
+  };
+
+  const openProposalModal = (proposal) => {
+    setSelectedProposalEditMode(false);
+    setSelectedProposalForView(proposal);
+  };
+
+  const closeProposalModal = () => {
+    setSelectedProposalEditMode(false);
+    setSelectedProposalForView(null);
+  };
+
+  const renderProposalList = (items) => {
+    if (!Array.isArray(items) || items.length === 0) return <p>N/A</p>;
+    return (
+      <ul className="student-proposal-detail-list">
+        {items.map((item, index) => <li key={index}>{item}</li>)}
+      </ul>
+    );
   };
 
   // Unique departments from published missions for filter tabs
@@ -807,8 +827,8 @@ const StudentHome = () => {
                       className="mission-card"
                       role="button"
                       tabIndex={0}
-                      onClick={() => setSelectedProposalForView(proposal)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedProposalForView(proposal); } }}
+                      onClick={() => openProposalModal(proposal)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openProposalModal(proposal); } }}
                       style={{ cursor: 'pointer' }}
                     >
                       <span
@@ -961,37 +981,137 @@ const StudentHome = () => {
     {selectedProposalForView && (
       <div
         className="student-modal-overlay"
-        onClick={(e) => { if (e.target === e.currentTarget) setSelectedProposalForView(null); }}
+        onClick={(e) => { if (e.target === e.currentTarget) closeProposalModal(); }}
       >
         <div className="student-modal student-proposal-modal">
-          {selectedProposalForView.status === 'for_approval' || selectedProposalForView.status === 'rejected' ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#000' }}>
-                  {selectedProposalForView.projectType === 'sl' ? 'Service Learning Proposal' : 'Community Engagement Proposal'}
-                </h3>
-                <button
-                  onClick={() => setSelectedProposalForView(null)}
-                  aria-label="Close proposal"
-                  style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#64748b', lineHeight: 1 }}
-                >x</button>
-              </div>
-              <div style={{ overflowY: 'auto', flex: 1 }}>
-                <ProjectProposal
-                  projectType={selectedProposalForView.projectType === 'sl' ? 'service-learning' : 'community-engagement'}
-                  editProposal={selectedProposalForView}
-                  onClose={() => { setSelectedProposalForView(null); setProposalRefreshKey(k => k + 1); }}
-                  timelineNode={<ProposalTimeline proposal={selectedProposalForView} compact />}
-                />
-              </div>
-            </>
-          ) : (
-            <ReviewModal
-              proposal={selectedProposalForView}
-              onClose={() => setSelectedProposalForView(null)}
-              isPartner={true}
-            />
-          )}
+          {(() => {
+            const proposalLocked = hasSignatoryApproval(selectedProposalForView);
+            const normalizedStatus = String(selectedProposalForView.status || '').toLowerCase();
+            const isEditableStatus = normalizedStatus === 'rejected' || normalizedStatus === 'for_approval' || normalizedStatus === 'for-approval';
+            const canEditProposal = isEditableStatus && !proposalLocked;
+            const editUnavailableReason = proposalLocked
+              ? PROPOSAL_LOCKED_NOTICE
+              : 'Editing is available only before the first signatory approval or when the proposal has been returned for revision.';
+
+            if (selectedProposalEditMode && canEditProposal) {
+              return (
+                <>
+                  <div className="student-proposal-modal-header">
+                    <h3>
+                      {selectedProposalForView.projectType === 'sl' ? 'Service Learning Proposal' : 'Community Engagement Proposal'}
+                    </h3>
+                    <button onClick={closeProposalModal} aria-label="Close proposal">x</button>
+                  </div>
+                  <div style={{ overflowY: 'auto', flex: 1 }}>
+                    <ProjectProposal
+                      projectType={selectedProposalForView.projectType === 'sl' ? 'service-learning' : 'community-engagement'}
+                      editProposal={selectedProposalForView}
+                      onClose={() => { closeProposalModal(); setProposalRefreshKey(k => k + 1); }}
+                      timelineNode={<ProposalTimeline proposal={selectedProposalForView} compact />}
+                    />
+                  </div>
+                </>
+              );
+            }
+
+            return (
+              <>
+                <div className="student-proposal-modal-header">
+                  <div>
+                    <h3>
+                      {selectedProposalForView.projectType === 'sl' ? 'Service Learning Proposal' : 'Community Engagement Proposal'}
+                    </h3>
+                    <p>{selectedProposalForView.title || 'Untitled Proposal'}</p>
+                  </div>
+                  <button onClick={closeProposalModal} aria-label="Close proposal">x</button>
+                </div>
+
+                <div className="student-proposal-details">
+                  {proposalLocked && (
+                    <div className="student-proposal-lock-notice" role="status">
+                      <strong>Proposal locked after first approval</strong>
+                      <span>{PROPOSAL_LOCKED_NOTICE}</span>
+                    </div>
+                  )}
+
+                  {normalizedStatus === 'rejected' && selectedProposalForView.rejectionReason && (
+                    <div className="student-proposal-rejection-notice">
+                      <strong>Returned for revision{selectedProposalForView.rejectedByUser ? ` by ${selectedProposalForView.rejectedByUser}` : ''}</strong>
+                      <span>{selectedProposalForView.rejectionReason}</span>
+                    </div>
+                  )}
+
+                  <div className="student-proposal-actions">
+                    <button
+                      type="button"
+                      className="student-proposal-edit-btn"
+                      disabled={!canEditProposal}
+                      title={!canEditProposal ? editUnavailableReason : 'Edit proposal'}
+                      aria-describedby={!canEditProposal ? 'proposal-edit-helper' : undefined}
+                      onClick={() => setSelectedProposalEditMode(true)}
+                    >
+                      Edit Proposal
+                    </button>
+                    {!canEditProposal && (
+                      <p id="proposal-edit-helper" className="student-proposal-edit-helper">
+                        {editUnavailableReason}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="student-proposal-detail-grid">
+                    <section>
+                      <h4>Status</h4>
+                      <p>{getProposalStatusLine(selectedProposalForView)}</p>
+                    </section>
+                    <section>
+                      <h4>Target Date</h4>
+                      <p>{formatDate(selectedProposalForView.targetDate) || 'Date TBA'}</p>
+                    </section>
+                    <section>
+                      <h4>Location</h4>
+                      <p>{selectedProposalForView.location || 'N/A'}</p>
+                    </section>
+                    <section>
+                      <h4>Volunteer Hours</h4>
+                      <p>{selectedProposalForView.volunteerHours || 'N/A'}</p>
+                    </section>
+                  </div>
+
+                  <section className="student-proposal-detail-section">
+                    <h4>Description</h4>
+                    <p>{selectedProposalForView.description || 'N/A'}</p>
+                  </section>
+                  <section className="student-proposal-detail-section">
+                    <h4>Objectives</h4>
+                    <p>{selectedProposalForView.objectives || 'N/A'}</p>
+                  </section>
+                  <section className="student-proposal-detail-section">
+                    <h4>Stakeholders</h4>
+                    {renderProposalList(selectedProposalForView.stakeholders)}
+                  </section>
+                  <section className="student-proposal-detail-section">
+                    <h4>Specific Activities</h4>
+                    {renderProposalList(selectedProposalForView.specificActivities)}
+                  </section>
+                  <section className="student-proposal-detail-section">
+                    <h4>Success Indicators</h4>
+                    {Array.isArray(selectedProposalForView.successIndicators)
+                      ? renderProposalList(selectedProposalForView.successIndicators)
+                      : <p>{selectedProposalForView.successIndicators || 'N/A'}</p>}
+                  </section>
+                  <section className="student-proposal-detail-section">
+                    <h4>Budget</h4>
+                    <p>{selectedProposalForView.budget || 'N/A'}</p>
+                  </section>
+                  <section className="student-proposal-detail-section">
+                    <h4>Approval Progress</h4>
+                    <ProposalTimeline proposal={selectedProposalForView} compact />
+                  </section>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
     )}

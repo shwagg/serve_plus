@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
-import { showToast } from '../../utils/toast';
+import { showConfirm, showToast } from '../../utils/toast';
 import { logAudit } from '../../utils/auditLogger';
 
 import { exportProposalPDF } from './exportProposalPDF';
@@ -66,21 +66,26 @@ function SummaryPanel({
    * Handles form submission: creates a mission document in the unified missions collection.
    */
   const handleSubmit = async () => {
-    setLoading(true);
     try {
       const limitError = validateProposalLimits();
       if (limitError) {
         showToast(limitError);
-        setLoading(false);
         return;
       }
       const user = auth.currentUser;
       if (!user) {
         showToast('You must be logged in to submit a proposal');
-        setLoading(false);
         return;
       }
 
+      if (!proposalId || isResubmission) {
+        const confirmed = await showConfirm(
+          'Submit for approval? You can edit only until the first signatory approval. After that, issues must be rejected with a reason and resubmitted.'
+        );
+        if (!confirmed) return;
+      }
+
+      setLoading(true);
       const now = serverTimestamp();
 
       // --- UPDATE MODE (editing existing proposal) ---
@@ -494,7 +499,7 @@ function SummaryPanel({
           ))}
         </div>
         <p style={{ margin: '0.6rem 0 0', fontSize: '0.78rem', color: '#0d9488' }}>
-          You can track the approval progress from your proposals list at any time.
+          You can edit this proposal until the first signatory approval is recorded. After that, editing is locked to preserve the approval record. If a later approver finds an issue, they must reject the proposal with a reason so you can revise and resubmit.
         </p>
       </div>
 

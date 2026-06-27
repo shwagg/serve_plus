@@ -3,6 +3,7 @@ import ProposalTimeline from "../../../components/ProposalTimeline";
 import { db, auth } from "../../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { createNotification, notifyUsersByRoles } from "../../../utils/notificationUtils";
+import { showConfirm } from "../../../utils/toast";
 import { SessionContext } from "../../../context/sessionContextCore";
 import { exportProposalPDF } from "../exportProposalPDF";
 import "./ReviewModal.css";
@@ -279,6 +280,11 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
       return;
     }
 
+    const confirmed = await showConfirm(
+      "Confirm this approval? The proponent can no longer edit after the first signatory approval."
+    );
+    if (!confirmed) return;
+
     setIsSubmitting(true);
     try {
       const proposalRef = doc(db, "missions", proposal.id);
@@ -374,9 +380,14 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     }
 
     if (!rejectComments.trim()) {
-      setApprovalMessage("Please provide comments for rejection.");
+      setApprovalMessage("A rejection reason is required so the proponent knows what to revise before resubmitting.");
       return;
     }
+
+    const confirmed = await showConfirm(
+      "Return this proposal for revision? Your reason will be sent to the proponent."
+    );
+    if (!confirmed) return;
 
     setIsSubmitting(true);
     try {
@@ -399,7 +410,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
         "approvals.endorsedBy": null,
         "approvals.approvedBy": null,
       };
-      setApprovalMessage("Proposal returned for revision. The proponent can edit and resubmit it.");
+      setApprovalMessage("Proposal returned for revision. The proponent can use your reason to revise and resubmit it.");
 
       await updateDoc(proposalRef, updateData);
 
@@ -661,6 +672,9 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
                 {canApproveSequential() && !isAlreadyApproved() ? (
                   <>
                     <div className="rm-panel-label">Your Action</div>
+                    <div className="rm-approval-lock-note">
+                      After you approve, the proponent can no longer edit this proposal. If a later signatory finds an issue, return it with a reason so it can be revised and resubmitted.
+                    </div>
                     <button
                       className="rm-btn-approve"
                       onClick={handleApprove}
@@ -681,18 +695,21 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
                     <div className="rm-return-label">Return to proposer</div>
                     <textarea
                       className="rm-rejection-textarea"
-                      placeholder="Reason for returning (required)…"
+                      placeholder="Explain what must be revised before resubmission (required)..."
                       value={rejectComments}
                       onChange={(e) => setRejectComments(e.target.value)}
                       rows={3}
                       disabled={isSubmitting}
                     />
+                    <div className="rm-rejection-help">
+                      Required: include enough detail for the proponent to correct the proposal before resubmitting.
+                    </div>
                     <button
                       className="rm-btn-return"
                       onClick={handleReject}
                       disabled={isSubmitting || !rejectComments.trim()}
                     >
-                      {isSubmitting ? "Returning…" : "↩ Return"}
+                      {isSubmitting ? "Returning..." : "Return for Revision"}
                     </button>
                   </>
                 ) : isAlreadyApproved() ? (
