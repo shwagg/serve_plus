@@ -46,6 +46,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+vite-dev.err.log
+vite-dev.log
 
 # PDF FORMS
 public/assets/SL-Proposal-Form-32.pdf
