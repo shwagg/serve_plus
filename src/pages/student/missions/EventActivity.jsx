@@ -1623,11 +1623,15 @@ export default function EventActivity() {
       const today = new Date().toLocaleDateString("en-CA");
       if (event?.targetDate && today !== event.targetDate) {
         if (today < event.targetDate) {
-          alert("Enrollment opens on the event date.");
+          if (!isInPreEnrollmentWindow) {
+            alert("Enrollment opens on the event date.");
+            return;
+          }
+          // Pre-enrollment window is open — fall through to join
         } else {
           alert("Enrollment deadline has passed for this task.");
+          return;
         }
-        return;
       }
 
       if (Date.now() > deadline.getTime()) {
@@ -2495,6 +2499,14 @@ export default function EventActivity() {
   })();
   const isEventDay = eventDate === today;
   const isEditable = today <= eventDate;
+
+  const enrollmentWindowDays = Number(event?.enrollmentWindowDays) || 0;
+  const isInPreEnrollmentWindow = (() => {
+    if (!eventDate || enrollmentWindowDays <= 0) return false;
+    const eventMs = new Date(eventDate).getTime();
+    const windowStart = new Date(eventMs - enrollmentWindowDays * 86400000).toLocaleDateString("en-CA");
+    return today >= windowStart && today < eventDate;
+  })();
 
   // Halfway logic: if event.time exists try to parse start, else use noon
   const isHalfwayDone = (() => {
@@ -3620,10 +3632,10 @@ export default function EventActivity() {
                         },
                         {
                           label: 'Task Assignment',
-                          desc: !attendanceDone ? 'Scan attendance first to unlock' : 'Join tasks and submit approved photo proofs',
+                          desc: isInPreEnrollmentWindow ? `Task pre-enrollment is open — you can join tasks now. Attendance (QR scan) is still required on event day.` : !attendanceDone ? 'Scan attendance first to unlock' : 'Join tasks and submit approved photo proofs',
                           done: taskProofDone,
-                          locked: !attendanceDone,
-                          onOpen: attendanceDone ? () => {
+                          locked: !isInPreEnrollmentWindow && !attendanceDone,
+                          onOpen: (isInPreEnrollmentWindow || attendanceDone) ? () => {
                             const wasOpen = showTasksInReq;
                             setShowTasksInReq(prev => !prev);
                             if (wasOpen) {
@@ -3750,15 +3762,17 @@ export default function EventActivity() {
                                   const enrollmentDeadlineLabel = getEnrollmentDeadlineLabel(activity);
 
                                   const attendanceDoneLocal = volunteerProgress?.attendance === 'present';
-                                  if (!isEnrolled && (!isEventDay || !attendanceDoneLocal)) {
+                                  if (!isEnrolled && !isInPreEnrollmentWindow && (!isEventDay || !attendanceDoneLocal)) {
                                     return (
                                       <div key={idx} className="task-card task-card--locked">
                                         <span className="task-card__title-only">{activity.title}</span>
                                         {enrollmentDeadlineLabel && (
                                           <span className="task-deadline-label">{enrollmentDeadlineLabel}</span>
                                         )}
-                                        {isEventDay && !attendanceDoneLocal && (
-                                          <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to unlock</span>
+                                        {isEventDay && !attendanceDoneLocal ? (
+                                          <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Scan attendance first to join this task</span>
+                                        ) : (
+                                          <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Task joining opens on event day</span>
                                         )}
                                       </div>
                                     );

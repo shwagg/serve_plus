@@ -338,6 +338,7 @@ export default function CurrentEvent() {
           partnerSchool: data.partnerSchool || data.partnerName || "",
           affiliatedDepartment: data.affiliatedDepartment || data.department || "",
           studentOutcomes: data.studentOutcomes || "",
+          enrollmentWindowDays: data.enrollmentWindowDays ? String(data.enrollmentWindowDays) : "0",
         });
       }
       await fetchMissionVolunteers();
@@ -351,7 +352,7 @@ export default function CurrentEvent() {
   }, [missionId]);
 
   const handleSaveDetails = async () => {
-    // Published missions: only the target date may be changed
+    // Published missions: only target date + enrollmentWindowDays may be changed
     if (missionData?.status === "published") {
       if (!editDetailsData.targetDate) { showToast("Target date is required."); return; }
       // Normalise the existing date to a YYYY-MM-DD string for comparison
@@ -362,18 +363,23 @@ export default function CurrentEvent() {
         oldDateStr = missionData.targetDate;
       }
       const newDateStr = editDetailsData.targetDate;
-      if (newDateStr === oldDateStr) {
+      const newWindowDays = parseInt(editDetailsData.enrollmentWindowDays) || 0;
+      const oldWindowDays = Number(missionData.enrollmentWindowDays) || 0;
+      const dateChanged = newDateStr !== oldDateStr;
+      const windowChanged = newWindowDays !== oldWindowDays;
+
+      if (!dateChanged && !windowChanged) {
         setEditingDetails(false);
         return;
       }
-      if (!await showConfirm("Do you really want to change the date?")) return;
+      if (dateChanged && !await showConfirm("Do you really want to change the date?")) return;
 
       setSavingDetails(true);
       try {
 
-        const updatePayload = { targetDate: newDateStr, updatedAt: serverTimestamp() };
+        const updatePayload = { targetDate: newDateStr, enrollmentWindowDays: newWindowDays, updatedAt: serverTimestamp() };
         // On first date change, freeze the approved date as plannedTargetDate
-        if (!missionData.plannedTargetDate) {
+        if (dateChanged && !missionData.plannedTargetDate) {
           updatePayload.plannedTargetDate = oldDateStr;
         }
         await updateDoc(doc(db, "missions", missionId), updatePayload);
@@ -440,6 +446,7 @@ export default function CurrentEvent() {
         partnerSchool: editDetailsData.partnerSchool,
         affiliatedDepartment: editDetailsData.affiliatedDepartment,
         studentOutcomes: editDetailsData.studentOutcomes,
+        enrollmentWindowDays: parseInt(editDetailsData.enrollmentWindowDays) || 0,
         updatedAt: serverTimestamp(),
       });
       logAudit({
@@ -1832,6 +1839,7 @@ export default function CurrentEvent() {
                     { label: "Volunteer Hours", key: "volunteerHours", type: "number" },
                     { label: "Partner School / Organization", key: "partnerSchool", type: "text" },
                     { label: "Affiliated Department", key: "affiliatedDepartment", type: "text" },
+                    { label: "Task Pre-enrollment Window (days before event students can join tasks, 0 = event day only)", key: "enrollmentWindowDays", type: "number" },
                   ].map(({ label, key, type }) => (
                     <div key={key} style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 5 }}>{label}</div>
@@ -1960,7 +1968,7 @@ export default function CurrentEvent() {
                             <div style={{ fontSize: "0.93rem", color: "#1e293b" }}>{missionData.targetDate || "—"}</div>
                           )}
                           {!isFaculty && missionData?.status === "published" && !de && (
-                            <button onClick={() => { setEditDetailsData({ targetDate: missionData.targetDate || "" }); setEditingDetails(true); }}
+                            <button onClick={() => { setEditDetailsData({ targetDate: missionData.targetDate || "", enrollmentWindowDays: missionData.enrollmentWindowDays ? String(missionData.enrollmentWindowDays) : "0" }); setEditingDetails(true); }}
                               style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
                               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -1977,6 +1985,58 @@ export default function CurrentEvent() {
                       <div style={{ padding: "10px 14px" }}>
                         <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Location</div>
                         <div style={{ fontSize: "0.93rem", color: missionData.location ? "#1e293b" : "#94a3b8" }}>{missionData.location || "—"}</div>
+                      </div>
+                    </div>
+
+                    {/* Row: Task Pre-enrollment Window */}
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1.5px solid #94a3b8" }}>
+                      <div style={{ padding: "10px 14px", background: de ? "#f4f6f8" : "#f1f5f9", borderRight: "1.5px solid #94a3b8", display: "flex", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: "0.68rem", fontWeight: 700, color: de ? "#c4cdd6" : "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Task Pre-enrollment Window</div>
+                      </div>
+                      <div style={{ padding: "10px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          {de ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="7"
+                                  value={editDetailsData.enrollmentWindowDays ?? "0"}
+                                  onChange={e => setEditDetailsData(p => ({ ...p, enrollmentWindowDays: e.target.value }))}
+                                  style={{ width: 72, padding: "6px 10px", border: "1.5px solid #e2e8f0", borderRadius: 7, fontSize: "0.9rem", color: "#1e293b" }}
+                                />
+                                <span style={{ fontSize: "0.85rem", color: "#475569" }}>days before event</span>
+                              </div>
+                              <span style={{ fontSize: "0.72rem", color: "#64748b", lineHeight: 1.5 }}>
+                                Allows students to <strong>join tasks</strong> this many days before the event.<br />
+                                Set to <strong>0</strong> to keep task joining locked until event day.
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <div style={{ fontSize: "0.93rem", color: "#1e293b", fontWeight: 500 }}>
+                                {(missionData.enrollmentWindowDays || 0) > 0
+                                  ? `Students can join tasks up to ${missionData.enrollmentWindowDays} day${missionData.enrollmentWindowDays !== 1 ? "s" : ""} before the event`
+                                  : <span style={{ color: "#94a3b8" }}>Task joining opens on event day only</span>}
+                              </div>
+                              {(missionData.enrollmentWindowDays || 0) > 0 && (
+                                <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 3 }}>Attendance (QR scan) is still required on event day to submit proof.</div>
+                              )}
+                            </div>
+                          )}
+                          {!isFaculty && missionData?.status === "published" && !de && (
+                            <button
+                              onClick={() => { setEditDetailsData({ targetDate: missionData.targetDate || "", enrollmentWindowDays: missionData.enrollmentWindowDays ? String(missionData.enrollmentWindowDays) : "0" }); setEditingDetails(true); }}
+                              style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#e8f0fe", color: "#1a73e8", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
 

@@ -27,6 +27,7 @@ const FIELD_LIMITS = {
   successIndicators: 1000,
   budget: 200,
   studentOutcomes: 130,
+  facultyInCharge: 100,
   proponents: 3,
 };
 
@@ -224,6 +225,8 @@ function NumberedStakeholderInput({ items, onAdd, onRemove, placeholder, addMore
  */
 function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const { userData, authLoading } = useSession();
+  const submitterRole = normalizeValue(userData?.role || userData?.userRole || userData?.Role);
+  const isStudentSubmitter = submitterRole === 'student';
   const [loading, setLoading] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [hasProponentName, setHasProponentName] = useState(false);
@@ -250,6 +253,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     alt: '',
     partnerSchool: '',
     participantLimit: '',
+    facultyInCharge: '',
   });
   // Department options for dropdown
   const departments = [
@@ -265,7 +269,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const [partnerSchools, setPartnerSchools] = useState([]);
   const [chairList, setChairList] = useState([]);
   const [deanList, setDeanList] = useState([]);
+  const [facultyList, setFacultyList] = useState([]);
   const [loadingSchools, setLoadingSchools] = useState(true);
+  const [locationOption, setLocationOption] = useState('');
 
   useEffect(() => {
     async function fetchUsers() {
@@ -275,10 +281,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         setPartnerSchools(allUsers.filter(u => u.role === 'partner'));
         setChairList(allUsers.filter(u => u.position === 'program chair'));
         setDeanList(allUsers.filter(u => u.position === 'college dean'));
+        setFacultyList(allUsers.filter(u => u.role === 'faculty'));
       } catch {
         setPartnerSchools([]);
         setChairList([]);
         setDeanList([]);
+        setFacultyList([]);
       } finally {
         setLoadingSchools(false);
       }
@@ -370,6 +378,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       alt: p.alt || '',
       partnerSchool: p.partnerSchool || '',
       participantLimit: p.participantLimit ? String(p.participantLimit) : '',
+      facultyInCharge: p.slFields?.assignedFaculty || p.ceFields?.assignedFaculty || '',
     });
     if (p.projectType === 'sl' && p.slFields) {
       setSlFields({
@@ -386,6 +395,11 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       });
     }
     setHasProponentName(true);
+    const _loc = p.location || '';
+    if (_loc === 'Partner School Address') setLocationOption('partner-school-address');
+    else if (_loc === 'Mapua Malayan Colleges Laguna') setLocationOption('our-campus');
+    else if (_loc) setLocationOption('other');
+    else setLocationOption('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editProposal?.id]);
 
@@ -413,6 +427,10 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
           if (!Array.isArray(restored.proponents))         restored.proponents         = [];
           if (!Array.isArray(restored.specificActivities)) restored.specificActivities = [];
           setFormData(prev => ({ ...prev, ...restored }));
+          const _restoredLoc = restored.location || '';
+          if (_restoredLoc === 'Partner School Address') setLocationOption('partner-school-address');
+          else if (_restoredLoc === 'Mapua Malayan Colleges Laguna') setLocationOption('our-campus');
+          else if (_restoredLoc) setLocationOption('other');
         }
         if (draft.slFields) setSlFields(prev => ({ ...prev, ...draft.slFields }));
         if (draft.ceFields) setCeFields(prev => ({ ...prev, ...draft.ceFields }));
@@ -479,10 +497,11 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     clearDraft();
     submittedRef.current = false;
     hasUserInputRef.current = false;
-    setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '' });
+    setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '', facultyInCharge: '' });
     setSlFields({ section: '', course: '', courseCode: '' });
     setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '' });
     setDraftRestored(false);
+    setLocationOption('');
     showToast('Draft discarded.');
   };
 
@@ -529,6 +548,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       successIndicators: FIELD_LIMITS.successIndicators,
       budget: FIELD_LIMITS.budget,
       studentOutcomes: FIELD_LIMITS.studentOutcomes,
+      facultyInCharge: FIELD_LIMITS.facultyInCharge,
     };
 
     if (name === 'volunteerHours') {
@@ -554,6 +574,19 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       showTemporaryFieldError(name, `This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
       showToast(`This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
       return;
+    } else if (name === 'reviewedBy' || name === 'recommendedBy') {
+      // Prevent a signatory from also being listed as a proponent
+      if (value) {
+        const normalizedVal = normalizeValue(value);
+        const conflict = (formData.proponents || []).some(p => normalizeValue(p) === normalizedVal);
+        if (conflict) {
+          showToast(`"${value}" is already listed as a proponent and cannot also be a signatory.`);
+          showTemporaryFieldError(name, 'This person is already listed as a proponent.');
+          return;
+        }
+      }
+      setFormData(prev => ({ ...prev, [name]: value }));
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
       setFieldErrors(prev => ({ ...prev, [name]: '' }));
@@ -655,6 +688,22 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       showTemporaryFieldError('proponents', `Only ${FIELD_LIMITS.proponents} proponent names are allowed.`);
       return;
     }
+    // Prevent overlap with selected signatories
+    const normalizedName = normalizeValue(name);
+    if (
+      (formData.reviewedBy && normalizeValue(formData.reviewedBy) === normalizedName) ||
+      (formData.recommendedBy && normalizeValue(formData.recommendedBy) === normalizedName)
+    ) {
+      showToast(`"${name}" is already selected as a signatory. Signatories and proponents cannot overlap.`);
+      showTemporaryFieldError('proponents', 'This person is already selected as a signatory.');
+      return;
+    }
+    // Prevent Faculty In Charge from also appearing as a proponent (student proposals)
+    if (isStudentSubmitter && formData.facultyInCharge && normalizeValue(formData.facultyInCharge) === normalizedName) {
+      showToast(`"${name}" is already designated as the Faculty In Charge and cannot also be a proponent.`);
+      showTemporaryFieldError('proponents', 'The Faculty In Charge cannot also be listed as a proponent.');
+      return;
+    }
     setFormData(prev => ({ ...prev, proponents: [...(prev.proponents || []), name] }));
     setFieldErrors(prev => ({ ...prev, proponents: '' }));
   };
@@ -746,6 +795,8 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   const validateBeforeSummary = () => {
     const nextErrors = {};
+    if (isStudentSubmitter && !formData.facultyInCharge?.trim()) nextErrors.facultyInCharge = 'Please select a Faculty In Charge.';
+    if (isStudentSubmitter && formData.facultyInCharge?.trim() && (formData.proponents || []).some(p => normalizeValue(p) === normalizeValue(formData.facultyInCharge))) nextErrors.facultyInCharge = 'The Faculty In Charge cannot also be listed as a proponent.';
     if (getVisibleCharacterCount(formData.title) > FIELD_LIMITS.title) nextErrors.title = `Only ${FIELD_LIMITS.title} characters are allowed, excluding spaces and line breaks.`;
     if (getVisibleCharacterCount(formData.location) > FIELD_LIMITS.location) nextErrors.location = `Only ${FIELD_LIMITS.location} characters are allowed, excluding spaces and line breaks.`;
     if (getVisibleCharacterCount(slFields.course) > FIELD_LIMITS.course) nextErrors.course = `Only ${FIELD_LIMITS.course} characters are allowed, excluding spaces and line breaks.`;
@@ -771,12 +822,15 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     return true;
   };
 
-  // Chairs and deans are filtered by the selected affiliated department.
+  // Chairs, deans, and faculty are filtered by the selected affiliated department.
   const filteredChairs = chairList.filter(
     c => !formData.affiliatedDepartment || c.department === formData.affiliatedDepartment
   );
   const filteredDeans = deanList.filter(
     d => !formData.affiliatedDepartment || d.department === formData.affiliatedDepartment
+  );
+  const filteredFaculty = facultyList.filter(
+    f => !formData.affiliatedDepartment || f.department === formData.affiliatedDepartment
   );
 
   // Submission logic is now handled in SummaryPanel
@@ -841,7 +895,10 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                 </small>
               </div>
               <div className="form-group">
-                <label htmlFor="partnerSchool">Partner School</label>
+                <label htmlFor="partnerSchool">Partner School / Organization</label>
+                <small className="field-limit-hint" style={{ marginBottom: 6, display: 'block' }}>
+                  Select the community partner for this project. The activity venue is specified separately below.
+                </small>
                 {loadingSchools ? (
                   <div>Loading schools...</div>
                 ) : (
@@ -850,7 +907,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     name="partnerSchool"
                     value={formData.partnerSchool || ''}
                     onChange={handleInputChange}
-                    placeholder="Select Partner School"
+                    placeholder="Select Partner School / Organization"
                     options={partnerSchools.map(s => ({
                       value: s.organizationName || s.name || s.email,
                       label: s.organizationName || s.name || s.email,
@@ -874,7 +931,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
               {projectType === 'service-learning' && (
                 <div className="form-group">
-                  <label>Faculty-in-Charge / Proponent(s) *</label>
+                  <label>Proponent(s) *</label>
+                  <small className="field-limit-hint" style={{ marginBottom: 6, display: 'block' }}>
+                    {isStudentSubmitter
+                      ? 'List the student co-proponents for this proposal.'
+                      : 'You are the Faculty-in-Charge of record (locked first entry). Add co-faculty/proponents below if needed.'}
+                  </small>
                   <ProponentTagInput
                     tags={formData.proponents || []}
                     onAdd={handleAddProponent}
@@ -884,6 +946,31 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   <small className={`field-limit-hint${fieldErrors.proponents ? ' error' : ''}`}>
                     {fieldErrors.proponents || `${(formData.proponents || []).length} / ${FIELD_LIMITS.proponents} proponents`}
                   </small>
+                  {isStudentSubmitter && (
+                    <div style={{ marginTop: 14 }}>
+                      <label htmlFor="facultyInCharge">Faculty In Charge *</label>
+                      <small className="field-limit-hint" style={{ marginBottom: 6, display: 'block' }}>
+                        The faculty member supervising this proposal. Select your affiliated department first to filter the list.
+                      </small>
+                      <CustomSelect
+                        id="facultyInCharge"
+                        name="facultyInCharge"
+                        value={formData.facultyInCharge || ''}
+                        onChange={handleInputChange}
+                        placeholder={
+                          !formData.affiliatedDepartment
+                            ? 'Select a department first'
+                            : filteredFaculty.length === 0
+                              ? 'No faculty found for this department'
+                              : 'Select Faculty In Charge'
+                        }
+                        options={filteredFaculty.map(f => ({ value: f.name || f.email, label: f.name || f.email }))}
+                      />
+                      <small className={`field-limit-hint${fieldErrors.facultyInCharge ? ' error' : ''}`}>
+                        {fieldErrors.facultyInCharge || ''}
+                      </small>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -892,6 +979,11 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Name of Proponent(s)</label>
+                    <small className="field-limit-hint" style={{ marginBottom: 6, display: 'block' }}>
+                      {isStudentSubmitter
+                        ? 'List the student co-proponents for this proposal.'
+                        : 'You are the Faculty-in-Charge of record. Add co-faculty/proponents below if needed.'}
+                    </small>
                     <ProponentTagInput
                       tags={formData.proponents || []}
                       onAdd={handleAddProponent}
@@ -901,6 +993,31 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                     <small className={`field-limit-hint${fieldErrors.proponents ? ' error' : ''}`}>
                       {fieldErrors.proponents || `${(formData.proponents || []).length} / ${FIELD_LIMITS.proponents} proponents`}
                     </small>
+                    {isStudentSubmitter && (
+                      <div style={{ marginTop: 14 }}>
+                        <label htmlFor="facultyInCharge">Faculty In Charge *</label>
+                        <small className="field-limit-hint" style={{ marginBottom: 6, display: 'block' }}>
+                          The faculty member supervising this proposal. Select your affiliated department first to filter the list.
+                        </small>
+                        <CustomSelect
+                          id="facultyInCharge"
+                          name="facultyInCharge"
+                          value={formData.facultyInCharge || ''}
+                          onChange={handleInputChange}
+                          placeholder={
+                            !formData.affiliatedDepartment
+                              ? 'Select a department first'
+                              : filteredFaculty.length === 0
+                                ? 'No faculty found for this department'
+                                : 'Select Faculty In Charge'
+                          }
+                          options={filteredFaculty.map(f => ({ value: f.name || f.email, label: f.name || f.email }))}
+                        />
+                        <small className={`field-limit-hint${fieldErrors.facultyInCharge ? ' error' : ''}`}>
+                          {fieldErrors.facultyInCharge || ''}
+                        </small>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1013,19 +1130,48 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="location">Location</label>
-                <input
-                  type="text"
-                  id="location"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="Venue or community where project will take place"
-                />
-                <small className={`field-limit-hint${fieldErrors.location ? ' error' : ''}`}>
-                  {fieldErrors.location || `${getVisibleCharacterCount(formData.location)} / ${FIELD_LIMITS.location} characters`}
+                <label htmlFor="locationOption">Target Location</label>
+                <small className="field-limit-hint" style={{ marginBottom: 6, display: 'block' }}>
+                  Where will the activity take place?
                 </small>
+                <select
+                  id="locationOption"
+                  value={locationOption}
+                  required
+                  onChange={e => {
+                    const val = e.target.value;
+                    setLocationOption(val);
+                    if (val === 'partner-school-address') {
+                      handleInputChange({ target: { name: 'location', value: 'Partner School Address' } });
+                    } else if (val === 'our-campus') {
+                      handleInputChange({ target: { name: 'location', value: 'Mapua Malayan Colleges Laguna' } });
+                    } else {
+                      handleInputChange({ target: { name: 'location', value: '' } });
+                    }
+                  }}
+                >
+                  <option value="">Select activity location...</option>
+                  <option value="partner-school-address">Partner School Address</option>
+                  <option value="our-campus">Mapua Malayan Colleges Laguna</option>
+                  <option value="other">Other</option>
+                </select>
+                {locationOption === 'other' && (
+                  <>
+                    <input
+                      type="text"
+                      id="location"
+                      name="location"
+                      value={formData.location}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Specify the venue or community"
+                      style={{ marginTop: 8 }}
+                    />
+                    <small className={`field-limit-hint${fieldErrors.location ? ' error' : ''}`}>
+                      {fieldErrors.location || `${getVisibleCharacterCount(formData.location)} / ${FIELD_LIMITS.location} characters`}
+                    </small>
+                  </>
+                )}
               </div>
 
               <div className="form-group">

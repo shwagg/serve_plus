@@ -87,6 +87,8 @@ function SummaryPanel({
 
       setLoading(true);
       const now = serverTimestamp();
+      // Derive Faculty In Charge: explicit input (student proposals) or locked first proponent (faculty proposals)
+      const assignedFacultyValue = formData.facultyInCharge?.trim() || formData.proponents?.[0] || formData.preparedBy || '';
 
       // --- UPDATE MODE (editing existing proposal) ---
       if (proposalId) {
@@ -144,12 +146,14 @@ function SummaryPanel({
             section: slFields.section,
             course: slFields.course,
             courseCode: slFields.courseCode,
+            assignedFaculty: assignedFacultyValue,
           };
         } else {
           updateData.ceFields = {
             nature: ceFields.nature,
             learningOutcomes: ceFields.learningOutcomes,
             customLearningOutcome: ceFields.customLearningOutcome || '',
+            assignedFaculty: assignedFacultyValue,
           };
         }
         await updateDoc(doc(db, 'missions', proposalId), updateData);
@@ -271,12 +275,14 @@ function SummaryPanel({
           section: slFields.section,
           course: slFields.course,
           courseCode: slFields.courseCode,
+          assignedFaculty: assignedFacultyValue,
         };
       } else {
         missionData.ceFields = {
           nature: ceFields.nature,
           learningOutcomes: ceFields.learningOutcomes,
           customLearningOutcome: ceFields.customLearningOutcome || '',
+          assignedFaculty: assignedFacultyValue,
         };
       }
 
