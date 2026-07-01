@@ -6,7 +6,7 @@ export const BADGE_DEFINITIONS = [
     id: "serve-ready",
     name: "SERVE+ Ready",
     category: "default",
-    colorTheme: "gray",
+    colorTheme: "navy-cyan",
     description: "Made an account and got set up. Welcome to SERVE+.",
     criteria: "Created a SERVE+ account.",
     svgFilename: "00-serve-ready.svg",

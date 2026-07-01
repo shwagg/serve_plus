@@ -146,6 +146,7 @@ function SummaryPanel({
             section: slFields.section,
             course: slFields.course,
             courseCode: slFields.courseCode,
+            courseId: slFields.courseId || null,
             assignedFaculty: assignedFacultyValue,
           };
         } else {
@@ -275,6 +276,7 @@ function SummaryPanel({
           section: slFields.section,
           course: slFields.course,
           courseCode: slFields.courseCode,
+          courseId: slFields.courseId || null,
           assignedFaculty: assignedFacultyValue,
         };
       } else {

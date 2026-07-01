@@ -303,6 +303,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Courses — faculty-owned course roster management for Service Learning
+    match /courses/{courseId} {
+      // Any authenticated user can read (students need to check their own enrollment)
+      allow read: if request.auth != null;
+
+      // Faculty can create a course for themselves
+      allow create: if request.auth != null &&
+        currentUserData().role == "faculty" &&
+        request.resource.data.facultyUid == request.auth.uid;
+
+      // Faculty who owns the course can update it (roster changes, etc.)
+      allow update: if request.auth != null &&
+        currentUserData().role == "faculty" &&
+        resource.data.facultyUid == request.auth.uid;
+
+      // Admin / sysadmin can update or delete any course
+      allow update, delete: if request.auth != null && (
+        currentUserData().role == "admin" ||
+        currentUserData().role == "sysadmin"
+      );
+    }
+
     // Support tickets — any authenticated user can submit; only owner + admins/sysadmins can read/reply
     match /support/{ticketId} {
       allow create: if request.auth != null;

@@ -77,6 +77,13 @@ export const partnerLinks = [
 //faculty side
 export const facultyLinks = [
   {
+    key: "courses",
+    label: "Courses",
+    children: [
+      { label: "My Courses", to: "/faculty/courses" },
+    ],
+  },
+  {
     key: "events",
     label: "Events",
     children: [

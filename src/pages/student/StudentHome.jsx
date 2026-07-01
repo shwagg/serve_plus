@@ -127,9 +127,38 @@ const StudentHome = () => {
         const user = currentUser;
 
         const querySnapshot = await getDocs(collection(db, "missions"));
-        const missions = querySnapshot.docs
+        const allPublished = querySnapshot.docs
           .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
           .filter(m => m.status === "published");
+
+        // ── SL visibility filter ──────────────────────────────────────────────
+        // SL missions with a courseId are restricted to enrolled students.
+        // CE missions and legacy SL missions (no courseId) are visible to all.
+        let missions = allPublished;
+        const slCourseIds = [
+          ...new Set(
+            allPublished
+              .filter(m => m.projectType === 'sl' && m.slFields?.courseId)
+              .map(m => m.slFields.courseId)
+          ),
+        ];
+        if (slCourseIds.length > 0) {
+          const courseSnaps = await Promise.all(
+            slCourseIds.map(id => getDoc(doc(db, 'courses', id)))
+          );
+          const courseEnrollment = {};
+          slCourseIds.forEach((id, i) => {
+            if (courseSnaps[i].exists()) {
+              courseEnrollment[id] = courseSnaps[i].data().students || [];
+            }
+          });
+          missions = allPublished.filter(m => {
+            if (m.projectType !== 'sl') return true;        // CE: always visible
+            const cid = m.slFields?.courseId;
+            if (!cid) return true;                           // legacy SL: no restriction
+            return user ? (courseEnrollment[cid] || []).includes(user.uid) : false;
+          });
+        }
 
         setMissionCards(missions);
 

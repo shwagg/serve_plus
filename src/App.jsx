@@ -36,6 +36,7 @@ import CurrentEvent from "./pages/admin/CurrentEvent";
 import ProjectTasks from "./pages/admin/ProjectTasks";
 import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
 import FacultyHome from "./pages/faculty/FacultyHome";
+import FacultyCourses from "./pages/faculty/FacultyCourses";
 import Chat from "./pages/global/Chat";
 import CommunityFeedbackForm from "./pages/global/CommunityFeedbackForm";
 import EventActivity from "./pages/student/missions/EventActivity";
@@ -202,6 +203,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="courses" element={<FacultyCourses />} />
             <Route path="projects" element={<ProjectList mode="faculty" />} />
             <Route path="review-proposals" element={<ReviewProposal />} />
             <Route path="current-event" element={<CurrentEvent />} />

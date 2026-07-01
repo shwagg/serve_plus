@@ -2,7 +2,7 @@
 // React and library imports
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { auth, db } from '../../../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import '../../../styles/ProjectProposal.css';
 import TargetDatePicker from '../../../components/TargetDatePicker';
 import SummaryPanel from '../SummaryPanel';
@@ -227,7 +227,28 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const { userData, authLoading } = useSession();
   const submitterRole = normalizeValue(userData?.role || userData?.userRole || userData?.Role);
   const isStudentSubmitter = submitterRole === 'student';
+  const isFacultySubmitter = submitterRole === 'faculty';
   const [loading, setLoading] = useState(false);
+
+  // Faculty course list for SL course dropdown
+  const [facultyCourses, setFacultyCourses] = useState([]);
+  useEffect(() => {
+    if (!isFacultySubmitter || projectType !== 'service-learning') return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    let cancelled = false;
+    getDocs(query(collection(db, 'courses'), where('facultyUid', '==', uid)))
+      .then((snap) => {
+        if (cancelled) return;
+        setFacultyCourses(
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
+        );
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isFacultySubmitter, projectType]);
   const [showSummary, setShowSummary] = useState(false);
   const [hasProponentName, setHasProponentName] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -328,6 +349,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
 
   // Service Learning specific fields
   const [slFields, setSlFields] = useState({
+    courseId: '',
     section: '',
     course: '',
     courseCode: '',
@@ -382,6 +404,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     });
     if (p.projectType === 'sl' && p.slFields) {
       setSlFields({
+        courseId: p.slFields.courseId || '',
         section: p.slFields.section || '',
         course: p.slFields.course || '',
         courseCode: p.slFields.courseCode || '',
@@ -498,7 +521,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     submittedRef.current = false;
     hasUserInputRef.current = false;
     setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '', facultyInCharge: '' });
-    setSlFields({ section: '', course: '', courseCode: '' });
+    setSlFields({ courseId: '', section: '', course: '', courseCode: '' });
     setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '' });
     setDraftRestored(false);
     setLocationOption('');
@@ -797,6 +820,10 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     const nextErrors = {};
     if (isStudentSubmitter && !formData.facultyInCharge?.trim()) nextErrors.facultyInCharge = 'Please select a Faculty In Charge.';
     if (isStudentSubmitter && formData.facultyInCharge?.trim() && (formData.proponents || []).some(p => normalizeValue(p) === normalizeValue(formData.facultyInCharge))) nextErrors.facultyInCharge = 'The Faculty In Charge cannot also be listed as a proponent.';
+    // Faculty must link a course to an SL proposal
+    if (isFacultySubmitter && projectType === 'service-learning' && !slFields.courseId) {
+      nextErrors.courseSelect = 'Please select a course for this Service Learning proposal.';
+    }
     if (getVisibleCharacterCount(formData.title) > FIELD_LIMITS.title) nextErrors.title = `Only ${FIELD_LIMITS.title} characters are allowed, excluding spaces and line breaks.`;
     if (getVisibleCharacterCount(formData.location) > FIELD_LIMITS.location) nextErrors.location = `Only ${FIELD_LIMITS.location} characters are allowed, excluding spaces and line breaks.`;
     if (getVisibleCharacterCount(slFields.course) > FIELD_LIMITS.course) nextErrors.course = `Only ${FIELD_LIMITS.course} characters are allowed, excluding spaces and line breaks.`;
@@ -1198,53 +1225,108 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             {projectType === 'service-learning' && (
               <div className="form-section">
                 <h2>Academic Information</h2>
-                <div className="form-row">
+                {isFacultySubmitter ? (
+                  /* Faculty: pick from their courses dropdown */
                   <div className="form-group">
-                    <label htmlFor="course">Course *</label>
-                    <input
-                      type="text"
-                      id="course"
-                      name="course"
-                      value={slFields.course}
-                      onChange={handleSlFieldChange}
-                      required
-                      placeholder="e.g., Introduction to Community Development"
-                    />
-                    <small className={`field-limit-hint${fieldErrors.course ? ' error' : ''}`}>
-                      {fieldErrors.course || `${getVisibleCharacterCount(slFields.course)} / ${FIELD_LIMITS.course} characters`}
-                    </small>
+                    <label htmlFor="courseSelect">Course *</label>
+                    <select
+                      id="courseSelect"
+                      value={slFields.courseId || ''}
+                      onChange={e => {
+                        hasUserInputRef.current = true;
+                        const selected = facultyCourses.find(c => c.id === e.target.value);
+                        if (selected) {
+                          setSlFields({
+                            courseId: selected.id,
+                            course: selected.courseName,
+                            courseCode: selected.courseCode,
+                            section: selected.section,
+                          });
+                        } else {
+                          setSlFields({ courseId: '', course: '', courseCode: '', section: '' });
+                        }
+                      }}
+                      style={{
+                        width: '100%', padding: '9px 12px', borderRadius: 8,
+                        border: `1px solid ${fieldErrors.courseSelect ? '#e53e3e' : '#cbd5e0'}`,
+                        fontSize: 14, background: '#fff', outline: 'none', cursor: 'pointer',
+                      }}
+                    >
+                      <option value="">Select a course…</option>
+                      {facultyCourses.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.courseName} ({c.courseCode} · Section {c.section})
+                        </option>
+                      ))}
+                    </select>
+                    {facultyCourses.length === 0 && (
+                      <small style={{ color: '#718096', fontSize: 12, marginTop: 4, display: 'block' }}>
+                        No courses found. Go to the <strong>Courses</strong> tab to create one first.
+                      </small>
+                    )}
+                    {fieldErrors.courseSelect && (
+                      <small style={{ color: '#e53e3e', fontSize: 12, marginTop: 4, display: 'block' }}>
+                        {fieldErrors.courseSelect}
+                      </small>
+                    )}
+                    {slFields.courseId && (
+                      <small className="field-limit-hint">
+                        {slFields.courseCode} · Section {slFields.section} — only enrolled students will see this event.
+                      </small>
+                    )}
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="courseCode">Course Code *</label>
-                    <input
-                      type="text"
-                      id="courseCode"
-                      name="courseCode"
-                      value={slFields.courseCode}
-                      onChange={handleSlFieldChange}
-                      required
-                      placeholder="e.g., CD 101"
-                    />
-                    <small className={`field-limit-hint${fieldErrors.courseCode ? ' error' : ''}`}>
-                      {fieldErrors.courseCode || `${getVisibleCharacterCount(slFields.courseCode)} / ${FIELD_LIMITS.courseCode} characters`}
-                    </small>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label htmlFor="section">Section *</label>
-                  <input
-                    type="text"
-                    id="section"
-                    name="section"
-                    value={slFields.section}
-                    onChange={handleSlFieldChange}
-                    required
-                    placeholder="e.g., Section A"
-                  />
-                  <small className={`field-limit-hint${fieldErrors.section ? ' error' : ''}`}>
-                    {fieldErrors.section || `${getVisibleCharacterCount(slFields.section)} / ${FIELD_LIMITS.section} characters`}
-                  </small>
-                </div>
+                ) : (
+                  /* Students: free-text fields */
+                  <>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="course">Course *</label>
+                        <input
+                          type="text"
+                          id="course"
+                          name="course"
+                          value={slFields.course}
+                          onChange={handleSlFieldChange}
+                          required
+                          placeholder="e.g., Introduction to Community Development"
+                        />
+                        <small className={`field-limit-hint${fieldErrors.course ? ' error' : ''}`}>
+                          {fieldErrors.course || `${getVisibleCharacterCount(slFields.course)} / ${FIELD_LIMITS.course} characters`}
+                        </small>
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="courseCode">Course Code *</label>
+                        <input
+                          type="text"
+                          id="courseCode"
+                          name="courseCode"
+                          value={slFields.courseCode}
+                          onChange={handleSlFieldChange}
+                          required
+                          placeholder="e.g., CD 101"
+                        />
+                        <small className={`field-limit-hint${fieldErrors.courseCode ? ' error' : ''}`}>
+                          {fieldErrors.courseCode || `${getVisibleCharacterCount(slFields.courseCode)} / ${FIELD_LIMITS.courseCode} characters`}
+                        </small>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="section">Section *</label>
+                      <input
+                        type="text"
+                        id="section"
+                        name="section"
+                        value={slFields.section}
+                        onChange={handleSlFieldChange}
+                        required
+                        placeholder="e.g., Section A"
+                      />
+                      <small className={`field-limit-hint${fieldErrors.section ? ' error' : ''}`}>
+                        {fieldErrors.section || `${getVisibleCharacterCount(slFields.section)} / ${FIELD_LIMITS.section} characters`}
+                      </small>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
