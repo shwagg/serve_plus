@@ -3,7 +3,8 @@ import {
   query, where, serverTimestamp, Timestamp, onSnapshot,
   deleteField,
 } from "firebase/firestore";
-import { db } from "../../firebaseConfig";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "../../firebaseConfig";
 import { useState, useEffect, useRef, useContext } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { SessionContext } from "../../context/sessionContextCore";
@@ -184,13 +185,34 @@ function MetaItem({ icon, label, value }) {
   );
 }
 
+function missionDateToInputValue(value) {
+  if (!value) return "";
+  if (typeof value?.toDate === "function") {
+    return value.toDate().toLocaleDateString("en-CA");
+  }
+  return String(value);
+}
+
+function getMissionCoverUrl(data = {}) {
+  return data.img || data.coverUrl || data.coverPhotoUrl || "";
+}
+
+function parseOrganizationTags(value = "") {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 // ── main component ────────────────────────────────────────────────────
 export default function CurrentEvent() {
   const { missionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { userData } = useContext(SessionContext);
-  const isFaculty = (userData?.role || userData?.userRole || "").toLowerCase() === "faculty";
+  const currentRole = (userData?.role || userData?.userRole || "").toLowerCase();
+  const isFaculty = currentRole === "faculty";
+  const canManageEventDetails = currentRole === "admin" || currentRole === "sysadmin";
 
   // ── list view state ───────────────────────────────────────────────
   const [missions, setMissions] = useState([]);
@@ -237,7 +259,10 @@ export default function CurrentEvent() {
 
   // ── edit details state ────────────────────────────────────────────
   const [editingDetails, setEditingDetails] = useState(false);
+  const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [editDetailsData, setEditDetailsData] = useState({});
+  const [editCoverFile, setEditCoverFile] = useState(null);
+  const [editCoverPreview, setEditCoverPreview] = useState("");
   const [savingDetails, setSavingDetails] = useState(false);
 
   // ── community feedback tab state ─────────────────────────────────
@@ -328,9 +353,10 @@ export default function CurrentEvent() {
         setEditDetailsData({
           title: data.title || "",
           description: data.description || "",
+          coverUrl: getMissionCoverUrl(data),
           objectives: data.objectives || "",
           location: data.location || "",
-          targetDate: data.targetDate || "",
+          targetDate: missionDateToInputValue(data.targetDate),
           volunteerHours: data.volunteerHours ? String(data.volunteerHours) : "",
           budget: data.budget || "",
           stakeholdersText: Array.isArray(data.stakeholders)
@@ -340,6 +366,8 @@ export default function CurrentEvent() {
           studentOutcomes: data.studentOutcomes || "",
           enrollmentWindowDays: data.enrollmentWindowDays ? String(data.enrollmentWindowDays) : "0",
         });
+        setEditCoverFile(null);
+        setEditCoverPreview("");
       }
       await fetchMissionVolunteers();
     } finally {
@@ -351,40 +379,102 @@ export default function CurrentEvent() {
     loadMissionDetails({ silent: true });
   }, [missionId]);
 
+  const openEditDetailsModal = () => {
+    if (!missionData) return;
+    setEditDetailsData({
+      title: missionData.title || "",
+      description: missionData.description || "",
+      coverUrl: getMissionCoverUrl(missionData),
+      objectives: missionData.objectives || "",
+      location: missionData.location || "",
+      targetDate: missionDateToInputValue(missionData.targetDate),
+      volunteerHours: missionData.volunteerHours ? String(missionData.volunteerHours) : "",
+      budget: missionData.budget || "",
+      stakeholdersText: Array.isArray(missionData.stakeholders)
+        ? missionData.stakeholders.join("\n")
+        : (missionData.stakeholders || ""),
+      partnerSchool: missionData.partnerSchool || missionData.partnerName || "",
+      affiliatedDepartment: missionData.affiliatedDepartment || missionData.department || "",
+      studentOutcomes: missionData.studentOutcomes || "",
+      enrollmentWindowDays: missionData.enrollmentWindowDays ? String(missionData.enrollmentWindowDays) : "0",
+    });
+    setEditCoverFile(null);
+    setEditCoverPreview("");
+    setShowEditDetailsModal(true);
+  };
+
+  const handleCoverFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Please upload an image file.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Cover photo must be under 5MB.");
+      event.target.value = "";
+      return;
+    }
+    setEditCoverFile(file);
+    setEditCoverPreview(URL.createObjectURL(file));
+  };
+
+  const uploadMissionCover = async (file) => {
+    const ext = file.name.split(".").pop() || "jpg";
+    const storageRef = ref(storage, `mission-covers/${missionId}/${Date.now()}.${ext}`);
+    await uploadBytes(storageRef, file, { contentType: file.type });
+    return getDownloadURL(storageRef);
+  };
+
   const handleSaveDetails = async () => {
-    // Published missions: only target date + enrollmentWindowDays may be changed
-    if (missionData?.status === "published") {
-      if (!editDetailsData.targetDate) { showToast("Target date is required."); return; }
-      // Normalise the existing date to a YYYY-MM-DD string for comparison
-      let oldDateStr = "";
-      if (missionData.targetDate?.toDate) {
-        oldDateStr = missionData.targetDate.toDate().toLocaleDateString("en-CA");
-      } else if (typeof missionData.targetDate === "string") {
-        oldDateStr = missionData.targetDate;
-      }
-      const newDateStr = editDetailsData.targetDate;
+    if (!canManageEventDetails) {
+      showToast("Only admins can edit event details.");
+      return;
+    }
+    if (!editDetailsData.title.trim()) { showToast("Title is required."); return; }
+    if (!editDetailsData.targetDate) { showToast("Target date is required."); return; }
+
+    const oldDateStr = missionDateToInputValue(missionData?.targetDate);
+    const newDateStr = editDetailsData.targetDate;
+    const dateChanged = newDateStr !== oldDateStr;
+    if (dateChanged && !await showConfirm("Do you really want to change the date?")) return;
+
+    setSavingDetails(true);
+    try {
+      const stakeholdersArr = parseOrganizationTags(editDetailsData.stakeholdersText);
       const newWindowDays = parseInt(editDetailsData.enrollmentWindowDays) || 0;
-      const oldWindowDays = Number(missionData.enrollmentWindowDays) || 0;
-      const dateChanged = newDateStr !== oldDateStr;
-      const windowChanged = newWindowDays !== oldWindowDays;
+      const uploadedCoverUrl = editCoverFile ? await uploadMissionCover(editCoverFile) : "";
+      const coverUrl = uploadedCoverUrl || editDetailsData.coverUrl.trim();
 
-      if (!dateChanged && !windowChanged) {
-        setEditingDetails(false);
-        return;
+      const updatePayload = {
+        title: editDetailsData.title.trim(),
+        description: editDetailsData.description,
+        targetDate: newDateStr,
+        enrollmentWindowDays: newWindowDays,
+        stakeholders: stakeholdersArr,
+        img: coverUrl,
+        coverUrl,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (dateChanged && !missionData?.plannedTargetDate) {
+        updatePayload.plannedTargetDate = oldDateStr;
       }
-      if (dateChanged && !await showConfirm("Do you really want to change the date?")) return;
 
-      setSavingDetails(true);
-      try {
+      if (missionData?.status !== "published") {
+        updatePayload.objectives = editDetailsData.objectives;
+        updatePayload.location = editDetailsData.location;
+        updatePayload.volunteerHours = parseInt(editDetailsData.volunteerHours) || 0;
+        updatePayload.budget = editDetailsData.budget;
+        updatePayload.partnerSchool = editDetailsData.partnerSchool;
+        updatePayload.affiliatedDepartment = editDetailsData.affiliatedDepartment;
+        updatePayload.studentOutcomes = editDetailsData.studentOutcomes;
+      }
 
-        const updatePayload = { targetDate: newDateStr, enrollmentWindowDays: newWindowDays, updatedAt: serverTimestamp() };
-        // On first date change, freeze the approved date as plannedTargetDate
-        if (dateChanged && !missionData.plannedTargetDate) {
-          updatePayload.plannedTargetDate = oldDateStr;
-        }
-        await updateDoc(doc(db, "missions", missionId), updatePayload);
+      await updateDoc(doc(db, "missions", missionId), updatePayload);
 
-        // Best-effort: auto-populate actualStart in the accomplishment report
+      if (dateChanged) {
         try {
           const reportRef = doc(db, "missions", missionId, "accomplishmentReport", "submission");
           const reportSnap = await getDoc(reportRef);
@@ -394,7 +484,6 @@ export default function CurrentEvent() {
               "formData.actualStart": newDateStr,
               updatedAt: serverTimestamp(),
             };
-            // Also back-fill plannedStart if it was never saved
             if (!fd.plannedStart) {
               reportUpdate["formData.plannedStart"] = oldDateStr || newDateStr;
             }
@@ -412,48 +501,18 @@ export default function CurrentEvent() {
             newDate: newDateStr,
           },
         });
-
-        const refreshed = await getDoc(doc(db, "missions", missionId));
-        if (refreshed.exists()) {
-          setMissionData({ id: refreshed.id, ...refreshed.data() });
-          setMissionTitle(refreshed.data().title || "Event");
-        }
-        showToast("Event date updated.");
-        setEditingDetails(false);
-      } catch {
-        showToast("Failed to save. Try again.");
-      } finally {
-        setSavingDetails(false);
       }
-      return;
-    }
 
-    // Non-published missions: full edit
-    if (!editDetailsData.title.trim()) { showToast("Title is required."); return; }
-    setSavingDetails(true);
-    try {
-      const stakeholdersArr = editDetailsData.stakeholdersText
-        .split("\n").map(s => s.trim()).filter(Boolean);
-      await updateDoc(doc(db, "missions", missionId), {
-        title: editDetailsData.title.trim(),
-        description: editDetailsData.description,
-        objectives: editDetailsData.objectives,
-        location: editDetailsData.location,
-        targetDate: editDetailsData.targetDate,
-        volunteerHours: parseInt(editDetailsData.volunteerHours) || 0,
-        budget: editDetailsData.budget,
-        stakeholders: stakeholdersArr,
-        partnerSchool: editDetailsData.partnerSchool,
-        affiliatedDepartment: editDetailsData.affiliatedDepartment,
-        studentOutcomes: editDetailsData.studentOutcomes,
-        enrollmentWindowDays: parseInt(editDetailsData.enrollmentWindowDays) || 0,
-        updatedAt: serverTimestamp(),
-      });
       logAudit({
         action: "EVENT_DETAILS_UPDATED",
         category: "event",
-        details: { missionId, missionTitle: editDetailsData.title },
+        details: {
+          missionId,
+          missionTitle: editDetailsData.title,
+          fields: ["title", "description", "coverPhoto", "stakeholders", "targetDate", "enrollmentWindowDays"],
+        },
       });
+
       const refreshed = await getDoc(doc(db, "missions", missionId));
       if (refreshed.exists()) {
         setMissionData({ id: refreshed.id, ...refreshed.data() });
@@ -461,6 +520,9 @@ export default function CurrentEvent() {
       }
       showToast("Event details saved.");
       setEditingDetails(false);
+      setShowEditDetailsModal(false);
+      setEditCoverFile(null);
+      setEditCoverPreview("");
     } catch {
       showToast("Failed to save. Try again.");
     } finally {
@@ -1801,30 +1863,21 @@ export default function CurrentEvent() {
         {activeTab === "details" && (
           missionData ? (
             <div>
-              {/* Edit / Save controls */}
-              {!isFaculty && (missionData?.status !== "published" || editingDetails) && (
-                <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
-                  {!editingDetails ? (
-                    <button onClick={() => setEditingDetails(true)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                      </svg>
-                      Edit Details
-                    </button>
-                  ) : (
-                    <>
-                      <button onClick={handleSaveDetails} disabled={savingDetails}
-                        style={{ padding: "8px 20px", background: savingDetails ? "#f8f9fa" : "#1a73e8", color: savingDetails ? "#9aa0a6" : "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: savingDetails ? "not-allowed" : "pointer" }}>
-                        {savingDetails ? "Saving…" : "Save Changes"}
-                      </button>
-                      <button onClick={() => setEditingDetails(false)} disabled={savingDetails}
-                        style={{ padding: "8px 16px", background: "#fff", color: "#5f6368", border: "1px solid #dadce0", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
-                        Cancel
-                      </button>
-                    </>
-                  )}
+              {canManageEventDetails && (
+                <div className="ce-details-toolbar">
+                  <button className="ce-primary-edit-btn" onClick={openEditDetailsModal}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Edit Event Details
+                  </button>
+                </div>
+              )}
+
+              {getMissionCoverUrl(missionData) && (
+                <div className="ce-cover-preview-card">
+                  <img src={getMissionCoverUrl(missionData)} alt={missionData.title || "Event cover"} />
                 </div>
               )}
 
@@ -2178,6 +2231,132 @@ export default function CurrentEvent() {
           ) : (
             <div className="loading-message">Loading details…</div>
           )
+        )}
+
+        {showEditDetailsModal && missionData && (
+          <div className="ce-edit-modal-overlay" onClick={() => !savingDetails && setShowEditDetailsModal(false)}>
+            <div className="ce-edit-modal" onClick={e => e.stopPropagation()}>
+              <div className="ce-edit-modal-header">
+                <div>
+                  <h3>Edit Event Details</h3>
+                  <p>Updates appear on the current event page and student event cards.</p>
+                </div>
+                <button
+                  className="admin-modal-close"
+                  onClick={() => setShowEditDetailsModal(false)}
+                  disabled={savingDetails}
+                  aria-label="Close edit event details modal"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="ce-edit-modal-body">
+                <div className="ce-edit-cover-panel">
+                  <div className="ce-edit-label">Cover Photo</div>
+                  <div className="ce-edit-cover-preview">
+                    {(editCoverPreview || editDetailsData.coverUrl) ? (
+                      <img src={editCoverPreview || editDetailsData.coverUrl} alt="Event cover preview" />
+                    ) : (
+                      <span>No cover photo</span>
+                    )}
+                  </div>
+                  <label className="ce-edit-file-btn">
+                    Choose Image
+                    <input type="file" accept="image/*" onChange={handleCoverFileChange} disabled={savingDetails} />
+                  </label>
+                  <input
+                    className="ce-edit-input"
+                    type="url"
+                    value={editDetailsData.coverUrl || ""}
+                    placeholder="Or paste an image URL"
+                    onChange={e => {
+                      setEditCoverFile(null);
+                      setEditCoverPreview("");
+                      setEditDetailsData(p => ({ ...p, coverUrl: e.target.value }));
+                    }}
+                    disabled={savingDetails}
+                  />
+                </div>
+
+                <div className="ce-edit-fields-grid">
+                  <label className="ce-edit-field ce-edit-field--wide">
+                    <span>Title *</span>
+                    <input
+                      className="ce-edit-input"
+                      value={editDetailsData.title || ""}
+                      onChange={e => setEditDetailsData(p => ({ ...p, title: e.target.value }))}
+                      disabled={savingDetails}
+                    />
+                  </label>
+
+                  <label className="ce-edit-field">
+                    <span>Target Date *</span>
+                    <TargetDatePicker
+                      id="event-edit-target-date"
+                      name="targetDate"
+                      value={editDetailsData.targetDate || ""}
+                      onChange={e => setEditDetailsData(p => ({ ...p, targetDate: e.target.value }))}
+                      required
+                    />
+                  </label>
+
+                  <label className="ce-edit-field">
+                    <span>Task Pre-enrollment Window</span>
+                    <input
+                      className="ce-edit-input"
+                      type="number"
+                      min="0"
+                      max="7"
+                      value={editDetailsData.enrollmentWindowDays ?? "0"}
+                      onChange={e => setEditDetailsData(p => ({ ...p, enrollmentWindowDays: e.target.value }))}
+                      disabled={savingDetails}
+                    />
+                  </label>
+
+                  <label className="ce-edit-field ce-edit-field--wide">
+                    <span>Description</span>
+                    <textarea
+                      className="ce-edit-textarea"
+                      rows={5}
+                      value={editDetailsData.description || ""}
+                      onChange={e => setEditDetailsData(p => ({ ...p, description: e.target.value }))}
+                      disabled={savingDetails}
+                    />
+                  </label>
+
+                  <label className="ce-edit-field ce-edit-field--wide">
+                    <span>Tagged Organizations</span>
+                    <textarea
+                      className="ce-edit-textarea"
+                      rows={3}
+                      value={editDetailsData.stakeholdersText || ""}
+                      placeholder="Type one organization per line, or separate names with commas"
+                      onChange={e => setEditDetailsData(p => ({ ...p, stakeholdersText: e.target.value }))}
+                      disabled={savingDetails}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="ce-edit-modal-footer">
+                <button
+                  className="ce-edit-cancel-btn"
+                  onClick={() => setShowEditDetailsModal(false)}
+                  disabled={savingDetails}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="ce-edit-save-btn"
+                  onClick={handleSaveDetails}
+                  disabled={savingDetails}
+                >
+                  {savingDetails ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── Document Library tab ── */}

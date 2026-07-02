@@ -247,7 +247,15 @@ const StudentHome = () => {
           setMissionCards((prev) =>
             prev.map((m) =>
               m.id === updated.id
-                ? { ...m, img: updated.img, title: updated.title, status: updated.status }
+                ? {
+                    ...m,
+                    img: updated.img || updated.coverUrl || m.img,
+                    coverUrl: updated.coverUrl || updated.img || m.coverUrl,
+                    title: updated.title,
+                    description: updated.description,
+                    stakeholders: updated.stakeholders,
+                    status: updated.status,
+                  }
                 : m
             )
           );
