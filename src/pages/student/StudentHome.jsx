@@ -135,9 +135,9 @@ const StudentHome = () => {
           .filter(m => m.status === "published");
 
         // ── SL visibility filter ──────────────────────────────────────────────
-        // SL missions with a courseId are restricted to enrolled students.
-        // CE missions and legacy SL missions (no courseId) are visible to all.
-        let missions = allPublished;
+        // SL missions are restricted to enrolled students and must have a linked course.
+        // CE missions remain visible to all students.
+        let missions = allPublished.filter(m => m.projectType !== 'sl');
         const slCourseIds = [
           ...new Set(
             allPublished
@@ -158,7 +158,7 @@ const StudentHome = () => {
           missions = allPublished.filter(m => {
             if (m.projectType !== 'sl') return true;        // CE: always visible
             const cid = m.slFields?.courseId;
-            if (!cid) return true;                           // legacy SL: no restriction
+            if (!cid) return false;                          // legacy/unlinked SL: hidden
             return user ? (courseEnrollment[cid] || []).includes(user.uid) : false;
           });
         }

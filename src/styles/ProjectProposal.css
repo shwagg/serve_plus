@@ -385,6 +385,20 @@
   background: white;
 }
 
+.sdg-dropdown-toggle.disabled,
+.sdg-dropdown-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  background: #edf2f7;
+  color: #718096;
+}
+
+.sdg-dropdown-toggle.disabled:hover,
+.sdg-dropdown-toggle:disabled:hover {
+  border-color: #e2e8f0;
+  background: #edf2f7;
+}
+
 .sdg-dropdown-toggle:focus {
   outline: none;
   border-color: #9FC939;

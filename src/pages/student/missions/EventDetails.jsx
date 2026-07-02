@@ -34,6 +34,7 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const [userDepartment, setUserDepartment] = useState('');
   const [userAuthProvider, setUserAuthProvider] = useState('');
   const [userRole, setUserRole] = useState('');
+  const [slRosterAccess, setSlRosterAccess] = useState(null);
   const [attendanceFlag, setAttendanceFlag] = useState(null); // { flagged: bool, expiry: Date, missionTitle: string }
   const [userJoinedTasks, setUserJoinedTasks] = useState([]);
   const defaultBanner = mission1;
@@ -80,7 +81,8 @@ export default function EventDetails({ onClose = null, missionId = null }) {
         const missionRef = doc(db, 'missions', id);
         const missionSnap = await getDoc(missionRef);
         if (missionSnap.exists()) {
-          setMission(missionSnap.data());
+          const missionData = missionSnap.data();
+          setMission(missionData);
           // Check if user is already a volunteer
           const user = auth.currentUser;
           const tasksRef = collection(db, "missions", id, "task");
@@ -128,7 +130,25 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               setUserRole(uData.role || '');
             }
 
-            const missionStatus = missionSnap.data().status;
+            if (missionData.projectType === 'sl') {
+              const isCreator = missionData.createdBy === user.uid;
+              const courseId = missionData.slFields?.courseId;
+              if (isCreator) {
+                setSlRosterAccess(true);
+              } else if (!courseId) {
+                setSlRosterAccess(false);
+              } else {
+                const courseSnap = await getDoc(doc(db, 'courses', courseId));
+                const roster = courseSnap.exists() && Array.isArray(courseSnap.data().students)
+                  ? courseSnap.data().students
+                  : [];
+                setSlRosterAccess(roster.includes(user.uid));
+              }
+            } else {
+              setSlRosterAccess(true);
+            }
+
+            const missionStatus = missionData.status;
             if (missionStatus === 'completed' || missionStatus === 'cancelled') {
               const joinedList = [];
               for (const tDoc of tasksSnap.docs) {
@@ -140,6 +160,9 @@ export default function EventDetails({ onClose = null, missionId = null }) {
               }
               setUserJoinedTasks(joinedList);
             }
+          }
+          if (!user) {
+            setSlRosterAccess(missionData.projectType !== 'sl');
           }
         } else {
           setMission(null);
@@ -236,6 +259,28 @@ export default function EventDetails({ onClose = null, missionId = null }) {
         alert("Only Blackboard-integrated student accounts can join events.");
         setJoining(false);
         return;
+      }
+
+      if (mission?.projectType === 'sl') {
+        const courseId = mission?.slFields?.courseId;
+        if (!courseId) {
+          alert("This Service Learning event is not linked to a course roster.");
+          setJoining(false);
+          return;
+        }
+        if (!isCreator) {
+          const courseSnap = await getDoc(doc(db, 'courses', courseId));
+          const roster = courseSnap.exists() && Array.isArray(courseSnap.data().students)
+            ? courseSnap.data().students
+            : [];
+          if (!roster.includes(user.uid)) {
+            alert("Only students in this course roster can join this Service Learning event.");
+            setSlRosterAccess(false);
+            setJoining(false);
+            return;
+          }
+          setSlRosterAccess(true);
+        }
       }
 
       // Enforce participant limit
@@ -340,7 +385,8 @@ export default function EventDetails({ onClose = null, missionId = null }) {
   const currentUserId = auth.currentUser?.uid;
   const isMissionCreator = mission?.createdBy === currentUserId;
   const isBlackboardStudent = normalizeValue(userRole) === "student" && isBlackboardProvider(userAuthProvider);
-  const canJoinEvent = isMissionCreator || isBlackboardStudent;
+  const slAccessAllowed = mission?.projectType !== 'sl' || slRosterAccess === true;
+  const canJoinEvent = (isMissionCreator || isBlackboardStudent) && slAccessAllowed;
   const isClosed = mission.status === 'completed' || mission.status === 'cancelled';
   const closedDate = (() => {
     const ts = mission.completedAt;
@@ -551,6 +597,23 @@ export default function EventDetails({ onClose = null, missionId = null }) {
                       </button>
                       <p style={{ marginTop: 8, fontSize: 12, color: '#6b7280', fontWeight: 500, maxWidth: 260 }}>
                         This event has reached its maximum of {mission.participantLimit} participants.
+                      </p>
+                    </div>
+                  ) : mission?.projectType === 'sl' && slRosterAccess === false && !isMissionCreator ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <button
+                        className="event-details-join-btn"
+                        disabled
+                        style={{
+                          background: 'linear-gradient(135deg, #64748b, #334155)',
+                          cursor: 'not-allowed',
+                          opacity: 0.9,
+                        }}
+                      >
+                        COURSE ROSTER ONLY
+                      </button>
+                      <p style={{ marginTop: 8, fontSize: 12, color: '#475569', fontWeight: 500, maxWidth: 260 }}>
+                        Only students in this Service Learning course roster can join this event.
                       </p>
                     </div>
                   ) : !canJoinEvent ? (

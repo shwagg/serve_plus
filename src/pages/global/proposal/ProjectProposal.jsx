@@ -61,10 +61,54 @@ function isProposalLockedForUser(userData) {
   return normalizeValue(userData?.authProvider) !== 'blackboard';
 }
 
+function sortCourses(courses) {
+  return [...courses].sort((a, b) => {
+    const aKey = `${a.courseCode || ''} ${a.courseName || ''} ${a.section || ''}`.toLowerCase();
+    const bKey = `${b.courseCode || ''} ${b.courseName || ''} ${b.section || ''}`.toLowerCase();
+    return aKey.localeCompare(bKey);
+  });
+}
+
+function getCourseGroupKey(course) {
+  return `${course.courseCode || ''}__${course.courseName || ''}`;
+}
+
+function buildCourseGroups(courses) {
+  const duplicateCodeCounts = courses.reduce((counts, course) => {
+    const code = course.courseCode || '';
+    counts[code] = counts[code] || new Set();
+    counts[code].add(course.courseName || '');
+    return counts;
+  }, {});
+
+  const groups = new Map();
+  sortCourses(courses).forEach((course) => {
+    const key = getCourseGroupKey(course);
+    if (!groups.has(key)) {
+      const courseCode = course.courseCode || '';
+      const courseName = course.courseName || '';
+      const hasDuplicateCode = (duplicateCodeCounts[courseCode]?.size || 0) > 1;
+      groups.set(key, {
+        key,
+        courseCode,
+        courseName,
+        label: hasDuplicateCode ? `${courseCode} - ${courseName}` : courseCode,
+        sections: [],
+      });
+    }
+    groups.get(key).sections.push(course);
+  });
+
+  return Array.from(groups.values()).map(group => ({
+    ...group,
+    sections: sortCourses(group.sections),
+  }));
+}
+
 /**
  * Reusable custom dropdown that matches the SDG dropdown style and stays the same width as its trigger.
  */
-function CustomSelect({ id, name, value, onChange, options, placeholder }) {
+function CustomSelect({ id, name, value, onChange, options, placeholder, disabled = false }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -83,15 +127,18 @@ function CustomSelect({ id, name, value, onChange, options, placeholder }) {
       <button
         type="button"
         id={id}
-        className="sdg-dropdown-toggle"
-        onClick={() => setOpen(o => !o)}
+        className={`sdg-dropdown-toggle${disabled ? ' disabled' : ''}`}
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) setOpen(o => !o);
+        }}
       >
         <span style={{ color: selected ? '#2d3748' : '#a0aec0' }}>
           {selected ? selected.label : placeholder}
         </span>
-        <span className="dropdown-arrow">{open ? '▲' : '▼'}</span>
+        <span className="dropdown-arrow">{disabled ? '▼' : (open ? '▲' : '▼')}</span>
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="sdg-dropdown-menu" role="listbox">
           {options.length === 0 ? (
             <div className="sdg-option" style={{ color: '#a0aec0', cursor: 'default' }}>
@@ -230,25 +277,35 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const isFacultySubmitter = submitterRole === 'faculty';
   const [loading, setLoading] = useState(false);
 
-  // Faculty course list for SL course dropdown
-  const [facultyCourses, setFacultyCourses] = useState([]);
+  // Eligible course list for SL course dropdowns
+  const [eligibleCourses, setEligibleCourses] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
   useEffect(() => {
-    if (!isFacultySubmitter || projectType !== 'service-learning') return;
+    if (projectType !== 'service-learning' || (!isFacultySubmitter && !isStudentSubmitter)) {
+      setEligibleCourses([]);
+      setLoadingCourses(false);
+      return;
+    }
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     let cancelled = false;
-    getDocs(query(collection(db, 'courses'), where('facultyUid', '==', uid)))
+    setLoadingCourses(true);
+    const coursesQuery = isFacultySubmitter
+      ? query(collection(db, 'courses'), where('facultyUid', '==', uid))
+      : query(collection(db, 'courses'), where('students', 'array-contains', uid));
+    getDocs(coursesQuery)
       .then((snap) => {
         if (cancelled) return;
-        setFacultyCourses(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
-        );
+        setEligibleCourses(sortCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setEligibleCourses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCourses(false);
+      });
     return () => { cancelled = true; };
-  }, [isFacultySubmitter, projectType]);
+  }, [isFacultySubmitter, isStudentSubmitter, projectType]);
   const [showSummary, setShowSummary] = useState(false);
   const [hasProponentName, setHasProponentName] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -353,7 +410,14 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     section: '',
     course: '',
     courseCode: '',
+    facultyUid: '',
   });
+  const courseGroups = buildCourseGroups(eligibleCourses);
+  const selectedCourseGroupKey = slFields.courseCode && slFields.course
+    ? getCourseGroupKey({ courseCode: slFields.courseCode, courseName: slFields.course })
+    : '';
+  const selectedCourseGroup = courseGroups.find(group => group.key === selectedCourseGroupKey);
+  const selectedCourseSections = selectedCourseGroup?.sections || [];
 
   // Community Engagement specific fields
   const [ceFields, setCeFields] = useState({
@@ -408,6 +472,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         section: p.slFields.section || '',
         course: p.slFields.course || '',
         courseCode: p.slFields.courseCode || '',
+        facultyUid: p.slFields.facultyUid || '',
       });
     }
     if (p.projectType === 'ce' && p.ceFields) {
@@ -521,7 +586,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     submittedRef.current = false;
     hasUserInputRef.current = false;
     setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '', facultyInCharge: '' });
-    setSlFields({ courseId: '', section: '', course: '', courseCode: '' });
+    setSlFields({ courseId: '', section: '', course: '', courseCode: '', facultyUid: '' });
     setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '' });
     setDraftRestored(false);
     setLocationOption('');
@@ -614,38 +679,6 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       setFormData(prev => ({ ...prev, [name]: value }));
       setFieldErrors(prev => ({ ...prev, [name]: '' }));
     }
-  };
-
-  /**
-   * Handles changes to Service Learning specific fields.
-   */
-  const handleSlFieldChange = (e) => {
-    hasUserInputRef.current = true;
-    const { name } = e.target;
-    let value = e.target.value;
-    if (hasEmoji(value)) {
-      value = stripEmojis(value);
-      showToast('Emojis are not allowed in this field.');
-    }
-    const textLimits = {
-      section: FIELD_LIMITS.section,
-      course: FIELD_LIMITS.course,
-      courseCode: FIELD_LIMITS.courseCode,
-    };
-    if (textLimits[name] && getVisibleCharacterCount(value) > textLimits[name]) {
-      setSlFields(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-      showTemporaryFieldError(name, `This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
-      showToast(`This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
-      return;
-    }
-    setSlFields(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    setFieldErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   /**
@@ -820,9 +853,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     const nextErrors = {};
     if (isStudentSubmitter && !formData.facultyInCharge?.trim()) nextErrors.facultyInCharge = 'Please select a Faculty In Charge.';
     if (isStudentSubmitter && formData.facultyInCharge?.trim() && (formData.proponents || []).some(p => normalizeValue(p) === normalizeValue(formData.facultyInCharge))) nextErrors.facultyInCharge = 'The Faculty In Charge cannot also be listed as a proponent.';
-    // Faculty must link a course to an SL proposal
-    if (isFacultySubmitter && projectType === 'service-learning' && !slFields.courseId) {
-      nextErrors.courseSelect = 'Please select a course for this Service Learning proposal.';
+    // Every SL proposal must link to a rostered course section.
+    if (projectType === 'service-learning' && !slFields.courseId) {
+      nextErrors.courseSelect = 'Please select a course and section for this Service Learning proposal.';
     }
     if (getVisibleCharacterCount(formData.title) > FIELD_LIMITS.title) nextErrors.title = `Only ${FIELD_LIMITS.title} characters are allowed, excluding spaces and line breaks.`;
     if (getVisibleCharacterCount(formData.location) > FIELD_LIMITS.location) nextErrors.location = `Only ${FIELD_LIMITS.location} characters are allowed, excluding spaces and line breaks.`;
@@ -1225,43 +1258,41 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             {projectType === 'service-learning' && (
               <div className="form-section">
                 <h2>Academic Information</h2>
-                {isFacultySubmitter ? (
-                  /* Faculty: pick from their courses dropdown */
+                <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="courseSelect">Course *</label>
-                    <select
+                    <label htmlFor="courseSelect">Course Code *</label>
+                    <CustomSelect
                       id="courseSelect"
-                      value={slFields.courseId || ''}
+                      name="courseSelect"
+                      value={selectedCourseGroupKey}
+                      disabled={loadingCourses}
+                      placeholder={loadingCourses ? 'Loading courses...' : 'Select course code...'}
+                      options={courseGroups.map(group => ({
+                        value: group.key,
+                        label: group.label,
+                      }))}
                       onChange={e => {
                         hasUserInputRef.current = true;
-                        const selected = facultyCourses.find(c => c.id === e.target.value);
-                        if (selected) {
+                        const selectedGroup = courseGroups.find(group => group.key === e.target.value);
+                        if (selectedGroup) {
                           setSlFields({
-                            courseId: selected.id,
-                            course: selected.courseName,
-                            courseCode: selected.courseCode,
-                            section: selected.section,
+                            courseId: '',
+                            course: selectedGroup.courseName,
+                            courseCode: selectedGroup.courseCode,
+                            section: '',
+                            facultyUid: '',
                           });
                         } else {
-                          setSlFields({ courseId: '', course: '', courseCode: '', section: '' });
+                          setSlFields({ courseId: '', course: '', courseCode: '', section: '', facultyUid: '' });
                         }
+                        setFieldErrors(prev => ({ ...prev, courseSelect: '', section: '' }));
                       }}
-                      style={{
-                        width: '100%', padding: '9px 12px', borderRadius: 8,
-                        border: `1px solid ${fieldErrors.courseSelect ? '#e53e3e' : '#cbd5e0'}`,
-                        fontSize: 14, background: '#fff', outline: 'none', cursor: 'pointer',
-                      }}
-                    >
-                      <option value="">Select a course…</option>
-                      {facultyCourses.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.courseName} ({c.courseCode} · Section {c.section})
-                        </option>
-                      ))}
-                    </select>
-                    {facultyCourses.length === 0 && (
+                    />
+                    {eligibleCourses.length === 0 && !loadingCourses && (
                       <small style={{ color: '#718096', fontSize: 12, marginTop: 4, display: 'block' }}>
-                        No courses found. Go to the <strong>Courses</strong> tab to create one first.
+                        {isFacultySubmitter
+                          ? <>No courses found. Go to the <strong>Courses</strong> tab to create one first.</>
+                          : 'No rostered courses found. Ask your faculty to add you to the course roster first.'}
                       </small>
                     )}
                     {fieldErrors.courseSelect && (
@@ -1269,64 +1300,64 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                         {fieldErrors.courseSelect}
                       </small>
                     )}
-                    {slFields.courseId && (
-                      <small className="field-limit-hint">
-                        {slFields.courseCode} · Section {slFields.section} — only enrolled students will see this event.
-                      </small>
-                    )}
                   </div>
-                ) : (
-                  /* Students: free-text fields */
-                  <>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label htmlFor="course">Course *</label>
-                        <input
-                          type="text"
-                          id="course"
-                          name="course"
-                          value={slFields.course}
-                          onChange={handleSlFieldChange}
-                          required
-                          placeholder="e.g., Introduction to Community Development"
-                        />
-                        <small className={`field-limit-hint${fieldErrors.course ? ' error' : ''}`}>
-                          {fieldErrors.course || `${getVisibleCharacterCount(slFields.course)} / ${FIELD_LIMITS.course} characters`}
-                        </small>
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="courseCode">Course Code *</label>
-                        <input
-                          type="text"
-                          id="courseCode"
-                          name="courseCode"
-                          value={slFields.courseCode}
-                          onChange={handleSlFieldChange}
-                          required
-                          placeholder="e.g., CD 101"
-                        />
-                        <small className={`field-limit-hint${fieldErrors.courseCode ? ' error' : ''}`}>
-                          {fieldErrors.courseCode || `${getVisibleCharacterCount(slFields.courseCode)} / ${FIELD_LIMITS.courseCode} characters`}
-                        </small>
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="section">Section *</label>
-                      <input
-                        type="text"
-                        id="section"
-                        name="section"
-                        value={slFields.section}
-                        onChange={handleSlFieldChange}
-                        required
-                        placeholder="e.g., Section A"
-                      />
-                      <small className={`field-limit-hint${fieldErrors.section ? ' error' : ''}`}>
-                        {fieldErrors.section || `${getVisibleCharacterCount(slFields.section)} / ${FIELD_LIMITS.section} characters`}
-                      </small>
-                    </div>
-                  </>
-                )}
+
+                  <div className="form-group">
+                    <label htmlFor="course">Course Name</label>
+                    <input
+                      type="text"
+                      id="course"
+                      name="course"
+                      value={slFields.course}
+                      readOnly
+                      placeholder="Auto-filled after selecting a course code"
+                    />
+                    <small className="field-limit-hint">
+                      Course name is locked from the selected course record.
+                    </small>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="section">Section *</label>
+                  <CustomSelect
+                    id="section"
+                    name="section"
+                    value={slFields.courseId || ''}
+                    disabled={!selectedCourseGroupKey}
+                    placeholder={selectedCourseGroupKey ? 'Select section...' : 'Select a course code first'}
+                    options={selectedCourseSections.map(c => ({
+                      value: c.id,
+                      label: `Section ${c.section}`,
+                    }))}
+                    onChange={e => {
+                      hasUserInputRef.current = true;
+                      const selected = selectedCourseSections.find(c => c.id === e.target.value);
+                      if (selected) {
+                        setSlFields({
+                          courseId: selected.id,
+                          course: selected.courseName,
+                          courseCode: selected.courseCode,
+                          section: selected.section,
+                          facultyUid: selected.facultyUid || '',
+                        });
+                      } else {
+                        setSlFields(prev => ({
+                          ...prev,
+                          courseId: '',
+                          section: '',
+                          facultyUid: '',
+                        }));
+                      }
+                      setFieldErrors(prev => ({ ...prev, courseSelect: '', section: '' }));
+                    }}
+                  />
+                  <small className={`field-limit-hint${fieldErrors.section ? ' error' : ''}`}>
+                    {fieldErrors.section || (slFields.courseId
+                      ? `${slFields.courseCode} · Section ${slFields.section} — only rostered students will see this event.`
+                      : 'Select the section roster that will have access to this Service Learning event.')}
+                  </small>
+                </div>
               </div>
             )}
 

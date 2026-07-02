@@ -53,7 +53,68 @@ service cloud.firestore {
     function canJoinMission(missionId, userId) {
       return request.auth != null &&
         request.auth.uid == userId &&
-        (isMissionCreator(missionId) || hasStudentBlackboardAccess());
+        (isMissionCreator(missionId) || hasStudentBlackboardAccess()) &&
+        canAccessMissionByCourseRoster(get(/databases/$(database)/documents/missions/$(missionId)).data, userId);
+    }
+
+    function isServiceLearningMission(missionData) {
+      return missionData.projectType == "sl";
+    }
+
+    function hasLinkedSlCourse(missionData) {
+      return missionData.slFields is map &&
+        missionData.slFields.courseId is string &&
+        missionData.slFields.courseId != "" &&
+        exists(/databases/$(database)/documents/courses/$(missionData.slFields.courseId));
+    }
+
+    function linkedSlCourseData(missionData) {
+      return get(/databases/$(database)/documents/courses/$(missionData.slFields.courseId)).data;
+    }
+
+    function isRosteredForLinkedSlCourse(missionData, userId) {
+      return hasLinkedSlCourse(missionData) &&
+        linkedSlCourseData(missionData).students is list &&
+        userId in linkedSlCourseData(missionData).students;
+    }
+
+    function canUseLinkedSlCourse(missionData) {
+      return hasLinkedSlCourse(missionData) &&
+        (
+          linkedSlCourseData(missionData).facultyUid == request.auth.uid ||
+          (
+            currentUserData().role == "student" &&
+            isRosteredForLinkedSlCourse(missionData, request.auth.uid)
+          )
+        );
+    }
+
+    function slCourseSnapshotMatches(missionData) {
+      return hasLinkedSlCourse(missionData) &&
+        missionData.slFields.course == linkedSlCourseData(missionData).courseName &&
+        missionData.slFields.courseCode == linkedSlCourseData(missionData).courseCode &&
+        missionData.slFields.section == linkedSlCourseData(missionData).section &&
+        missionData.slFields.facultyUid == linkedSlCourseData(missionData).facultyUid;
+    }
+
+    function validMissionSlCourseLink(missionData) {
+      return !isServiceLearningMission(missionData) ||
+        (canUseLinkedSlCourse(missionData) && slCourseSnapshotMatches(missionData));
+    }
+
+    function hasValidSlCourseSnapshot(missionData) {
+      return !isServiceLearningMission(missionData) || slCourseSnapshotMatches(missionData);
+    }
+
+    function canAccessMissionByCourseRoster(missionData, userId) {
+      return !isServiceLearningMission(missionData) ||
+        (
+          hasLinkedSlCourse(missionData) &&
+          (
+            missionData.createdBy == userId ||
+            isRosteredForLinkedSlCourse(missionData, userId)
+          )
+        );
     }
 
     function hasMissionIndexSource(missionId, userId) {
@@ -448,7 +509,7 @@ service cloud.firestore {
       allow read: if request.auth != null;
 
       // Allow proposal creation only for admins/sysadmins and Blackboard-linked students/faculty
-      allow create: if canCreateMission();
+      allow create: if canCreateMission() && validMissionSlCourseLink(request.resource.data);
 
       // ADMIN / SYSADMIN - can update and delete, except publishing is reserved for the creator
       allow update: if
@@ -456,7 +517,8 @@ service cloud.firestore {
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sysadmin"
         ) &&
-        !isPublishingTransition(resource.data, request.resource.data);
+        !isPublishingTransition(resource.data, request.resource.data) &&
+        hasValidSlCourseSnapshot(request.resource.data);
 
       allow delete: if
         request.auth != null && (
@@ -465,13 +527,15 @@ service cloud.firestore {
         );
 
       // PROPOSAL CREATOR - can publish only after every signatory has approved.
-      allow update: if isOwnerPublishUpdate(resource.data, request.resource.data);
+      allow update: if isOwnerPublishUpdate(resource.data, request.resource.data) &&
+        validMissionSlCourseLink(request.resource.data);
 
       // PROPOSAL CREATOR - can update their own proposal while awaiting first review or after being returned.
       allow update: if
         request.auth != null &&
         request.auth.uid == resource.data.createdBy &&
-        resource.data.status in ['for_approval', 'rejected'];
+        resource.data.status in ['for_approval', 'rejected'] &&
+        validMissionSlCourseLink(request.resource.data);
 
       // FACULTY - can update approval chain fields (reviewedBy, recommendedBy) and nested approvals map
       allow update: if
@@ -479,13 +543,15 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "faculty" &&
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewedBy', 'recommendedBy', 'status', 'lastApprovedAt', 'lastApprovedBy', 'rejectionReason', 'rejectedBy', 'rejectedAt', 'rejectedByUser', 'approvals'])
-        );
+        ) &&
+        hasValidSlCourseSnapshot(request.resource.data);
 
       // PARTNER - can update only the approvals field (partner approval decision)
       allow update: if
         request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "partner" &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvals', 'status']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvals', 'status']) &&
+        hasValidSlCourseSnapshot(request.resource.data);
       
       // Allow Blackboard-linked students, plus the mission creator, to join as volunteers
       match /volunteer/{userId} {

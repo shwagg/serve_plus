@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteField } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
 import { showConfirm, showToast } from '../../utils/toast';
@@ -27,6 +27,10 @@ function getVisibleCharacterCount(value) {
   return String(value || '').replace(/[\s\r\n]+/g, '').length;
 }
 
+function normalizeValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function SummaryPanel({
   formData,
   slFields,
@@ -44,6 +48,7 @@ function SummaryPanel({
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
 
   const validateProposalLimits = () => {
+    if (projectType === 'service-learning' && !slFields.courseId) return 'Please select a course and section for this Service Learning proposal.';
     if ((formData.title || '').length > FIELD_LIMITS.title) return `Title can only have ${FIELD_LIMITS.title} characters.`;
     if ((formData.location || '').length > FIELD_LIMITS.location) return `Location can only have ${FIELD_LIMITS.location} characters.`;
     if (getVisibleCharacterCount(formData.title) > FIELD_LIMITS.title) return `Title can only have ${FIELD_LIMITS.title} characters, excluding spaces and line breaks.`;
@@ -61,6 +66,43 @@ function SummaryPanel({
     if (getVisibleCharacterCount(slFields.section) > FIELD_LIMITS.section) return `Section can only have ${FIELD_LIMITS.section} characters, excluding spaces and line breaks.`;
     return '';
   };
+
+  const verifySelectedSlCourse = async (user) => {
+    if (projectType !== 'service-learning') return null;
+    if (!slFields.courseId) {
+      throw new Error('Please select a course and section for this Service Learning proposal.');
+    }
+
+    const [courseSnap, userSnap] = await Promise.all([
+      getDoc(doc(db, 'courses', slFields.courseId)),
+      getDoc(doc(db, 'users', user.uid)),
+    ]);
+
+    if (!courseSnap.exists()) {
+      throw new Error('The selected course no longer exists. Please select another course.');
+    }
+
+    const course = { id: courseSnap.id, ...courseSnap.data() };
+    const userRole = normalizeValue(userSnap.exists() ? userSnap.data()?.role : '');
+    const studentRoster = Array.isArray(course.students) ? course.students : [];
+    const isCourseFaculty = userRole === 'faculty' && course.facultyUid === user.uid;
+    const isRosterStudent = userRole === 'student' && studentRoster.includes(user.uid);
+
+    if (!isCourseFaculty && !isRosterStudent) {
+      throw new Error('You can only submit Service Learning proposals for courses where you are the faculty owner or an enrolled roster student.');
+    }
+
+    return course;
+  };
+
+  const buildVerifiedSlFields = (course, assignedFacultyValue) => ({
+    section: course.section || '',
+    course: course.courseName || '',
+    courseCode: course.courseCode || '',
+    courseId: course.id,
+    facultyUid: course.facultyUid || '',
+    assignedFaculty: assignedFacultyValue,
+  });
 
   /**
    * Handles form submission: creates a mission document in the unified missions collection.
@@ -89,6 +131,7 @@ function SummaryPanel({
       const now = serverTimestamp();
       // Derive Faculty In Charge: explicit input (student proposals) or locked first proponent (faculty proposals)
       const assignedFacultyValue = formData.facultyInCharge?.trim() || formData.proponents?.[0] || formData.preparedBy || '';
+      const verifiedSlCourse = await verifySelectedSlCourse(user);
 
       // --- UPDATE MODE (editing existing proposal) ---
       if (proposalId) {
@@ -142,13 +185,7 @@ function SummaryPanel({
           } : {}),
         };
         if (projectType === 'service-learning') {
-          updateData.slFields = {
-            section: slFields.section,
-            course: slFields.course,
-            courseCode: slFields.courseCode,
-            courseId: slFields.courseId || null,
-            assignedFaculty: assignedFacultyValue,
-          };
+          updateData.slFields = buildVerifiedSlFields(verifiedSlCourse, assignedFacultyValue);
         } else {
           updateData.ceFields = {
             nature: ceFields.nature,
@@ -272,13 +309,7 @@ function SummaryPanel({
 
       // Add type-specific fields
       if (projectType === 'service-learning') {
-        missionData.slFields = {
-          section: slFields.section,
-          course: slFields.course,
-          courseCode: slFields.courseCode,
-          courseId: slFields.courseId || null,
-          assignedFaculty: assignedFacultyValue,
-        };
+        missionData.slFields = buildVerifiedSlFields(verifiedSlCourse, assignedFacultyValue);
       } else {
         missionData.ceFields = {
           nature: ceFields.nature,
@@ -326,7 +357,7 @@ function SummaryPanel({
       onClose();
     } catch (error) {
       console.error('Error submitting proposal:', error);
-      showToast('Failed to submit proposal. Please try again.');
+      showToast(error?.message || 'Failed to submit proposal. Please try again.');
     } finally {
       setLoading(false);
     }
