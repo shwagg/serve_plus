@@ -92,7 +92,7 @@ export default function ProposalTimeline({ proposal, compact = false }) {
     {
       key: "ready",
       label: "Ready to Publish",
-      sublabel: "All approvals complete — admin or director can now publish the event",
+      sublabel: "All approvals complete — the proponent can now publish the event",
       done: !!isAllDone,
       decidedAt: null,
     },

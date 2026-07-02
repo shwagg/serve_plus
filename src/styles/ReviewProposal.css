@@ -154,11 +154,15 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 .rp-card-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  flex: 1 1 130px;
+  min-width: 0;
 }
 .rp-type-tag {
   font-size: 0.7rem;
@@ -186,8 +190,12 @@
   border-radius: 99px;
   font-size: 0.72rem;
   font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  line-height: 1.25;
+  max-width: 100%;
+  flex: 0 1 auto;
   font-family: 'Inter', sans-serif;
   letter-spacing: 0.01em;
 }

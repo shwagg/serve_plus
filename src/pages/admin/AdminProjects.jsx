@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState, useContext, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs, doc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { showToast, showConfirm } from "../../utils/toast";
 import { logAudit } from "../../utils/auditLogger";
-import { createNotification } from "../../utils/notificationUtils";
 import ProjectDetailSidebar from "./ProjectDetailSidebar";
-import ProjectProposal from "../global/proposal/ProjectProposal";
 import "../../styles/ReviewProposal.css";
 import "../../styles/AdminProjects.css";
 import { SessionContext } from "../../context/sessionContextCore";
@@ -14,7 +12,7 @@ import { SessionContext } from "../../context/sessionContextCore";
 const FILTER_OPTIONS = [
   { key: "all",         label: "All Projects" },
   { key: "for_approval", label: "For Approval" },
-  { key: "draft",       label: "Ready for Publishing" },
+  { key: "draft",       label: "Approved" },
   { key: "published",   label: "Published" },
   { key: "completed",   label: "Completed" },
   { key: "archived",    label: "Archived" },
@@ -71,12 +69,6 @@ export default function AdminProjects() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editProject, setEditProject] = useState(null);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelProject, setCancelProject] = useState(null);
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelling, setCancelling] = useState(false);
   const dropdownRef = useRef(null);
 
   const fetchProjects = async () => {
@@ -137,7 +129,7 @@ export default function AdminProjects() {
     [filtered, statusFilter]
   );
 
-  const forPublishingList = useMemo(
+  const approvedList = useMemo(
     () => (statusFilter === "all" ? filtered.filter(p => (p.status || "").toLowerCase() === "draft") : []),
     [filtered, statusFilter]
   );
@@ -187,7 +179,7 @@ export default function AdminProjects() {
 
   function formatStatus(status = "") {
     if (!status) return "Ready for Publishing";
-    if (status.toLowerCase() === "draft") return "Ready for Publishing";
+    if (status.toLowerCase() === "draft") return "Approved";
     if (status.toLowerCase() === "rejected") return "Returned for Revision";
     if (isForApproval(status)) return "Pending";
     if (status.toLowerCase() === "published") return "Active · Open";
@@ -205,114 +197,6 @@ export default function AdminProjects() {
     setSelectedProject(project);
     setShowSidebar(true);
   }
-
-  const handlePublish = async (e, project) => {
-    e.stopPropagation();
-    if (!await showConfirm(`Publish "${project.title}"? Volunteers will be able to join the event.`)) return;
-    try {
-      const taskCollectionRef = collection(db, "missions", project.id, "task");
-      const existingTasksSnap = await getDocs(taskCollectionRef);
-      const existingTaskIds = new Set(existingTasksSnap.docs.map(taskDoc => taskDoc.id));
-      const activities = Array.isArray(project.specificActivities)
-        ? project.specificActivities
-          .map(item => String(typeof item === "string" ? item : item?.name || item?.title || "").trim())
-          .filter(Boolean)
-        : [];
-      const batch = writeBatch(db);
-
-      activities.forEach((activityTitle, index) => {
-        const taskRef = doc(db, "missions", project.id, "task", String(index));
-        const proposalTaskFields = {
-          title: activityTitle,
-          sourceActivityIndex: index,
-          sourceActivityTitle: activityTitle,
-          isProposalActivity: true,
-          updatedAt: serverTimestamp(),
-        };
-
-        if (existingTaskIds.has(String(index))) {
-          batch.set(taskRef, proposalTaskFields, { merge: true });
-        } else {
-          batch.set(taskRef, {
-            ...proposalTaskFields,
-            description: "",
-            points: 0,
-            type: "individual",
-            maxParticipants: 5,
-            participantCount: 0,
-            createdAt: new Date().toISOString(),
-          });
-        }
-      });
-
-      const projectRef = doc(db, "missions", project.id);
-      batch.update(projectRef, {
-        status: "published",
-        publishedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      await batch.commit();
-      logAudit({
-        action: "PROPOSAL_PUBLISHED",
-        category: "proposal",
-        actorName: userData?.name || "",
-        details: { proposalId: project.id, proposalTitle: project.title || "" },
-      });
-      showToast("Event published.");
-      fetchProjects();
-    } catch {
-      showToast("Failed to publish. Try again.");
-    }
-  };
-
-  const handleCancelClick = (e, project) => {
-    e.stopPropagation();
-    setCancelProject(project);
-    setCancelReason("");
-    setShowCancelModal(true);
-  };
-
-  const handleCancelConfirm = async () => {
-    if (!cancelReason.trim()) return;
-    setCancelling(true);
-    try {
-      await updateDoc(doc(db, "missions", cancelProject.id), {
-        status: "cancelled",
-        cancellationReason: cancelReason.trim(),
-        cancelledAt: serverTimestamp(),
-        cancelledBy: userData?.name || userData?.email || "",
-        updatedAt: serverTimestamp(),
-      });
-      logAudit({
-        action: "PROPOSAL_CANCELLED",
-        category: "proposal",
-        actorName: userData?.name || "",
-        details: {
-          proposalId: cancelProject.id,
-          proposalTitle: cancelProject.title || "",
-          reason: cancelReason.trim(),
-        },
-      });
-      if (cancelProject.createdBy) {
-        await createNotification(cancelProject.createdBy, {
-          type: "proposal_cancelled",
-          title: "Proposal Cancelled",
-          message: `Your proposal "${cancelProject.title || "Untitled"}" has been cancelled. Reason: ${cancelReason.trim()}`,
-          link: "/global/review-proposals",
-          proposalId: cancelProject.id,
-        }).catch(() => {});
-      }
-      showToast("Proposal cancelled and student notified.");
-      setShowCancelModal(false);
-      setCancelProject(null);
-      setCancelReason("");
-      fetchProjects();
-    } catch {
-      showToast("Failed to cancel. Try again.");
-    } finally {
-      setCancelling(false);
-    }
-  };
 
   const handleArchive = async (e, project) => {
     e.stopPropagation();
@@ -375,30 +259,6 @@ export default function AdminProjects() {
           >
             {needsAction ? "Review & Approve →" : "View Details →"}
           </button>
-          {project.status === "draft" && role === "admin" && (
-            <button
-              className="rp-review-btn rp-review-btn--edit"
-              onClick={e => { e.stopPropagation(); setEditProject(project); setShowEditModal(true); }}
-            >
-              Edit →
-            </button>
-          )}
-          {project.status === "draft" && role === "admin" && (
-            <button
-              className="rp-review-btn rp-btn-publish"
-              onClick={e => handlePublish(e, project)}
-            >
-              ✓ Publish
-            </button>
-          )}
-          {project.status === "draft" && role === "admin" && (
-            <button
-              className="rp-review-btn rp-btn-cancel-proposal"
-              onClick={e => handleCancelClick(e, project)}
-            >
-              ✕ Cancel
-            </button>
-          )}
           {project.status === "completed" && role === "admin" && (
             <button
               className="rp-review-btn rp-btn-archive"
@@ -413,7 +273,7 @@ export default function AdminProjects() {
   }
 
   const currentLabel = FILTER_OPTIONS.find(f => f.key === statusFilter)?.label ?? "All Projects";
-  const isEmpty = forApprovalList.length === 0 && forPublishingList.length === 0 && publishedSectionList.length === 0 && otherList.length === 0;
+  const isEmpty = forApprovalList.length === 0 && approvedList.length === 0 && publishedSectionList.length === 0 && otherList.length === 0;
 
   return (
     <div className="admin-projects-page">
@@ -496,12 +356,12 @@ export default function AdminProjects() {
                 </div>
               )}
 
-              {/* For Publishing section (only in "All Projects" view) */}
-              {statusFilter === "all" && forPublishingList.length > 0 && (
+              {/* Approved section (only in "All Projects" view) */}
+              {statusFilter === "all" && approvedList.length > 0 && (
                 <div className="ap-section">
-                  <span className="ap-section-heading">For Publishing</span>
+                  <span className="ap-section-heading">Approved</span>
                   <div className="rp-card-grid">
-                    {forPublishingList.map(renderCard)}
+                    {approvedList.map(renderCard)}
                   </div>
                 </div>
               )}
@@ -540,102 +400,6 @@ export default function AdminProjects() {
         />
       )}
 
-      {showCancelModal && cancelProject && (
-        <div
-          className="ap-modal-overlay ap-modal-overlay--cancel"
-          onClick={() => { if (!cancelling) { setShowCancelModal(false); setCancelProject(null); setCancelReason(""); } }}
-        >
-          <div className="ap-cancel-modal" onClick={e => e.stopPropagation()}>
-            <div className="ap-cancel-modal__header">
-              <h3 className="ap-cancel-modal__title">Cancel Proposal</h3>
-              <button
-                className="ap-cancel-modal__close"
-                onClick={() => { setShowCancelModal(false); setCancelProject(null); setCancelReason(""); }}
-                disabled={cancelling}
-              >×</button>
-            </div>
-            <p className="ap-cancel-modal__body">
-              You are cancelling <strong>{cancelProject.title || "Untitled"}</strong>.
-              The student will be notified with the reason you provide below.
-            </p>
-            <div className="ap-cancel-modal__field">
-              <label className="ap-cancel-modal__label">
-                Reason for Cancellation <span className="ap-cancel-modal__required">*</span>
-              </label>
-              <textarea
-                className="ap-cancel-modal__textarea"
-                value={cancelReason}
-                onChange={e => setCancelReason(e.target.value)}
-                placeholder="State the reason why this proposal is being cancelled…"
-                rows={4}
-                disabled={cancelling}
-              />
-            </div>
-            <div className="ap-cancel-modal__actions">
-              <button
-                className="ap-cancel-modal__btn-back"
-                onClick={() => { setShowCancelModal(false); setCancelProject(null); setCancelReason(""); }}
-                disabled={cancelling}
-              >
-                Go Back
-              </button>
-              <button
-                className="ap-cancel-modal__btn-confirm"
-                onClick={handleCancelConfirm}
-                disabled={cancelling || !cancelReason.trim()}
-              >
-                {cancelling ? "Cancelling…" : "Confirm Cancellation"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showEditModal && editProject && (() => {
-        const allSigned = !!(editProject.reviewedBy && editProject.recommendedBy && editProject.endorsedBy && editProject.approvedBy);
-        const canEditForm = role === "admin";
-        return (
-          <div
-            className="ap-modal-overlay ap-modal-overlay--edit"
-            onClick={() => { setShowEditModal(false); setEditProject(null); }}
-          >
-            <div className="ap-edit-modal" onClick={e => e.stopPropagation()}>
-              <div className="ap-edit-modal__header">
-                <h3 className="ap-edit-modal__title">
-                  {editProject.projectType === "sl" ? "Service Learning Proposal" : "Community Engagement Proposal"}
-                </h3>
-                <button
-                  className="ap-edit-modal__close"
-                  onClick={() => { setShowEditModal(false); setEditProject(null); }}
-                >×</button>
-              </div>
-              {allSigned && !canEditForm ? (
-                <div className="ap-edit-modal__locked">
-                  <div className="ap-edit-modal__lock-icon">🔒</div>
-                  <div className="ap-edit-modal__lock-title">Editing Locked</div>
-                  <p className="ap-edit-modal__lock-text">
-                    All signatories have approved this proposal. Only an admin can make changes at this stage.
-                  </p>
-                </div>
-              ) : (
-                <div className="ap-edit-modal__body">
-                  {allSigned && (
-                    <div className="ap-edit-modal__warning">
-                      <span>⚠️</span>
-                      <span>All signatories have approved — changes here are admin-only edits before publishing.</span>
-                    </div>
-                  )}
-                  <ProjectProposal
-                    projectType={editProject.projectType === "sl" ? "service-learning" : "community-engagement"}
-                    editProposal={editProject}
-                    onClose={() => { setShowEditModal(false); setEditProject(null); fetchProjects(); }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

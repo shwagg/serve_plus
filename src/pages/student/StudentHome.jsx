@@ -18,6 +18,8 @@ import banner from '../../assets/banner.jpg';
 import emptyFile from '../../assets/empty_file.svg';
 import servePlusIcon from '../../assets/serve_plus_icon.svg';
 import { hasSignatoryApproval, PROPOSAL_LOCKED_NOTICE } from "../../utils/proposalApproval";
+import { canCurrentUserPublishProposal, publishApprovedProposal } from "../../utils/publishProposal";
+import { showConfirm, showToast } from "../../utils/toast";
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
   const radius = (size - stroke) / 2;
@@ -91,6 +93,7 @@ const StudentHome = () => {
   const [enrollmentRefreshKey, setEnrollmentRefreshKey] = useState(0);
   const [selectedProposalForView, setSelectedProposalForView] = useState(null);
   const [selectedProposalEditMode, setSelectedProposalEditMode] = useState(false);
+  const [publishingProposalId, setPublishingProposalId] = useState("");
   const [proposalRefreshKey, setProposalRefreshKey] = useState(0);
   const [proposalCards, setProposalCards] = useState([]);
   const [volunteerInfo, setVolunteerInfo] = useState({});
@@ -455,7 +458,7 @@ const StudentHome = () => {
       return `Returned for revision${rejectedByUser ? ` by ${rejectedByUser}` : ''}`;
     }
     if (approvedBy && recommendedBy && endorsedBy && reviewedBy) {
-      return 'All approvals complete - Ready to publish';
+      return 'Approved - Ready for you to publish';
     }
     if (endorsedBy) return `Endorsed by Admin - Awaiting Director approval`;
     if (recommendedBy) return `Recommended by ${recommendedBy} - Awaiting Admin (CSCE) endorsement`;
@@ -498,6 +501,29 @@ const StudentHome = () => {
   const closeProposalModal = () => {
     setSelectedProposalEditMode(false);
     setSelectedProposalForView(null);
+  };
+
+  const handlePublishProposal = async (proposal) => {
+    if (!proposal || publishingProposalId) return;
+    const confirmed = await showConfirm(`Publish "${proposal.title || "this event"}"? Volunteers will be able to join the event.`);
+    if (!confirmed) return;
+
+    setPublishingProposalId(proposal.id);
+    try {
+      await publishApprovedProposal(proposal, {
+        name: studentName,
+        username: studentUsername,
+      });
+      showToast("Event published.");
+      closeProposalModal();
+      setProposalRefreshKey(k => k + 1);
+      setEnrollmentRefreshKey(k => k + 1);
+    } catch (error) {
+      console.error("Error publishing proposal:", error);
+      showToast(error?.message || "Failed to publish. Try again.");
+    } finally {
+      setPublishingProposalId("");
+    }
   };
 
   const renderProposalList = (items) => {
@@ -844,7 +870,7 @@ const StudentHome = () => {
                 proposalCards.map((proposal) => {
                   const statusLabels = {
                     for_approval: { label: 'For Approval', color: '#d97706' },
-                    draft: { label: 'For Publishing', color: '#64748b' },
+                    draft: { label: 'Ready to Publish', color: '#166534' },
                     rejected: { label: 'Returned for Revision', color: '#dc2626' },
                     approved: { label: 'Approved', color: '#16a34a' },
                   };
@@ -1018,6 +1044,7 @@ const StudentHome = () => {
             const normalizedStatus = String(selectedProposalForView.status || '').toLowerCase();
             const isEditableStatus = normalizedStatus === 'rejected' || normalizedStatus === 'for_approval' || normalizedStatus === 'for-approval';
             const canEditProposal = isEditableStatus && !proposalLocked;
+            const canPublishProposal = canCurrentUserPublishProposal(selectedProposalForView, currentUser);
             const editUnavailableReason = proposalLocked
               ? PROPOSAL_LOCKED_NOTICE
               : 'Editing is available only before the first signatory approval or when the proposal has been returned for revision.';
@@ -1081,6 +1108,16 @@ const StudentHome = () => {
                     >
                       Edit Proposal
                     </button>
+                    {canPublishProposal && (
+                      <button
+                        type="button"
+                        className="student-proposal-publish-btn"
+                        disabled={publishingProposalId === selectedProposalForView.id}
+                        onClick={() => handlePublishProposal(selectedProposalForView)}
+                      >
+                        {publishingProposalId === selectedProposalForView.id ? 'Publishing...' : 'Publish Event'}
+                      </button>
+                    )}
                     {!canEditProposal && (
                       <p id="proposal-edit-helper" className="student-proposal-edit-helper">
                         {editUnavailableReason}

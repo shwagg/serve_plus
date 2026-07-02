@@ -63,7 +63,7 @@ export default function ReviewProposal() {
     const s = status.toLowerCase();
     if (s === "for_approval" || s === "for-approval") return "For Approval";
     if (s === "pending") return "Pending";
-    if (s === "draft") return "Ready for Publishing";
+    if (s === "draft") return "Approved";
     if (s === "rejected") return "Returned for Revision";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
@@ -186,7 +186,7 @@ export default function ReviewProposal() {
     "overall": "All",
     "for-approval": "For Approval",
     "pending": "Pending",
-    "draft": "Ready for Publishing",
+    "draft": "Approved",
     "published": "Published",
     "completed": "Completed",
   };

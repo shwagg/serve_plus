@@ -1499,7 +1499,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             <div className="form-section">
               <h2>Signatories</h2>
               <p style={{ margin: '0 0 1rem', color: '#718096', fontSize: '0.85rem' }}>
-                Select the signatories who will review this proposal. Once submitted, it will route digitally through <strong>Program Chair → College Dean → Admin (CSCE) → Director</strong> for sequential approval before the event can be published.
+                Select the signatories who will review this proposal. Once submitted, it will route digitally through <strong>Program Chair → College Dean → Admin (CSCE) → Director</strong> for sequential approval before the proponent can publish the event.
               </p>
               <div className="form-row">
                 <div className="form-group">

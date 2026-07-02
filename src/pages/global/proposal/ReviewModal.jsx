@@ -210,7 +210,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
     const s = status.toLowerCase();
     if (s === "for_approval" || s === "for-approval") return "For Approval";
     if (s === "pending") return "For Approval";
-    if (s === "draft") return "Ready for Publishing";
+    if (s === "draft") return "Approved";
     if (s === "rejected") return "Returned for Revision";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
@@ -323,7 +323,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
       if (allApprovalsFilled) {
         // All approvals complete → draft
         updateData.status = "draft";
-        setApprovalMessage("Proposal fully approved! All signatures collected. Status updated to Draft for admin review.");
+        setApprovalMessage("Proposal fully approved! All signatures collected. The proponent can now publish the event.");
       } else if (currentApprovalCount === 0) {
         // First approval (transitioning from for_approval) → pending
         updateData.status = "pending";

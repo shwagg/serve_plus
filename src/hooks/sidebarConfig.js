@@ -94,6 +94,7 @@ export const facultyLinks = [
     key: "project",
     label: "Project",
     children: [
+      { label: "My Proposals", to: "/faculty/my-proposals" },
       { label: "Review Proposals", to: "/faculty/review-proposals" },
     ],
   },

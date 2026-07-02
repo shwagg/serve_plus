@@ -23,10 +23,21 @@ const BLACKBOARD_ALLOWED_ROLES = new Set(["student", "faculty"]);
 const NON_BLACKBOARD_ALLOWED_ROLES = new Set(["partner", "admin", "sysadmin"]);
 const TOTP_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
 const SHS_DEPARTMENT = "Mapua MCL Senior High School (SHS)";
+const CGC_DEPARTMENT = "Center for Guidance and Counseling (CGC)";
+const CLIR_DEPARTMENT = "Center for Learning and Information Resources (CLIR)";
 const FACULTY_POSITIONS_WITHOUT_DEPARTMENT = new Set([
   "sao director",
   "student organization adviser",
 ]);
+const DEPARTMENT_SPECIFIC_FACULTY_POSITIONS = {
+  [CGC_DEPARTMENT]: [
+    "guidance counselor",
+    "guidance facilitator",
+    "head",
+    "director",
+  ],
+  [CLIR_DEPARTMENT]: ["librarian", "director", "VPAA"],
+};
 
 const ROLE_FILTER_OPTIONS = [
   { value: "overall", label: "All" },
@@ -150,6 +161,8 @@ export default function RosterAccountManagement({ readOnly = false }) {
     "Mapua-Laguna Institute of Aviation (MIA)",
     "Mapua Institute of Technology at Laguna (MITL)",
     SHS_DEPARTMENT,
+    CGC_DEPARTMENT,
+    CLIR_DEPARTMENT,
   ];
 
   // Filter states
@@ -181,6 +194,9 @@ export default function RosterAccountManagement({ readOnly = false }) {
     selectedRole === "faculty" && normalizedSelectedPosition === "shs principal"
       ? [SHS_DEPARTMENT]
       : departments;
+  const facultyPositionOptions =
+    DEPARTMENT_SPECIFIC_FACULTY_POSITIONS[selectedDepartment] ||
+    positionsByRole.faculty;
 
   useEffect(() => {
     fetchUsers();
@@ -350,6 +366,13 @@ export default function RosterAccountManagement({ readOnly = false }) {
       !selectedPosition
     ) {
       showToast("Please select a position for this account level.");
+      return;
+    }
+    if (
+      selectedRole === "faculty" &&
+      !facultyPositionOptions.includes(selectedPosition)
+    ) {
+      showToast("Please select a valid position for the selected department.");
       return;
     }
     const departmentToSave = facultyPositionSkipsDepartment
@@ -717,13 +740,14 @@ export default function RosterAccountManagement({ readOnly = false }) {
                                     className="role-select"
                                   >
                                     <option value="">Select Position</option>
-                                    {positionsByRole[selectedRole]?.map(
-                                      (position) => (
+                                    {(selectedRole === "faculty"
+                                      ? facultyPositionOptions
+                                      : positionsByRole[selectedRole]
+                                    )?.map((position) => (
                                         <option key={position} value={position}>
                                           {position}
                                         </option>
-                                      ),
-                                    )}
+                                      ))}
                                   </select>
                                 )}
 
@@ -734,9 +758,20 @@ export default function RosterAccountManagement({ readOnly = false }) {
                                       ? SHS_DEPARTMENT
                                       : selectedDepartment
                                   }
-                                  onChange={(e) =>
-                                    setSelectedDepartment(e.target.value)
-                                  }
+                                  onChange={(e) => {
+                                    const nextDepartment = e.target.value;
+                                    const nextPositionOptions =
+                                      DEPARTMENT_SPECIFIC_FACULTY_POSITIONS[
+                                        nextDepartment
+                                      ] || positionsByRole.faculty;
+                                    setSelectedDepartment(nextDepartment);
+                                    if (
+                                      selectedPosition &&
+                                      !nextPositionOptions.includes(selectedPosition)
+                                    ) {
+                                      setSelectedPosition("");
+                                    }
+                                  }}
                                   className="role-select"
                                 >
                                   <option value="">Select Department</option>

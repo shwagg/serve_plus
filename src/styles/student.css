@@ -2080,6 +2080,23 @@
 .student-proposal-edit-btn:hover:not(:disabled) {
   background: #28a8a3;
 }
+.student-proposal-publish-btn {
+  border: none;
+  border-radius: 8px;
+  background: #166534;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 9px 16px;
+}
+.student-proposal-publish-btn:hover:not(:disabled) {
+  background: #14532d;
+}
+.student-proposal-publish-btn:disabled {
+  background: #9ca3af;
+  cursor: wait;
+}
 .student-proposal-edit-btn:disabled {
   background: #d1d5db;
   color: #6b7280;

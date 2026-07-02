@@ -492,7 +492,7 @@ function SummaryPanel({
             { step: 1, label: 'Program Chair', desc: 'Reviews and approves the proposal' },
             { step: 2, label: 'College Dean', desc: 'Recommends the proposal' },
             { step: 3, label: 'Admin (CSCE)', desc: 'Endorses and forwards for final sign-off' },
-            { step: 4, label: 'Director', desc: 'Final approval — event becomes ready to publish' },
+            { step: 4, label: 'Director', desc: 'Final approval — proponent can publish the event' },
           ].map(({ step, label, desc }) => (
             <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{

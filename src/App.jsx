@@ -54,6 +54,7 @@ import ProposeProject from "./pages/global/ProposeProject";
 import PublicProfile from "./pages/global/PublicProfile";
 import ProjectProposal from "./pages/global/proposal/ProjectProposal";
 import ReviewProposal from "./pages/global/proposal/ReviewProposal";
+import MyProposals from "./pages/global/MyProposals";
 import AdminProjects from "./pages/admin/AdminProjects";
 import Support from "./pages/global/menu/Support";
 import PartnerHome from "./pages/partner/PartnerHome";
@@ -205,6 +206,7 @@ function App() {
           >
             <Route path="courses" element={<FacultyCourses />} />
             <Route path="projects" element={<ProjectList mode="faculty" />} />
+            <Route path="my-proposals" element={<MyProposals />} />
             <Route path="review-proposals" element={<ReviewProposal />} />
             <Route path="current-event" element={<CurrentEvent />} />
             <Route path="current-event/:missionId" element={<CurrentEvent />} />
