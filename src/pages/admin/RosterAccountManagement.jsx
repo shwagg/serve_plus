@@ -25,6 +25,23 @@ const TOTP_REQUIRED_ROLES = new Set(["student", "faculty", "admin"]);
 const SHS_DEPARTMENT = "Mapua MCL Senior High School (SHS)";
 const CGC_DEPARTMENT = "Center for Guidance and Counseling (CGC)";
 const CLIR_DEPARTMENT = "Center for Learning and Information Resources (CLIR)";
+const COMMUNITY_CHAIR_POSITION = "community chair";
+const COMMUNITY_CHAIR_DEPARTMENTS = new Set([
+  "College of Arts and Science (CAS)",
+  "College of Computer and Information Science (CCIS)",
+  "College of Health Sciences (CHS)",
+  "College of Nursing (CN)",
+  "College of Maritime Education and Training (CMET)",
+  "E.T. Yuchengco College of Business (ETYCB)",
+  "Mapua-Laguna Institute of Aviation (MIA)",
+  "Mapua Institute of Technology at Laguna (MITL)",
+]);
+const COMMUNITY_DEPARTMENT_RESTRICTED_POSITIONS = new Set([
+  "sao director",
+  "shs principal",
+  "student organization adviser",
+  "cluster head",
+]);
 const FACULTY_POSITIONS_WITHOUT_DEPARTMENT = new Set([
   "sao director",
   "student organization adviser",
@@ -64,6 +81,9 @@ const isRoleAllowedForAccount = (user, role) =>
 
 const canResetTotpForUser = (user) =>
   TOTP_REQUIRED_ROLES.has(String(user?.role || "").toLowerCase());
+
+const normalizeRosterValue = (value) =>
+  String(value || "").trim().toLowerCase();
 
 const normalizeSearchText = (value) =>
   String(value ?? "")
@@ -184,9 +204,26 @@ export default function RosterAccountManagement({ readOnly = false }) {
     ],
     admin: ["director", "regular"],
   };
-  const normalizedSelectedPosition = String(selectedPosition || "")
-    .trim()
-    .toLowerCase();
+  const getFacultyPositionOptions = (department) => {
+    const departmentSpecificOptions =
+      DEPARTMENT_SPECIFIC_FACULTY_POSITIONS[department] || positionsByRole.faculty;
+
+    if (!COMMUNITY_CHAIR_DEPARTMENTS.has(department)) {
+      return departmentSpecificOptions;
+    }
+
+    const filteredOptions = departmentSpecificOptions.filter(
+      (position) =>
+        !COMMUNITY_DEPARTMENT_RESTRICTED_POSITIONS.has(
+          normalizeRosterValue(position),
+        ),
+    );
+
+    return filteredOptions.includes(COMMUNITY_CHAIR_POSITION)
+      ? filteredOptions
+      : [...filteredOptions, COMMUNITY_CHAIR_POSITION];
+  };
+  const normalizedSelectedPosition = normalizeRosterValue(selectedPosition);
   const facultyPositionSkipsDepartment =
     selectedRole === "faculty" &&
     FACULTY_POSITIONS_WITHOUT_DEPARTMENT.has(normalizedSelectedPosition);
@@ -195,8 +232,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
       ? [SHS_DEPARTMENT]
       : departments;
   const facultyPositionOptions =
-    DEPARTMENT_SPECIFIC_FACULTY_POSITIONS[selectedDepartment] ||
-    positionsByRole.faculty;
+    getFacultyPositionOptions(selectedDepartment);
 
   useEffect(() => {
     fetchUsers();
@@ -394,6 +430,25 @@ export default function RosterAccountManagement({ readOnly = false }) {
     ) {
       showToast("SHS Principal must be assigned to Mapua MCL Senior High School (SHS).");
       return;
+    }
+
+    if (
+      selectedRole === "faculty" &&
+      normalizedSelectedPosition === COMMUNITY_CHAIR_POSITION &&
+      COMMUNITY_CHAIR_DEPARTMENTS.has(departmentToSave)
+    ) {
+      const hasExistingCommunityChair = users.some(
+        (user) =>
+          user.id !== userId &&
+          normalizeRosterValue(user.role) === "faculty" &&
+          normalizeRosterValue(user.position) === COMMUNITY_CHAIR_POSITION &&
+          user.department === departmentToSave,
+      );
+
+      if (hasExistingCommunityChair) {
+        showToast("Only one community chair can be assigned to this department.");
+        return;
+      }
     }
 
     try {
@@ -761,9 +816,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
                                   onChange={(e) => {
                                     const nextDepartment = e.target.value;
                                     const nextPositionOptions =
-                                      DEPARTMENT_SPECIFIC_FACULTY_POSITIONS[
-                                        nextDepartment
-                                      ] || positionsByRole.faculty;
+                                      getFacultyPositionOptions(nextDepartment);
                                     setSelectedDepartment(nextDepartment);
                                     if (
                                       selectedPosition &&

@@ -11,6 +11,7 @@ const ROLE_OPTIONS = new Set([
 ]);
 const BLACKBOARD_ALLOWED_ROLES = new Set(["student", "faculty"]);
 const NON_BLACKBOARD_ALLOWED_ROLES = new Set(["partner", "admin", "sysadmin"]);
+const COMMUNITY_CHAIR_POSITION = "community chair";
 const FACULTY_POSITIONS = new Set([
   "regular",
   "program chair",
@@ -21,10 +22,27 @@ const FACULTY_POSITIONS = new Set([
   "shs principal",
   "sao director",
   "department head",
+  COMMUNITY_CHAIR_POSITION,
 ]);
 const ADMIN_POSITIONS = new Set(["director", "regular"]);
 const MFA_SESSION_COLLECTION = "mfaSessions";
 const SHS_DEPARTMENT = "Mapua MCL Senior High School (SHS)";
+const COMMUNITY_CHAIR_DEPARTMENTS = new Set([
+  "College of Arts and Science (CAS)",
+  "College of Computer and Information Science (CCIS)",
+  "College of Health Sciences (CHS)",
+  "College of Nursing (CN)",
+  "College of Maritime Education and Training (CMET)",
+  "E.T. Yuchengco College of Business (ETYCB)",
+  "Mapua-Laguna Institute of Aviation (MIA)",
+  "Mapua Institute of Technology at Laguna (MITL)",
+]);
+const COMMUNITY_DEPARTMENT_RESTRICTED_POSITIONS = new Set([
+  "sao director",
+  "shs principal",
+  "student organization adviser",
+  "cluster head",
+]);
 const FACULTY_POSITIONS_WITHOUT_DEPARTMENT = new Set([
   "sao director",
   "student organization adviser",
@@ -113,6 +131,16 @@ function validateRoleUpdate({targetData, role, position, department}) {
         "SHS Principal must be assigned to Mapua MCL Senior High School (SHS).",
       );
     }
+
+    if (
+      COMMUNITY_CHAIR_DEPARTMENTS.has(department) &&
+      COMMUNITY_DEPARTMENT_RESTRICTED_POSITIONS.has(position)
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Please select a valid faculty position for the selected department.",
+      );
+    }
   }
 
   if (role === "admin" && (!position || !ADMIN_POSITIONS.has(position))) {
@@ -176,6 +204,32 @@ function buildRoleUpdateData({targetData, role, position, department}) {
     position: FieldValue.delete(),
     department: FieldValue.delete(),
   };
+}
+
+async function assertCommunityChairAvailable({targetUid, role, position, department}) {
+  if (
+    role !== "faculty" ||
+    position !== COMMUNITY_CHAIR_POSITION ||
+    !COMMUNITY_CHAIR_DEPARTMENTS.has(department)
+  ) {
+    return;
+  }
+
+  const chairSnap = await getDb()
+    .collection("users")
+    .where("role", "==", "faculty")
+    .where("position", "==", COMMUNITY_CHAIR_POSITION)
+    .where("department", "==", department)
+    .limit(2)
+    .get();
+
+  const existingChair = chairSnap.docs.find((doc) => doc.id !== targetUid);
+  if (existingChair) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Only one community chair can be assigned to this department.",
+    );
+  }
 }
 
 async function clearMfaSessionsForUser(uid) {
@@ -263,6 +317,7 @@ async function changeUserRole(request) {
   const roleChanged = previousRole !== role;
 
   validateRoleUpdate({targetData, role, position, department});
+  await assertCommunityChairAvailable({targetUid, role, position, department});
 
   const updateData = buildRoleUpdateData({
     targetData,
