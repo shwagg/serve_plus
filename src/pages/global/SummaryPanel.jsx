@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
-import { createNotification, notifyUsersByRoles } from '../../utils/notificationUtils';
+import { createNotification, notifyCommunityChairsForProposal, notifyUsersByRoles } from '../../utils/notificationUtils';
 import { showConfirm, showToast } from '../../utils/toast';
 import { logAudit } from '../../utils/auditLogger';
 
@@ -216,6 +216,16 @@ function SummaryPanel({
               link: '/global/review-proposals',
               proposalId,
             });
+            await notifyCommunityChairsForProposal(
+              { id: proposalId, ...updateData },
+              {
+                type: 'proposal_submitted',
+                title: 'Department Proposal Resubmitted',
+                message: `"${formData.title}" was resubmitted for approval in your department.`,
+                proposalId,
+              },
+              { excludeUserIds: [user.uid] },
+            );
           } catch (notificationError) {
             console.error('Error creating proposal resubmission notifications:', notificationError);
           }
@@ -348,6 +358,17 @@ function SummaryPanel({
           link: '/global/review-proposals',
           proposalId: docRef.id,
         });
+
+        await notifyCommunityChairsForProposal(
+          { id: docRef.id, ...missionData },
+          {
+            type: 'proposal_submitted',
+            title: 'New Department Proposal',
+            message: `"${formData.title}" was submitted for approval in your department.`,
+            proposalId: docRef.id,
+          },
+          { excludeUserIds: [user.uid] },
+        );
       } catch (notificationError) {
         console.error('Error creating proposal notifications:', notificationError);
       }

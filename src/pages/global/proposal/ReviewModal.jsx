@@ -2,11 +2,23 @@ import React, { useState, useContext, useMemo, useEffect } from "react";
 import ProposalTimeline from "../../../components/ProposalTimeline";
 import { db, auth } from "../../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
-import { createNotification, notifyUsersByRoles } from "../../../utils/notificationUtils";
+import { createNotification, notifyCommunityChairsForProposal, notifyUsersByRoles } from "../../../utils/notificationUtils";
 import { showConfirm } from "../../../utils/toast";
 import { SessionContext } from "../../../context/sessionContextCore";
 import { exportProposalPDF } from "../exportProposalPDF";
 import "./ReviewModal.css";
+
+function getChairApprovalMessage(proposal, approvalLevel, approverName, allApprovalsFilled) {
+  const title = proposal.title || "Untitled";
+  if (allApprovalsFilled) {
+    return `"${title}" is ready for publishing after approval by CSCE Director ${approverName}.`;
+  }
+  if (approvalLevel === "reviewedBy") return `"${title}" was reviewed by ${approverName}.`;
+  if (approvalLevel === "recommendedBy") return `"${title}" was recommended by ${approverName}.`;
+  if (approvalLevel === "endorsedBy") return `"${title}" was approved by CSCE ${approverName}.`;
+  if (approvalLevel === "approvedBy") return `"${title}" was approved by CSCE Director ${approverName}.`;
+  return `"${title}" approval progress was updated by ${approverName}.`;
+}
 
 export default function ReviewModal({ proposal, onClose, onApprovalChange, isPartner }) {
 
@@ -363,6 +375,21 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
             })
           : Promise.resolve(),
         notifyUsersByRoles(["admin", "faculty"], notifData),
+        notifyCommunityChairsForProposal(
+          currentProposal,
+          {
+            type: "proposal_status",
+            title: allApprovalsFilled ? "Department Proposal Ready to Publish" : "Department Proposal Updated",
+            message: getChairApprovalMessage(
+              proposal,
+              approvalLevel,
+              userData.name || userData.email,
+              allApprovalsFilled,
+            ),
+            proposalId: proposal.id,
+          },
+          { excludeUserIds: [auth.currentUser?.uid, proposal.createdBy] },
+        ),
       ]).catch((err) => console.error("Error sending proposal status notifications:", err));
     } catch (error) {
       console.error("Error approving proposal:", error);
@@ -435,6 +462,16 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
         proposal.createdBy
           ? createNotification(proposal.createdBy, notifData)
           : Promise.resolve(),
+        notifyCommunityChairsForProposal(
+          { id: proposal.id, ...proposal, ...updateData },
+          {
+            type: "proposal_rejected",
+            title: "Department Proposal Returned",
+            message: `${rejectorName || "An approver"} returned "${proposal.title || "Untitled"}" for revision: ${rejectComments.trim()}`,
+            proposalId: proposal.id,
+          },
+          { excludeUserIds: [auth.currentUser?.uid, proposal.createdBy] },
+        ),
       ]).catch((err) => console.error("Error sending proposal status notifications:", err));
     } catch (error) {
       console.error("Error rejecting proposal:", error);

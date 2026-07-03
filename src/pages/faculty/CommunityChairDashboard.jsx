@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
+import { useLocation, useNavigate } from "react-router-dom";
 import ProjectDetailSidebar from "../admin/ProjectDetailSidebar";
 import { SessionContext } from "../../context/sessionContextCore";
 import { db } from "../../firebaseConfig";
@@ -17,6 +18,15 @@ const RANGE_OPTIONS = [
 
 const COMPLETED_STATUSES = new Set(["complete", "completed", "graded"]);
 const PUBLISHED_HISTORY_STATUSES = new Set(["published", "completed"]);
+const ROWS_PER_PAGE = 3;
+const TRACKED_PROPOSAL_STATUSES = new Set([
+  "for_approval",
+  "for-approval",
+  "pending",
+  "rejected",
+  "draft",
+  "published",
+]);
 
 function toDate(value) {
   if (!value) return null;
@@ -52,6 +62,31 @@ function missionDepartment(mission) {
 
 function hasPublishedHistoryStatus(mission) {
   return PUBLISHED_HISTORY_STATUSES.has(normalizeRosterText(mission.status));
+}
+
+function hasAllApprovals(mission) {
+  return Boolean(mission.reviewedBy && mission.recommendedBy && mission.endorsedBy && mission.approvedBy);
+}
+
+function getTrackerLabel(mission) {
+  const status = normalizeRosterText(mission.status);
+  if (status === "rejected") return "Returned";
+  if (status === "published") return "Published";
+  if (status === "pending") return "In Review";
+  if (status === "draft" && hasAllApprovals(mission)) return "Ready to Publish";
+  if (status === "for_approval" || status === "for-approval") return "Submitted";
+  if (status === "draft") return "Draft";
+  return mission.status || "Proposal";
+}
+
+function getApprovalProgress(mission) {
+  return ["reviewedBy", "recommendedBy", "endorsedBy", "approvedBy"]
+    .filter((field) => Boolean(mission[field])).length;
+}
+
+function isTrackedProposal(mission) {
+  const status = normalizeRosterText(mission.status);
+  return TRACKED_PROPOSAL_STATUSES.has(status);
 }
 
 function isCompletedVolunteer(volunteer) {
@@ -98,13 +133,51 @@ function buildRangeStats(projects, range) {
   };
 }
 
+function projectMatchesSearch(project, query) {
+  const normalizedQuery = normalizeRosterText(query);
+  if (!normalizedQuery) return true;
+
+  const searchableText = [
+    project.title,
+    project.alt,
+    project.status,
+    project.preparedBy,
+    project.location,
+    project.departmentLabel,
+    missionDepartment(project),
+    project.projectType === "sl" ? "service learning" : "community engagement",
+  ]
+    .map((value) => normalizeRosterText(value))
+    .join(" ");
+
+  return searchableText.includes(normalizedQuery);
+}
+
+function paginateRows(rows, page) {
+  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const startIndex = (safePage - 1) * ROWS_PER_PAGE;
+
+  return {
+    rows: rows.slice(startIndex, startIndex + ROWS_PER_PAGE),
+    safePage,
+    totalPages,
+  };
+}
+
 export default function CommunityChairDashboard() {
   const { userData, authLoading } = useContext(SessionContext);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeRangeKey, setActiveRangeKey] = useState("fourMonths");
   const [selectedProject, setSelectedProject] = useState(null);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectPage, setProjectPage] = useState(1);
+  const [trackerSearch, setTrackerSearch] = useState("");
+  const [trackerPage, setTrackerPage] = useState(1);
 
   const isChair = isCommunityChair(userData);
   const chairDepartment = userData?.department || "";
@@ -129,7 +202,6 @@ export default function CommunityChairDashboard() {
         const departmentMissions = missionSnap.docs
           .map((missionDoc) => ({ id: missionDoc.id, ...missionDoc.data() }))
           .filter((mission) => (
-            hasPublishedHistoryStatus(mission) &&
             normalizeRosterText(missionDepartment(mission)) === normalizedDepartment
           ));
 
@@ -178,12 +250,42 @@ export default function CommunityChairDashboard() {
     };
   }, [authLoading, isChair, normalizedDepartment]);
 
+  useEffect(() => {
+    const targetId = location.state?.proposalId || location.state?.missionId;
+    if (!targetId || loading || selectedProject) return;
+
+    const match = projects.find((project) => project.id === targetId);
+    if (!match) return;
+
+    setSelectedProject(match);
+    navigate(location.pathname, {
+      replace: true,
+      state: { ...location.state, proposalId: null, missionId: null },
+    });
+  }, [loading, location.pathname, location.state, navigate, projects, selectedProject]);
+
+  const publishedProjects = useMemo(
+    () => projects.filter((project) => hasPublishedHistoryStatus(project)),
+    [projects],
+  );
+
+  const trackerProjects = useMemo(() => {
+    return projects
+      .filter((project) => isTrackedProposal(project))
+      .sort((a, b) => {
+        if (!a.rangeDate && !b.rangeDate) return (a.title || "").localeCompare(b.title || "");
+        if (!a.rangeDate) return 1;
+        if (!b.rangeDate) return -1;
+        return b.rangeDate.getTime() - a.rangeDate.getTime();
+      });
+  }, [projects]);
+
   const rangeStats = useMemo(() => {
     return RANGE_OPTIONS.reduce((acc, range) => {
-      acc[range.key] = buildRangeStats(projects, range);
+      acc[range.key] = buildRangeStats(publishedProjects, range);
       return acc;
     }, {});
-  }, [projects]);
+  }, [publishedProjects]);
 
   const activeRange = RANGE_OPTIONS.find((range) => range.key === activeRangeKey) || RANGE_OPTIONS[0];
   const activeStats = rangeStats[activeRange.key] || buildRangeStats([], activeRange);
@@ -195,6 +297,10 @@ export default function CommunityChairDashboard() {
     if (!b.rangeDate) return -1;
     return b.rangeDate.getTime() - a.rangeDate.getTime();
   });
+  const filteredVisibleProjects = visibleProjects.filter((project) => projectMatchesSearch(project, projectSearch));
+  const pagedVisibleProjects = paginateRows(filteredVisibleProjects, projectPage);
+  const filteredTrackerProjects = trackerProjects.filter((project) => projectMatchesSearch(project, trackerSearch));
+  const pagedTrackerProjects = paginateRows(filteredTrackerProjects, trackerPage);
 
   if (authLoading || loading) {
     return (
@@ -247,7 +353,10 @@ export default function CommunityChairDashboard() {
               key={range.key}
               type="button"
               className={`ccd-range-card${isActive ? " ccd-range-card--active" : ""}`}
-              onClick={() => setActiveRangeKey(range.key)}
+              onClick={() => {
+                setActiveRangeKey(range.key);
+                setProjectPage(1);
+              }}
             >
               <span className="ccd-range-label">{range.label}</span>
               <span className="ccd-range-metrics">
@@ -274,18 +383,57 @@ export default function CommunityChairDashboard() {
           <div>
             <h2>Projects in {activeRange.label}</h2>
             <p>
-              {activeStats.projectCount} project{activeStats.projectCount !== 1 ? "s" : ""} found
+              {filteredVisibleProjects.length} project{filteredVisibleProjects.length !== 1 ? "s" : ""} found
+              {projectSearch && ` of ${visibleProjects.length}`}
             </p>
           </div>
-          <div className="ccd-panel-totals">
-            <span>{activeStats.joinedCount} joined</span>
-            <span>{activeStats.completedCount} completed</span>
+          <div className="ccd-panel-actions">
+            <div className="ccd-panel-totals">
+              <span>{activeStats.joinedCount} joined</span>
+              <span>{activeStats.completedCount} completed</span>
+            </div>
+            <div className="ccd-panel-tools">
+              <input
+                className="ccd-search-input"
+                type="search"
+                value={projectSearch}
+                onChange={(event) => {
+                  setProjectSearch(event.target.value);
+                  setProjectPage(1);
+                }}
+                placeholder="Search projects"
+                aria-label="Search projects"
+              />
+              <div className="ccd-pagination" aria-label="Project pagination">
+                <button
+                  type="button"
+                  onClick={() => setProjectPage((page) => Math.max(1, page - 1))}
+                  disabled={pagedVisibleProjects.safePage <= 1}
+                >
+                  Previous
+                </button>
+                <span>
+                  {pagedVisibleProjects.safePage} / {pagedVisibleProjects.totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setProjectPage((page) => Math.min(pagedVisibleProjects.totalPages, page + 1))}
+                  disabled={pagedVisibleProjects.safePage >= pagedVisibleProjects.totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         {visibleProjects.length === 0 ? (
           <div className="ccd-empty">
             No published or completed projects found for this department in the selected range.
+          </div>
+        ) : filteredVisibleProjects.length === 0 ? (
+          <div className="ccd-empty">
+            No matching projects found for this range.
           </div>
         ) : (
           <div className="ccd-table-wrap">
@@ -302,7 +450,7 @@ export default function CommunityChairDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {visibleProjects.map((project) => (
+                {pagedVisibleProjects.rows.map((project) => (
                   <tr
                     key={project.id}
                     tabIndex={0}
@@ -330,6 +478,116 @@ export default function CommunityChairDashboard() {
                     <td>{project.location || "N/A"}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="ccd-project-panel">
+        <div className="ccd-panel-header">
+          <div>
+            <h2>Approval Tracker</h2>
+            <p>
+              {filteredTrackerProjects.length} department proposal{filteredTrackerProjects.length !== 1 ? "s" : ""} tracked
+              {trackerSearch && ` of ${trackerProjects.length}`}
+            </p>
+          </div>
+          <div className="ccd-panel-tools">
+            <input
+              className="ccd-search-input"
+              type="search"
+              value={trackerSearch}
+              onChange={(event) => {
+                setTrackerSearch(event.target.value);
+                setTrackerPage(1);
+              }}
+              placeholder="Search tracker"
+              aria-label="Search approval tracker"
+            />
+            <div className="ccd-pagination" aria-label="Approval tracker pagination">
+              <button
+                type="button"
+                onClick={() => setTrackerPage((page) => Math.max(1, page - 1))}
+                disabled={pagedTrackerProjects.safePage <= 1}
+              >
+                Previous
+              </button>
+              <span>
+                {pagedTrackerProjects.safePage} / {pagedTrackerProjects.totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTrackerPage((page) => Math.min(pagedTrackerProjects.totalPages, page + 1))}
+                disabled={pagedTrackerProjects.safePage >= pagedTrackerProjects.totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {trackerProjects.length === 0 ? (
+          <div className="ccd-empty">
+            No department proposals are currently available for tracking.
+          </div>
+        ) : filteredTrackerProjects.length === 0 ? (
+          <div className="ccd-empty">
+            No matching proposals found in the approval tracker.
+          </div>
+        ) : (
+          <div className="ccd-table-wrap">
+            <table className="ccd-table ccd-table--tracker">
+              <thead>
+                <tr>
+                  <th>Proposal</th>
+                  <th>Status</th>
+                  <th>Progress</th>
+                  <th>Latest Date</th>
+                  <th>Proponent</th>
+                  <th>Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedTrackerProjects.rows.map((project) => {
+                  const progress = getApprovalProgress(project);
+                  const trackerLabel = getTrackerLabel(project);
+                  const statusClass = normalizeRosterText(trackerLabel).replace(/\s+/g, "-");
+                  return (
+                    <tr
+                      key={`tracker-${project.id}`}
+                      tabIndex={0}
+                      onClick={() => setSelectedProject(project)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedProject(project);
+                        }
+                      }}
+                    >
+                      <td>
+                        <strong>{project.title || project.alt || "Untitled Project"}</strong>
+                        <span>{project.projectType === "sl" ? "Service Learning" : "Community Engagement"}</span>
+                      </td>
+                      <td>
+                        <span className={`ccd-status ccd-status--${statusClass}`}>
+                          {trackerLabel}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="ccd-progress-cell">
+                          <span>{progress}/4 approvals</span>
+                          <div className="ccd-progress-track" aria-hidden="true">
+                            <div style={{ width: `${(progress / 4) * 100}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td>{formatDate(project.rangeDate)}</td>
+                      <td>{project.preparedBy || "N/A"}</td>
+                      <td>{project.location || "N/A"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

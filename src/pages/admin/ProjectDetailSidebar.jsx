@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from "react";
-import { db } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, collection, getDocs, getDoc, setDoc, deleteDoc, deleteField } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -7,7 +7,7 @@ import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import ProposalTimeline from "../../components/ProposalTimeline";
 import AccomplishmentReportModal from "../../components/AccomplishmentReportModal";
 import { SessionContext } from "../../context/sessionContextCore";
-import { createNotification, notifyUsersByRoles } from "../../utils/notificationUtils";
+import { createNotification, notifyCommunityChairsForProposal, notifyUsersByRoles } from "../../utils/notificationUtils";
 import { logAudit } from "../../utils/auditLogger";
 import { showToast, showConfirm } from "../../utils/toast";
 import {
@@ -27,6 +27,18 @@ import "../../styles/ProjectDetailSidebar.css";
 function isForApproval(status = "") {
   const s = String(status).toLowerCase();
   return s === "for_approval" || s === "for-approval" || s === "pending";
+}
+
+function getChairApprovalMessage(project, approvalLevel, approverName, allApprovalsFilled) {
+  const title = project.title || "Untitled";
+  if (allApprovalsFilled) {
+    return `"${title}" is ready for publishing after approval by CSCE Director ${approverName}.`;
+  }
+  if (approvalLevel === "reviewedBy") return `"${title}" was reviewed by ${approverName}.`;
+  if (approvalLevel === "recommendedBy") return `"${title}" was recommended by ${approverName}.`;
+  if (approvalLevel === "endorsedBy") return `"${title}" was approved by CSCE ${approverName}.`;
+  if (approvalLevel === "approvedBy") return `"${title}" was approved by CSCE Director ${approverName}.`;
+  return `"${title}" approval progress was updated by ${approverName}.`;
 }
 
 function PieChart({ present, total }) {
@@ -332,6 +344,16 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       Promise.allSettled([
         project.createdBy ? createNotification(project.createdBy, { ...notifData, message: `Your proposal "${project.title || "Untitled"}" is now ${statusLabel}.` }) : Promise.resolve(),
         notifyUsersByRoles(["admin", "faculty"], notifData),
+        notifyCommunityChairsForProposal(
+          { id: project.id, ...merged },
+          {
+            type: "proposal_status",
+            title: allDone ? "Department Proposal Ready to Publish" : "Department Proposal Updated",
+            message: getChairApprovalMessage(project, approvalLevel, name, allDone),
+            proposalId: project.id,
+          },
+          { excludeUserIds: [auth.currentUser?.uid, project.createdBy] },
+        ),
       ]).catch(() => {});
     } catch {
       setActionMsg("Error approving. Please try again.");
@@ -362,6 +384,16 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
       };
       Promise.allSettled([
         project.createdBy ? createNotification(project.createdBy, notifData) : Promise.resolve(),
+        notifyCommunityChairsForProposal(
+          { id: project.id, ...project, status: "rejected" },
+          {
+            type: "proposal_rejected",
+            title: "Department Proposal Returned",
+            message: `${name || "An approver"} returned "${project.title || "Untitled"}" for revision: ${rejectText.trim()}`,
+            proposalId: project.id,
+          },
+          { excludeUserIds: [auth.currentUser?.uid, project.createdBy] },
+        ),
       ]).catch(() => {});
       setActionMsg("Returned to proponent for revision. All approvals cleared.");
       if (onApprovalChange) onApprovalChange();

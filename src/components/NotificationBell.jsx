@@ -48,6 +48,9 @@ export default function NotificationBell() {
     }
 
     if (role === "faculty") {
+      if (notification.audience === "community_chair") {
+        return "/faculty/dashboard";
+      }
       return "/faculty/review-proposals";
     }
 

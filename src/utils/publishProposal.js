@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 import { logAudit } from "./auditLogger";
+import { notifyCommunityChairsForProposal } from "./notificationUtils";
 
 export function isProposalReadyToPublish(proposal) {
   if (!proposal) return false;
@@ -91,5 +92,18 @@ export async function publishApprovedProposal(proposal, userData = {}) {
       proposalId: proposal.id,
       proposalTitle: proposal.title || "",
     },
+  });
+
+  notifyCommunityChairsForProposal(
+    proposal,
+    {
+      type: "proposal_status",
+      title: "Department Proposal Published",
+      message: `"${proposal.title || "Untitled"}" was published by ${publisherName || "the proponent"}.`,
+      proposalId: proposal.id,
+    },
+    { excludeUserIds: [user.uid, proposal.createdBy] },
+  ).catch((error) => {
+    console.error("Error sending community chair publish notifications:", error);
   });
 }

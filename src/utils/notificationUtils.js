@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   onSnapshot,
 } from "firebase/firestore";
+import { isCommunityChair, normalizeRosterText } from "./communityChair";
 
 export async function createNotification(userId, notificationData) {
   const notificationsRef = collection(db, "users", userId, "notifications");
@@ -38,6 +39,43 @@ export async function notifyUsersByRoles(roles, notificationData) {
   await Promise.allSettled(
     snapshot.docs.map((docSnap) => createNotification(docSnap.id, notificationData))
   );
+}
+
+function getMissionDepartment(mission = {}) {
+  return mission.affiliatedDepartment || mission.department || "";
+}
+
+export async function notifyCommunityChairsForProposal(mission, notificationData, options = {}) {
+  const department = getMissionDepartment(mission);
+  const normalizedDepartment = normalizeRosterText(department);
+  if (!normalizedDepartment) return [];
+
+  const excludeUserIds = new Set((options.excludeUserIds || []).filter(Boolean));
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("role", "==", "faculty"));
+  const snapshot = await getDocs(q);
+
+  const chairDocs = snapshot.docs.filter((docSnap) => {
+    if (excludeUserIds.has(docSnap.id)) return false;
+    const user = docSnap.data();
+    return isCommunityChair(user) &&
+      normalizeRosterText(user.department) === normalizedDepartment;
+  });
+
+  const payload = {
+    ...notificationData,
+    audience: "community_chair",
+    proposalId: mission.id || notificationData.proposalId,
+    missionId: mission.id || notificationData.missionId,
+    department,
+    link: "/faculty/dashboard",
+  };
+
+  await Promise.allSettled(
+    chairDocs.map((docSnap) => createNotification(docSnap.id, payload))
+  );
+
+  return chairDocs.map((docSnap) => docSnap.id);
 }
 
 export async function notifyEventParticipants(missionId, notificationData) {
