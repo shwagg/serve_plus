@@ -3,7 +3,7 @@
 import { signInWithCustomToken, signOut } from "firebase/auth";
 import { collection, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useSession } from "../context/useSession";
 import bbl_icon from "../assets/bbl_icon.svg";
@@ -14,12 +14,13 @@ import { auth, db, functions } from "../firebaseConfig";
 import useBlackboardAuth from "../hooks/useBlackboardAuth";
 import "../styles/ui.css";
 import { fetchCurrentAgreementVersion } from "../utils/agreementVersion";
+import { getFacultyLandingPath } from "../utils/communityChair";
 import { getMfaRouteForAction, saveMfaSession } from "../utils/mfaSession";
 
-function getBlackboardRedirectPath(role) {
+function getBlackboardRedirectPath(role, userData = null) {
   if (role === "admin") return "/admin/dashboard";
   if (role === "sysadmin") return "/sysadmin/roster";
-  if (role === "faculty") return "/faculty/current-event";
+  if (role === "faculty") return getFacultyLandingPath(userData || { role });
   if (role === "partner") return "/partner/dashboard";
   return "/student/home";
 }
@@ -89,13 +90,13 @@ function Auth() {
   // only after the current agreement has been accepted.
   const { userData, isSessionActive, authLoading } = useSession();
 
-  const getRoleRedirect = (role) => {
+  const getRoleRedirect = useCallback((role, data = null) => {
     if (role === "admin") return "/admin/dashboard";
     if (role === "sysadmin") return "/sysadmin/roster";
-    if (role === "faculty") return "/faculty/current-event";
+    if (role === "faculty") return getFacultyLandingPath(data || userData || { role });
     if (role === "partner") return "/partner/dashboard";
     return "/student/home";
-  };
+  }, [userData]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,12 +120,13 @@ function Auth() {
           role: userData.role,
           uid: auth.currentUser?.uid || userData.uid,
           authProvider: userData.authProvider || "password",
+          userData,
         });
         setShowAgreement(true);
         return;
       }
 
-      const destination = intendedPath || getRoleRedirect(userData.role);
+      const destination = intendedPath || getRoleRedirect(userData.role, userData);
       navigate(destination, { replace: true });
     };
 
@@ -135,6 +137,7 @@ function Auth() {
     };
   }, [
     authLoading,
+    getRoleRedirect,
     isSessionActive,
     intendedPath,
     navigate,
@@ -214,17 +217,18 @@ function Auth() {
           role,
           uid,
           authProvider,
+          userData,
         });
         setShowAgreement(true);
         return;
       }
 
       if (authProvider === "blackboard") {
-        navigate(getBlackboardRedirectPath(role), { replace: true });
+        navigate(getBlackboardRedirectPath(role, userData), { replace: true });
       } else if (role === "admin" || role === "sysadmin") {
         navigate(getPrivilegedRedirectPath(role), { replace: true });
       } else if (role === "faculty") {
-        navigate(intendedPath || "/faculty/current-event", { replace: true });
+        navigate(intendedPath || getFacultyLandingPath(userData), { replace: true });
       } else if (role === "partner") {
         navigate(intendedPath || "/partner/dashboard", { replace: true });
       } else {
@@ -407,21 +411,22 @@ function Auth() {
       const logLogin = httpsCallable(functions, "logLogin");
       logLogin({ uid }).catch(() => {});
       const freshSnap = await getDoc(doc(db, "users", uid));
-      const userAgreementVersion = freshSnap.data()?.agreementVersion || null;
+      const freshData = freshSnap.data() || { role };
+      const userAgreementVersion = freshData.agreementVersion || null;
       const currentVersion = await fetchCurrentAgreementVersion();
       setShowReactivatePrompt(false);
       setPendingReactivation(null);
       if (userAgreementVersion !== currentVersion) {
-        setPendingNavigation({ role, uid, authProvider });
+        setPendingNavigation({ role, uid, authProvider, userData: freshData });
         setShowAgreement(true);
         return;
       }
       if (authProvider === "blackboard") {
-        navigate(getBlackboardRedirectPath(role), { replace: true });
+        navigate(getBlackboardRedirectPath(role, freshData), { replace: true });
       } else if (role === "admin" || role === "sysadmin") {
         navigate(getPrivilegedRedirectPath(role), { replace: true });
       } else if (role === "faculty") {
-        navigate(intendedPath || "/faculty/current-event", { replace: true });
+        navigate(intendedPath || getFacultyLandingPath(freshData), { replace: true });
       } else if (role === "partner") {
         navigate(intendedPath || "/partner/dashboard", { replace: true });
       } else {
@@ -446,7 +451,7 @@ function Auth() {
     if (!pendingNavigation) return;
 
     if (pendingNavigation.authProvider === "blackboard") {
-      navigate(getBlackboardRedirectPath(pendingNavigation.role), { replace: true });
+      navigate(getBlackboardRedirectPath(pendingNavigation.role, pendingNavigation.userData), { replace: true });
       setPendingNavigation(null);
       return;
     }
@@ -456,7 +461,7 @@ function Auth() {
     if (role === "admin" || role === "sysadmin") {
       navigate(getPrivilegedRedirectPath(role), { replace: true });
     } else if (role === "faculty") {
-      navigate("/faculty/current-event", { replace: true });
+      navigate(getFacultyLandingPath(pendingNavigation.userData || { role }), { replace: true });
     } else if (role === "partner") {
       navigate("/partner/projects", { replace: true });
     } else {

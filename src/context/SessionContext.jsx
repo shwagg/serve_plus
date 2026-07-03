@@ -119,7 +119,7 @@ export function SessionProvider({ children }) {
       // Ignore unavailable sessionStorage.
     }
 
-    window.location.replace(getRoleRedirectPath(nextRole));
+    window.location.replace(getRoleRedirectPath(nextRole, nextData));
   }, [resetInactivityTimer]);
 
   const setupActivityListeners = useCallback(() => {

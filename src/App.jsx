@@ -35,6 +35,7 @@ import BackupRestore from "./pages/admin/BackupRestore";
 import CurrentEvent from "./pages/admin/CurrentEvent";
 import ProjectTasks from "./pages/admin/ProjectTasks";
 import RosterAccountManagement from "./pages/admin/RosterAccountManagement";
+import CommunityChairDashboard from "./pages/faculty/CommunityChairDashboard";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import FacultyCourses from "./pages/faculty/FacultyCourses";
 import Chat from "./pages/global/Chat";
@@ -204,6 +205,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="dashboard" element={<CommunityChairDashboard />} />
             <Route path="courses" element={<FacultyCourses />} />
             <Route path="projects" element={<ProjectList mode="faculty" />} />
             <Route path="my-proposals" element={<MyProposals />} />
