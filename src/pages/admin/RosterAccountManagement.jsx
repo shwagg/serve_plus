@@ -26,6 +26,7 @@ const SHS_DEPARTMENT = "Mapua MCL Senior High School (SHS)";
 const CGC_DEPARTMENT = "Center for Guidance and Counseling (CGC)";
 const CLIR_DEPARTMENT = "Center for Learning and Information Resources (CLIR)";
 const COMMUNITY_CHAIR_POSITION = "community chair";
+const EXECUTIVE_FACULTY_POSITIONS = ["VP", "COO"];
 const COMMUNITY_CHAIR_DEPARTMENTS = new Set([
   "College of Arts and Science (CAS)",
   "College of Computer and Information Science (CCIS)",
@@ -43,6 +44,8 @@ const COMMUNITY_DEPARTMENT_RESTRICTED_POSITIONS = new Set([
   "cluster head",
 ]);
 const FACULTY_POSITIONS_WITHOUT_DEPARTMENT = new Set([
+  "vp",
+  "coo",
   "sao director",
   "student organization adviser",
 ]);
@@ -201,18 +204,25 @@ export default function RosterAccountManagement({ readOnly = false }) {
       "shs principal",
       "sao director",
       "department head",
+      ...EXECUTIVE_FACULTY_POSITIONS,
     ],
     admin: ["director", "regular"],
   };
   const getFacultyPositionOptions = (department) => {
     const departmentSpecificOptions =
       DEPARTMENT_SPECIFIC_FACULTY_POSITIONS[department] || positionsByRole.faculty;
+    const optionsWithExecutivePositions = [
+      ...departmentSpecificOptions,
+      ...EXECUTIVE_FACULTY_POSITIONS.filter(
+        (position) => !departmentSpecificOptions.includes(position),
+      ),
+    ];
 
     if (!COMMUNITY_CHAIR_DEPARTMENTS.has(department)) {
-      return departmentSpecificOptions;
+      return optionsWithExecutivePositions;
     }
 
-    const filteredOptions = departmentSpecificOptions.filter(
+    const filteredOptions = optionsWithExecutivePositions.filter(
       (position) =>
         !COMMUNITY_DEPARTMENT_RESTRICTED_POSITIONS.has(
           normalizeRosterValue(position),
@@ -222,6 +232,12 @@ export default function RosterAccountManagement({ readOnly = false }) {
     return filteredOptions.includes(COMMUNITY_CHAIR_POSITION)
       ? filteredOptions
       : [...filteredOptions, COMMUNITY_CHAIR_POSITION];
+  };
+  const getCanonicalFacultyPosition = (position, department) => {
+    const normalizedPosition = normalizeRosterValue(position);
+    return getFacultyPositionOptions(department).find(
+      (option) => normalizeRosterValue(option) === normalizedPosition,
+    );
   };
   const normalizedSelectedPosition = normalizeRosterValue(selectedPosition);
   const facultyPositionSkipsDepartment =
@@ -372,7 +388,13 @@ export default function RosterAccountManagement({ readOnly = false }) {
     setSelectedRole(
       isRoleAllowedForAccount(currentUser, normalizedRole) ? normalizedRole : "",
     );
-    setSelectedPosition(currentPosition || "");
+    setSelectedPosition(
+      normalizedRole === "faculty"
+        ? getCanonicalFacultyPosition(currentPosition, currentDepartment) ||
+            currentPosition ||
+            ""
+        : currentPosition || "",
+    );
     setSelectedDepartment(currentDepartment || "");
   };
 
@@ -406,7 +428,10 @@ export default function RosterAccountManagement({ readOnly = false }) {
     }
     if (
       selectedRole === "faculty" &&
-      !facultyPositionOptions.includes(selectedPosition)
+      !facultyPositionOptions.some(
+        (position) =>
+          normalizeRosterValue(position) === normalizedSelectedPosition,
+      )
     ) {
       showToast("Please select a valid position for the selected department.");
       return;

@@ -22,6 +22,8 @@ const FACULTY_POSITIONS = new Set([
   "shs principal",
   "sao director",
   "department head",
+  "vp",
+  "coo",
   COMMUNITY_CHAIR_POSITION,
 ]);
 const ADMIN_POSITIONS = new Set(["director", "regular"]);
@@ -44,6 +46,8 @@ const COMMUNITY_DEPARTMENT_RESTRICTED_POSITIONS = new Set([
   "cluster head",
 ]);
 const FACULTY_POSITIONS_WITHOUT_DEPARTMENT = new Set([
+  "vp",
+  "coo",
   "sao director",
   "student organization adviser",
 ]);
