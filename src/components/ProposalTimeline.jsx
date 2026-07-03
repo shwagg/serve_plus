@@ -1,4 +1,5 @@
 import React from "react";
+import { getProposalStepLabel, getProposalSignatory } from "../utils/proposalHierarchy";
 
 /**
  * ProposalTimeline
@@ -29,6 +30,8 @@ export default function ProposalTimeline({ proposal, compact = false }) {
 
   const isRejected = rejectedBy && status === "rejected";
   const isAllDone = reviewedBy && recommendedBy && endorsedBy && approvedBy;
+  const reviewedSignatory = getProposalSignatory(proposal, "reviewedBy");
+  const recommendedSignatory = getProposalSignatory(proposal, "recommendedBy");
 
   const badgeLabel = isRejected ? "Returned" : isAllDone ? "Completed" : "In Progress";
   const badgeStyle = isRejected
@@ -48,8 +51,8 @@ export default function ProposalTimeline({ proposal, compact = false }) {
     {
       key: "reviewedBy",
       label: "Reviewed By",
-      sublabel: "Program Chair",
-      designated: selectedReviewedBy || null,
+      sublabel: getProposalStepLabel(proposal, "reviewedBy"),
+      designated: reviewedSignatory?.name || selectedReviewedBy || null,
       done: !!reviewedBy,
       name: reviewedBy,
       decidedAt: fmt(approvals?.reviewedBy?.decidedAt),
@@ -59,8 +62,8 @@ export default function ProposalTimeline({ proposal, compact = false }) {
     {
       key: "recommendedBy",
       label: "Recommended By",
-      sublabel: "College Dean / Cluster Head",
-      designated: selectedRecommendedBy || null,
+      sublabel: getProposalStepLabel(proposal, "recommendedBy"),
+      designated: recommendedSignatory?.name || selectedRecommendedBy || null,
       done: !!recommendedBy,
       name: recommendedBy,
       decidedAt: fmt(approvals?.recommendedBy?.decidedAt),

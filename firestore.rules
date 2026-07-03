@@ -139,6 +139,116 @@ service cloud.firestore {
       return value is string && value != "";
     }
 
+    function approvalStatusIsActive(missionData) {
+      return missionData.status in ["for_approval", "for-approval", "pending"];
+    }
+
+    function userNameMatchesApproval(value) {
+      return value is string &&
+        value != "" &&
+        (
+          value == currentUserData().name ||
+          value == currentUserData().email ||
+          value == request.auth.token.email
+        );
+    }
+
+    function currentPositionIn(positions) {
+      return currentUserData().position in positions;
+    }
+
+    function reviewedDesignationMatches(missionData) {
+      return (
+        ("selectedReviewedByUid" in missionData &&
+          missionData.selectedReviewedByUid != "" &&
+          missionData.selectedReviewedByUid == request.auth.uid)
+      ) ||
+      (
+        (!("selectedReviewedByUid" in missionData) || missionData.selectedReviewedByUid == "") &&
+        (
+          (
+            "selectedReviewedBy" in missionData &&
+            missionData.selectedReviewedBy != "" &&
+            userNameMatchesApproval(missionData.selectedReviewedBy)
+          ) ||
+          (
+            (!("selectedReviewedBy" in missionData) || missionData.selectedReviewedBy == "") &&
+            currentPositionIn(["program chair", "cluster head", "college engagement head"])
+          )
+        )
+      );
+    }
+
+    function recommendedDesignationMatches(missionData) {
+      return (
+        ("selectedRecommendedByUid" in missionData &&
+          missionData.selectedRecommendedByUid != "" &&
+          missionData.selectedRecommendedByUid == request.auth.uid)
+      ) ||
+      (
+        (!("selectedRecommendedByUid" in missionData) || missionData.selectedRecommendedByUid == "") &&
+        (
+          (
+            "selectedRecommendedBy" in missionData &&
+            missionData.selectedRecommendedBy != "" &&
+            userNameMatchesApproval(missionData.selectedRecommendedBy)
+          ) ||
+          (
+            (!("selectedRecommendedBy" in missionData) || missionData.selectedRecommendedBy == "") &&
+            currentPositionIn(["college dean"])
+          )
+        )
+      );
+    }
+
+    function isReviewedByTurn(missionData) {
+      return approvalStatusIsActive(missionData) &&
+        reviewedDesignationMatches(missionData) &&
+        !hasApprovalName(missionData.reviewedBy) &&
+        !hasApprovalName(missionData.recommendedBy) &&
+        !hasApprovalName(missionData.endorsedBy) &&
+        !hasApprovalName(missionData.approvedBy);
+    }
+
+    function isRecommendedByTurn(missionData) {
+      return approvalStatusIsActive(missionData) &&
+        recommendedDesignationMatches(missionData) &&
+        hasApprovalName(missionData.reviewedBy) &&
+        !hasApprovalName(missionData.recommendedBy) &&
+        !hasApprovalName(missionData.endorsedBy) &&
+        !hasApprovalName(missionData.approvedBy);
+    }
+
+    function isFacultyReviewedApprovalUpdate(beforeData, afterData) {
+      return isReviewedByTurn(beforeData) &&
+        userNameMatchesApproval(afterData.reviewedBy) &&
+        afterData.recommendedBy == beforeData.recommendedBy &&
+        afterData.endorsedBy == beforeData.endorsedBy &&
+        afterData.approvedBy == beforeData.approvedBy &&
+        afterData.status == "pending";
+    }
+
+    function isFacultyRecommendedApprovalUpdate(beforeData, afterData) {
+      return isRecommendedByTurn(beforeData) &&
+        afterData.reviewedBy == beforeData.reviewedBy &&
+        userNameMatchesApproval(afterData.recommendedBy) &&
+        afterData.endorsedBy == beforeData.endorsedBy &&
+        afterData.approvedBy == beforeData.approvedBy &&
+        afterData.status == "pending";
+    }
+
+    function isFacultySignatoryReturnUpdate(beforeData, afterData) {
+      return (isReviewedByTurn(beforeData) || isRecommendedByTurn(beforeData)) &&
+        afterData.status == "rejected" &&
+        afterData.reviewedBy == "" &&
+        afterData.recommendedBy == "" &&
+        afterData.endorsedBy == "" &&
+        afterData.approvedBy == "" &&
+        afterData.rejectionReason is string &&
+        afterData.rejectionReason != "" &&
+        afterData.rejectedBy in ["reviewedBy", "recommendedBy"];
+    }
+
     function missionHasAllSignatoryApprovals(missionData) {
       return hasApprovalName(missionData.reviewedBy) &&
         hasApprovalName(missionData.recommendedBy) &&
@@ -544,7 +654,12 @@ service cloud.firestore {
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewedBy', 'recommendedBy', 'status', 'lastApprovedAt', 'lastApprovedBy', 'rejectionReason', 'rejectedBy', 'rejectedAt', 'rejectedByUser', 'approvals'])
         ) &&
-        hasValidSlCourseSnapshot(request.resource.data);
+        hasValidSlCourseSnapshot(request.resource.data) &&
+        (
+          isFacultyReviewedApprovalUpdate(resource.data, request.resource.data) ||
+          isFacultyRecommendedApprovalUpdate(resource.data, request.resource.data) ||
+          isFacultySignatoryReturnUpdate(resource.data, request.resource.data)
+        );
 
       // PARTNER - can update only the approvals field (partner approval decision)
       allow update: if

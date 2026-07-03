@@ -10,6 +10,7 @@ import { SessionContext } from "../../context/sessionContextCore";
 import { createNotification, notifyCommunityChairsForProposal, notifyUsersByRoles } from "../../utils/notificationUtils";
 import { logAudit } from "../../utils/auditLogger";
 import { showToast, showConfirm } from "../../utils/toast";
+import { getUserApprovalFieldForProposal } from "../../utils/proposalHierarchy";
 import {
   MAX_GROUP_MEMBERS,
   MAX_TASK_GROUPS,
@@ -284,22 +285,8 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
   }, [project?.id]);
 
   const role = (userData?.role || "").toLowerCase();
-  const positionField = userData?.position || userData?.positions || "";
-  const userPositions = Array.isArray(positionField) ? positionField : positionField ? [positionField] : [];
-  const normalizedPositions = userPositions.map(p => String(p).toLowerCase().trim().replace(/\s+/g, " "));
-
-  function getApprovalLevel() {
-    if (role === "faculty") {
-      if (normalizedPositions.includes("program chair")) return "reviewedBy";
-      if (normalizedPositions.includes("college dean") || normalizedPositions.includes("cluster head")) return "recommendedBy";
-    }
-    if (role === "admin") {
-      if (normalizedPositions.includes("regular")) return "endorsedBy";
-      if (normalizedPositions.includes("director")) return "approvedBy";
-    }
-    return null;
-  }
-  const approvalLevel = getApprovalLevel();
+  const currentUid = auth.currentUser?.uid || userData?.id || userData?.uid || "";
+  const approvalLevel = getUserApprovalFieldForProposal(project, userData || {}, currentUid);
   const isAdmin = role === "admin";
   const canEditProject = isAdmin && !isPublishedOrDone;
   const canManageTasks = isAdmin && statusStr !== "archived" && statusStr !== "cancelled";
@@ -330,6 +317,7 @@ export default function ProjectDetailSidebar({ project, onClose, onApprovalChang
         [`approvals.${approvalLevel}.approved`]: true,
         [`approvals.${approvalLevel}.decidedAt`]: serverTimestamp(),
         [`approvals.${approvalLevel}.name`]: name,
+        [`approvals.${approvalLevel}.uid`]: auth.currentUser?.uid || "",
         ...(approveNote.trim() ? { [`approvals.${approvalLevel}.note`]: approveNote.trim() } : {}),
       });
       setActionMsg(allDone ? "All signatures collected! Status updated to Draft." : "Approval recorded!");

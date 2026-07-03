@@ -86,7 +86,16 @@ const canResetTotpForUser = (user) =>
   TOTP_REQUIRED_ROLES.has(String(user?.role || "").toLowerCase());
 
 const normalizeRosterValue = (value) =>
-  String(value || "").trim().toLowerCase();
+  String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const getDepartmentSpecificFacultyPositions = (department) => {
+  const normalizedDepartment = normalizeRosterValue(department);
+  const entry = Object.entries(DEPARTMENT_SPECIFIC_FACULTY_POSITIONS).find(
+    ([departmentName]) =>
+      normalizeRosterValue(departmentName) === normalizedDepartment,
+  );
+  return entry?.[1] || null;
+};
 
 const normalizeSearchText = (value) =>
   String(value ?? "")
@@ -210,7 +219,7 @@ export default function RosterAccountManagement({ readOnly = false }) {
   };
   const getFacultyPositionOptions = (department) => {
     const departmentSpecificOptions =
-      DEPARTMENT_SPECIFIC_FACULTY_POSITIONS[department] || positionsByRole.faculty;
+      getDepartmentSpecificFacultyPositions(department) || positionsByRole.faculty;
     const optionsWithExecutivePositions = [
       ...departmentSpecificOptions,
       ...EXECUTIVE_FACULTY_POSITIONS.filter(
@@ -845,7 +854,11 @@ export default function RosterAccountManagement({ readOnly = false }) {
                                     setSelectedDepartment(nextDepartment);
                                     if (
                                       selectedPosition &&
-                                      !nextPositionOptions.includes(selectedPosition)
+                                      !nextPositionOptions.some(
+                                        (position) =>
+                                          normalizeRosterValue(position) ===
+                                          normalizeRosterValue(selectedPosition),
+                                      )
                                     ) {
                                       setSelectedPosition("");
                                     }

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo, useEffect } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import ProposalTimeline from "../../../components/ProposalTimeline";
 import { db, auth } from "../../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
@@ -6,6 +6,7 @@ import { createNotification, notifyCommunityChairsForProposal, notifyUsersByRole
 import { showConfirm } from "../../../utils/toast";
 import { SessionContext } from "../../../context/sessionContextCore";
 import { exportProposalPDF } from "../exportProposalPDF";
+import { getUserApprovalFieldForProposal } from "../../../utils/proposalHierarchy";
 import "./ReviewModal.css";
 
 function getChairApprovalMessage(proposal, approvalLevel, approverName, allApprovalsFilled) {
@@ -228,42 +229,18 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
   };
 
   // Sequential approval enforcement
-  // Normalize role and position
-  const role = userData?.role || userData?.userRole || userData?.Role || "";
-  const positionField = userData?.position || userData?.positions || userData?.Position || userData?.Positions || "";
-  const userPositions = Array.isArray(positionField) ? positionField : positionField ? [positionField] : [];
-  const normalizedPositions = userPositions.map(p => String(p).toLowerCase().trim().replace(/\s+/g, " ")).filter(p => p.length > 0);
-
-  function getApprovalLevel() {
-    if (role.toLowerCase() === "faculty") {
-      if (normalizedPositions.includes("program chair")) return "reviewedBy";
-      // Allow both 'college dean' and 'cluster head' for recommendedBy
-      if (normalizedPositions.includes("college dean") || normalizedPositions.includes("cluster head")) return "recommendedBy";
-    }
-    if (role.toLowerCase() === "admin") {
-      if (normalizedPositions.includes("regular")) return "endorsedBy";
-      if (normalizedPositions.includes("director")) return "approvedBy";
-    }
-    return null;
-  }
-  const approvalLevel = useMemo(() => getApprovalLevel(), [userData, proposal?.projectType, proposal?.id]);
+  const currentUid = auth.currentUser?.uid || userData?.id || userData?.uid || "";
+  const approvalLevel = getUserApprovalFieldForProposal(proposal, userData || {}, currentUid);
 
   // Only allow approval if previous steps are completed
   function canApproveSequential() {
     if (!approvalLevel || !proposal) return false;
     const status = String(proposal.status || "").toLowerCase();
     if (!["for_approval", "for-approval", "pending"].includes(status)) return false;
-    const approverName = userData?.name || "";
     if (approvalLevel === "reviewedBy") {
-      // Guard: only the designated Program Chair may approve
-      const designated = proposal.selectedReviewedBy || "";
-      if (designated && approverName && designated !== approverName) return false;
       return !proposal.reviewedBy && !proposal.recommendedBy && !proposal.endorsedBy && !proposal.approvedBy;
     }
     if (approvalLevel === "recommendedBy") {
-      // Guard: only the designated College Dean may approve
-      const designated = proposal.selectedRecommendedBy || "";
-      if (designated && approverName && designated !== approverName) return false;
       return typeof proposal.reviewedBy === "string" && proposal.reviewedBy.trim() !== "" && (!proposal.recommendedBy || proposal.recommendedBy.trim() === "") && (!proposal.endorsedBy || proposal.endorsedBy.trim() === "") && (!proposal.approvedBy || proposal.approvedBy.trim() === "");
     }
     if (approvalLevel === "endorsedBy") {
@@ -309,6 +286,7 @@ export default function ReviewModal({ proposal, onClose, onApprovalChange, isPar
         [`approvals.${approvalLevel}.approved`]: true,
         [`approvals.${approvalLevel}.decidedAt`]: serverTimestamp(),
         [`approvals.${approvalLevel}.name`]: approverName,
+        [`approvals.${approvalLevel}.uid`]: auth.currentUser?.uid || "",
       };
 
       // Check how many approval fields are currently filled (before this approval)

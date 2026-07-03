@@ -6,6 +6,7 @@ import ProposalTimeline from "../../components/ProposalTimeline";
 import { SessionContext } from "../../context/sessionContextCore";
 import { hasSignatoryApproval, PROPOSAL_LOCKED_NOTICE } from "../../utils/proposalApproval";
 import { canCurrentUserPublishProposal, publishApprovedProposal } from "../../utils/publishProposal";
+import { getProposalStepLabel } from "../../utils/proposalHierarchy";
 import { showConfirm, showToast } from "../../utils/toast";
 import ProjectProposal from "./proposal/ProjectProposal";
 import "../../styles/ReviewProposal.css";
@@ -28,8 +29,8 @@ function getProposalStatusLine(proposal) {
   }
   if (endorsedBy) return "Endorsed by Admin - Awaiting Director approval";
   if (recommendedBy) return `Recommended by ${recommendedBy} - Awaiting Admin (CSCE) endorsement`;
-  if (reviewedBy) return `Reviewed by ${reviewedBy} - Awaiting College Dean recommendation`;
-  return "Submitted - Awaiting Program Chair review";
+  if (reviewedBy) return `Reviewed by ${reviewedBy} - Awaiting ${getProposalStepLabel(proposal, "recommendedBy")} recommendation`;
+  return `Submitted - Awaiting ${getProposalStepLabel(proposal, "reviewedBy")} review`;
 }
 
 function renderList(items) {

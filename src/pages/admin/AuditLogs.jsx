@@ -354,8 +354,8 @@ function ProposalApprovalsTab() {
   const [search, setSearch] = useState("");
 
   const APPROVAL_STEPS = [
-    { field: "reviewedBy", approvalKey: "reviewedBy", label: "Program Chair Review" },
-    { field: "recommendedBy", approvalKey: "recommendedBy", label: "College Dean Recommendation" },
+    { field: "reviewedBy", approvalKey: "reviewedBy", label: "Reviewed By" },
+    { field: "recommendedBy", approvalKey: "recommendedBy", label: "Recommended By" },
     { field: "endorsedBy", approvalKey: "endorsedBy", label: "Admin Endorsement" },
     { field: "approvedBy", approvalKey: "approvedBy", label: "Director Approval" },
   ];

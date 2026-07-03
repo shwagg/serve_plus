@@ -44,11 +44,35 @@ function SummaryPanel({
   onClearDraft,
   proposalId,
   isResubmission = false,
+  signatoryFlow = {},
 }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
 
+  const getResolvedSignatory = (field, fallbackName, fallbackUid, fallbackLabel) => {
+    const raw = signatoryFlow?.[field] || {};
+    return {
+      uid: raw.uid || fallbackUid || '',
+      name: raw.name || fallbackName || '',
+      email: raw.email || '',
+      position: raw.position || '',
+      department: raw.department || '',
+      label: raw.label || fallbackLabel,
+    };
+  };
+
+  const reviewedSignatory = getResolvedSignatory('reviewedBy', formData.reviewedBy, formData.reviewedByUid, 'Reviewer');
+  const recommendedSignatory = getResolvedSignatory('recommendedBy', formData.recommendedBy, formData.recommendedByUid, 'Recommender');
+  const resolvedSignatoryFlow = {
+    reviewedBy: reviewedSignatory,
+    recommendedBy: recommendedSignatory,
+  };
+
   const validateProposalLimits = () => {
     if (projectType === 'service-learning' && !slFields.courseId) return 'Please select a course and section for this Service Learning proposal.';
+    if (!reviewedSignatory.name) return 'Please resolve the Reviewed By signatory before submitting.';
+    if (!recommendedSignatory.name) return 'Please resolve the Recommended By signatory before submitting.';
+    if (reviewedSignatory.uid && reviewedSignatory.uid === recommendedSignatory.uid) return 'Reviewed By and Recommended By must be different people.';
+    if (reviewedSignatory.name && normalizeValue(reviewedSignatory.name) === normalizeValue(recommendedSignatory.name)) return 'Reviewed By and Recommended By must be different people.';
     if ((formData.title || '').length > FIELD_LIMITS.title) return `Title can only have ${FIELD_LIMITS.title} characters.`;
     if ((formData.location || '').length > FIELD_LIMITS.location) return `Location can only have ${FIELD_LIMITS.location} characters.`;
     if (getVisibleCharacterCount(formData.title) > FIELD_LIMITS.title) return `Title can only have ${FIELD_LIMITS.title} characters, excluding spaces and line breaks.`;
@@ -156,8 +180,11 @@ function SummaryPanel({
           studentOutcomes: formData.studentOutcomes || '',
           proponents: formData.proponents?.length ? formData.proponents : [formData.preparedBy],
           preparedBy: formData.proponents?.[0] || formData.preparedBy,
-          selectedReviewedBy: formData.reviewedBy || '',
-          selectedRecommendedBy: formData.recommendedBy || '',
+          selectedReviewedBy: reviewedSignatory.name,
+          selectedReviewedByUid: reviewedSignatory.uid,
+          selectedRecommendedBy: recommendedSignatory.name,
+          selectedRecommendedByUid: recommendedSignatory.uid,
+          signatoryFlow: resolvedSignatoryFlow,
           affiliatedDepartment: formData.affiliatedDepartment || '',
           partnerSchool: formData.partnerSchool || '',
           participantLimit: formData.participantLimit ? Math.min(Number(formData.participantLimit), 50) : null,
@@ -236,25 +263,14 @@ function SummaryPanel({
         return;
       }
 
-      // --- Approval Flow Logic ---
-      // reviewedBy / recommendedBy come from the proponent's form selections.
-      // approvalFlow is built from Firestore for tracking the full chain.
-      const reviewedBy    = formData.reviewedBy    || '';
-      const recommendedBy = formData.recommendedBy || '';
       let endorsedBy = '';
       let approvedBy = '';
-      let approvalFlow = [];
-      try {
-        const { getDocs, collection: col, query, where } = await import('firebase/firestore');
-        const dept = formData.affiliatedDepartment;
-        const chairSnap = await getDocs(query(col(db, 'users'), where('department', '==', dept), where('position', '==', 'program chair')));
-        const deanSnap  = await getDocs(query(col(db, 'users'), where('department', '==', dept), where('position', '==', 'college dean')));
-        const chairName = chairSnap.docs.length > 0 ? (chairSnap.docs[0].data().name || '') : '';
-        const deanName  = deanSnap.docs.length  > 0 ? (deanSnap.docs[0].data().name  || '') : '';
-        approvalFlow = [chairName, deanName, 'Admin Regular', 'Admin Director'];
-      } catch {
-        approvalFlow = [];
-      }
+      const approvalFlow = [
+        reviewedSignatory.name,
+        recommendedSignatory.name,
+        'Admin Regular',
+        'Admin Director',
+      ];
 
       // Create mission document with unified schema
       const missionData = {
@@ -290,8 +306,11 @@ function SummaryPanel({
         preparedBy: formData.proponents?.[0] || formData.preparedBy,
         createdBy: user.uid,
         // Signatory selections made by proponent (who should review/recommend)
-        selectedReviewedBy: reviewedBy,
-        selectedRecommendedBy: recommendedBy,
+        selectedReviewedBy: reviewedSignatory.name,
+        selectedReviewedByUid: reviewedSignatory.uid,
+        selectedRecommendedBy: recommendedSignatory.name,
+        selectedRecommendedByUid: recommendedSignatory.uid,
+        signatoryFlow: resolvedSignatoryFlow,
         // Actual approval fields — filled only when each approver manually acts
         reviewedBy: '',
         recommendedBy: '',
@@ -541,8 +560,8 @@ function SummaryPanel({
         <strong style={{ display: 'block', marginBottom: '0.5rem' }}>What happens after submission?</strong>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
-            { step: 1, label: 'Program Chair', desc: 'Reviews and approves the proposal' },
-            { step: 2, label: 'College Dean', desc: 'Recommends the proposal' },
+            { step: 1, label: reviewedSignatory.label || 'Reviewer', desc: 'Reviews and approves the proposal' },
+            { step: 2, label: recommendedSignatory.label || 'Recommender', desc: 'Recommends the proposal' },
             { step: 3, label: 'Admin (CSCE)', desc: 'Endorses and forwards for final sign-off' },
             { step: 4, label: 'Director', desc: 'Final approval — proponent can publish the event' },
           ].map(({ step, label, desc }) => (

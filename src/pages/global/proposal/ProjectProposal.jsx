@@ -8,6 +8,15 @@ import TargetDatePicker from '../../../components/TargetDatePicker';
 import SummaryPanel from '../SummaryPanel';
 import { showToast } from '../../../utils/toast';
 import { useSession } from '../../../context/useSession';
+import {
+  PROPOSAL_DEPARTMENTS,
+  buildStudentSignatoryFlow,
+  findUserByUidOrName,
+  getAcademicRecommendedByOptions,
+  getAcademicReviewedByOptions,
+  getUserDisplayName,
+  resolveFacultySignatoryFlow,
+} from '../../../utils/proposalHierarchy';
 
 const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
@@ -325,7 +334,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     preparedBy: '',           // primary proponent name (auto-filled from auth)
     proponents: [],           // full proponents array (managed by tag input)
     reviewedBy: '',           // Program Chair signatory
+    reviewedByUid: '',
     recommendedBy: '',        // College Dean signatory
+    recommendedByUid: '',
     affiliatedDepartment: '',
     studentOutcomes: '',
     alt: '',
@@ -333,20 +344,8 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     participantLimit: '',
     facultyInCharge: '',
   });
-  // Department options for dropdown
-  const departments = [
-    "College of Arts and Science (CAS)",
-    "College of Computer and Information Science (CCIS)",
-    "College of Health Sciences (CHS)",
-    "College of Nursing (CN)",
-    "College of Maritime Education and Training (CMET)",
-    "E.T. Yuchengco College of Business (ETYCB)",
-    "Mapua-Laguna Institute of Aviation (MIA)",
-    "Mapua Institute of Technology at Laguna (MITL)",
-  ];
   const [partnerSchools, setPartnerSchools] = useState([]);
-  const [chairList, setChairList] = useState([]);
-  const [deanList, setDeanList] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [facultyList, setFacultyList] = useState([]);
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [locationOption, setLocationOption] = useState('');
@@ -356,14 +355,12 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       try {
         const snap = await getDocs(collection(db, 'users'));
         const allUsers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAllUsers(allUsers);
         setPartnerSchools(allUsers.filter(u => u.role === 'partner'));
-        setChairList(allUsers.filter(u => u.position === 'program chair'));
-        setDeanList(allUsers.filter(u => u.position === 'college dean'));
         setFacultyList(allUsers.filter(u => u.role === 'faculty'));
       } catch {
+        setAllUsers([]);
         setPartnerSchools([]);
-        setChairList([]);
-        setDeanList([]);
         setFacultyList([]);
       } finally {
         setLoadingSchools(false);
@@ -459,7 +456,9 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       preparedBy: p.preparedBy || '',
       proponents: Array.isArray(p.proponents) ? p.proponents : [],
       reviewedBy: p.selectedReviewedBy || '',
+      reviewedByUid: p.selectedReviewedByUid || p.signatoryFlow?.reviewedBy?.uid || '',
       recommendedBy: p.selectedRecommendedBy || '',
+      recommendedByUid: p.selectedRecommendedByUid || p.signatoryFlow?.recommendedBy?.uid || '',
       affiliatedDepartment: p.affiliatedDepartment || '',
       alt: p.alt || '',
       partnerSchool: p.partnerSchool || '',
@@ -585,7 +584,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     clearDraft();
     submittedRef.current = false;
     hasUserInputRef.current = false;
-    setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', recommendedBy: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '', facultyInCharge: '' });
+    setFormData({ title: '', sdgs: [], targetDate: '', stakeholders: [], location: '', volunteerHours: '', description: '', objectives: '', specificActivities: [], successIndicators: '', budget: '', preparedBy: formDataRef.current?.preparedBy || '', proponents: formDataRef.current?.preparedBy ? [formDataRef.current.preparedBy] : [], reviewedBy: '', reviewedByUid: '', recommendedBy: '', recommendedByUid: '', affiliatedDepartment: '', studentOutcomes: '', alt: '', partnerSchool: '', participantLimit: '', facultyInCharge: '' });
     setSlFields({ courseId: '', section: '', course: '', courseCode: '', facultyUid: '' });
     setCeFields({ nature: '', learningOutcomes: '0', customLearningOutcome: '' });
     setDraftRestored(false);
@@ -662,6 +661,37 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
       showTemporaryFieldError(name, `This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
       showToast(`This field only allows up to ${textLimits[name]} characters, excluding spaces and line breaks.`);
       return;
+    } else if (name === 'affiliatedDepartment') {
+      setFormData(prev => ({
+        ...prev,
+        affiliatedDepartment: value,
+        ...(isFacultySubmitter ? {} : {
+          reviewedBy: '',
+          reviewedByUid: '',
+          recommendedBy: '',
+          recommendedByUid: '',
+        }),
+      }));
+      setFieldErrors(prev => ({ ...prev, affiliatedDepartment: '', reviewedBy: '', recommendedBy: '', signatories: '' }));
+    } else if (name === 'reviewedByUid' || name === 'recommendedByUid') {
+      const selectedUser = findUserByUidOrName(allUsers, value, '');
+      const selectedName = selectedUser ? getUserDisplayName(selectedUser) : '';
+      const nameField = name === 'reviewedByUid' ? 'reviewedBy' : 'recommendedBy';
+      if (selectedName) {
+        const normalizedVal = normalizeValue(selectedName);
+        const conflict = (formData.proponents || []).some(p => normalizeValue(p) === normalizedVal);
+        if (conflict) {
+          showToast(`"${selectedName}" is already listed as a proponent and cannot also be a signatory.`);
+          showTemporaryFieldError(nameField, 'This person is already listed as a proponent.');
+          return;
+        }
+      }
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        [nameField]: selectedName,
+      }));
+      setFieldErrors(prev => ({ ...prev, [nameField]: '', signatories: '' }));
     } else if (name === 'reviewedBy' || name === 'recommendedBy') {
       // Prevent a signatory from also being listed as a proponent
       if (value) {
@@ -849,6 +879,80 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     }
   };
 
+  const currentSubmitter = {
+    ...(userData || {}),
+    id: auth.currentUser?.uid || userData?.id || userData?.uid || '',
+    uid: auth.currentUser?.uid || userData?.uid || userData?.id || '',
+  };
+  const hierarchyDepartment = isFacultySubmitter
+    ? (userData?.department || formData.affiliatedDepartment || '')
+    : formData.affiliatedDepartment;
+  const usesManualAcademicSignatories = !isFacultySubmitter;
+  const studentReviewedOptions = usesManualAcademicSignatories
+    ? getAcademicReviewedByOptions(allUsers, formData.affiliatedDepartment)
+    : [];
+  const studentRecommendedOptions = usesManualAcademicSignatories
+    ? getAcademicRecommendedByOptions(allUsers, formData.affiliatedDepartment)
+    : [];
+  const facultySignatoryResolution = isFacultySubmitter
+    ? resolveFacultySignatoryFlow({
+        submitter: currentSubmitter,
+        users: allUsers,
+        department: hierarchyDepartment,
+      })
+    : null;
+  const activeSignatoryFlow = isFacultySubmitter
+    ? {
+        reviewedBy: facultySignatoryResolution?.reviewedBy || null,
+        recommendedBy: facultySignatoryResolution?.recommendedBy || null,
+      }
+    : buildStudentSignatoryFlow({
+        users: allUsers,
+        reviewedByUid: formData.reviewedByUid,
+        reviewedByName: formData.reviewedBy,
+        recommendedByUid: formData.recommendedByUid,
+        recommendedByName: formData.recommendedBy,
+      });
+  const signatoryResolutionError = isFacultySubmitter
+    ? (loadingSchools ? 'Signatory accounts are still loading.' : facultySignatoryResolution?.error || '')
+    : '';
+  const resolvedReviewedName = facultySignatoryResolution?.reviewedBy?.name || '';
+  const resolvedReviewedUid = facultySignatoryResolution?.reviewedBy?.uid || '';
+  const resolvedRecommendedName = facultySignatoryResolution?.recommendedBy?.name || '';
+  const resolvedRecommendedUid = facultySignatoryResolution?.recommendedBy?.uid || '';
+
+  useEffect(() => {
+    if (!isFacultySubmitter) return;
+
+    const nextDepartment = hierarchyDepartment || '';
+
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        affiliatedDepartment: nextDepartment || prev.affiliatedDepartment,
+        reviewedBy: resolvedReviewedName,
+        reviewedByUid: resolvedReviewedUid,
+        recommendedBy: resolvedRecommendedName,
+        recommendedByUid: resolvedRecommendedUid,
+      };
+
+      return (
+        next.affiliatedDepartment === prev.affiliatedDepartment &&
+        next.reviewedBy === prev.reviewedBy &&
+        next.reviewedByUid === prev.reviewedByUid &&
+        next.recommendedBy === prev.recommendedBy &&
+        next.recommendedByUid === prev.recommendedByUid
+      ) ? prev : next;
+    });
+  }, [
+    isFacultySubmitter,
+    hierarchyDepartment,
+    resolvedReviewedUid,
+    resolvedReviewedName,
+    resolvedRecommendedUid,
+    resolvedRecommendedName,
+  ]);
+
   const validateBeforeSummary = () => {
     const nextErrors = {};
     if (isStudentSubmitter && !formData.facultyInCharge?.trim()) nextErrors.facultyInCharge = 'Please select a Faculty In Charge.';
@@ -873,22 +977,28 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     if ((formData.stakeholders || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.stakeholderItem)) nextErrors.stakeholders = `Each stakeholder can only have ${FIELD_LIMITS.stakeholderItem} characters, excluding spaces and line breaks.`;
     if ((formData.specificActivities || []).some(item => getVisibleCharacterCount(item) > FIELD_LIMITS.activityItem)) nextErrors.specificActivities = `Each activity can only have ${FIELD_LIMITS.activityItem} characters, excluding spaces and line breaks.`;
     if (formData.targetDate && (formData.targetDate < minDateString || formData.targetDate > maxDateString)) nextErrors.targetDate = `Select a date at least 1 month from today and no later than 5 months from today.`;
+    if (isFacultySubmitter && signatoryResolutionError) nextErrors.signatories = signatoryResolutionError;
+    if (!isFacultySubmitter && !formData.reviewedBy) nextErrors.reviewedBy = 'Please select who will review this proposal.';
+    if (!isFacultySubmitter && !formData.recommendedBy) nextErrors.recommendedBy = 'Please select who will recommend this proposal.';
+    if (activeSignatoryFlow?.reviewedBy?.uid && activeSignatoryFlow?.reviewedBy?.uid === activeSignatoryFlow?.recommendedBy?.uid) {
+      nextErrors.signatories = 'Reviewed By and Recommended By must be different people.';
+    }
+    const signatoryNames = [
+      activeSignatoryFlow?.reviewedBy?.name,
+      activeSignatoryFlow?.recommendedBy?.name,
+    ].filter(Boolean).map(normalizeValue);
+    if ((formData.proponents || []).some(p => signatoryNames.includes(normalizeValue(p)))) {
+      nextErrors.proponents = 'Signatories and proponents cannot overlap.';
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       showTemporaryFieldErrors(nextErrors);
-      showToast('Some fields exceed the allowed limits. Please review the highlighted fields.');
+      showToast(nextErrors.signatories || 'Some fields exceed the allowed limits. Please review the highlighted fields.');
       return false;
     }
     return true;
   };
 
-  // Chairs, deans, and faculty are filtered by the selected affiliated department.
-  const filteredChairs = chairList.filter(
-    c => !formData.affiliatedDepartment || c.department === formData.affiliatedDepartment
-  );
-  const filteredDeans = deanList.filter(
-    d => !formData.affiliatedDepartment || d.department === formData.affiliatedDepartment
-  );
   const filteredFaculty = facultyList.filter(
     f => !formData.affiliatedDepartment || f.department === formData.affiliatedDepartment
   );
@@ -984,9 +1094,15 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   name="affiliatedDepartment"
                   value={formData.affiliatedDepartment}
                   onChange={handleInputChange}
-                  placeholder="Select Department"
-                  options={departments.map(d => ({ value: d, label: d }))}
+                  disabled={isFacultySubmitter && Boolean(userData?.department)}
+                  placeholder={isFacultySubmitter && userData?.department ? userData.department : "Select Department"}
+                  options={PROPOSAL_DEPARTMENTS.map(d => ({ value: d, label: d }))}
                 />
+                {isFacultySubmitter && (
+                  <small className="field-limit-hint">
+                    Faculty proposals use the department assigned to your account for approval routing.
+                  </small>
+                )}
               </div>
 
               {projectType === 'service-learning' && (
@@ -1530,40 +1646,85 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             <div className="form-section">
               <h2>Signatories</h2>
               <p style={{ margin: '0 0 1rem', color: '#718096', fontSize: '0.85rem' }}>
-                Select the signatories who will review this proposal. Once submitted, it will route digitally through <strong>Program Chair → College Dean → Admin (CSCE) → Director</strong> for sequential approval before the proponent can publish the event.
+                {isFacultySubmitter
+                  ? <>The required signatories are resolved from your faculty position and department. Once submitted, it will route through <strong>Reviewed By → Recommended By → Admin (CSCE) → Director</strong>.</>
+                  : <>Select the signatories who will review this proposal. Once submitted, it will route digitally through <strong>Reviewed By → Recommended By → Admin (CSCE) → Director</strong> for sequential approval before the proponent can publish the event.</>}
               </p>
+              {fieldErrors.signatories && (
+                <small className="field-limit-hint error" style={{ display: 'block', marginBottom: 10 }}>
+                  {fieldErrors.signatories}
+                </small>
+              )}
               <div className="form-row">
                 <div className="form-group">
-                  <label>Reviewed By <span style={{ color: '#718096', fontWeight: 400 }}>(Program Chair)</span></label>
-                  <CustomSelect
-                    name="reviewedBy"
-                    value={formData.reviewedBy}
-                    onChange={handleInputChange}
-                    placeholder={
-                      !formData.affiliatedDepartment
-                        ? 'Select a department first'
-                        : filteredChairs.length === 0
-                          ? 'No program chair found for this department'
-                          : 'Select Program Chair'
-                    }
-                    options={filteredChairs.map(c => ({ value: c.name || c.email, label: c.name || c.email }))}
-                  />
+                  <label>Reviewed By <span style={{ color: '#718096', fontWeight: 400 }}>({activeSignatoryFlow?.reviewedBy?.label || 'Reviewer'})</span></label>
+                  {isFacultySubmitter ? (
+                    <>
+                      <input
+                        type="text"
+                        value={formData.reviewedBy}
+                        readOnly
+                        placeholder={loadingSchools ? 'Resolving approver...' : 'No approver resolved'}
+                      />
+                      <small className={`field-limit-hint${fieldErrors.reviewedBy ? ' error' : ''}`}>
+                        {fieldErrors.reviewedBy || activeSignatoryFlow?.reviewedBy?.position || ''}
+                      </small>
+                    </>
+                  ) : (
+                    <>
+                      <CustomSelect
+                        name="reviewedByUid"
+                        value={formData.reviewedByUid || activeSignatoryFlow?.reviewedBy?.uid || ''}
+                        onChange={handleInputChange}
+                        placeholder={
+                          !formData.affiliatedDepartment
+                            ? 'Select a department first'
+                            : studentReviewedOptions.length === 0
+                              ? 'No reviewer found for this department'
+                              : 'Select reviewer'
+                        }
+                        options={studentReviewedOptions.map(c => ({ value: c.uid, label: `${c.name} (${c.label})` }))}
+                      />
+                      <small className={`field-limit-hint${fieldErrors.reviewedBy ? ' error' : ''}`}>
+                        {fieldErrors.reviewedBy || ''}
+                      </small>
+                    </>
+                  )}
                 </div>
                 <div className="form-group">
-                  <label>Recommended By <span style={{ color: '#718096', fontWeight: 400 }}>(College Dean)</span></label>
-                  <CustomSelect
-                    name="recommendedBy"
-                    value={formData.recommendedBy}
-                    onChange={handleInputChange}
-                    placeholder={
-                      !formData.affiliatedDepartment
-                        ? 'Select a department first'
-                        : filteredDeans.length === 0
-                          ? 'No college dean found for this department'
-                          : 'Select College Dean'
-                    }
-                    options={filteredDeans.map(d => ({ value: d.name || d.email, label: d.name || d.email }))}
-                  />
+                  <label>Recommended By <span style={{ color: '#718096', fontWeight: 400 }}>({activeSignatoryFlow?.recommendedBy?.label || 'Recommender'})</span></label>
+                  {isFacultySubmitter ? (
+                    <>
+                      <input
+                        type="text"
+                        value={formData.recommendedBy}
+                        readOnly
+                        placeholder={loadingSchools ? 'Resolving approver...' : 'No approver resolved'}
+                      />
+                      <small className={`field-limit-hint${fieldErrors.recommendedBy ? ' error' : ''}`}>
+                        {fieldErrors.recommendedBy || activeSignatoryFlow?.recommendedBy?.position || ''}
+                      </small>
+                    </>
+                  ) : (
+                    <>
+                      <CustomSelect
+                        name="recommendedByUid"
+                        value={formData.recommendedByUid || activeSignatoryFlow?.recommendedBy?.uid || ''}
+                        onChange={handleInputChange}
+                        placeholder={
+                          !formData.affiliatedDepartment
+                            ? 'Select a department first'
+                            : studentRecommendedOptions.length === 0
+                              ? 'No recommender found for this department'
+                              : 'Select recommender'
+                        }
+                        options={studentRecommendedOptions.map(d => ({ value: d.uid, label: `${d.name} (${d.label})` }))}
+                      />
+                      <small className={`field-limit-hint${fieldErrors.recommendedBy ? ' error' : ''}`}>
+                        {fieldErrors.recommendedBy || ''}
+                      </small>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1603,6 +1764,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
             slFields={slFields}
             ceFields={ceFields}
             projectType={projectType}
+            signatoryFlow={activeSignatoryFlow}
             loading={loading}
             onBack={() => setShowSummary(false)}
             onClose={onClose}

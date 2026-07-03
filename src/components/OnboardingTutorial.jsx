@@ -22,7 +22,7 @@ const STEPS = [
   {
     icon: '📝',
     title: 'Create a Proposal',
-    body: "Have a project idea? Open the menu (top-right) and select 'Create Proposal'. Choose between a Service Learning or Community Engagement proposal, fill out the form, preview it, then submit. It goes through Program Chair → College Dean → Admin → Director for approval.",
+    body: "Have a project idea? Open the menu (top-right) and select 'Create Proposal'. Choose between a Service Learning or Community Engagement proposal, fill out the form, preview it, then submit. It goes through Reviewed By → Recommended By → Admin → Director for approval.",
   },
   {
     icon: '🏅',

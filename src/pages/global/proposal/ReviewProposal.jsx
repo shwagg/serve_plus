@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState, useContext } from "react";
 import { useLocation } from "react-router-dom";
-import { db } from "../../../firebaseConfig";
+import { auth, db } from "../../../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import Header from "../../../components/Header";
 import ReviewModal from "./ReviewModal";
 import "../../../styles/ReviewProposal.css";
 import { SessionContext } from "../../../context/sessionContextCore";
+import { getUserApprovalFieldForProposal } from "../../../utils/proposalHierarchy";
 
 export default function ReviewProposal() {
   const location = useLocation();
@@ -40,23 +41,10 @@ export default function ReviewProposal() {
   const { userData: contextUserData } = useContext(SessionContext);
   const userData = contextUserData || {};
   const role = userData?.role || userData?.userRole || userData?.Role || "";
-  const positionField = userData?.position || userData?.positions || userData?.Position || userData?.Positions || "";
-  const userPositions = Array.isArray(positionField) ? positionField : positionField ? [positionField] : [];
-  const normalizedPositions = userPositions.map(p => String(p).toLowerCase().trim().replace(/\s+/g, " ")).filter(p => p.length > 0);
+  const roleLower = role.toLowerCase();
+  const currentUid = auth.currentUser?.uid || userData?.id || userData?.uid || "";
   const isPartner = role.toLowerCase() === "partner";
-
-  function getUserApprovalField() {
-    if (role.toLowerCase() === "faculty") {
-      if (normalizedPositions.includes("program chair") || normalizedPositions.includes("cluster head")) return "reviewedBy";
-      if (normalizedPositions.includes("college dean")) return "recommendedBy";
-    }
-    if (role.toLowerCase() === "admin") {
-      if (normalizedPositions.includes("regular")) return "endorsedBy";
-      if (normalizedPositions.includes("director")) return "approvedBy";
-    }
-    return null;
-  }
-  const userApprovalField = getUserApprovalField();
+  const canReviewByRole = roleLower === "faculty" || roleLower === "admin";
 
   const formatStatus = (status = "") => {
     if (!status) return "Draft";
@@ -73,6 +61,8 @@ export default function ReviewProposal() {
     const status = (proposal.status || "").toLowerCase();
     const activeApprovalStatuses = new Set(["for_approval", "for-approval", "pending"]);
     if (!activeApprovalStatuses.has(status)) return formatStatus(proposal.status);
+
+    const userApprovalField = getUserApprovalFieldForProposal(proposal, userData, currentUid);
 
     // Determine which step this user is on
     if (userApprovalField === "reviewedBy") {
@@ -100,29 +90,27 @@ export default function ReviewProposal() {
       // Only show proposals where partnerSchool matches this partner's name
       const partnerName = userData?.name || userData?.displayName || "";
       data = data.filter(p => (p.partnerSchool || "").toLowerCase() === partnerName.toLowerCase());
-    } else if (userApprovalField) {
+    } else if (canReviewByRole) {
       data = data.filter(p => {
         const status = (p.status || "").toLowerCase();
         const activeApprovalStatuses = new Set(["for_approval", "for-approval", "pending"]);
         // Always show drafts and published in overall/draft/published filters for all roles
         if (statusFilter === "overall" || statusFilter === "draft" || statusFilter === "published") {
-          if (status === "draft" || status === "published") return true;
+          if (status === "draft" || status === "published") {
+            return roleLower === "admin" || !!getUserApprovalFieldForProposal(p, userData, currentUid);
+          }
         }
         if (!activeApprovalStatuses.has(status)) return false;
+        const userApprovalField = getUserApprovalFieldForProposal(p, userData, currentUid);
+        if (!userApprovalField) return false;
         if (userApprovalField === "reviewedBy") {
-          // Only show proposals designated for this specific Program Chair
-          const userName = userData?.name || "";
-          const isDesignated = !p.selectedReviewedBy || p.selectedReviewedBy === userName;
-          const isForApproval = isDesignated && !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy;
-          const isPending = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "";
+          const isForApproval = !p.reviewedBy && !p.recommendedBy && !p.endorsedBy && !p.approvedBy;
+          const isPending = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "";
           return isForApproval || isPending;
         }
         if (userApprovalField === "recommendedBy") {
-          // Only show proposals designated for this specific College Dean
-          const userName = userData?.name || "";
-          const isDesignated = !p.selectedRecommendedBy || p.selectedRecommendedBy === userName;
-          const isForApproval = isDesignated && typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "");
-          const isPending = isDesignated && typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "";
+          const isForApproval = typeof p.reviewedBy === "string" && p.reviewedBy.trim() !== "" && (!p.recommendedBy || p.recommendedBy.trim() === "") && (!p.endorsedBy || p.endorsedBy.trim() === "") && (!p.approvedBy || p.approvedBy.trim() === "");
+          const isPending = typeof p.recommendedBy === "string" && p.recommendedBy.trim() !== "";
           return isForApproval || isPending;
         }
         if (userApprovalField === "endorsedBy") {
@@ -153,7 +141,7 @@ export default function ReviewProposal() {
       }
     }
     return data;
-  }, [proposals, searchTerm, statusFilter, userApprovalField, isPartner, userData]);
+  }, [proposals, searchTerm, statusFilter, canReviewByRole, isPartner, userData, currentUid]);
 
   const getStatusBadgeClass = (status = "") => {
     const s = status.toLowerCase();

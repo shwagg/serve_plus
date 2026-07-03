@@ -19,6 +19,7 @@ import emptyFile from '../../assets/empty_file.svg';
 import servePlusIcon from '../../assets/serve_plus_icon.svg';
 import { hasSignatoryApproval, PROPOSAL_LOCKED_NOTICE } from "../../utils/proposalApproval";
 import { canCurrentUserPublishProposal, publishApprovedProposal } from "../../utils/publishProposal";
+import { getProposalStepLabel } from "../../utils/proposalHierarchy";
 import { showConfirm, showToast } from "../../utils/toast";
 
 const ProgressRing = ({ percent, size = 68, stroke = 7 }) => {
@@ -470,8 +471,8 @@ const StudentHome = () => {
     }
     if (endorsedBy) return `Endorsed by Admin - Awaiting Director approval`;
     if (recommendedBy) return `Recommended by ${recommendedBy} - Awaiting Admin (CSCE) endorsement`;
-    if (reviewedBy) return `Reviewed by ${reviewedBy} - Awaiting College Dean recommendation`;
-    return 'Submitted - Awaiting Program Chair review';
+    if (reviewedBy) return `Reviewed by ${reviewedBy} - Awaiting ${getProposalStepLabel(proposal, "recommendedBy")} recommendation`;
+    return `Submitted - Awaiting ${getProposalStepLabel(proposal, "reviewedBy")} review`;
   };
 
   const formatDate = (dateStr) => {

@@ -12,6 +12,26 @@ const ROLE_OPTIONS = new Set([
 const BLACKBOARD_ALLOWED_ROLES = new Set(["student", "faculty"]);
 const NON_BLACKBOARD_ALLOWED_ROLES = new Set(["partner", "admin", "sysadmin"]);
 const COMMUNITY_CHAIR_POSITION = "community chair";
+const CGC_DEPARTMENT = "Center for Guidance and Counseling (CGC)";
+const CLIR_DEPARTMENT = "Center for Learning and Information Resources (CLIR)";
+const CGC_FACULTY_POSITIONS = new Set([
+  "guidance counselor",
+  "guidance councilor",
+  "guidance facilitator",
+  "head",
+  "director",
+  "director/sao",
+  "director / sao",
+]);
+const CLIR_FACULTY_POSITIONS = new Set([
+  "librarian",
+  "director",
+  "vpaa",
+]);
+const DEPARTMENT_SPECIFIC_ONLY_FACULTY_POSITIONS = new Set([
+  ...CGC_FACULTY_POSITIONS,
+  ...CLIR_FACULTY_POSITIONS,
+]);
 const FACULTY_POSITIONS = new Set([
   "regular",
   "program chair",
@@ -23,8 +43,11 @@ const FACULTY_POSITIONS = new Set([
   "sao director",
   "department head",
   "vp",
+  "vpaa",
   "coo",
   COMMUNITY_CHAIR_POSITION,
+  ...CGC_FACULTY_POSITIONS,
+  ...CLIR_FACULTY_POSITIONS,
 ]);
 const ADMIN_POSITIONS = new Set(["director", "regular"]);
 const MFA_SESSION_COLLECTION = "mfaSessions";
@@ -56,12 +79,27 @@ function getDb() {
   return admin.firestore();
 }
 
-function normalizeRole(role) {
-  return String(role || "").trim().toLowerCase();
-}
-
 function normalizeText(value) {
   return String(value || "").trim();
+}
+
+function normalizeLookupValue(value) {
+  return normalizeText(value).toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizeRole(role) {
+  return normalizeLookupValue(role);
+}
+
+function getDepartmentSpecificFacultyPositions(department) {
+  const normalizedDepartment = normalizeLookupValue(department);
+  if (normalizedDepartment === normalizeLookupValue(CGC_DEPARTMENT)) {
+    return CGC_FACULTY_POSITIONS;
+  }
+  if (normalizedDepartment === normalizeLookupValue(CLIR_DEPARTMENT)) {
+    return CLIR_FACULTY_POSITIONS;
+  }
+  return null;
 }
 
 function isBlackboardAccount(userData) {
@@ -121,6 +159,8 @@ function validateRoleUpdate({targetData, role, position, department}) {
     }
 
     const skipsDepartment = FACULTY_POSITIONS_WITHOUT_DEPARTMENT.has(position);
+    const departmentSpecificPositions =
+      getDepartmentSpecificFacultyPositions(department);
 
     if (!skipsDepartment && !department) {
       throw new HttpsError(
@@ -133,6 +173,28 @@ function validateRoleUpdate({targetData, role, position, department}) {
       throw new HttpsError(
         "invalid-argument",
         "SHS Principal must be assigned to Mapua MCL Senior High School (SHS).",
+      );
+    }
+
+    if (
+      !skipsDepartment &&
+      departmentSpecificPositions &&
+      !departmentSpecificPositions.has(position)
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Please select a valid faculty position for the selected department.",
+      );
+    }
+
+    if (
+      !skipsDepartment &&
+      !departmentSpecificPositions &&
+      DEPARTMENT_SPECIFIC_ONLY_FACULTY_POSITIONS.has(position)
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Please select a valid faculty position for the selected department.",
       );
     }
 
@@ -295,7 +357,7 @@ async function changeUserRole(request) {
   const actor = await assertSysadminCaller(request);
   const targetUid = normalizeText(request.data?.targetUid);
   const role = normalizeRole(request.data?.role);
-  const position = normalizeText(request.data?.position).toLowerCase();
+  const position = normalizeLookupValue(request.data?.position);
   const department = normalizeText(request.data?.department);
 
   if (!targetUid) {
