@@ -6,6 +6,29 @@
   position: fixed;
   top: 0;
   z-index: 1000;
+  --header-role-accent: transparent;
+  overflow: visible;
+}
+.serve-header::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: var(--header-role-accent);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.serve-header--admin {
+  --header-role-accent: #2563eb;
+}
+.serve-header--faculty {
+  --header-role-accent: #0f766e;
+}
+.serve-header--partner {
+  --header-role-accent: #b45309;
+}
+.serve-header--sysadmin {
+  --header-role-accent: #4b5563;
 }
 /* Profile avatar button in header */
 .header-avatar {
@@ -143,6 +166,45 @@
 .header-logo-plus {
   color: #30bdb7;
 }
+.header-role-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  margin-left: 2px;
+  padding: 0 10px;
+  border: 1px solid rgba(17, 24, 39, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  color: #111827;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.header-role-strip-icon {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 16px !important;
+  flex-shrink: 0;
+}
+.header-role-strip--admin {
+  border-color: rgba(37, 99, 235, 0.34);
+  color: #1d4ed8;
+}
+.header-role-strip--faculty {
+  border-color: rgba(15, 118, 110, 0.34);
+  color: #0f766e;
+}
+.header-role-strip--partner {
+  border-color: rgba(180, 83, 9, 0.34);
+  color: #92400e;
+}
+.header-role-strip--sysadmin {
+  border-color: rgba(75, 85, 99, 0.36);
+  color: #374151;
+}
 /* Header Actions */
 .header-actions {
   display: flex;
@@ -204,6 +266,9 @@
   .header-container {
     padding: 0 12px;
   }
+  .serve-header::after {
+    width: 100%;
+  }
   .header-actions {
     gap: 6px;
   }
@@ -230,6 +295,9 @@
   }
   /* Hide logo text only when the player strip is occupying the center slot */
   .header-container:has(#header-center-slot > *) .header-logo-text {
+    display: none;
+  }
+  .header-role-strip {
     display: none;
   }
   .header-logo {
@@ -279,11 +347,11 @@
 /* Gradient fade below the header — convex arch extends further in the center */
 .header-fade-gradient {
   position: fixed;
-  top: 56px;
+  top: 60px;
   left: 0;
   right: 0;
-  height: 40px;
-  background: linear-gradient(to bottom, #d0edfc 10%, rgba(208, 237, 252, 0) 100%);
+  height: 15px;
+  background: linear-gradient(to bottom, #d0edfc 40%, rgba(208, 237, 252, 0) 80%);
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
   pointer-events: none;
   z-index: 98;

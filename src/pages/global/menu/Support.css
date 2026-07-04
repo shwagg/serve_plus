@@ -1,11 +1,19 @@
 .support-page {
   width: 100%;
   min-height: 100vh;
-  background: #f4f6fb;
+  background: #f8fafc;
   font-family: 'Inter', Helvetica, Arial, sans-serif;
 }
 
 /* Back button */
+.support-back-row {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 0 20px;
+  box-sizing: border-box;
+}
+
 .support-back-btn {
   display: inline-flex;
   align-items: center;
@@ -13,21 +21,21 @@
   background: none;
   border: none;
   min-height: unset;
-  padding: 6px 12px;
-  font-size: 0.88rem;
+  padding: 8px 14px;
+  font-size: 0.9rem;
   font-weight: 600;
   color: #475569;
   cursor: pointer;
   font-family: inherit;
-  margin-bottom: 20px;
-  margin-left: -12px;
+  margin: 0;
   border-radius: 999px;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, transform 0.15s;
   outline: none;
 }
 .support-back-btn:hover {
   color: #0f172a;
   background: #f1f5f9;
+  transform: translateX(-1px);
 }
 .support-back-btn:focus-visible {
   outline: 2px solid #14b8a6;
@@ -39,9 +47,11 @@
 }
 
 .support-body {
-  max-width: 680px;
+  width: 100%;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: calc(var(--header-height, 60px) + 36px) 24px 60px;
+  padding: calc(var(--header-height, 60px) + 36px) 32px 60px;
+  box-sizing: border-box;
 }
 
 /* Hero */

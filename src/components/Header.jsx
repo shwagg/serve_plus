@@ -16,7 +16,17 @@ import SysAdminMenu from './menu/SysAdminMenu';
 import CertificateQRScannerModal from './CertificateQRScannerModal';
 import SettingsModal from './SettingsModal';
 import ProjectProposal from '../pages/global/proposal/ProjectProposal';
-import { VolunteerActivismOutlinedIcon, LocalLibraryOutlinedIcon, CloseIcon, HelpOutlineRoundedIcon, ExpandMoreRoundedIcon, ExpandLessRoundedIcon} from './icons';
+import {
+  VolunteerActivismOutlinedIcon,
+  LocalLibraryOutlinedIcon,
+  CloseIcon,
+  HelpOutlineRoundedIcon,
+  ExpandMoreRoundedIcon,
+  ExpandLessRoundedIcon,
+  LocalPoliceOutlinedIcon,
+  ConnectWithoutContactOutlinedIcon,
+  SettingsOutlinedIcon,
+} from './icons';
 import ChatModal from './ChatModal';
 import GlobalAnnouncements, { GlobalNotificationButton } from './GlobalAnnouncements';
 import OnboardingTutorial from './OnboardingTutorial';
@@ -67,6 +77,28 @@ function getUserRoleLabel(role, positionField) {
   }
 
   return formatDisplayLabel(role);
+}
+
+function getHeaderRoleStripLabel(role) {
+  const normalizedRole = normalizeValue(role);
+
+  if (normalizedRole === 'admin') return 'Admin';
+  if (normalizedRole === 'faculty') return 'Faculty';
+  if (normalizedRole === 'partner') return 'Partner';
+  if (normalizedRole === 'sysadmin') return 'System Admin';
+
+  return '';
+}
+
+function getHeaderRoleStripIcon(role) {
+  const normalizedRole = normalizeValue(role);
+
+  if (normalizedRole === 'admin') return LocalPoliceOutlinedIcon;
+  if (normalizedRole === 'faculty') return LocalLibraryOutlinedIcon;
+  if (normalizedRole === 'partner') return ConnectWithoutContactOutlinedIcon;
+  if (normalizedRole === 'sysadmin') return SettingsOutlinedIcon;
+
+  return null;
 }
 
 function canUserCreateProposal(role, authProvider) {
@@ -129,6 +161,8 @@ export default function Header() {
   const userRole = userData?.role || null;
   const userPosition = userData?.position || userData?.positions || '';
   const userRoleLabel = getUserRoleLabel(userRole, userPosition);
+  const headerRoleStripLabel = getHeaderRoleStripLabel(userRole);
+  const HeaderRoleStripIcon = getHeaderRoleStripIcon(userRole);
   const userAuthProvider = userData?.authProvider || '';
   const canCreateProposal = canUserCreateProposal(userRole, userAuthProvider);
   const userName = userData?.name || '';
@@ -379,7 +413,7 @@ export default function Header() {
   return (
     <>
       <OnboardingTutorial forceOpen={showTutorial} onClose={() => setShowTutorial(false)} />
-      <header className="serve-header">
+      <header className={`serve-header${headerRoleStripLabel ? ` serve-header--${normalizeValue(userRole)}` : ''}`}>
         <div className="header-container">
           {/* Logo */}
           <button className="header-logo" onClick={handleLogoClick}>
@@ -387,6 +421,14 @@ export default function Header() {
               <img src={servePlusIcon} alt="SERVE+" width="32" height="32" />
             </div>
             <span className="header-logo-text">SERVE<span className="header-logo-plus">+</span></span>
+            {headerRoleStripLabel && (
+              <span className={`header-role-strip header-role-strip--${normalizeValue(userRole)}`}>
+                {HeaderRoleStripIcon && (
+                  <HeaderRoleStripIcon className="header-role-strip-icon" aria-hidden="true" />
+                )}
+                {headerRoleStripLabel}
+              </span>
+            )}
           </button>
           {/* Center slot — player strip renders here for students */}
           <div className="header-center-slot" id="header-center-slot">
@@ -446,7 +488,6 @@ export default function Header() {
           </div>
         </div>
       </header>
-      <div className="header-fade-gradient" aria-hidden="true" />
       {userRole === 'student' && (
         <button
           className="tutorial-fab"
@@ -505,5 +546,3 @@ export default function Header() {
     </>
   );
 }
-
-

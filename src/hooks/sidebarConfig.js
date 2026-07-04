@@ -1,4 +1,4 @@
-//icons
+// icons
 import {
   HomeRoundedIcon,
   ListAltIcon,
@@ -6,7 +6,7 @@ import {
   SettingsOutlinedIcon,
 } from "../components/icons/index";
 
-//admin side
+// admin side
 export const adminLinks = [
   {
     key: "dashboard",
@@ -69,7 +69,11 @@ export const partnerLinks = [
     key: "project",
     label: "Project",
     children: [
-      { label: "Project List", to: "/partner/projects" },
+      {
+        label: "Project List",
+        to: "/partner/dashboard",
+        state: { expandSection: "projects" },
+      },
     ],
   },
 ];

@@ -1416,7 +1416,14 @@ useEffect(() => {
         events={profile?.registeredEvents || []}
       />
 
+      <div style={{ width: "100%", maxWidth: "1200px", margin: "0 auto", display: "flex", justifyContent: "flex-start", padding: "32px 32px 0", boxSizing: "border-box" }}>
+        <button className="support-back-btn" onClick={() => navigate(-1)} style={{ margin: 0 }}>
+          ← Back
+        </button>
+      </div>
+
       <div className="profile-main-flex">
+        
         <div
           className="profile-card"
           style={{

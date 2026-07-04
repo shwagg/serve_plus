@@ -134,6 +134,9 @@ export default function PartnerDashboard() {
         setReviewExpanded(true);
         sectionRefs.current["section-review"]?.scrollIntoView({ behavior: "smooth", block: "start" });
       },
+      projects: () => {
+        sectionRefs.current["section-projects"]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
     };
 
     const action = scrollActions[location.state.expandSection];

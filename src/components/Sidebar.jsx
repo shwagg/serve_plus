@@ -154,7 +154,11 @@ export default function Sidebar({ links, collapsed, setCollapsed }) {
                                     className={({ isActive }) =>
                                         `admin-sidebar-item ${isActive ? "active" : ""}`
                                     }
-                                    onClick={() => { if (window.innerWidth < 768) setCollapsed(true); }}
+                                    state={sub.state}
+                                    onClick={() => {
+                                        if (sub.onClick) sub.onClick();
+                                        if (window.innerWidth < 768) setCollapsed(true);
+                                    }}
                                 >
                                     {sub.label}
                                 </NavLink>

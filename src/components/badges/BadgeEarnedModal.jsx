@@ -47,7 +47,7 @@ export default function BadgeEarnedModal({ badgeQueue = [], onDismiss }) {
         style={{ position: "relative" }}
       >
         {/* X close button */}
-        <div className="badge-earned-close-wrap">
+        <div className="badge-earned-close-wrap" style={{ textAlign: "right" }}>
           <button
             className="badge-earned-close-btn"
             onClick={handleClose}

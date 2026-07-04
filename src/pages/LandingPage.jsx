@@ -61,7 +61,7 @@ const FAQS = [
 const STEPS = [
   {
     num: "01",
-    title: "🔍. Discover Missions",
+    title: "🔍 Discover Missions",
     body: "Find community projects and volunteer opportunities that match your interests.",
     features: [
       "All active missions in one feed",
@@ -81,7 +81,7 @@ const STEPS = [
   },
   {
     num: "03",
-    title: "🏆   Earn Recognition",
+    title: "🏆  Earn Recognition",
     body: "Receive verified certificates, unlock achievements, and build your impact portfolio.",
     features: [
       "XP and level progression (1–10)",

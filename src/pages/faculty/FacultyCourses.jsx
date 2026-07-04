@@ -160,9 +160,9 @@ export default function FacultyCourses() {
   };
 
   return (
-    <div className="content-page" style={{ padding: "28px 32px" }}>
+    <>
       {/* Page header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, padding: "28px 32px" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: G.text }}>Courses</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: G.sub }}>
@@ -518,6 +518,6 @@ export default function FacultyCourses() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

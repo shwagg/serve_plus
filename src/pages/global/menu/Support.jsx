@@ -180,9 +180,11 @@ export default function Support() {
       <div className="support-body">
 
         {/* Back */}
-        <button className="support-back-btn" onClick={() => navigate(-1)}>
-          ← Back
-        </button>
+        <div className="support-back-row">
+          <button className="support-back-btn" onClick={() => navigate(-1)}>
+            ← Back
+          </button>
+        </div>
 
         {/* Hero */}
         <div className="support-hero">
