@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { auth, db, functions } from '../firebaseConfig';
 import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -8,6 +8,7 @@ import { useSession } from '../context/useSession';
 import './Header.css';
 import NotificationBell from './NotificationBell';
 import servePlusIcon from '../assets/serve_plus_icon.svg';
+import mapuaMclLogo from '../assets/institutions/MMCL_Logo_Horizontal.svg';
 import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
@@ -37,6 +38,20 @@ import { announceHeaderModalOpen, useCloseOnHeaderModalOpen } from '../utils/mod
 
 const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
+
+const INSTITUTION_BRAND = {
+  logo: mapuaMclLogo,
+  alt: 'Mapua Malayan Colleges Laguna',
+};
+
+const INSTITUTION_BRAND_ROUTES = new Set([
+  '/student/home',
+  '/admin/dashboard',
+  '/faculty/dashboard',
+  '/faculty/current-event',
+  '/partner/dashboard',
+  '/sysadmin/roster',
+]);
 
 function normalizeValue(value) {
   return String(value || '').trim().toLowerCase();
@@ -158,6 +173,7 @@ const CreateProposalModal = ({ isOpen, onClose, onSelectType }) => {
 
 export default function Header() {
   const { userData } = useSession();
+  const location = useLocation();
   const userRole = userData?.role || null;
   const userPosition = userData?.position || userData?.positions || '';
   const userRoleLabel = getUserRoleLabel(userRole, userPosition);
@@ -184,6 +200,7 @@ export default function Header() {
   const menuRef = useRef(null);
   const announcementsRef = useRef(null);
   const navigate = useNavigate();
+  const shouldUseInstitutionBrand = INSTITUTION_BRAND_ROUTES.has(location.pathname);
 
   const closeHeaderOwnedModals = useCallback(() => {
     setShowMenu(false);
@@ -416,11 +433,21 @@ export default function Header() {
       <header className={`serve-header${headerRoleStripLabel ? ` serve-header--${normalizeValue(userRole)}` : ''}`}>
         <div className="header-container">
           {/* Logo */}
-          <button className="header-logo" onClick={handleLogoClick}>
-            <div className="logo-icon">
-              <img src={servePlusIcon} alt="SERVE+" width="32" height="32" />
-            </div>
-            <span className="header-logo-text">SERVE<span className="header-logo-plus">+</span></span>
+          <button className={`header-logo${shouldUseInstitutionBrand ? ' header-logo--institution' : ''}`} onClick={handleLogoClick}>
+            {shouldUseInstitutionBrand ? (
+              <img
+                src={INSTITUTION_BRAND.logo}
+                alt={INSTITUTION_BRAND.alt}
+                className="header-institution-logo"
+              />
+            ) : (
+              <>
+                <div className="logo-icon">
+                  <img src={servePlusIcon} alt="SERVE+" width="32" height="32" />
+                </div>
+                <span className="header-logo-text">SERVE<span className="header-logo-plus">+</span></span>
+              </>
+            )}
             {headerRoleStripLabel && (
               <span className={`header-role-strip header-role-strip--${normalizeValue(userRole)}`}>
                 {HeaderRoleStripIcon && (

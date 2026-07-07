@@ -127,13 +127,17 @@
 }
 
 .admin-sidebar-nav {
-  padding: calc(var(--context-height) + 8px) 0 32px;
+  padding: var(--context-height) 0 32px;
+  align-items: flex-start;
 }
 
 .admin-sidebar-group {
   margin-bottom: 18px;
 }
 
+.admin-sidebar-group:first-of-type .admin-sidebar-group-label {
+  margin-top: calc(-1 * var(--context-height) / 2);
+}
 .admin-sidebar-group + .admin-sidebar-group {
   border-top: 1px solid var(--border);
   padding-top: 10px;
@@ -141,7 +145,7 @@
 
 .admin-sidebar-group-label {
   display: block;
-  padding: 8px 16px 6px;
+  padding: 3px 16px 6px;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
