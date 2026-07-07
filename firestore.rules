@@ -404,9 +404,9 @@ service cloud.firestore {
         );
     }
 
-    // User profiles - users can read their own profile, admins/sysadmins can manage all users
+    // User profiles - authenticated users can read profiles; admins/sysadmins can manage all users
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null;
       allow create: if request.auth != null &&
         (request.auth.uid == userId || isAccountManager());
       allow update: if request.auth != null && (

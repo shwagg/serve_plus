@@ -44,6 +44,10 @@ function normalizeValue(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function getUserDepartment(user = {}) {
+  return user?.department || user?.Department || user?.affiliatedDepartment || user?.collegeDepartment || user?.college || '';
+}
+
 function trimToLimit(value, limit) {
   return String(value || '').slice(0, limit);
 }
@@ -347,6 +351,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   const [partnerSchools, setPartnerSchools] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [facultyList, setFacultyList] = useState([]);
+  const [userDirectoryError, setUserDirectoryError] = useState('');
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [locationOption, setLocationOption] = useState('');
 
@@ -356,12 +361,15 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         const snap = await getDocs(collection(db, 'users'));
         const allUsers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setAllUsers(allUsers);
-        setPartnerSchools(allUsers.filter(u => u.role === 'partner'));
-        setFacultyList(allUsers.filter(u => u.role === 'faculty'));
-      } catch {
+        setPartnerSchools(allUsers.filter(u => normalizeValue(u.role || u.userRole || u.Role) === 'partner'));
+        setFacultyList(allUsers.filter(u => normalizeValue(u.role || u.userRole || u.Role) === 'faculty'));
+        setUserDirectoryError('');
+      } catch (error) {
+        console.error('Error fetching user directory for proposal signatories:', error);
         setAllUsers([]);
         setPartnerSchools([]);
         setFacultyList([]);
+        setUserDirectoryError('Unable to load faculty signatory accounts. Please check Firestore rules or reload the app.');
       } finally {
         setLoadingSchools(false);
       }
@@ -883,9 +891,11 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
     ...(userData || {}),
     id: auth.currentUser?.uid || userData?.id || userData?.uid || '',
     uid: auth.currentUser?.uid || userData?.uid || userData?.id || '',
+    department: getUserDepartment(userData),
   };
+  const accountDepartment = getUserDepartment(userData);
   const hierarchyDepartment = isFacultySubmitter
-    ? (userData?.department || formData.affiliatedDepartment || '')
+    ? (accountDepartment || formData.affiliatedDepartment || '')
     : formData.affiliatedDepartment;
   const usesManualAcademicSignatories = !isFacultySubmitter;
   const studentReviewedOptions = usesManualAcademicSignatories
@@ -899,8 +909,16 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         submitter: currentSubmitter,
         users: allUsers,
         department: hierarchyDepartment,
+        reviewedByUid: formData.reviewedByUid,
+        reviewedByName: formData.reviewedBy,
+        recommendedByUid: formData.recommendedByUid,
+        recommendedByName: formData.recommendedBy,
       })
     : null;
+  const facultyReviewedOptions = facultySignatoryResolution?.reviewedByOptions || [];
+  const facultyRecommendedOptions = facultySignatoryResolution?.recommendedByOptions || [];
+  const useFacultyReviewedDropdown = isFacultySubmitter && facultyReviewedOptions.length > 1;
+  const useFacultyRecommendedDropdown = isFacultySubmitter && facultyRecommendedOptions.length > 1;
   const activeSignatoryFlow = isFacultySubmitter
     ? {
         reviewedBy: facultySignatoryResolution?.reviewedBy || null,
@@ -914,12 +932,18 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
         recommendedByName: formData.recommendedBy,
       });
   const signatoryResolutionError = isFacultySubmitter
-    ? (loadingSchools ? 'Signatory accounts are still loading.' : facultySignatoryResolution?.error || '')
+    ? (loadingSchools ? 'Signatory accounts are still loading.' : userDirectoryError || facultySignatoryResolution?.error || '')
     : '';
   const resolvedReviewedName = facultySignatoryResolution?.reviewedBy?.name || '';
   const resolvedReviewedUid = facultySignatoryResolution?.reviewedBy?.uid || '';
   const resolvedRecommendedName = facultySignatoryResolution?.recommendedBy?.name || '';
   const resolvedRecommendedUid = facultySignatoryResolution?.recommendedBy?.uid || '';
+  const reviewedResolutionHint = isFacultySubmitter && !loadingSchools && !resolvedReviewedName
+    ? signatoryResolutionError
+    : activeSignatoryFlow?.reviewedBy?.position || '';
+  const recommendedResolutionHint = isFacultySubmitter && !loadingSchools && !resolvedRecommendedName
+    ? signatoryResolutionError
+    : activeSignatoryFlow?.recommendedBy?.position || '';
 
   useEffect(() => {
     if (!isFacultySubmitter) return;
@@ -1000,7 +1024,7 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
   };
 
   const filteredFaculty = facultyList.filter(
-    f => !formData.affiliatedDepartment || f.department === formData.affiliatedDepartment
+    f => !formData.affiliatedDepartment || normalizeValue(getUserDepartment(f)) === normalizeValue(formData.affiliatedDepartment)
   );
 
   // Submission logic is now handled in SummaryPanel
@@ -1094,8 +1118,8 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   name="affiliatedDepartment"
                   value={formData.affiliatedDepartment}
                   onChange={handleInputChange}
-                  disabled={isFacultySubmitter && Boolean(userData?.department)}
-                  placeholder={isFacultySubmitter && userData?.department ? userData.department : "Select Department"}
+                  disabled={isFacultySubmitter && Boolean(accountDepartment)}
+                  placeholder={isFacultySubmitter && accountDepartment ? accountDepartment : "Select Department"}
                   options={PROPOSAL_DEPARTMENTS.map(d => ({ value: d, label: d }))}
                 />
                 {isFacultySubmitter && (
@@ -1660,14 +1684,24 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   <label>Reviewed By <span style={{ color: '#718096', fontWeight: 400 }}>({activeSignatoryFlow?.reviewedBy?.label || 'Reviewer'})</span></label>
                   {isFacultySubmitter ? (
                     <>
-                      <input
-                        type="text"
-                        value={formData.reviewedBy}
-                        readOnly
-                        placeholder={loadingSchools ? 'Resolving approver...' : 'No approver resolved'}
-                      />
+                      {useFacultyReviewedDropdown ? (
+                        <CustomSelect
+                          name="reviewedByUid"
+                          value={formData.reviewedByUid || activeSignatoryFlow?.reviewedBy?.uid || ''}
+                          onChange={handleInputChange}
+                          placeholder="Select reviewer"
+                          options={facultyReviewedOptions.map(c => ({ value: c.uid, label: `${c.name} (${c.position || c.label})` }))}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={formData.reviewedBy}
+                          readOnly
+                          placeholder={loadingSchools ? 'Resolving approver...' : 'No approver resolved'}
+                        />
+                      )}
                       <small className={`field-limit-hint${fieldErrors.reviewedBy ? ' error' : ''}`}>
-                        {fieldErrors.reviewedBy || activeSignatoryFlow?.reviewedBy?.position || ''}
+                        {fieldErrors.reviewedBy || reviewedResolutionHint}
                       </small>
                     </>
                   ) : (
@@ -1695,14 +1729,24 @@ function ProjectProposal({ projectType, onClose, editProposal, timelineNode }) {
                   <label>Recommended By <span style={{ color: '#718096', fontWeight: 400 }}>({activeSignatoryFlow?.recommendedBy?.label || 'Recommender'})</span></label>
                   {isFacultySubmitter ? (
                     <>
-                      <input
-                        type="text"
-                        value={formData.recommendedBy}
-                        readOnly
-                        placeholder={loadingSchools ? 'Resolving approver...' : 'No approver resolved'}
-                      />
+                      {useFacultyRecommendedDropdown ? (
+                        <CustomSelect
+                          name="recommendedByUid"
+                          value={formData.recommendedByUid || activeSignatoryFlow?.recommendedBy?.uid || ''}
+                          onChange={handleInputChange}
+                          placeholder="Select recommender"
+                          options={facultyRecommendedOptions.map(d => ({ value: d.uid, label: `${d.name} (${d.position || d.label})` }))}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={formData.recommendedBy}
+                          readOnly
+                          placeholder={loadingSchools ? 'Resolving approver...' : 'No approver resolved'}
+                        />
+                      )}
                       <small className={`field-limit-hint${fieldErrors.recommendedBy ? ' error' : ''}`}>
-                        {fieldErrors.recommendedBy || activeSignatoryFlow?.recommendedBy?.position || ''}
+                        {fieldErrors.recommendedBy || recommendedResolutionHint}
                       </small>
                     </>
                   ) : (

@@ -20,8 +20,17 @@ export const PROPOSAL_DEPARTMENTS = [
   CLIR_DEPARTMENT,
 ];
 
+const ACADEMIC_REVIEW_ALIASES = ["program chair", "cluster head", "college engagement head"];
+const COLLEGE_DEAN_ALIASES = ["college dean"];
+const CLIR_DIRECTOR_ALIASES = ["director"];
+const VPAA_ALIASES = ["vpaa"];
+const CGC_ENTRY_ALIASES = ["guidance counselor", "guidance councilor", "guidance facilitator"];
+const CGC_DIRECTOR_ALIASES = ["director", "sao director", "director/sao", "director / sao"];
+const VP_ALIASES = ["vp"];
+const COO_ALIASES = ["coo"];
+
 export function normalizeApprovalText(value) {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return String(value || "").trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
 }
 
 export function getUserUid(user = {}) {
@@ -44,23 +53,40 @@ export function getPositionList(user = {}) {
   return raw ? [raw] : [];
 }
 
-function hasPosition(user, aliases) {
-  const normalizedAliases = aliases.map(normalizeApprovalText);
-  return getPositionList(user).some((position) =>
-    normalizedAliases.includes(normalizeApprovalText(position))
-  );
+function getNormalizedPositions(user = {}) {
+  return getPositionList(user).map(normalizeApprovalText).filter(Boolean);
 }
 
 function getPrimaryPosition(user = {}) {
   return getPositionList(user)[0] || "";
 }
 
-function sameDepartment(user, department) {
-  return normalizeApprovalText(user?.department) === normalizeApprovalText(department);
+function getUserDepartment(user = {}) {
+  return user?.department || user?.Department || user?.affiliatedDepartment || user?.collegeDepartment || user?.college || "";
 }
 
 function isFaculty(user = {}) {
   return normalizeApprovalText(user?.role || user?.userRole || user?.Role) === "faculty";
+}
+
+function hasPosition(user, aliases) {
+  const normalizedAliases = aliases.map(normalizeApprovalText);
+  return getNormalizedPositions(user).some((position) => normalizedAliases.includes(position));
+}
+
+function getBestPositionRank(user, aliases) {
+  const normalizedAliases = aliases.map(normalizeApprovalText);
+  const userPositions = getNormalizedPositions(user);
+  return normalizedAliases.findIndex((alias) => userPositions.includes(alias));
+}
+
+function getPositionLabel(user, aliases) {
+  const rank = getBestPositionRank(user, aliases);
+  return rank >= 0 ? aliases[rank] : getPrimaryPosition(user);
+}
+
+function sameDepartment(user, department) {
+  return normalizeApprovalText(getUserDepartment(user)) === normalizeApprovalText(department);
 }
 
 function userMatchesName(user, name) {
@@ -73,50 +99,117 @@ function userMatchesName(user, name) {
   ].some((value) => normalizeApprovalText(value) === target);
 }
 
-function toSignatoryUser(user, label) {
+function toSignatoryUser(user, label, positionOverride = "") {
   if (!user) return null;
   return {
     uid: getUserUid(user),
     name: getUserDisplayName(user),
     email: user.email || "",
-    position: getPrimaryPosition(user),
-    department: user.department || "",
+    position: positionOverride || getPrimaryPosition(user),
+    department: getUserDepartment(user),
     label,
   };
 }
 
-function findApprover(users, { aliases, department, label, allowNoDepartment = false }) {
+function findApprover(users, { aliases, department, label, allowNoDepartment = false }, selectedUid = "", selectedName = "") {
   const matches = users.filter((user) => {
     if (!isFaculty(user) || !hasPosition(user, aliases)) return false;
-    if (!department) return allowNoDepartment || !user.department;
-    return sameDepartment(user, department) || (allowNoDepartment && !user.department);
+    const userDepartment = getUserDepartment(user);
+    if (!department) return allowNoDepartment || !userDepartment;
+    return sameDepartment(user, department) || (allowNoDepartment && !userDepartment);
   });
+
+  const rankedMatches = matches
+    .map((user) => ({ user, rank: getBestPositionRank(user, aliases) }))
+    .filter(({ rank }) => rank >= 0);
+  const bestRank = rankedMatches.reduce(
+    (best, { rank }) => Math.min(best, rank),
+    Number.POSITIVE_INFINITY,
+  );
+  const bestMatches = Number.isFinite(bestRank)
+    ? rankedMatches.filter(({ rank }) => rank === bestRank)
+    : [];
+  const options = bestMatches.map(({ user }) =>
+    toSignatoryUser(user, label, getPositionLabel(user, aliases)),
+  );
+  const selectedSignatory =
+    (selectedUid && options.find((option) => option.uid === selectedUid)) ||
+    (selectedName && options.find((option) => normalizeApprovalText(option.name) === normalizeApprovalText(selectedName))) ||
+    null;
 
   return {
     matches,
-    signatory: matches.length === 1 ? toSignatoryUser(matches[0], label) : null,
+    bestMatches,
+    options,
+    signatory: selectedSignatory || (options.length === 1 ? options[0] : null),
   };
 }
 
-const ACADEMIC_REVIEW_ALIASES = ["program chair", "cluster head", "college engagement head"];
-const COLLEGE_DEAN_ALIASES = ["college dean"];
-const CLIR_DIRECTOR_ALIASES = ["director"];
-const VPAA_ALIASES = ["vpaa"];
-const CGC_ENTRY_ALIASES = ["guidance counselor", "guidance councilor", "guidance facilitator"];
-const CGC_DIRECTOR_ALIASES = ["director", "sao director", "director/sao", "director / sao"];
-const VP_ALIASES = ["vp"];
-const COO_ALIASES = ["coo"];
+function requireSingle(result, label) {
+  if (result.matches.length === 0) return `No ${label} account was found for this approval route.`;
+  if (result.signatory) return "";
+  if (result.options.length > 1) return `Please select the ${label} for this proposal.`;
+  return `Multiple ${label} accounts were found. Please select one account for this approval route.`;
+}
+
+function buildFlowFromTargets(users, reviewedTarget, recommendedTarget, selected = {}) {
+  const reviewedResult = findApprover(
+    users,
+    reviewedTarget,
+    selected.reviewedByUid,
+    selected.reviewedByName,
+  );
+  const recommendedResult = findApprover(
+    users,
+    recommendedTarget,
+    selected.recommendedByUid,
+    selected.recommendedByName,
+  );
+  const reviewedError = requireSingle(reviewedResult, reviewedTarget.label);
+  const recommendedError = requireSingle(recommendedResult, recommendedTarget.label);
+
+  if (reviewedError || recommendedError) {
+    return {
+      blocked: true,
+      error: reviewedError || recommendedError,
+      reviewedBy: reviewedResult.signatory,
+      recommendedBy: recommendedResult.signatory,
+      reviewedByOptions: reviewedResult.options,
+      recommendedByOptions: recommendedResult.options,
+    };
+  }
+
+  if (reviewedResult.signatory.uid && reviewedResult.signatory.uid === recommendedResult.signatory.uid) {
+    return {
+      blocked: true,
+      error: "Reviewed By and Recommended By must be different people.",
+      reviewedBy: reviewedResult.signatory,
+      recommendedBy: recommendedResult.signatory,
+      reviewedByOptions: reviewedResult.options,
+      recommendedByOptions: recommendedResult.options,
+    };
+  }
+
+  return {
+    blocked: false,
+    error: "",
+    reviewedBy: reviewedResult.signatory,
+    recommendedBy: recommendedResult.signatory,
+    reviewedByOptions: reviewedResult.options,
+    recommendedByOptions: recommendedResult.options,
+  };
+}
 
 export function getAcademicReviewedByOptions(users, department) {
   return users
     .filter((user) => isFaculty(user) && sameDepartment(user, department) && hasPosition(user, ACADEMIC_REVIEW_ALIASES))
-    .map((user) => toSignatoryUser(user, getPrimaryPosition(user) || "Program Chair"));
+    .map((user) => toSignatoryUser(user, getPositionLabel(user, ACADEMIC_REVIEW_ALIASES) || "Program Chair"));
 }
 
 export function getAcademicRecommendedByOptions(users, department) {
   return users
     .filter((user) => isFaculty(user) && sameDepartment(user, department) && hasPosition(user, COLLEGE_DEAN_ALIASES))
-    .map((user) => toSignatoryUser(user, "College Dean"));
+    .map((user) => toSignatoryUser(user, "College Dean", getPositionLabel(user, COLLEGE_DEAN_ALIASES)));
 }
 
 export function findUserByUidOrName(users, uid, name) {
@@ -134,7 +227,11 @@ export function buildStudentSignatoryFlow({ users, reviewedByUid, reviewedByName
 
   return {
     reviewedBy: reviewedUser
-      ? toSignatoryUser(reviewedUser, getPrimaryPosition(reviewedUser) || "Program Chair")
+      ? toSignatoryUser(
+          reviewedUser,
+          getPositionLabel(reviewedUser, ACADEMIC_REVIEW_ALIASES) || "Program Chair",
+          getPositionLabel(reviewedUser, ACADEMIC_REVIEW_ALIASES),
+        )
       : {
           uid: reviewedByUid || "",
           name: reviewedByName || "",
@@ -144,7 +241,7 @@ export function buildStudentSignatoryFlow({ users, reviewedByUid, reviewedByName
           label: "Program Chair",
         },
     recommendedBy: recommendedUser
-      ? toSignatoryUser(recommendedUser, getPrimaryPosition(recommendedUser) || "College Dean")
+      ? toSignatoryUser(recommendedUser, "College Dean", getPositionLabel(recommendedUser, COLLEGE_DEAN_ALIASES))
       : {
           uid: recommendedByUid || "",
           name: recommendedByName || "",
@@ -156,54 +253,28 @@ export function buildStudentSignatoryFlow({ users, reviewedByUid, reviewedByName
   };
 }
 
-function requireSingle(result, label) {
-  if (result.matches.length === 0) return `No ${label} account was found for this approval route.`;
-  if (result.matches.length > 1) return `Multiple ${label} accounts were found. Please keep exactly one account for this approval route.`;
-  return "";
-}
+export function resolveFacultySignatoryFlow({
+  submitter,
+  users,
+  department,
+  reviewedByUid = "",
+  reviewedByName = "",
+  recommendedByUid = "",
+  recommendedByName = "",
+}) {
+  const submitterPositions = getNormalizedPositions(submitter);
+  const submitterDepartment = department || getUserDepartment(submitter);
+  const submitterHasPosition = (aliases) =>
+    aliases.some((alias) => submitterPositions.includes(normalizeApprovalText(alias)));
 
-function buildFlowFromTargets(users, reviewedTarget, recommendedTarget) {
-  const reviewedResult = findApprover(users, reviewedTarget);
-  const recommendedResult = findApprover(users, recommendedTarget);
-  const reviewedError = requireSingle(reviewedResult, reviewedTarget.label);
-  const recommendedError = requireSingle(recommendedResult, recommendedTarget.label);
-
-  if (reviewedError || recommendedError) {
-    return {
-      blocked: true,
-      error: reviewedError || recommendedError,
-      reviewedBy: reviewedResult.signatory,
-      recommendedBy: recommendedResult.signatory,
-    };
-  }
-
-  if (reviewedResult.signatory.uid && reviewedResult.signatory.uid === recommendedResult.signatory.uid) {
-    return {
-      blocked: true,
-      error: "Reviewed By and Recommended By must be different people.",
-      reviewedBy: reviewedResult.signatory,
-      recommendedBy: recommendedResult.signatory,
-    };
-  }
-
-  return {
-    blocked: false,
-    error: "",
-    reviewedBy: reviewedResult.signatory,
-    recommendedBy: recommendedResult.signatory,
-  };
-}
-
-export function resolveFacultySignatoryFlow({ submitter, users, department }) {
-  const submitterPosition = normalizeApprovalText(getPrimaryPosition(submitter));
-  const submitterDepartment = department || submitter?.department || "";
-
-  if (["vp", "coo"].includes(submitterPosition)) {
+  if (submitterHasPosition(["vp", "coo"])) {
     return {
       blocked: true,
       error: "VP and COO accounts can approve proposals, but proposal submission is blocked until a higher approval route is defined.",
       reviewedBy: null,
       recommendedBy: null,
+      reviewedByOptions: [],
+      recommendedByOptions: [],
     };
   }
 
@@ -213,6 +284,8 @@ export function resolveFacultySignatoryFlow({ submitter, users, department }) {
       error: "Your faculty account needs a department before proposal signatories can be resolved.",
       reviewedBy: null,
       recommendedBy: null,
+      reviewedByOptions: [],
+      recommendedByOptions: [],
     };
   }
 
@@ -220,35 +293,35 @@ export function resolveFacultySignatoryFlow({ submitter, users, department }) {
   let recommendedTarget = null;
 
   if (normalizeApprovalText(submitterDepartment) === normalizeApprovalText(CLIR_DEPARTMENT)) {
-    if (submitterPosition === "librarian") {
+    if (submitterHasPosition(["librarian"])) {
       reviewedTarget = { aliases: CLIR_DIRECTOR_ALIASES, department: submitterDepartment, label: "Director" };
       recommendedTarget = { aliases: VPAA_ALIASES, department: CLIR_DEPARTMENT, label: "VPAA" };
-    } else if (submitterPosition === "director") {
+    } else if (submitterHasPosition(["director"])) {
       reviewedTarget = { aliases: VPAA_ALIASES, department: CLIR_DEPARTMENT, label: "VPAA" };
       recommendedTarget = { aliases: VP_ALIASES, label: "VP", allowNoDepartment: true };
-    } else if (submitterPosition === "vpaa") {
+    } else if (submitterHasPosition(["vpaa"])) {
       reviewedTarget = { aliases: VP_ALIASES, label: "VP", allowNoDepartment: true };
       recommendedTarget = { aliases: COO_ALIASES, label: "COO", allowNoDepartment: true };
     }
   } else if (normalizeApprovalText(submitterDepartment) === normalizeApprovalText(CGC_DEPARTMENT)) {
-    if (CGC_ENTRY_ALIASES.includes(submitterPosition)) {
+    if (submitterHasPosition(CGC_ENTRY_ALIASES)) {
       reviewedTarget = { aliases: ["head"], department: CGC_DEPARTMENT, label: "Head" };
       recommendedTarget = { aliases: CGC_DIRECTOR_ALIASES, department: CGC_DEPARTMENT, label: "Director / SAO", allowNoDepartment: true };
-    } else if (submitterPosition === "head") {
+    } else if (submitterHasPosition(["head"])) {
       reviewedTarget = { aliases: CGC_DIRECTOR_ALIASES, department: CGC_DEPARTMENT, label: "Director / SAO", allowNoDepartment: true };
       recommendedTarget = { aliases: VP_ALIASES, label: "VP", allowNoDepartment: true };
-    } else if (CGC_DIRECTOR_ALIASES.includes(submitterPosition)) {
+    } else if (submitterHasPosition(CGC_DIRECTOR_ALIASES)) {
       reviewedTarget = { aliases: VP_ALIASES, label: "VP", allowNoDepartment: true };
       recommendedTarget = { aliases: COO_ALIASES, label: "COO", allowNoDepartment: true };
     }
   } else {
-    if (["regular", "community chair"].includes(submitterPosition)) {
-      reviewedTarget = { aliases: ACADEMIC_REVIEW_ALIASES, department: submitterDepartment, label: "Program Chair / Cluster Head / College Engagement Head" };
+    if (submitterHasPosition(["regular", "community chair"])) {
+      reviewedTarget = { aliases: ACADEMIC_REVIEW_ALIASES, department: submitterDepartment, label: "Program Chair" };
       recommendedTarget = { aliases: COLLEGE_DEAN_ALIASES, department: submitterDepartment, label: "College Dean" };
-    } else if (ACADEMIC_REVIEW_ALIASES.includes(submitterPosition)) {
+    } else if (submitterHasPosition(ACADEMIC_REVIEW_ALIASES)) {
       reviewedTarget = { aliases: COLLEGE_DEAN_ALIASES, department: submitterDepartment, label: "College Dean" };
       recommendedTarget = { aliases: VP_ALIASES, label: "VP", allowNoDepartment: true };
-    } else if (submitterPosition === "college dean") {
+    } else if (submitterHasPosition(["college dean"])) {
       reviewedTarget = { aliases: VP_ALIASES, label: "VP", allowNoDepartment: true };
       recommendedTarget = { aliases: COO_ALIASES, label: "COO", allowNoDepartment: true };
     }
@@ -260,10 +333,17 @@ export function resolveFacultySignatoryFlow({ submitter, users, department }) {
       error: `No approval hierarchy is configured for ${getPrimaryPosition(submitter) || "this faculty position"}.`,
       reviewedBy: null,
       recommendedBy: null,
+      reviewedByOptions: [],
+      recommendedByOptions: [],
     };
   }
 
-  return buildFlowFromTargets(users, reviewedTarget, recommendedTarget);
+  return buildFlowFromTargets(users, reviewedTarget, recommendedTarget, {
+    reviewedByUid,
+    reviewedByName,
+    recommendedByUid,
+    recommendedByName,
+  });
 }
 
 function signatoryNameMatches(signatory, user) {
