@@ -27,19 +27,19 @@
 }
 .serve-header--admin {
   --header-role-accent: var(--role-admin);
-  background-color: rgba(13, 71, 161, 0.08);
+  background-color: #ecf0f7;
 }
 .serve-header--faculty {
   --header-role-accent: var(--role-faculty);
-  background-color: rgba(0, 150, 136, 0.08);
+  background-color: #ebf7f5;
 }
 .serve-header--partner {
   --header-role-accent: var(--role-partner);
-  background-color: rgba(251, 140, 0, 0.1);
+  background-color: #fff4e6;
 }
 .serve-header--sysadmin {
   --header-role-accent: var(--role-sysadmin);
-  background-color: rgba(66, 66, 66, 0.08);
+  background-color: #f0f0f0;
 }
 .serve-header--student {
   --header-role-accent: var(--role-student);
