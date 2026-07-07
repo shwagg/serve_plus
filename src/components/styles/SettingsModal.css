@@ -69,13 +69,13 @@
 }
 
 .settings-close:hover {
-  background: #30bdb7;
+  background: #EB1F29;
   color: #fff;
   transform: scale(1.05);
 }
 
 .settings-close:active {
-  background: #28a8a3;
+  background: #C81724;
   color: #fff;
 }
 
@@ -126,7 +126,7 @@
   top: 20%;
   height: 60%;
   width: 3px;
-  background: #30bdb7;
+  background: #EB1F29;
   border-radius: 0 4px 4px 0;
   opacity: 0;
   transition: opacity 0.15s;
@@ -134,12 +134,12 @@
 
 .settings-nav-item:hover {
   background: #f0fdf9;
-  color: #0f766e;
+  color: #1A375C;
 }
 
 .settings-nav-item.active {
   background: #e6f7f6;
-  color: #0f766e;
+  color: #1A375C;
   font-weight: 600;
   border-radius: 10px;
 }
@@ -248,7 +248,7 @@
   height: 38px;
   padding: 0 22px;
   border-radius: 16px;
-  background: #30bdb7;
+  background: #EB1F29;
   border: none;
   color: #fff;
   font-size: 13.5px;
@@ -273,7 +273,7 @@
   max-width: 100%;
   height: 42px;
   border-radius: 16px;
-  background: #30bdb7;
+  background: #EB1F29;
   border: none;
   color: #fff;
   font-size: 14px;
@@ -455,7 +455,7 @@
 }
 
 .settings-agreement-tab.active {
-  background: #30bdb7;
+  background: #EB1F29;
   color: #fff;
   font-weight: 600;
   border-radius: 10px;
@@ -463,7 +463,7 @@
 
 .settings-agreement-tab:hover:not(.active) {
   background: #e6f7f6;
-  color: #0f766e;
+  color: #1A375C;
   border-radius: 10px;
 }
 
@@ -581,7 +581,7 @@
 }
 
 .settings-toggle.on {
-  background: #30bdb7;
+  background: #EB1F29;
 }
 
 .settings-toggle-thumb {
@@ -714,8 +714,8 @@
 
 .settings-doc-item:hover {
   background: #e6f7f6;
-  border-color: #30bdb7;
-  color: #0f766e;
+  border-color: #EB1F29;
+  color: #1A375C;
 }
 
 .settings-doc-icon {
@@ -726,7 +726,7 @@
 
 .settings-doc-item:hover .settings-doc-icon,
 .settings-doc-item:hover .settings-doc-action {
-  color: #0f766e;
+  color: #1A375C;
 }
 
 .settings-doc-info {
@@ -747,7 +747,7 @@
 }
 
 .settings-doc-item:hover .settings-doc-desc {
-  color: #0f766e;
+  color: #1A375C;
 }
 
 .settings-doc-action {

@@ -1,12 +1,19 @@
 .serve-header {
   width: 100%;
   height: 60px; /* fixed height of header */
-  background-color: #d0edfc;
+  background-color: #ffffff;
   box-shadow: none;
   position: fixed;
   top: 0;
   z-index: 1000;
-  --header-role-accent: transparent;
+  --mmcl-navy: #1A375C;
+  --mmcl-red: #EB1F29;
+  --role-admin: #0D47A1;
+  --role-sysadmin: #424242;
+  --role-faculty: #009688;
+  --role-partner: #cb9148;
+  --role-student: #1A375C;
+  --header-role-accent: var(--mmcl-red);
   overflow: visible;
 }
 .serve-header::after {
@@ -19,31 +26,39 @@
   pointer-events: none;
 }
 .serve-header--admin {
-  --header-role-accent: #2563eb;
+  --header-role-accent: var(--role-admin);
+  background-color: rgba(13, 71, 161, 0.08);
 }
 .serve-header--faculty {
-  --header-role-accent: #0f766e;
+  --header-role-accent: var(--role-faculty);
+  background-color: rgba(0, 150, 136, 0.08);
 }
 .serve-header--partner {
-  --header-role-accent: #b45309;
+  --header-role-accent: var(--role-partner);
+  background-color: rgba(251, 140, 0, 0.1);
 }
 .serve-header--sysadmin {
-  --header-role-accent: #4b5563;
+  --header-role-accent: var(--role-sysadmin);
+  background-color: rgba(66, 66, 66, 0.08);
 }
+.serve-header--student {
+  --header-role-accent: var(--role-student);
+  background-color: #ffffff;
+} 
 /* Profile avatar button in header */
 .header-avatar {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #30bdb7;
+  border: 2px solid var(--mmcl-red);
   display: block;
 }
 .header-avatar-initials {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #30bdb7;
+  background: var(--mmcl-navy);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -86,7 +101,7 @@
   margin-top: 2px;
   max-width: 100%;
   overflow: hidden;
-  color: #0f766e;
+  color: var(--mmcl-navy);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.1;
@@ -150,7 +165,7 @@
 .logo-text {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #003366;
+  color: var(--mmcl-navy);
   letter-spacing: 0.5px;
 }
 .plus-sign {
@@ -160,12 +175,12 @@
 .header-logo-text {
   font-size: 1.3rem;
   font-weight: 800;
-  color: #111827;
+  color: var(--mmcl-navy);
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
 .header-logo-plus {
-  color: #30bdb7;
+  color: var(--mmcl-red);
 }
 .header-logo--institution {
   gap: 0.65rem;
@@ -182,41 +197,51 @@
 .header-role-strip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 28px;
+  gap: 6px;
+  min-height: 30px;
   margin-left: 2px;
-  padding: 0 10px;
-  border: 1px solid rgba(17, 24, 39, 0.16);
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.24);
-  color: #111827;
-  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--mmcl-navy);
+  font-size: 0.88rem;
   font-weight: 800;
   letter-spacing: 0.5px;
   line-height: 1;
   white-space: nowrap;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.03);
 }
 .header-role-strip-icon {
-  width: 16px !important;
-  height: 16px !important;
-  font-size: 16px !important;
+  width: 18px !important;
+  height: 18px !important;
+  font-size: 18px !important;
   flex-shrink: 0;
 }
 .header-role-strip--admin {
-  border-color: rgba(37, 99, 235, 0.34);
-  color: #1d4ed8;
+  border-color: rgba(13, 71, 161, 0.32);
+  background: rgba(13, 71, 161, 0.12);
+  color: var(--role-admin);
 }
 .header-role-strip--faculty {
-  border-color: rgba(15, 118, 110, 0.34);
-  color: #0f766e;
+  border-color: rgba(0, 150, 136, 0.32);
+  background: rgba(0, 150, 136, 0.12);
+  color: var(--role-faculty);
 }
 .header-role-strip--partner {
-  border-color: rgba(180, 83, 9, 0.34);
-  color: #92400e;
+  border-color: rgba(251, 140, 0, 0.32);
+  background: rgba(251, 140, 0, 0.12);
+  color: var(--role-partner);
 }
 .header-role-strip--sysadmin {
-  border-color: rgba(75, 85, 99, 0.36);
-  color: #374151;
+  border-color: rgba(66, 66, 66, 0.32);
+  background: rgba(66, 66, 66, 0.12);
+  color: var(--role-sysadmin);
+}
+.header-role-strip--student {
+  border-color: rgba(26, 55, 92, 0.28);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--role-student);
 }
 /* Header Actions */
 .header-actions {
@@ -243,7 +268,7 @@
 .icon-button {
   background: none;
   border: none;
-  color: #00BCD4;
+  color: var(--mmcl-navy);
   cursor: pointer;
   width: 36px;
   height: 36px;
@@ -259,7 +284,7 @@
   box-sizing: border-box;
 }
 .icon-button:hover {
-  background-color: rgba(0, 188, 212, 0.1);
+  background-color: rgba(26, 55, 92, 0.08);
   transform: scale(1.05);
 }
 .icon-button:active {
@@ -298,56 +323,93 @@
     min-height: 34px;
   }
   .header-user-text {
-    max-width: 96px;
+    max-width: 80px;
   }
   .header-logo {
-    max-width: min(40vw, 320px);
+    max-width: min(30vw, 200px);
   }
   .header-institution-logo {
-    max-width: min(36vw, 250px);
-    height: 38px;
+    max-width: min(30vw, 200px);
+    height: 32px;
+  }
+  .header-center-slot {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  /* Compress header-role-strip on tablets */
+  .header-role-strip {
+    height: 24px;
+    padding: 0 8px;
+    font-size: 0.7rem;
+    gap: 3px;
+  }
+  .header-role-strip-icon {
+    width: 13px !important;
+    height: 13px !important;
+    font-size: 13px !important;
   }
 }
 @media (max-width: 540px) {
-  /* Hide greeting on small screens to maximise header space */
+  /* Minimize header user text on small screens */
   .header-user-text {
     display: none;
   }
-  /* Hide logo text only when the player strip is occupying the center slot */
-  .header-container:has(#header-center-slot > *) .header-logo-text {
-    display: none;
+  /* Always show logo text */
+  .header-logo-text {
+    display: inline;
   }
+  /* Keep role strip visible with icon and compressed label */
   .header-role-strip {
-    display: none;
+    width: auto;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    gap: 2px;
+    font-weight: 700;
+    white-space: nowrap;
   }
+  .header-role-strip-icon {
+    width: 11px !important;
+    height: 11px !important;
+    font-size: 11px !important;
+  }
+  /* Compress logo further */
   .header-logo {
     max-width: unset;
+    gap: 6px;
   }
   .header-logo--institution {
-    max-width: 136px;
+    max-width: 100px;
   }
   .header-institution-logo {
-    max-width: 136px;
-    height: 34px;
+    max-width: 100px;
+    height: 28px;
+  }
+  .header-logo-text {
+    font-size: 1.1rem;
+  }
+  .logo-icon img {
+    height: 24px;
   }
   .profile-btn {
-    padding: 4px;
-    min-width: 36px;
+    padding: 2px;
+    min-width: 32px;
   }
   .header-actions {
-    gap: 4px;
+    gap: 2px;
   }
   .icon-button {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
   }
   .notification-bell-button {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
   }
 }
 @media (max-width: 480px) {
@@ -378,6 +440,52 @@
   }
 }
 
+@media (max-width: 360px) {
+  /* Ultra-small phone screens */
+  .header-container {
+    padding: 0 8px;
+  }
+  .header-logo {
+    max-width: 70px;
+    gap: 3px;
+  }
+  .header-logo--institution {
+    max-width: 70px;
+  }
+  .header-institution-logo {
+    max-width: 70px;
+    height: 24px;
+  }
+  .header-logo-text {
+    font-size: 0.95rem;
+  }
+  .logo-icon img {
+    height: 18px;
+  }
+  .header-role-strip {
+    height: 20px;
+    padding: 0 5px;
+    font-size: 0.6rem;
+  }
+  .header-role-strip-icon {
+    width: 10px !important;
+    height: 10px !important;
+    font-size: 10px !important;
+  }
+  .icon-button {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+  }
+  .notification-bell-button {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+  }
+}
+
 /* Gradient fade below the header — convex arch extends further in the center */
 .header-fade-gradient {
   position: fixed;
@@ -385,7 +493,7 @@
   left: 0;
   right: 0;
   height: 15px;
-  background: linear-gradient(to bottom, #d0edfc 40%, rgba(208, 237, 252, 0) 80%);
+  background: linear-gradient(to bottom, #ffffff 40%, rgba(255, 255, 255, 0) 80%);
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
   pointer-events: none;
   z-index: 98;
@@ -524,13 +632,13 @@
 }
 
 .proposal-type-btn:hover {
-  border-color: #30bdb7;
-  background: #f0fdfb;
-  box-shadow: 0 4px 12px rgba(48, 189, 183, 0.12);
+  border-color: var(--mmcl-red);
+  background: #fff5f5;
+  box-shadow: 0 4px 12px rgba(235, 31, 41, 0.12);
 }
 
 .proposal-type-icon {
-  color: #30bdb7;
+  color: var(--mmcl-red);
   margin-bottom: 5px;
   font-size: 1.5rem !important;
 }

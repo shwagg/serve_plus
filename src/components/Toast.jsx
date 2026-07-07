@@ -111,13 +111,13 @@ export default function ToastContainer() {
             </button>
             <button
               onClick={() => handleConfirm(true)}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#28a8a3'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#30bdb7'}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#C81724'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#EB1F29'}
               style={{
                 padding: '5px 12px',
                 borderRadius: 6,
                 border: 'none',
-                background: '#30bdb7',
+                background: '#EB1F29',
                 color: '#fff',
                 fontSize: 12,
                 fontWeight: 600,
@@ -155,7 +155,7 @@ export default function ToastContainer() {
             </div>
             <button
               onClick={() => removeToast(t.id)}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#30bdb7'}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#EB1F29'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#888'}
               style={{
                 background: 'transparent',

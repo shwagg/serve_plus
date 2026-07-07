@@ -21,7 +21,7 @@ export default function CertificateQRScannerModal({ isOpen, onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1rem 0' }}>
           <QRScanner onScan={handleScan} />
           {scanResult && (
-            <div style={{ marginTop: '1rem', color: '#00BCD4', wordBreak: 'break-all' }}>
+            <div style={{ marginTop: '1rem', color: '#1A375C', wordBreak: 'break-all' }}>
               <strong>Scanned Result:</strong>
               <div>{scanResult}</div>
             </div>

@@ -1,8 +1,11 @@
 
 :root{
-  --navy:#1f3b73;
-  --teal:#30bdb7;
-  --teal-dark:#0f766e;
+  --navy:#1A375C;
+  --teal:#EB1F29;
+  --teal-dark:#1A375C;
+  --mmcl-red:#EB1F29;
+  --mmcl-red-soft:#fff0f1;
+  --mmcl-navy-soft:#eef4fb;
   --bg:#ffffff;
   --card:#ffffff;
   --muted:#64748b;
@@ -170,14 +173,14 @@
   top: 20%;
   height: 60%;
   width: 3px;
-  background: var(--teal);
+  background: var(--mmcl-red);
   border-radius: 0 3px 3px 0;
   opacity: 0;
   transition: opacity 0.15s;
 }
 
 .admin-sidebar-item:hover {
-  background: #e6f7f6;
+  background: var(--mmcl-navy-soft);
   color: var(--teal-dark);
 }
 
@@ -187,7 +190,7 @@
 }
 
 .admin-sidebar-item.active {
-  background: #d1f0ef;
+  background: var(--mmcl-red-soft);
   font-weight: 600;
   color: var(--teal-dark);
 }
@@ -296,7 +299,7 @@
 }
 
 .breadcrumb-dropdown-item.active > span {
-  background: #d1f0ef;
+  background: var(--mmcl-red-soft);
   color: var(--teal-dark);
   font-weight: 600;
   border-radius: 8px;
@@ -317,7 +320,7 @@
   transition: border-color 0.15s;
 }
 .ann-input:focus {
-  border-color: var(--teal);
+  border-color: var(--mmcl-red);
 }
 
 /* CSS Design for every pages in Outlet under Admin*/
@@ -447,7 +450,7 @@
 /* Primary action button (Add Project) */
 .btn-primary{
   border: none;
-  background: var(--teal);
+  background: var(--mmcl-red);
   color: #fff;
   font-weight: 900;
   font-size: 12px;
@@ -534,7 +537,7 @@
 .event-details{
   border: none;
   background: transparent;
-  color: var(--teal-dark);
+  color: var(--navy);
   font-weight: 800;
   font-size: 11px;
   cursor: pointer;

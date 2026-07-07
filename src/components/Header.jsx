@@ -200,7 +200,10 @@ export default function Header() {
   const menuRef = useRef(null);
   const announcementsRef = useRef(null);
   const navigate = useNavigate();
-  const shouldUseInstitutionBrand = INSTITUTION_BRAND_ROUTES.has(location.pathname);
+  const normalizedUserRole = normalizeValue(userRole);
+  const shouldUseInstitutionBrand =
+    ['admin', 'partner', 'faculty', 'sysadmin'].includes(normalizedUserRole) ||
+    INSTITUTION_BRAND_ROUTES.has(location.pathname);
 
   const closeHeaderOwnedModals = useCallback(() => {
     setShowMenu(false);

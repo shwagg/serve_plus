@@ -121,7 +121,7 @@
   border-radius: 0;
 }
 
-/* Left teal indicator bar — matches sidebar-ribbon-item */
+/* Left brand indicator bar — matches sidebar-ribbon-item */
 .menu-item::before {
   content: "";
   position: absolute;
@@ -129,15 +129,15 @@
   top: 20%;
   height: 60%;
   width: 4px;
-  background: #30bdb7;
+  background: #EB1F29;
   border-radius: 0 4px 4px 0;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
 
 .menu-item:hover {
-  background: #e6f7f6;
-  color: #0f766e;
+  background: #eef4fb;
+  color: #1A375C;
 }
 
 .menu-item:disabled,
@@ -163,7 +163,7 @@
 }
 
 .menu-item:hover .menu-icon {
-  filter: brightness(0) saturate(100%) invert(38%) sepia(72%) saturate(576%) hue-rotate(151deg) brightness(95%) contrast(96%);
+  filter: brightness(0) saturate(100%) invert(18%) sepia(43%) saturate(1058%) hue-rotate(174deg) brightness(92%) contrast(91%);
 }
 
 .menu-item:disabled .menu-icon,
@@ -185,7 +185,7 @@
   width: calc(100% - 16px);
   margin: 4px 8px 10px;
   padding: 10px;
-  background: #30bdb7;
+  background: #1A375C;
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -196,8 +196,8 @@
 }
 
 .logout-btn:hover {
-  background: #28a8a3;
-  box-shadow: 0 4px 12px rgba(48, 189, 183, 0.3);
+  background: #EB1F29;
+  box-shadow: 0 4px 12px rgba(235, 31, 41, 0.24);
 }
 
 /* ── Responsive ──────────────────────────────────────── */

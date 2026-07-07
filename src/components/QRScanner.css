@@ -46,7 +46,7 @@
   margin-left: 2px;
 }
 .qrs-status-text--success {
-  color: #30bdb7;
+  color: #EB1F29;
 }
 
 /* ── Error card ──────────────────────────────────────── */
@@ -172,7 +172,7 @@
 }
 .qrs-upload-btn:hover {
   background: #f0fdf9;
-  border-color: #30bdb7;
-  color: #0f766e;
+  border-color: #EB1F29;
+  color: #1A375C;
 }
 .qrs-upload-input { display: none; }

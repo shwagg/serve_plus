@@ -80,7 +80,7 @@
   transition: background 0.2s, width 0.25s, border-radius 0.25s;
 }
 .ot-dot-active {
-  background: #30bdb7;
+  background: #EB1F29;
   width: 22px;
   border-radius: 4px;
 }
@@ -110,7 +110,7 @@
 }
 
 .ot-btn-primary {
-  background: linear-gradient(135deg, #30bdb7, #1f3c88);
+  background: linear-gradient(135deg, #EB1F29, #1A375C);
   color: #fff;
   min-width: 110px;
 }

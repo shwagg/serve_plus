@@ -219,13 +219,18 @@
   border: 1.5px solid #e5e7eb;
   background: #ffffff;
   border-radius: 999px;
-  padding: 8px 22px;
-  max-width: 90%;
-  overflow: hidden;
+  padding: 8px 10px;
+  max-width: 80%;
+  min-width: 0;
+  overflow: visible;
+  flex-wrap: wrap;
+  margin-left: 3px;
 }
 .strip-compact-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 14px;
 }
 /* Separator dot */
@@ -2607,36 +2612,44 @@
 
   /* Player strip — compact pill on mobile */
   .player-strip-inner {
-    padding: 5px 10px;
+    padding: 4px 4px;
+    max-width: calc(100vw - 10px);
+    overflow: visible;
+    border-radius: 999px;
+    gap: 6px;
   }
   .strip-compact-row {
-    gap: 8px;
+    gap: 6px;
+    flex-wrap: nowrap;
   }
   .strip-sep {
     display: none;
   }
   .strip-pts-bar {
-    width: 80px;
-    height: 18px;
+    width: min(70px, calc(100vw - 220px));
+    height: 14px;
+    flex-shrink: 0;
   }
   .strip-level-text,
   .strip-missions-text {
-    font-size: 12px;
+    font-size: 11px;
+    white-space: nowrap;
   }
   .strip-missions-label {
     display: inline;
-    font-size: 11px;
+    font-size: 9px;
   }
   .strip-pts-text {
-    font-size: 10px;
+    font-size: 9px;
   }
   .strip-pts-text img {
     display: none;
   }
   .strip-caret {
-    width: 5px;
-    height: 5px;
-    margin-left: 6px;
+    width: 4px;
+    height: 4px;
+    margin-left: 4px;
+    flex-shrink: 0;
   }
   .pts-history-panel {
     width: calc(100vw - 32px);
@@ -3083,6 +3096,37 @@
   .event-details-join-btn {
     width: 100%;
     padding: 12px 18px;
+  }
+}
+
+@media (max-width: 360px) {
+  /* Ultra-small phones — compress player strip even more */
+  .player-strip-inner {
+    padding: 3px 3px;
+    max-width: calc(100vw - 8px);
+    gap: 4px;
+  }
+  .strip-compact-row {
+    gap: 4px;
+  }
+  .strip-pts-bar {
+    width: min(50px, calc(100vw - 240px));
+    height: 12px;
+  }
+  .strip-level-text,
+  .strip-missions-text {
+    font-size: 10px;
+  }
+  .strip-missions-label {
+    font-size: 8px;
+  }
+  .strip-pts-text {
+    font-size: 8px;
+  }
+  .strip-caret {
+    width: 3px;
+    height: 3px;
+    margin-left: 2px;
   }
 }
 

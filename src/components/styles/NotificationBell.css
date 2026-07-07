@@ -117,7 +117,7 @@
 .mark-all-read-btn {
   background: none;
   border: none;
-  color: #30bdb7;
+  color: #EB1F29;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -127,12 +127,12 @@
 }
 
 .mark-all-read-btn:hover {
-  background: rgba(48, 189, 183, 0.1);
-  color: #1a9e99;
+  background: rgba(235, 31, 41, 0.10);
+  color: #1A375C;
 }
 
 .mark-all-read-btn:focus-visible {
-  outline: 2px solid #30bdb7;
+  outline: 2px solid #EB1F29;
   outline-offset: 2px;
 }
 
@@ -299,7 +299,7 @@
   transform: translateY(-50%);
   width: 8px;
   height: 8px;
-  background: #30bdb7;
+  background: #EB1F29;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -382,7 +382,7 @@
 }
 
 .event-announcement-modal-close:focus-visible {
-  outline: 2px solid #30bdb7;
+  outline: 2px solid #EB1F29;
   outline-offset: 2px;
 }
 
@@ -418,7 +418,7 @@
 
 .event-announcement-modal-cta {
   display: inline-block;
-  background: linear-gradient(135deg, #30bdb7 0%, #1a9e99 100%);
+  background: linear-gradient(135deg, #EB1F29 0%, #1A375C 100%);
   color: white;
   padding: 10px 24px;
   border-radius: 8px;
@@ -433,7 +433,7 @@
 
 .event-announcement-modal-cta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(48, 189, 183, 0.3);
+  box-shadow: 0 6px 20px rgba(235, 31, 41, 0.24);
 }
 
 .event-announcement-modal-cta:focus-visible {
