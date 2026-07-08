@@ -189,7 +189,7 @@
   display: block;
   width: auto;
   max-width: min(34vw, 330px);
-  height: 44px;
+  height: 60px;
   object-fit: contain;
   object-position: left center;
   flex-shrink: 0;
@@ -330,7 +330,7 @@
   }
   .header-institution-logo {
     max-width: min(30vw, 200px);
-    height: 32px;
+    height: 55px;
   }
   .header-center-slot {
     flex: 0 0 auto;
@@ -384,7 +384,7 @@
   }
   .header-institution-logo {
     max-width: 100px;
-    height: 28px;
+    height: 45px;
   }
   .header-logo-text {
     font-size: 1.1rem;
@@ -436,7 +436,7 @@
   }
   .header-institution-logo {
     max-width: 112px;
-    height: 30px;
+    height: 50px;
   }
 }
 
@@ -454,7 +454,7 @@
   }
   .header-institution-logo {
     max-width: 70px;
-    height: 24px;
+    height: 40px;
   }
   .header-logo-text {
     font-size: 0.95rem;
@@ -463,7 +463,7 @@
     height: 18px;
   }
   .header-role-strip {
-    height: 20px;
+    height: 15px;
     padding: 0 5px;
     font-size: 0.6rem;
   }

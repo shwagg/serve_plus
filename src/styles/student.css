@@ -222,6 +222,7 @@
   padding: 8px 10px;
   max-width: 80%;
   min-width: 0;
+  height:10px;
   overflow: visible;
   flex-wrap: wrap;
   margin-left: 3px;
@@ -2614,6 +2615,7 @@
   .player-strip-inner {
     padding: 4px 4px;
     max-width: calc(100vw - 10px);
+    height: 10px;
     overflow: visible;
     border-radius: 999px;
     gap: 6px;

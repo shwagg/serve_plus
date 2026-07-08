@@ -8,7 +8,7 @@ import { useSession } from '../context/useSession';
 import './Header.css';
 import NotificationBell from './NotificationBell';
 import servePlusIcon from '../assets/serve_plus_icon.svg';
-import mapuaMclLogo from '../assets/institutions/MMCL_Logo_Horizontal.svg';
+import servePlusLogo from '../assets/serve_plus_logo_black.svg';
 import StudentMenu from './menu/StudentMenu';
 import FacultyMenu from './menu/FacultyMenu';
 import AdminMenu from './menu/AdminMenu';
@@ -40,8 +40,8 @@ const PROPOSAL_BLACKBOARD_LOCK_REASON =
   'Create Proposal is only available for Blackboard-linked student and faculty accounts.';
 
 const INSTITUTION_BRAND = {
-  logo: mapuaMclLogo,
-  alt: 'Mapua Malayan Colleges Laguna',
+  logo: servePlusLogo,
+  alt: 'SERVE+',
 };
 
 const INSTITUTION_BRAND_ROUTES = new Set([
