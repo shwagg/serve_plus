@@ -437,7 +437,7 @@ export default function Header() {
         <div className="header-container">
           {/* Logo */}
           <button className={`header-logo${shouldUseInstitutionBrand ? ' header-logo--institution' : ''}`} onClick={handleLogoClick}>
-            {shouldUseInstitutionBrand ? (
+            {false ? (
               <img
                 src={INSTITUTION_BRAND.logo}
                 alt={INSTITUTION_BRAND.alt}
