@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs, onSnapshot, addDoc, deleteDoc, query, orderBy } from "firebase/firestore";
 import { getLevelInfo, getNextUnlock, LEVEL_UNLOCKS } from "../../hooks/rewardSystem";
@@ -777,6 +778,7 @@ function GalleryUploadModal({ isOpen, onClose, onUpload, events }) {
   );
 }
 export default function Profile() {
+  const navigate = useNavigate();
   const { refreshUserData } = useSession();
   const [profile, setProfile] = useState(null);
   const [earnedBadges, setEarnedBadges] = useState([]);
